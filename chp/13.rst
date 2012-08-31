@@ -193,6 +193,15 @@ Haskell 语言的威力部分在于它可以让我们方便地创建并操作函
 扩展示例： /etc/password
 -----------------------------
 
+以下是一个扩展示例，它展示了几种不同的数据结构的用法，根据 ``/etc/passwd`` 文件的格式，程序处理并保存它的实体（entry）：
+
+.. literalinclude:: /code/ch13/passwdmap.hs
+
+示例程序维持两个 ``Map`` ：一个从用户名映射到 ``PasswdEntry`` ，另一个从用户 ID 映射到 ``PasswdEntry`` 。有数据库使用经验的人可以将它们看作是两个不同数据域的索引。
+
+根据 ``/etc/passwd`` 文件的格式， ``PasswdEntry`` 的 ``Show`` 和 ``Read`` 实例分别用于显示（display）和处理（parse）工作。
+
+
 扩展示例：数值类型
 ---------------------
 
