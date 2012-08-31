@@ -90,8 +90,44 @@ Haskell 里有几种不同的方法来处理这种结构的数据，最常用的
     Could not find that UID
 
 
-映射
+Map
 ------
+
+``Data.Map`` 模块提供的 ``Map`` 类型的行为和关联列表类似，但 ``Map`` 类型的性能更好。
+
+``Map`` 提供了和其他语言的哈希表同等的能力。 ``Map`` 在内部由平衡二叉树实现，在 Haskell 这种使用不可变数据的语言中，它是一个比哈希表更有效的表示。这是一个非常明显的例子，说明纯函数式语言是如何深入地影响我们编写程序的方式：对于一个给定的任务，我们总是选择合适的算法和数据结构，使得解决方案尽可能地简单和有效，但这些（纯函数式的）选择通常不同于命令式语言处理同样问题时的选择。
+
+因为 ``Data.Map`` 模块的一些函数和 ``Prelude`` 模块的函数重名，我们通过 ``import qualified Data.Map as Map`` 的方式引入模块，并使用 ``Map.name`` 的方式引用模块中的名字。
+
+我们以展示几种不同的构建 ``Map`` 的方式作为开始：
+
+.. literalinclude:: /code/ch13/buildmap.hs
+
+``Map.insert`` 函数处理数据的方式非常 Haskell 化：它返回经过函数应用的输入数据的副本。这种处理数据的方式在操作多个 ``Map`` 时非常有用，它意味着你可以像前面代码中 ``mapFold`` 那样使用 ``fold`` 来构建一个 ``Map`` ，又或者像 ``mapManual`` 那样，串连起多个 ``Map.insert`` 调用。
+
+现在，到 ghci 中验证一下是否所有定义都如我们所预期的那样工作：
+
+::
+
+    Prelude> :l buildmap.hs
+    [1 of 1] Compiling Main             ( buildmap.hs, interpreted )
+    Ok, modules loaded: Main.
+    *Main> al
+    Loading package array-0.4.0.0 ... linking ... done.
+    Loading package deepseq-1.3.0.0 ... linking ... done.
+    Loading package containers-0.4.2.1 ... linking ... done.
+    [(1,"one"),(2,"two"),(3,"three"),(4,"four")]
+    *Main> mapFromAL
+    fromList [(1,"one"),(2,"two"),(3,"three"),(4,"four")]
+    *Main> mapFold
+    fromList [(1,"one"),(2,"two"),(3,"three"),(4,"four")]
+    *Main> mapManual
+    fromList [(1,"one"),(2,"two"),(3,"three"),(4,"four")]
+
+注意， ``Map`` 并不保证它的输出排列和原本的输入排列一致，对比 ``mapManual`` 的输入和输出可以看出这一点。
+
+``Map`` 的操作方式和关联列表类似。 ``Data.Map`` 模块提供了一组函数，用于增删 ``Map`` 元素，对 ``Map`` 进行过滤、修改和 fold ，以及在 ``Map`` 和关联列表之间进行转换。 ``Data.Map`` 模块本身的文档非常优秀，因此我们在这里不会详细讲解每个函数，而是使用一个具体的例子来展示本章介绍的概念。
+
 
 别把函数不当数据
 -------------------
