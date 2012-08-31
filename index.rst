@@ -8,11 +8,12 @@ Real World Haskell 中文版
 
 .. image:: /image/cover.jpg
    :align: right
-   :width: 240px
-   :height: 240px
+   :width: 500px
+   :height: 650px
+   :scale: 53
 
 
-本文档是 Bryan O'Sullivan 、 Don Stewart 和 John Goerzen 三人编写的 `Real World Haskell <http://book.realworldhaskell.org/>`_ 一书的简体中文翻译版。
+本文档是 Bryan O'Sullivan 、 Don Stewart 和 John Goerzen 三人编写的 `Real World Haskell <http://book.realworldhaskell.org/>`_ 一书的简体中文翻译。
 
 本文档和原书一样，通过 CC-BY-NC 协议授权。
 
