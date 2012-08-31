@@ -129,8 +129,66 @@ Map
 ``Map`` 的操作方式和关联列表类似。 ``Data.Map`` 模块提供了一组函数，用于增删 ``Map`` 元素，对 ``Map`` 进行过滤、修改和 fold ，以及在 ``Map`` 和关联列表之间进行转换。 ``Data.Map`` 模块本身的文档非常优秀，因此我们在这里不会详细讲解每个函数，而是使用一个具体的例子来展示本章介绍的概念。
 
 
-别把函数不当数据
+函数也是数据
 -------------------
+
+Haskell 语言的威力部分在于它可以让我们方便地创建并操作函数。
+
+以下示例展示了怎样将函数保存到记录的域中：
+
+.. literalinclude:: /code/ch13/funcrecs.hs
+
+注意 ``colorCalc`` 域的类型：它是一个函数，接受一个 ``Int`` 类型值作为参数，并返回一个 ``(CustomColor, Int)`` 元组。
+
+我们创建了两个 ``FuncRec`` 记录： ``plus5`` 和 ``always0`` ，这两个记录的 ``colorCalc`` 域都总是返回紫色（purple）。 ``FuncRec`` 自身并没有域去保存所使用的颜色，颜色的值被保存在函数当中。这种用法被称为\ *闭包*\ 。
+
+以下是示例代码：
+
+::
+
+    *Main> :l funcrecs.hs
+    [1 of 1] Compiling Main             ( funcrecs.hs, interpreted )
+    Ok, modules loaded: Main.
+    *Main> :t plus5
+    plus5 :: FuncRec
+    *Main> name plus5
+    "plus5"
+    *Main> :t colorCalc plus5
+    colorCalc plus5 :: Int -> (CustomColor, Int)
+    *Main> (colorCalc plus5) 7
+    (CustomColor {red = 255, green = 0, blue = 255},12)
+    *Main> :t colorCalc always0
+    colorCalc always0 :: Int -> (CustomColor, Int)
+    *Main> (colorCalc always0) 7
+    (CustomColor {red = 255, green = 0, blue = 255},0)
+
+上面的程序工作得很好，但我们还想做一些更有趣的事，比如说，在多个域中使用同一段数据。可以使用一个类型构造函数来做到这一点：
+
+.. literalinclude:: /code/ch13/funcrecs2.hs
+
+``mkFuncRecs`` 函数接受一个字符串和一个函数作为参数，返回一个新的 ``FuncRec`` 记录。以下是对 ``mkFuncRecs`` 函数的测试：
+
+::
+
+    *Main> :l funcrecs2.hs
+    [1 of 1] Compiling Main             ( funcrecs2.hs, interpreted )
+    Ok, modules loaded: Main.
+    *Main> :t plus5
+    plus5 :: FuncRec
+    *Main> name plus5
+    "plus5"
+    *Main> (calc plus5) 5
+    10
+    *Main> (namedCalc plus5) 5
+    ("plus5",10)
+    *Main> let plus5a = plus5 {name = "PLUS5A"}
+    *Main> name plus5a
+    "PLUS5A"
+    *Main> (namedCalc plus5a) 5
+    ("plus5",10)
+
+注意 ``plus5a`` 的创建过程：我们改变了 ``plus5`` 的 ``name`` 域，但没有修改它的 ``namedCalc`` 域。这就是为什么调用 ``name`` 会返回新名字，而 ``namedCalc`` 依然返回原本使用 ``mkFuncRecs`` 创建时设置的名字 —— 除非我们显式地修改域，否则它们不会被改变。
+
 
 扩展示例： /etc/password
 -----------------------------
