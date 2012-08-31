@@ -4,6 +4,92 @@
 关联列表
 -----------
 
+我们常常会跟一些以键为索引的无序数据打交道。
+
+举个例子，UNIX 管理员可能会这么一个列表，它包含了用户 ID 及其对应的用户名。这个列表根据用户 ID 而不是数据的位置来查找相应的用户名。换句话来说， UID 就是这个数据集的键。
+
+Haskell 里有几种不同的方法来处理这种结构的数据，最常用的两个是关联列表（association list）和 ``Data.Map`` 模块提供的 ``Map`` 类型。
+
+关联列表非常简单，易于使用。由于关联列表由 Haskell 列表构成，因此所有列表操作函数都可以用于处理关联列表。
+
+另一方面， ``Map`` 类型在处理大数据集时，性能比关联列表要好。
+
+本章将同时介绍这两种数据结构。
+
+一个关联列表就是一个包含 ``(key, value)`` 元组的列表， ``key`` 和 ``value`` 可以是任意类型。一个处理用户 ID 和用户名映射的关联列表的类型可能是 ``[(Integer, String)]`` 。
+
+[注：关联列表的 ``key`` 必须是 ``Eq`` 类型的成员。]
+
+关联列表的构建方式和构建普通列表一样。Haskell 提供了一个 ``Data.List.lookup`` 函数，用于在关联列表中查找数据。这个函数的类型签名为 ``Eq a => a -> [(a, b)] -> Maybe b`` 。它的使用方式如下：
+
+::
+
+    Prelude> let al = [(1, "one"), (2, "two"), (3, "three"), (4, "four")]
+
+    Prelude> lookup 1 al
+    Just "one"
+
+    Prelude> lookup 5 al
+    Nothing
+
+``lookup`` 函数的定义如下：
+
+.. literalinclude:: /code/ch13/lookup.hs
+
+``lookup`` 在输入列表为空时返回 ``Nothing`` 。如果输入列表不为空，那么它检查当前列表元素的 ``key`` 是否就是我们要找的 ``key`` ，如果是的话就返回和这个 ``key`` 对应的 ``value`` ，否则就继续递归处理剩余的列表元素。
+
+现在来看一个更复杂的关联列表例子。在 Unix/Linux 系统中，有一个 ``/etc/passwd`` 文件，这个文件保存了用户名称，用户 ID，用户的 HOME 目录位置，以及其他一些数据。文件以行分割每个用户的资料，每个数据域用分号隔开：
+
+::
+
+    root:x:0:0:root:/root:/bin/bash
+    daemon:x:1:1:daemon:/usr/sbin:/bin/sh
+    bin:x:2:2:bin:/bin:/bin/sh
+    sys:x:3:3:sys:/dev:/bin/sh
+    sync:x:4:65534:sync:/bin:/bin/sync
+    games:x:5:60:games:/usr/games:/bin/sh
+    man:x:6:12:man:/var/cache/man:/bin/sh
+    lp:x:7:7:lp:/var/spool/lpd:/bin/sh
+    mail:x:8:8:mail:/var/mail:/bin/sh
+    news:x:9:9:news:/var/spool/news:/bin/sh
+    jgoerzen:x:1000:1000:John Goerzen,,,:/home/jgoerzen:/bin/bash
+
+以下程序读入并处理 ``/etc/passwd`` 文件，它创建一个关联列表，使得我们可以根据给定用户 ID ，获取相应的用户名：
+
+.. literalinclude:: /code/ch13/passwd-al.hs
+
+``findByUID`` 是整个程序的核心，它逐行读入并处理输入，使用 ``lookup`` 从处理结果中查找给定用户 ID ：
+
+::
+
+    *Main> findByUID "root:x:0:0:root:/root:/bin/bash" 0
+    Just "root"
+
+``parseline`` 读入并处理一个字符串，返回一个包含用户 ID 和用户名的元组：
+
+::
+
+    *Main> parseline "root:x:0:0:root:/root:/bin/bash"
+    (0,"root")
+
+``split`` 函数根据给定分隔符 ``delimiter`` 将一个文本行分割为列表：
+
+::
+
+    *Main> split ':' "root:x:0:0:root:/root:/bin/bash"
+    ["root","x","0","0","root","/root","/bin/bash"]
+
+以下是在本机执行 ``passwd-al.hs`` 处理 ``/etc/passwd`` 的结果：
+
+::
+
+    $ runghc passwd-al.hs /etc/passwd 0
+    root
+
+    $ runghc passwd-al.hs /etc/passwd 10086
+    Could not find that UID
+
+
 映射
 ------
 
