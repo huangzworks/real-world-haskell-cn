@@ -6,7 +6,7 @@
 
 我们常常会跟一些以键为索引的无序数据打交道。
 
-举个例子，UNIX 管理员可能会这么一个列表，它包含了用户 ID 及其对应的用户名。这个列表根据用户 ID 而不是数据的位置来查找相应的用户名。换句话来说， UID 就是这个数据集的键。
+举个例子，UNIX 管理猿可能需要这么一个列表，它包含系统中所有用户的 UID ，以及和这个 UID 相对应的用户名。这个列表根据 UID 而不是数据的位置来查找相应的用户名。换句话来说， UID 就是这个数据集的键。
 
 Haskell 里有几种不同的方法来处理这种结构的数据，最常用的两个是关联列表（association list）和 ``Data.Map`` 模块提供的 ``Map`` 类型。
 
@@ -16,7 +16,7 @@ Haskell 里有几种不同的方法来处理这种结构的数据，最常用的
 
 本章将同时介绍这两种数据结构。
 
-一个关联列表就是一个包含 ``(key, value)`` 元组的列表， ``key`` 和 ``value`` 可以是任意类型。一个处理用户 ID 和用户名映射的关联列表的类型可能是 ``[(Integer, String)]`` 。
+一个关联列表就是一个包含一个或多个 ``(key, value)`` 元组的列表， ``key`` 和 ``value`` 可以是任意类型。一个处理 UID 和用户名映射的关联列表的类型可能是 ``[(Integer, String)]`` 。
 
 [注：关联列表的 ``key`` 必须是 ``Eq`` 类型的成员。]
 
@@ -38,7 +38,7 @@ Haskell 里有几种不同的方法来处理这种结构的数据，最常用的
 
 ``lookup`` 在输入列表为空时返回 ``Nothing`` 。如果输入列表不为空，那么它检查当前列表元素的 ``key`` 是否就是我们要找的 ``key`` ，如果是的话就返回和这个 ``key`` 对应的 ``value`` ，否则就继续递归处理剩余的列表元素。
 
-现在来看一个更复杂的关联列表例子。在 Unix/Linux 系统中，有一个 ``/etc/passwd`` 文件，这个文件保存了用户名称，用户 ID，用户的 HOME 目录位置，以及其他一些数据。文件以行分割每个用户的资料，每个数据域用分号隔开：
+再来看一个稍微复杂点的例子。在 Unix/Linux 系统中，有一个 ``/etc/passwd`` 文件，这个文件保存了用户名称， UID，用户的 HOME 目录位置，以及其他一些数据。文件以行分割每个用户的资料，每个数据域用分号隔开：
 
 ::
 
@@ -54,18 +54,18 @@ Haskell 里有几种不同的方法来处理这种结构的数据，最常用的
     news:x:9:9:news:/var/spool/news:/bin/sh
     jgoerzen:x:1000:1000:John Goerzen,,,:/home/jgoerzen:/bin/bash
 
-以下程序读入并处理 ``/etc/passwd`` 文件，它创建一个关联列表，使得我们可以根据给定用户 ID ，获取相应的用户名：
+以下程序读入并处理 ``/etc/passwd`` 文件，它创建一个关联列表，使得我们可以根据给定 UID ，获取相应的用户名：
 
 .. literalinclude:: /code/ch13/passwd-al.hs
 
-``findByUID`` 是整个程序的核心，它逐行读入并处理输入，使用 ``lookup`` 从处理结果中查找给定用户 ID ：
+``findByUID`` 是整个程序的核心，它逐行读入并处理输入，使用 ``lookup`` 从处理结果中查找给定 UID ：
 
 ::
 
     *Main> findByUID "root:x:0:0:root:/root:/bin/bash" 0
     Just "root"
 
-``parseline`` 读入并处理一个字符串，返回一个包含用户 ID 和用户名的元组：
+``parseline`` 读入并处理一个字符串，返回一个包含 UID 和用户名的元组：
 
 ::
 
@@ -90,20 +90,22 @@ Haskell 里有几种不同的方法来处理这种结构的数据，最常用的
     Could not find that UID
 
 
-Map
-------
+Map 类型
+------------
 
 ``Data.Map`` 模块提供的 ``Map`` 类型的行为和关联列表类似，但 ``Map`` 类型的性能更好。
 
-``Map`` 提供了和其他语言的哈希表同等的能力。 ``Map`` 在内部由平衡二叉树实现，在 Haskell 这种使用不可变数据的语言中，它是一个比哈希表更有效的表示。这是一个非常明显的例子，说明纯函数式语言是如何深入地影响我们编写程序的方式：对于一个给定的任务，我们总是选择合适的算法和数据结构，使得解决方案尽可能地简单和有效，但这些（纯函数式的）选择通常不同于命令式语言处理同样问题时的选择。
+``Map`` 和其他语言提供的哈希表类似。不同的是， ``Map`` 的内部由平衡二叉树实现，在 Haskell 这种使用不可变数据的语言中，它是一个比哈希表更有效的表示。这是一个非常明显的例子，说明纯函数式语言是如何深入地影响我们编写程序的方式：对于一个给定的任务，我们总是选择合适的算法和数据结构，使得解决方案尽可能地简单和有效，但这些（纯函数式的）选择通常不同于命令式语言处理同样问题时的选择。
 
 因为 ``Data.Map`` 模块的一些函数和 ``Prelude`` 模块的函数重名，我们通过 ``import qualified Data.Map as Map`` 的方式引入模块，并使用 ``Map.name`` 的方式引用模块中的名字。
 
-我们以展示几种不同的构建 ``Map`` 的方式作为开始：
+先来看看如何用几种不同的方式构建 ``Map`` ：
 
 .. literalinclude:: /code/ch13/buildmap.hs
 
-``Map.insert`` 函数处理数据的方式非常 Haskell 化：它返回经过函数应用的输入数据的副本。这种处理数据的方式在操作多个 ``Map`` 时非常有用，它意味着你可以像前面代码中 ``mapFold`` 那样使用 ``fold`` 来构建一个 ``Map`` ，又或者像 ``mapManual`` 那样，串连起多个 ``Map.insert`` 调用。
+``Map.insert`` 函数处理数据的方式非常『 Haskell 化』：它返回经过函数应用的输入数据的副本。这种处理数据的方式在操作多个 ``Map`` 时非常有用，它意味着你可以像前面代码中 ``mapFold`` 那样使用 ``fold`` 来构建一个 ``Map`` ，又或者像 ``mapManual`` 那样，串连起多个 ``Map.insert`` 调用。
+
+[译注：这里说『 Haskell 化』实际上就是『函数式化』，对于函数式语言来说，最常见的函数处理方式是接受一个输入，然后返回一个输出，输出是另一个独立的值，且原输入不会被修改。]
 
 现在，到 ghci 中验证一下是否所有定义都如我们所预期的那样工作：
 
@@ -112,21 +114,25 @@ Map
     Prelude> :l buildmap.hs
     [1 of 1] Compiling Main             ( buildmap.hs, interpreted )
     Ok, modules loaded: Main.
+
     *Main> al
     Loading package array-0.4.0.0 ... linking ... done.
     Loading package deepseq-1.3.0.0 ... linking ... done.
     Loading package containers-0.4.2.1 ... linking ... done.
     [(1,"one"),(2,"two"),(3,"three"),(4,"four")]
+
     *Main> mapFromAL
     fromList [(1,"one"),(2,"two"),(3,"three"),(4,"four")]
+
     *Main> mapFold
     fromList [(1,"one"),(2,"two"),(3,"three"),(4,"four")]
+
     *Main> mapManual
     fromList [(1,"one"),(2,"two"),(3,"three"),(4,"four")]
 
 注意， ``Map`` 并不保证它的输出排列和原本的输入排列一致，对比 ``mapManual`` 的输入和输出可以看出这一点。
 
-``Map`` 的操作方式和关联列表类似。 ``Data.Map`` 模块提供了一组函数，用于增删 ``Map`` 元素，对 ``Map`` 进行过滤、修改和 fold ，以及在 ``Map`` 和关联列表之间进行转换。 ``Data.Map`` 模块本身的文档非常优秀，因此我们在这里不会详细讲解每个函数，而是使用一个具体的例子来展示本章介绍的概念。
+``Map`` 的操作方式和关联列表类似。 ``Data.Map`` 模块提供了一组函数，用于增删 ``Map`` 元素，对 ``Map`` 进行过滤、修改和 fold ，以及在 ``Map`` 和关联列表之间进行转换。 ``Data.Map`` 模块本身的文档非常优秀，因此我们在这里不会详细讲解每个函数，而是在本章的后续内容中，通过例子来介绍这些概念。
 
 
 函数也是数据
@@ -140,7 +146,7 @@ Haskell 语言的威力部分在于它可以让我们方便地创建并操作函
 
 注意 ``colorCalc`` 域的类型：它是一个函数，接受一个 ``Int`` 类型值作为参数，并返回一个 ``(CustomColor, Int)`` 元组。
 
-我们创建了两个 ``FuncRec`` 记录： ``plus5`` 和 ``always0`` ，这两个记录的 ``colorCalc`` 域都总是返回紫色（purple）。 ``FuncRec`` 自身并没有域去保存所使用的颜色，颜色的值被保存在函数当中。这种用法被称为\ *闭包*\ 。
+我们创建了两个 ``FuncRec`` 记录： ``plus5`` 和 ``always0`` ，这两个记录的 ``colorCalc`` 域都总是返回紫色（purple）。 ``FuncRec`` 自身并没有域去保存所使用的颜色，颜色的值被保存在函数当中 —— 我们称这种用法为\ *闭包*\ 。
 
 以下是示例代码：
 
@@ -149,16 +155,22 @@ Haskell 语言的威力部分在于它可以让我们方便地创建并操作函
     *Main> :l funcrecs.hs
     [1 of 1] Compiling Main             ( funcrecs.hs, interpreted )
     Ok, modules loaded: Main.
+
     *Main> :t plus5
     plus5 :: FuncRec
+
     *Main> name plus5
     "plus5"
+
     *Main> :t colorCalc plus5
     colorCalc plus5 :: Int -> (CustomColor, Int)
+
     *Main> (colorCalc plus5) 7
     (CustomColor {red = 255, green = 0, blue = 255},12)
+
     *Main> :t colorCalc always0
     colorCalc always0 :: Int -> (CustomColor, Int)
+
     *Main> (colorCalc always0) 7
     (CustomColor {red = 255, green = 0, blue = 255},0)
 
@@ -173,17 +185,24 @@ Haskell 语言的威力部分在于它可以让我们方便地创建并操作函
     *Main> :l funcrecs2.hs
     [1 of 1] Compiling Main             ( funcrecs2.hs, interpreted )
     Ok, modules loaded: Main.
+
     *Main> :t plus5
     plus5 :: FuncRec
+
     *Main> name plus5
     "plus5"
+
     *Main> (calc plus5) 5
     10
+
     *Main> (namedCalc plus5) 5
     ("plus5",10)
+
     *Main> let plus5a = plus5 {name = "PLUS5A"}
+
     *Main> name plus5a
     "PLUS5A"
+
     *Main> (namedCalc plus5a) 5
     ("plus5",10)
 
@@ -197,28 +216,126 @@ Haskell 语言的威力部分在于它可以让我们方便地创建并操作函
 
 .. literalinclude:: /code/ch13/passwdmap.hs
 
-示例程序维持两个 ``Map`` ：一个从用户名映射到 ``PasswdEntry`` ，另一个从用户 ID 映射到 ``PasswdEntry`` 。有数据库使用经验的人可以将它们看作是两个不同数据域的索引。
+示例程序维持两个 ``Map`` ：一个从用户名映射到 ``PasswdEntry`` ，另一个从 UID 映射到 ``PasswdEntry`` 。有数据库使用经验的人可以将它们看作是两个不同数据域的索引。
 
 根据 ``/etc/passwd`` 文件的格式， ``PasswdEntry`` 的 ``Show`` 和 ``Read`` 实例分别用于显示（display）和处理（parse）工作。
 
 
-扩展示例：数值类型
----------------------
+Extended Example: Numeric Types
+------------------------------------
 
-首要步骤
-^^^^^^^^^^
+First Steps
+^^^^^^^^^^^^^^
 
-补全代码
-^^^^^^^^^^
+Completed Code
+^^^^^^^^^^^^^^^^^^^
 
-善用『函数既数据』思想
----------------------------
+Taking Advantage of Functions as Data
+---------------------------------------------
 
-将不同的列表作为单个包
-^^^^^^^^^^^^^^^^^^^^^^^
+Turning Difference Lists into a Proper Library
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-列表，不同的列表，以及 Monoids
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lists, Difference Lists, and Monoids
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 通用序列
 ----------
+
+不论是 Haskell 内置的列表，还是我们前面定义的 ``DList`` ，这些数据结构在不同的地方都有自己的性能短板。为此， ``Data.Sequence`` 模块定义了 ``Seq`` 容器类型，对于大多数操作，这种类型能都提供良好的效率保证。
+
+为了避免命名冲突， ``Data.Sequence`` 模块通常以 ``qualified`` 的方式引入：
+
+::
+
+    Prelude> import qualified Data.Sequence as Seq
+    Prelude Seq>
+
+``empty`` 函数用于创建一个空 ``Seq`` ， ``singleton`` 用于创建只包含单个元素的 ``Seq`` ：
+
+::
+
+    Prelude Seq> Seq.empty
+    fromList []
+
+    Prelude Seq> Seq.singleton 1
+    fromList [1]
+
+还可以使用 ``fromList`` 函数，通过列表创建出相应的 ``Seq`` ：
+
+::
+
+    Prelude Seq> let a = Seq.fromList [1, 2, 3]
+
+    Prelude Seq> a
+    fromList [1,2,3]
+
+``Data.Sequence`` 模块还提供了几种操作符形式的构造函数。但是，在使用 ``qualified`` 形式载入模块的情况下调用它们会非常难看：
+
+[译注：操作符形式指的是那种放在两个操作对象之间的函数，比如 ``2 * 2`` 中的 ``*`` 函数。]
+
+::
+
+    Prelude Seq> 1 Seq.<| Seq.singleton 2
+    fromList [1,2]
+
+可以通过直接载入这几个函数来改善可读性：
+
+::
+
+    Prelude Seq> import Data.Sequence((><), (<|), (|>))
+
+现在好多了：
+
+::
+
+    Prelude Seq Data.Sequence> Seq.singleton 1 |> 2
+    fromList [1,2]
+
+一个帮助记忆 ``(<|)`` 和 ``(|>)`` 函数的方法是，函数的『箭头』总是指向被添加的元素： ``(<|)`` 函数要添加的元素在左边，而 ``(|>)`` 函数要添加的元素在右边：
+
+::
+
+    Prelude Seq Data.Sequence> 1 <| Seq.singleton 2
+    fromList [1,2]
+
+    Prelude Seq Data.Sequence> Seq.singleton 1 |> 2
+    fromList [1,2]
+
+不管是从左边添加元素，还是从右边添加元素，添加操作都可以在常数时间内完成。对两个 ``Seq`` 进行追加（append）操作同样非常廉价，复杂度等同于两个 ``Seq`` 中较短的那个 ``Seq`` 的长度的对数。
+
+追加操作由 ``(><)`` 函数完成：
+
+::
+
+    Prelude Seq Data.Sequence> let left = Seq.fromList [1, 3, 3]
+
+    Prelude Seq Data.Sequence> let right = Seq.fromList [7, 1]
+
+    Prelude Seq Data.Sequence> left >< right
+    fromList [1,3,3,7,1]
+
+反过来，如果我们想将 ``Seq`` 转换回列表，那么就需要 ``Data.Foldable`` 模块的帮助：
+
+::
+
+    Prelude Seq Data.Sequence> import qualified Data.Foldable as Foldable
+    Prelude Seq Data.Sequence Foldable> 
+
+这个模块定义了一个类型， ``Foldable`` ，而 ``Seq`` 实现了这个类型：
+
+::
+
+    Prelude Seq Data.Sequence Foldable> Foldable.toList (Seq.fromList [1, 2, 3])
+    [1,2,3]
+
+``Data.Foldable`` 中的 fold 函数可以用于对 ``Seq`` 进行 fold 操作：
+
+::
+
+    Prelude Seq Data.Sequence Foldable> Foldable.foldl' (+) 0 (Seq.fromList [1, 2, 3])
+    6
+
+``Data.Sequence`` 模块还提供了大量有用的函数，这些函数都和 Haskell 列表的函数类似。模块的文档也非常齐全，还提供了函数的时间复杂度信息。
+
+最后的疑问是，既然 ``Seq`` 的效率这么好，那为什么它不是 Haskell 默认的序列类型呢？答案是，列表类型更简单，消耗更低，对于大多数应用程序来说，列表已经足够满足需求了。除此之外，列表可以很好地处理惰性环境，而 ``Seq`` 在这方面做得还不够好。
