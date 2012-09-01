@@ -10,14 +10,14 @@ Real World Haskell 中文版
    :align: right
    :width: 500px
    :height: 650px
-   :scale: 53
+   :scale: 45
 
 
 本文档是 Bryan O'Sullivan 、 Don Stewart 和 John Goerzen 三人编写的 `Real World Haskell <http://book.realworldhaskell.org/>`_ 一书的简体中文翻译。
 
 本文档和原书一样，通过 CC-BY-NC 协议授权。
 
-目录：
+目录（未翻译的部分保留英文标题）：
 
 .. toctree::
    :maxdepth: 3
