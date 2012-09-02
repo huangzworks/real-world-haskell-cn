@@ -21,7 +21,8 @@ Real World Haskell 中文版
 
 .. toctree::
    :maxdepth: 3
-   
+
+   chp/4
    chp/13
 
 Indices and tables
