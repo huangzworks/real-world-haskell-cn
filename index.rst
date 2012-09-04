@@ -23,6 +23,7 @@ Real World Haskell 中文版
    :maxdepth: 3
 
    chp/1
+   chp/2
    chp/4
    chp/13
 
