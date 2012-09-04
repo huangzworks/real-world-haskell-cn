@@ -1,0 +1,159 @@
+第一章：入门
+==============
+
+
+初识类型
+---------
+
+尽管前面的内容里提到了一些类型方面的事情，但直到目前为止，我们还没有使用 ghci 进行过任何类型方面的交互：即使不告诉 ghci 输入是什么类型，它也会很高兴地接受传给它的输入。
+
+需要提醒的是，在 Haskell 里，所有类型名字都以大写字母开头，而所有变量名字都以小写字母开头。紧记这一点，你就不会弄错类型和变量。
+
+我们探索类型世界的第一步是修改 ghci ，让它在返回表达式的求值结果时，打印出这个结果的类型。使用 ghci 的 ``:set`` 命令可以做到这一点：
+
+    ::
+
+        Prelude> :set +t
+
+        Prelude> 'c'    -- 输入表达式
+        'c'             -- 输出值
+        it :: Char      -- 输出值的类型
+
+        Prelude> "foo"
+        "foo"
+        it :: [Char]
+
+注意打印信息中那个神秘的 ``it`` ：这是一个有特殊用途的变量， ghci 将最近一次求值所得的结果保存在这个变量里。（这不是 Haskell 语言的特性，只是 ghci 的一个辅助功能而已。）
+
+Ghci 打印的类型信息可以分为几个部分：
+
+* 它打印出 ``it`` 
+
+* ``x :: y`` 表示表达式 ``x`` 的类型为 ``y`` 
+
+* 第二个表达式的值的类型为 ``[Char]`` 。（类型 ``String`` 是 ``[Char]`` 的一个别名，它通常用于代替 ``[Char]`` 。）
+
+以下是另一个我们已经见过的类型：
+
+::
+
+    Prelude> 7 ^ 80
+    40536215597144386832065866109016673800875222251012083746192454448001
+    it :: Integer
+
+Haskell 的整数类型为 ``Integer`` 。 ``Integer`` 类型值的长度只受限于系统的内存大小。
+
+分数和整数看上去不太相同，它使用 ``%`` 操作符构建，其中分子放在操作符左边，而分母放在操作符右边：
+
+::
+
+    Prelude Data.Ratio> 11 % 29
+    11 % 29
+    it :: Ratio Integer
+
+这里的 ``:m`` 是 ``:module`` 的缩写，用于载入一个给定模块。Ghci 还提供了很多这类缩写，方便使用者。
+
+为了方便起见， ghci 给很多命令都提供了缩写，这里的 ``:m`` 就是 ``:module`` 的缩写，它用于载入给定的模块。
+
+注意这个分数的类型信息：在 ``::`` 的右边，有两个单词，分别是 ``Ratio`` 和 ``Integer`` ，可以将这个类型读作“由整数构成的分数”。这说明，分数的分子和分母必须都是整数类型，如果用一些别的类型值来构建分数，就会造成出错：
+
+::
+
+    Prelude Data.Ratio> 3.14 % 8
+
+    <interactive>:8:1:
+        Ambiguous type variable `a0' in the constraints:
+            (Fractional a0)
+                arising from the literal `3.14' at <interactive>:8:1-4
+            (Integral a0) arising from a use of `%' at <interactive>:8:6
+            (Num a0) arising from the literal `8' at <interactive>:8:8
+        Probable fix: add a type signature that fixes these type variable(s)
+        In the first argument of `(%)', namely `3.14'
+        In the expression: 3.14 % 8
+        In an equation for `it': it = 3.14 % 8
+
+    Prelude Data.Ratio> 1.2 % 3.4
+
+    <interactive>:9:1:
+        Ambiguous type variable `a0' in the constraints:
+            (Fractional a0)
+                arising from the literal `1.2' at <interactive>:9:1-3
+            (Integral a0) arising from a use of `%' at <interactive>:9:5
+        Probable fix: add a type signature that fixes these type variable(s)
+        In the first argument of `(%)', namely `1.2'
+        In the expression: 1.2 % 3.4
+        In an equation for `it': it = 1.2 % 3.4
+
+尽管每次都打印出值的类型很方便，但这实际上有点小题大作了。因为在一般情况下，表达式的类型并不难猜，或者我们并非对每个表达式的类型都感兴趣。所以这里用 ``:unset`` 命令取消对类型信息的打印：
+
+::
+
+    Prelude Data.Ratio> :unset +t
+
+    Prelude Data.Ratio> 2
+    2
+
+取而代之的是，如果现在我们对某个值或者表达式的类型不清楚，那么可以用 ``:type`` 命令显式地打印它的类型信息：
+
+::
+
+    Prelude Data.Ratio> :type 'a'
+    'a' :: Char
+
+    Prelude Data.Ratio> "foo"
+    "foo"
+
+    Prelude Data.Ratio> :type it
+    it :: [Char]
+
+注意 ``:type`` 并不实际执行传给它的表达式，它只是对输入进行检查，然后将输入的类型信息打印出来。以下两个例子显示了其中的区别：
+
+::
+
+    Prelude Data.Ratio> 3 + 2
+    5
+
+    Prelude Data.Ratio> :type it
+    it :: Integer
+
+    Prelude Data.Ratio> :type 3 + 2
+    3 + 2 :: Num a => a
+
+在前两个表达式中，我们先求值 ``3+2`` ，再使用 ``:type`` 命令打印 ``it`` 的类型，因为这时 ``it`` 已经是 ``3+2`` 的结果 ``5`` ，所以 ``:type`` 打印这个值的类型 ``it :: Integer`` 。
+
+另一方面，最后的表达式中，我们直接将 ``3+2`` 传给 ``:type`` ，而 ``:type`` 并不对输入进行求值，因此它返回表达式的类型 ``3 + 2 :: Num a => a`` 。
+
+第六章会介绍更多类型签名的相关信息。
+
+
+行计数程序
+------------------
+
+以下是一个用 Haskell 写的行计数程序。如果暂时看不太懂源码也没关系，先照着代码写写程序，热热身就行了。
+
+使用编辑器，输入以下内容，并将它保存为 ``WC.hs`` ：
+
+.. literalinclude:: /code/ch01/WC.hs
+
+再创建一个 ``quux.txt`` ，包含以下内容：
+
+::
+
+    Teignmouth, England
+    Paris, France
+    Ulm, Germany
+    Auxerre, France
+    Brunswick, Germany
+    Beaumont-en-Auge, France
+    Ryazan, Russia
+
+然后，在 shell 执行以下代码：
+
+::
+
+    $ runghc WC < quux.txt 
+    7
+
+恭喜你！你刚完成了一个非常有用的行计数程序（尽管它非常简单）。后面的章节会继续介绍更多有用的知识，帮助你（读者）写出属于自己的程序。
+
+[译注：可能会让人有点迷惑，这个程序明明是一个行计数（line count）程序，为什么却命名为 WC（word count）呢？实际上，在本章最后的练习中（未翻译），读者会被要求扩展这个程序，将程序从行计数改为单词计数，因此这里程序被命名为 ``WC.hs`` 。]
