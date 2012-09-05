@@ -146,3 +146,65 @@ Haskell 对强类型和静态类型的双重支持使得程序不可能发生运
         Couldn't match expected type `Int' with actual type `Char'
         In the expression: 'a' :: Int
         In an equation for `it': it = 'a' :: Int
+
+
+应用函数
+----------
+
+要应用一个函数，先写出它的名字，后接函数的参数：
+
+::
+
+    Prelude> odd 3
+    True
+
+    Prelude> odd 6
+    False
+
+注意，函数的参数不需要用括号来包围，参数和参数之间也不需要用逗号来隔开[译注：使用空格就可以了]：
+
+::
+
+    Prelude> compare 2 3
+    LT
+
+    Prelude> compare 3 3
+    EQ
+
+    Prelude> compare 3 2
+    GT
+
+Haskell 的函数应用方式和其他语言差不多，但是格式要来得更简单。
+
+
+因为函数应用的优先级比操作符要高，因此以下两个表达式是相等的：
+
+::
+
+    Prelude> (compare 2 3) == LT
+    True
+
+    Prelude> compare 2 3 == LT
+    True
+
+有时候，为了可读性考虑，添加一些额外的括号也是可以理解的，上面代码的第一个表达式就是这样一个例子。另一方面，在某些情况下，我们\ *必须*\ 使用括号来让编译器知道，该如何处理一个复杂的表达式：
+
+::
+
+    Prelude> compare (sqrt 3) (sqrt 6)
+    LT
+
+这个表达式将 ``sqrt 3`` 和 ``sqrt 6`` 的计算结果分别传给 ``compare`` 函数。如果将括号移走， Haskell 编译器就会产生一个编译错误，因为它认为我们将四个参数传给了只需要两个参数的 ``compare`` 函数：
+
+::
+
+    Prelude> compare sqrt 3 sqrt 6
+
+    <interactive>:17:1:
+        The function `compare' is applied to four arguments,
+        but its type `a0 -> a0 -> Ordering' has only two
+        In the expression: compare sqrt 3 sqrt 6
+        In an equation for `it': it = compare sqrt 3 sqrt 6
+
+
+
