@@ -758,6 +758,38 @@ Haskell 使用了另外一种求值方式 —— *非严格*\ 求值。在这种
 因为条件判断表达式的最终结果为 ``False`` ，所以这次执行的也是 ``else`` 分支，而被执行的表达式为 ``myDrop (1 - 1) (tail "bcd")`` 。
 
 
+终止递归
+^^^^^^^^^^
+
+这次递归调用将 ``1 - 1`` 绑定到 ``n`` ，而 ``xs`` 被绑定为 ``tail "bcd"`` ：
+
+::
+
+    *Main> :type (1 - 1) <= 0 || null (tail "bcd")
+    (1 - 1) <= 0 || null (tail "bcd") :: Bool
+
+再次对 ``(||)`` 操作符的右操作对象求值：
+
+::
+
+    *Main> :type (1 - 1) <= 0
+    (1 - 1) <= 0 :: Bool
+
+最终，我们得出了一个 ``True`` 值！
+
+::
+
+    *Main> True || null (tail "bcd")
+    True
+
+因为 ``(||)`` 的右操作符 ``null (tail "bcd")`` 并不影响表达式的计算结果，因此它没有被求值，而整个条件判断部分的最终值为 ``True`` 。于是 ``then`` 分支被求值：
+
+::
+
+    *Main> :type tail "bcd"
+    tail "bcd" :: [Char]
+
+
 Polymorphism in haskell
 ----------------------------
 
