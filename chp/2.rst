@@ -494,6 +494,150 @@ Haskell 不使用 ``return`` 关键字来返回函数值：因为一个函数就
     Failed, modules loaded: none.
 
 
+条件求值
+^^^^^^^^^^^^
+
+和很多语言一样，Haskell 也有自己的 ``if`` 表达式。本节先说明怎么用这个表达式，然后再慢慢介绍它的详细特性。
+
+我们通过编写一个个人版本的 ``drop`` 函数来熟悉 ``if`` 表达式。先来回顾一下 ``drop`` 的行为：
+
+::
+
+    Prelude> drop 2 "foobar"
+    "obar"
+
+    Prelude> drop 4 "foobar"
+    "ar"
+
+    Prelude> drop 4 [1, 2]
+    []
+
+    Prelude> drop 0 [1, 2]
+    [1,2]
+
+    Prelude> drop 7 []
+    []
+
+    Prelude> drop (-2) "foo"
+    "foo"
+
+从测试代码的反馈可以看到。当 ``drop`` 函数的第一个参数小于或等于 ``0`` 时， ``drop`` 函数返回整个输入列表。否则，它就从列表左边开始移除元素，一直到移除元素的数量足够，或者输入列表被清空为止。
+
+以下是带有同样行为的 ``myDrop`` 函数，它使用 ``if`` 表达来决定该做什么。而代码中的 ``null`` 函数则用于检查列表是否为空：
+
+.. literalinclude:: /code/ch02/myDrop.hs
+
+在 Haskell 里，代码的缩进非常重要：它会延续（continue）一个已存在的定义，而不是新创建一个。所以，不要省略缩进！
+
+变量 ``xs`` 展示了一个命名列表的常见模式： ``s`` 可以视为后缀，而 ``xs`` 则表示“复数个 ``x`` ”。
+
+先保存文件，试试 ``myDrop`` 函数是否如我们所预期的那样工作：
+
+::
+
+    [1 of 1] Compiling Main             ( myDrop.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> myDrop 2 "foobar"
+    "obar"
+
+    *Main> myDrop 4 "foobar"
+    "ar"
+
+    *Main> myDrop 4 [1, 2]
+    []
+
+    *Main> myDrop 0 [1, 2]
+    [1,2]
+
+    *Main> myDrop 7 []
+    []
+
+    *Main> myDrop (-2) "foo"
+    "foo"
+
+好的，代码正如我们所想的那样运行，现在是时候回过头来，说明一下 ``myDrop`` 的函数体里都干了些什么：
+
+``if`` 关键字引入了一个带有三个部分的表达式：
+
+* 跟在 ``if`` 之后的是一个 ``Bool`` 类型的表达式，它是 ``if`` 的条件部分。
+
+* 跟在 ``then`` 关键字之后的是另一个表达式，这个表达式在条件部分的值为 ``True`` 时被执行。
+
+* 跟在 ``else`` 关键字之后的又是另一个表达式，这个表达式在条件部分的值为 ``False`` 时被执行。
+
+我们将跟在 ``then`` 和 ``else`` 之后的表达式称为“分支”。不同分支之间的类型必须相同。[译注：这里原文还有一句“the ``if`` expression will also have this type”，这是错误的，因为条件部分的表达式只要是 ``Bool`` 类型就可以了，没有必要和分支的类型相同。]像是 ``if True then 1 else "foo"`` 这样的表达式会产生错误，因为两个分支的类型并不相同：
+
+::
+
+    Prelude> if True then 1 else "foo"
+
+    <interactive>:2:14:
+        No instance for (Num [Char])
+            arising from the literal `1'
+        Possible fix: add an instance declaration for (Num [Char])
+        In the expression: 1
+        In the expression: if True then 1 else "foo"
+        In an equation for `it': it = if True then 1 else "foo"
+
+记住，Haskell 是一门以表达式为主导（expression-oriented）的语言。在命令式语言中，代码由陈述（statement）而不是表达式组成，因此在省略 ``if`` 语句的 ``else`` 分支的情况下，程序仍是有意义的。但是，当代码由表达式组成时，一个缺少 ``else`` 分支的 ``if`` 语句，在条件部分为 ``False`` 时，是没有办法给出一个结果的，当然这个 ``else`` 分支也不会有任何类型，因此，省略 ``else`` 分支对于 Haskell 是无意义的，编译器也不会允许这么做。
+
+程序里还有几个新东西需要解释。其中， ``null`` 函数检查一个列表是否为空：
+
+::
+
+    Prelude> :type null
+    null :: [a] -> Bool
+
+    Prelude> null []
+    True
+
+    Prelude> null [1, 2, 3]
+    False
+
+而 ``(||)`` 操作符对它的 ``Bool`` 类型参数执行一个逻辑或（logical or）操作：
+
+::
+
+    Prelude> :type (||)
+    (||) :: Bool -> Bool -> Bool
+
+    Prelude> True || False
+    True
+
+    Prelude> True || True
+    True
+
+另外需要注意的是， ``myDrop`` 函数是一个递归函数：它通过调用自身来解决问题。关于递归，书本稍后会做更详细的介绍。
+
+最后，整个 ``if`` 表达式被分成了多行，而实际上，它也可以写成一行：
+
+.. literalinclude:: /code/ch02/myDropX.hs
+
+[译注：原文这里的文件名称为 ``myDrop.hs`` ，为了和之前的 ``myDrop.hs`` 区别开来，这里修改文件名，让它和函数名 ``myDropX`` 保持一致。]
+
+::
+
+    Prelude> :load myDropX.hs
+    [1 of 1] Compiling Main             ( myDropX.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> myDropX 2 "foobar"
+    "obar"
+
+这个一行版本的 ``myDrop`` 比起之前的定义要难读得多，为了可读性考虑，一般来说，总是应该通过分行来隔开条件部分和两个分支。
+
+作为对比，以下是一个 Python 版本的 ``myDrop`` ，它的结构和 Haskell 版本差不多：
+
+
+.. code-block:: python
+
+    def myDrop(n, elts):
+        while n > 0 and elts:
+            n = n -1
+            elts = elts[1:]
+        return elts
+
 Understanding Evaluation by Example
 ----------------------------------------
 
