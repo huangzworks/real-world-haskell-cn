@@ -4,6 +4,103 @@
 定义新的数据类型
 -------------------
 
+尽管列表和元组都非常有用，但是，定义新的数据类型也是一种常见的需求，这种能力使得我们可以为程序中的值添加结构。
+
+而且比起使用元组，对一簇相关的值赋予一个名字和一个独一无二的类型显得更有用一些。
+
+定义新的数据类型也提升了代码的安全性：Haskell 不会允许我们混用两个结构相同但类型不同的值。
+
+本章将以一个在线书店为例子，展示如何去进行类型定义。
+
+使用 ``data`` 关键字可以定义新的数据类型：
+
+::
+
+    -- file: ch03/BookStore.hs
+    data BookInfo = Book Int String [String]
+                    deriving (Show)
+
+
+跟在 ``data`` 关键字之后的 ``BookInfo`` 就是新类型的名字，我们称 ``BookInfo`` 为\ *类型构造器*\ 。类型构造器用于指代（refer）类型。正如前面提到过的，类型名字的首字母必须大写，因此，类型构造器的首字母也必须大写。
+
+接下来的 ``Book`` 是\ *值构造器*\ （有时候也称为数据构造器）的名字。类型的值就是由值构造器创建的。值构造器名字的首字母也必须大写。
+
+在 ``Book`` 之后的 ``Int`` ， ``String`` 和 ``[String]`` 是类型的\ *组成部分*\ 。组成部分的作用，和面向对象语言的类中的域作用一致：它是一个储存值的槽。（为了方便起见，我们通常也将组成部分称为域。）
+
+在这个例子中， ``Int`` 表示一本书的 ID ，而 ``String`` 表示书名，而 ``[String]`` 则代表作者。
+
+``BookInfo`` 类型包含的成分和一个 ``(Int, String, [String])`` 类型的三元组一样，它们唯一不相同的是类型。[译注：这里指的是整个值的类型，不是成分的类型。]我们不能混用结构相同但类型不同的值。
+
+举个例子，以下的 ``MagzineInfo`` 类型的成分和 ``BookInfo`` 一模一样，但 Haskell 会将它们作为不同的类型来区别对待，因为它们的类型构构造器和值构造器并不相同：
+
+::
+
+    -- file: ch03/BookStore.hs
+    data MagzineInfo = Magzine Int String [String]
+                       deriving (Show)
+
+可以将值构造器看作是一个函数 —— 它创建并返回某个类型值。在这个书店的例子里，我们将 ``Int`` 、 ``String`` 和 ``[String]`` 三个类型的值应用到 ``Book`` ，从而创建一个 ``BookInfo`` 类型的值：
+
+
+::
+
+    -- file: ch03/BookStore.hs
+    myInfo = Book 9780135072455 "Algebra of Programming"
+                  ["Richard Bird", "Oege de Moor"]
+
+
+定义类型的工作完成之后，可以到 ghci 里载入并测试这些新类型：
+
+::
+
+    Prelude> :load BookStore.hs
+    [1 of 1] Compiling Main             ( BookStore.hs, interpreted )
+    Ok, modules loaded: Main.
+
+再看看前面在文件里定义的 ``myInfo`` 变量：
+
+::
+
+    *Main> myInfo
+    Book 494539463 "Algebra of Programming" ["Richard Bird","Oege de Moor"]
+
+在 ghci 里面当然也可以创建新的 ``BookInfo`` 值：
+
+::
+
+    *Main> Book 0 "The Book of Imaginary Beings" ["Jorge Luis Borges"]
+    Book 0 "The Book of Imaginary Beings" ["Jorge Luis Borges"]
+
+可以用 ``:type`` 命令来查看表达式的值：
+
+::
+
+    *Main> :type Book 1 "Cosmicomics" ["Italo Calvino"]
+    Book 1 "Cosmicomics" ["Italo Calvino"] :: BookInfo
+
+请记住，在 ghci 里定义变量的语法和在源码文件里定义变量的语法并不相同。在 ghci 里，变量通过 ``let`` 定义：
+
+::
+
+    *Main> let cities = Book 173 "Use of Weapons" ["Iain M. Banks"]
+
+使用 ``:info`` 命令可以查看更多关于给定表达式的信息：
+
+::
+
+    *Main> :info BookInfo
+    data BookInfo = Book Int String [String]
+        -- Defined at BookStore.hs:2:6
+        instance Show BookInfo -- Defined at BookStore.hs:3:27
+
+使用 ``:type`` 命令，可以查看值构造器 ``Book`` 的类型签名，了解它是如何创建出 ``BookInfo`` 类型的值的：
+
+::
+
+    *Main> :type Book
+    Book :: Int -> String -> [String] -> BookInfo
+
+
 类型别名
 -----------
 
