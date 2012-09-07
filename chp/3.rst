@@ -1,0 +1,41 @@
+第三章：Defining Types, Streamlining Functions
+=================================================
+
+定义新的数据类型
+-------------------
+
+类型别名
+-----------
+
+Algebraic Data Types
+------------------------
+
+Pattern Matching
+----------------------
+
+Record Syntax
+-------------------
+
+Parameterized Types
+---------------------
+
+Recursive Types
+-------------------
+
+Reporting Errors
+------------------
+
+Intruducing Local Variables
+-------------------------------
+
+The Offside Rule and Whitespace in an Expression
+---------------------------------------------------------
+
+The Case Expression
+---------------------
+
+Common Beginner Mistakes with Patterns
+-----------------------------------------
+
+Conditional Evaluation with Guards
+-------------------------------------
