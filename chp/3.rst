@@ -208,6 +208,108 @@ ghci 抱怨我们没有给 ``Invoice`` 值构造器足够的参数。
 [译注：原文这里的代码示例有错，译文已改正。]
 
 
+什么情况下该用元组，而什么情况下又该用代数数据类型？
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+元组和自定域代数数据类型有一些相似的地方。比如说，可以使用一个 ``(Int, String, [String])`` 类型的元组来代替 ``BookInfo`` 类型：
+
+::
+
+    *Main> Book 2 "The Wealth of Networks" ["Yochai Benkler"]
+    Book 2 "The Wealth of Networks" ["Yochai Benkler"]
+
+    *Main> (2, "The Wealth of Networks", ["Yochai Benkler"])
+    (2,"The Wealth of Networks",["Yochai Benkler"])
+
+代数数据类型使得我们可以在结构相同但类型不同的数据之间进行区分。然而，对于元组来说，只要元素的结构和类型都一致，那么元组的类型就是相同的：
+
+::
+
+    -- file: ch03/Distinction.hs
+    a = ("Porpoise", "Grey")
+    b = ("Table", "Oak")
+
+其中 ``a`` 和 ``b`` 的类型相同：
+
+::
+
+    Prelude> :load Distinction.hs
+    [1 of 1] Compiling Main             ( Distinction.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> :type a
+    a :: ([Char], [Char])
+
+    *Main> :type b
+    b :: ([Char], [Char])
+
+对于两个不同的代数数据类型来说，即使值构造器成分的结构和类型都相同，它们也是不同的类型：
+
+::
+
+    -- file: ch03/Distinction.hs
+    data Cetacean = Cetacean String String
+    data Furniture = Furniture String String
+
+    c = Cetacean "Porpoise" "Grey"
+    d = Furniture "Table" "Oak"
+
+其中 ``c`` 和 ``d`` 的类型并不相同：
+
+::
+
+    Prelude> :load Distinction.hs
+    [1 of 1] Compiling Main             ( Distinction.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> :type c
+    c :: Cetacean
+
+    *Main> :type d
+    d :: Furniture
+
+以下是一个更细致的例子，它用两种不同的方式表示二维向量：
+
+.. literalinclude:: /code/ch03/AlgebraicVector.hs
+
+``Cartesian2D`` 和 ``Polar2D`` 两种类型的成分都是 ``Double`` 类型，但是，这些成分表达的是不同的\ *意思*\ 。因为 ``Cartesian2D`` 和 ``Polar2D`` 是不同的类型，因此 Haskell 不会允许混淆使用这两种类型：
+
+::
+
+    Prelude> :load AlgebraicVector.hs
+    [1 of 1] Compiling Main             ( AlgebraicVector.hs, interpreted )
+    Ok, modules loaded: Main.
+    *Main> Cartesian2D (sqrt 2) (sqrt 2) == Polar2D (pi / 4) 2
+
+    <interactive>:3:34:
+        Couldn't match expected type `Cartesian2D'
+    with actual type `Polar2D'
+        In the return type of a call of `Polar2D'
+    In the second argument of `(==)', namely `Polar2D (pi / 4) 2'
+    In the expression:
+        Cartesian2D (sqrt 2) (sqrt 2) == Polar2D (pi / 4) 2
+
+错误信息显示， ``(==)`` 操作符只接受类型相同的值作为它的参数，在类型签名里也可以看出这一点：
+
+::
+
+    *Main> :type (==)
+    (==) :: Eq a => a -> a -> Bool
+
+另一方面，如果使用类型为 ``(Double, Double)`` 的元组来表示二维向量的两种表示方式，那么我们就有麻烦了：
+
+::
+
+    Prelude> -- 第一个元组使用 Cartesian 表示，第二个元组使用 Polar 表示
+    Prelude> (1, 2) == (1, 2)   
+    True
+
+类型系统不会察觉到，我们正错误地对比两种不同表示方式的值，因为对两个类型相同的元组进行对比是完全合法的！
+
+关于该使用元组还是该使用代数数据类型，没有一劳永逸的办法。但是，有一个经验法则可以参考：如果程序大量使用复合数据，那么使用 ``data`` 进行类型自定义对于类型安全和可读性都有好处。而对于小规模的内部应用，那么通常使用元组就足够了。
+
+
+
 Pattern Matching
 ----------------------
 
