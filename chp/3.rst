@@ -144,11 +144,69 @@
     -- file: ch03/BookStore.hs
     type BookRecord = (BookInfo, BookReview)
    
-需要注意的是，类型别名只是为已有类型提供了一个新名字，创建值的工作还是由原来类型的值构造器进行。
+需要注意的是，类型别名只是为已有类型提供了一个新名字，创建值的工作还是由原来类型的值构造器进行。[注：如果你熟悉 C 或者 C++ ，可以将 Haskell 的类型别名看作是 ``typedef`` 。]
 
 
-Algebraic Data Types
+代数数据类型
 ------------------------
+
+``Bool`` 类型是\ *代数数据类型*\ （algebraic data type）的最简单也是最常见的例子。一个代数类型可以有多于一个值构造器：
+
+.. literalinclude:: /code/ch03/Bool.hs
+
+上面代码定义的 ``Bool`` 类型拥有两个值构造器，一个是 ``True`` ，另一个是 ``False`` 。每个值构造器使用 ``|`` 符号分割，读作“或者” —— 以 ``Bool`` 类型为例子，我们可以说， ``Bool`` 类型由 ``True`` 值或者 ``False`` 值构成。
+
+当一个类型拥有一个以上的值构造器时，这些值构造器通常被称为“备选”（alternatives）或“分支”（case）。同一类型的所有备选，创建出的的值的类型都是相同的。
+
+代数数据类型的各个值构造器都可以接受任意个数的参数。[译注：不同备选之间接受的参数个数不必相同，参数的类型也可以不一样。]以下是一个账单数据的例子：
+
+::
+
+    -- file: ch03/BookStore.hs
+    type CardHolder = String
+    type CardNumber = String
+    type Address = [String]
+    data BillingInfo = CreditCard CardNumber CardHolder Address
+                     | CashOnDelivery
+                     | Invoice CustomerID
+                       deriving (Show)
+
+这个程序提供了三种付款的方式。如果使用信用卡付款，就要使用 ``CreditCard`` 作为值构造器，并输入信用卡密码、信用卡持有人和地址作为参数。如果即时支付现金，就不用接受任何参数。最后，可以通过货到付款的方式来收款，在这种情况下，只需要填写客户的 ID 就可以了。
+
+当使用值构造器来创建 ``BillingInfo`` 类型的值时，必须提供这个值构造器所需的参数：
+
+::
+
+    Prelude> :load BookStore.hs
+    [1 of 1] Compiling Main             ( BookStore.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> :type CreditCard
+    CreditCard :: CardNumber -> CardHolder -> Address -> BillingInfo
+
+    *Main> CreditCard "2901650221064486" "Thomas Gradgrind" ["Dickens", "England"]
+    CreditCard "2901650221064486" "Thomas Gradgrind" ["Dickens","England"]
+
+    *Main> :type it
+    it :: BillingInfo
+
+如果输入参数的类型不对或者数量不对，那么引发一个错误：
+
+::
+
+    *Main> Invoice
+
+    <interactive>:7:1:
+        No instance for (Show (CustomerID -> BillingInfo))
+            arising from a use of `print'
+        Possible fix:
+            add an instance declaration for (Show (CustomerID -> BillingInfo))
+        In a stmt of an interactive GHCi command: print it
+
+ghci 抱怨我们没有给 ``Invoice`` 值构造器足够的参数。
+
+[译注：原文这里的代码示例有错，译文已改正。]
+
 
 Pattern Matching
 ----------------------
