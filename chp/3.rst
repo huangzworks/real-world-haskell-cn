@@ -123,6 +123,30 @@
 类型别名
 -----------
 
+可以使用\ *类型别名*\ ，来为一个已存在的类型设置一个更具描述性的名字。
+
+比如说，在前面 ``BookReview`` 类型的定义里，并没有说明 ``String`` 成分是干什么用的，通过类型别名，可以解决这个问题：
+
+::
+
+    -- file: ch03/BookStore.hs
+    type CustomerID = Int 
+    type ReviewBody = String
+
+    data BetterReview = BetterReview BookInfo CustomerID ReviewBody
+
+``type`` 关键字用于设置类型别名，其中新的类型名字放在 ``=`` 号的左边，而已有的类型名字放在 ``=`` 号的右边。这两个名字都标识同一个类型，因此，类型别名\ *完全是*\ 为了提高可读性而存在的。
+
+类型别名也可以用来为啰嗦的类型设置一个更短的名字：
+
+::
+
+    -- file: ch03/BookStore.hs
+    type BookRecord = (BookInfo, BookReview)
+   
+需要注意的是，类型别名只是为已有类型提供了一个新名字，创建值的工作还是由原来类型的值构造器进行。
+
+
 Algebraic Data Types
 ------------------------
 
