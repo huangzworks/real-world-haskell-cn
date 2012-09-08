@@ -33,3 +33,7 @@ data BillingInfo = CreditCard CardNumber CardHolder Address
                  | Invoice CustomerID
                    deriving (Show)
 
+-- file: ch03/BookStore.hs
+bookID      (Book id title authors) = id
+bookTitle   (Book id title authors) = title
+bookAuthors (Book id title authors) = authors

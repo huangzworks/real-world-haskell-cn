@@ -547,8 +547,81 @@ C 和 C++ 里的 ``enum`` 通常用于表示一系列符号值排列。代数数
 更进一步
 ^^^^^^^^^^^^
 
-Record Syntax
--------------------
+对元组进行模式匹配的语法，和构造元组的语法很相似。
+
+以下是一个可以返回三元组中最后一个元素的函数：
+
+.. literalinclude:: /code/ch03/third.hs
+
+[译注：原文的源码文件名为 ``Tuple.hs`` ，这里改为 ``third.hs`` ，和函数的名字保持一致。]
+
+在 ghci 里测试这个函数：
+
+::
+
+    Prelude> :load third.hs
+    [1 of 1] Compiling Main             ( third.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> third (1, 2, 3)
+    3
+
+模式匹配的“深度”并没有限制。以下模式会同时对元组和元组里的列表进行匹配：
+
+.. literalinclude:: /code/ch03/complicated.hs
+
+[译注：原文的源码文件名为 ``Tuple.hs`` ，这里改为 ``complicated.hs`` ，和函数的名字保持一致。]
+
+在 ghci 里测试这个函数：
+
+::
+
+    Prelude> :load complicated.hs
+    [1 of 1] Compiling Main             ( complicated.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> complicated (True, 1, [1, 2, 3], 5)
+    (1,[2,3])
+
+对于出现在模式里的字面（literal）值（比如前面元组例子里的 ``True`` 和 ``5`` ），输入里的各个值必须和这些字面值相等，匹配才有可能成功。以下代码显示，因为输入元组和模式的第一个字面值 ``True`` 不匹配，所以匹配失败了：
+
+::
+
+    *Main> complicated (False, 1, [1, 2, 3], 5)
+    *** Exception: complicated.hs:2:1-40: Non-exhaustive patterns in function complicated
+
+这个例子也显示了，如果所有给定等式的模式都匹配失败，那么返回一个运行时错误。
+
+对代数数据类型的匹配，可以通过这个类型的值构造器来进行。拿之前我们定义的 ``BookInfo`` 类型为例子，对它的模式匹配可以使用它的 ``Book`` 构造器来进行：
+
+::
+
+    -- file: ch03/BookStore.hs
+    bookID      (Book id title authors) = id
+    bookTitle   (Book id title authors) = title
+    bookAuthors (Book id title authors) = authors
+
+在 ghci 里试试：
+
+::
+
+    Prelude> :load BookStore.hs
+    [1 of 1] Compiling Main             ( BookStore.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> let book = (Book 3 "Probability Theory" ["E.T.H. Jaynes"])
+
+    *Main> bookID book
+    3
+
+    *Main> bookTitle book
+    "Probability Theory"
+
+    *Main> bookAuthors book
+    ["E.T.H. Jaynes"]
+
+字面值的比对规则对于列表和值构造器的匹配也适用： ``(3:xs)`` 模式只匹配那些不为空，并且第一个元素为 ``3`` 的列表；而 ``(Book 3 title authors)`` 只匹配 ID 值为 ``3`` 的那本书。
+
 
 Parameterized Types
 ---------------------
