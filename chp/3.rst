@@ -309,6 +309,148 @@ ghci 抱怨我们没有给 ``Invoice`` 值构造器足够的参数。
 关于该使用元组还是该使用代数数据类型，没有一劳永逸的办法。但是，有一个经验法则可以参考：如果程序大量使用复合数据，那么使用 ``data`` 进行类型自定义对于类型安全和可读性都有好处。而对于小规模的内部应用，那么通常使用元组就足够了。
 
 
+其他语言里类似代数数据类型的东西
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+代数数据类型为描述数据类型提供了一种单一且强大的方式。很多其他语言，要达到相当于代数数据类型的表达性，需要同时使用多种特性。
+
+以下是一些 C 和 C++ 方面的例子，说明怎样在这些语言里，怎么样实现类似于代数数据类型的功能。
+
+结构
+""""""
+
+当只有一个值构造器时，代数数据类型和元组很相似：它将一系列相关的值打包成一个复合值。这种做法相当于 C 和 C++ 里的 ``struct`` ，而代数数据类型的成分则相当于 ``struct`` 里的域。
+
+以下是一个 C 结构，它等同于我们前面定义的 ``BookInfo`` 类型：
+
+.. code-block:: c
+
+    struct book_info {
+        int id;
+        char *name;
+        char **authors;
+    };
+
+目前来说， C 结构和 Haskell 的代数数据类型最大的差别是，代数数据类型的成分是匿名且按位置排序的：
+
+::
+
+    --file: ch03/BookStore.hs
+    data BookInfo = Book Int String [String]
+                    deriving (Show)
+
+按位置排序指的是，对成分的访问是通过位置来实行的，而不是像 C 那样，通过名字：比如 ``book_info->id`` 。
+
+稍后的“模式匹配”小节会介绍如何访代数数据类型里的成分。在“记录”一节会介绍定义数据的新语法，通过这种语法，可以像 C 结构那样，使用名字来访问相应的成分。
+
+
+枚举
+"""""""
+
+C 和 C++ 里的 ``enum`` 通常用于表示一系列符号值排列。代数数据类型里面也有相似的东西，一般称之为\ *枚举类型*\ 。
+
+以下是一个 ``enum`` 例子：
+
+.. code-block:: c
+
+    enum roygbiv {
+        red,
+        orange,
+        yellow,
+        green,
+        blue,
+        indigo,
+        violet,
+    };
+
+以下是等价的 Haskell 代码：
+
+.. literalinclude:: /code/ch03/Roygbiv.hs
+
+在 ghci 里面测试：
+
+::
+
+    Prelude> :load Roygbiv.hs
+    [1 of 1] Compiling Main             ( Roygbiv.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> :type Yellow
+    Yellow :: Roygbiv
+
+    *Main> :type Red
+    Red :: Roygbiv
+
+    *Main> Red == Yellow
+    False
+
+    *Main> Green == Green
+    True
+
+``enum`` 的问题是，它使用整数值去代表元素：在一些接受 ``enum`` 的场景里，可以将整数传进去，C 编译器会自动进行类型转换。同样，在使用整数的场景里，也可以将一个 ``enum`` 元素传进去。这种用法可能会造成一些令人不爽的 bug 。
+
+另一方面，在 Haskell 里就没有这样的问题。比如说，不可能使用 ``Roygbiv`` 里的某个值来代替 ``Int`` 值[译注：因为枚举类型的每个元素都由一个唯一的值构造器生成，而不是使用整数表示。]：
+
+::
+
+    *Main> take 3 "foobar"
+    "foo"
+
+    *Main> take Red "foobar"
+
+    <interactive>:9:6:
+        Couldn't match expected type `Int' with actual type `Roygbiv'
+        In the first argument of `take', namely `Red'
+        In the expression: take Red "foobar"
+        In an equation for `it': it = take Red "foobar"
+
+
+联合
+""""""
+
+如果一个代数数据类型有多个备选，那么可以将它看作是 C 或 C++ 里的 ``union`` 。
+
+以上两者的一个主要区别是， ``union`` 并不告诉用户，当前使用的是哪一个备选， ``union`` 的使用者必须自己记录这方面的信息（通常使用一个额外的域来保存），这意味着，如果搞错了备选的信息，那么对 ``union`` 的使用就会出错。
+
+以下是一个 ``union`` 例子：
+
+.. code-block:: c
+
+    enum shape_type {
+        shape_circle,
+        shape_poly,
+    };
+
+    struct circle {
+        struct vector centre;
+        float radius;
+    };
+
+    struct poly {
+        size_t num_vertices;
+        struct vector *vertices;
+    };
+
+    struct shape
+    {
+        enum shape_type type;
+        union {
+        struct circle circle;
+        struct poly poly;
+        } shape;
+    };
+
+在上面的代码里， ``shape`` 域的值可以是一个 ``circle`` 结构，也可以是一个 ``poly`` 结构。 ``shape_type`` 用于记录目前 ``shape`` 正在使用的结构类型。
+
+另一方面，Haskell 版本不仅简单，而且更为安全：
+
+.. literalinclude:: /code/ch03/ShapeUnion.hs
+
+[译注：原文的代码少了 ``deriving (Show)`` 一行，在 ghci 测试时会出错。]
+
+注意，我们不必像 C 语言那样，使用 ``shape_type`` 域来手动记录 ``Shape`` 类型的值是由 ``Circle`` 构造器生成的，还是由 ``Poly`` 构造器生成， Haskell 自己有办法弄清楚一点，它不会弄混两种不同的值。其中的原因，下一节《模式匹配》就会讲到。
+
+[译注：原文这里将 ``Poly`` 写成了 ``Square`` 。]
 
 Pattern Matching
 ----------------------
