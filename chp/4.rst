@@ -160,3 +160,93 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 作为一项有用的技术，结构递归并不仅仅局限于列表，它也适用于其他代数数据类型，稍后就会介绍更多这方面的例子。
 
 
+对列表元素进行转换
+^^^^^^^^^^^^^^^^^^^^^
+
+考虑以下 C 函数， ``square`` ，它对数组中的所有元素执行平方计算：
+
+.. code-block:: c
+
+    void square(double *out, const double *in, size_t length)
+    {
+        for (size_t i = 0; i < length; i++) {
+            out[i] = in[i] * in[i];
+        }
+    }
+
+这段代码展示了一个直观且常见的 loop 动作，它对输入数组中的所有元素执行同样的动作。以下是 Haskell 版本的 ``square`` 函数：
+
+.. literalinclude:: /code/ch04/square.hs
+
+``square`` 函数包含两个模式匹配等式。第一个模式解构一个列表，取出它的 ``head`` 部分和 ``tail`` 部分，并对第一个元素进行加倍操作，然后将计算所得的新元素放进列表里面。一直这样做下去，直到处理完整个列表为止。第二个等式确保计算会在列表为空时顺利终止。
+
+``square`` 产生一个和输入列表一样长的新列表，其中每个新元素的值都是原本元素的平方：
+
+::
+
+    Prelude> :load square.hs
+    [1 of 1] Compiling Main             ( square.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> let one_to_ten = [1.0 .. 10.0]
+
+    *Main> square one_to_ten
+    [1.0,4.0,9.0,16.0,25.0,36.0,49.0,64.0,81.0,100.0]
+
+以下是另一个 C 循环，它将字符串中的所有字母都设置为大写：
+
+.. code-block:: c
+
+    #include <ctype.h>
+
+    char *uppercase(const char *in)
+    {
+        char *out = strdup(in);
+
+        if (out != NULL) {
+            for (size_t i = 0; out[i] != '\0'; i++) {
+                out[i] = toupper(out[i]);
+            }
+        }
+
+        return out;
+    }
+
+以下是相等的 Haskell 版本：
+
+.. literalinclude:: /code/ch04/upperCase.hs
+
+代码从 ``Data.Char`` 模块引入了 ``toUpper`` 函数，如果输入字符是一个字母的话，那么函数就将它转换成大写：
+
+::
+
+    Prelude> :module +Data.Char
+
+    Prelude Data.Char> toUpper 'a'
+    'A'
+
+    Prelude Data.Char> toUpper 'A'
+    'A'
+
+    Prelude Data.Char> toUpper '1'
+    '1'
+
+    Prelude Data.Char> toUpper '*'
+    '*'
+
+``upperCase`` 函数和之前的 ``square`` 函数很相似：如果输入是一个空列表，那么它就停止计算，返回一个空列表。另一方面，如果输入不为空，那么它就对列表的第一个元素调用 ``toUpper`` 函数，并且递归调用自身，继续处理剩余的列表元素：
+
+::
+
+    Prelude> :load upperCase.hs
+    [1 of 1] Compiling Main             ( upperCase.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> upperCase "The quick brown fox jumps over the lazy dog"
+    "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG"
+
+以上两个函数遵循了同一种处理列表的公共模式：基本情形处理（base case）空列表输入。而\ *递归情形*\ （recursive case）则处理列表非空时的情况，它对列表的头元素进行某种操作，然后递归地处理列表余下的其他元素。
+
+
+
+
