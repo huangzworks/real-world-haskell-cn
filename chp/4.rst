@@ -257,7 +257,7 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 
 .. literalinclude:: /code/ch04/rewrite_by_map.hs
 
-[译注：原文代码再次忘记载入 ``Data.Char`` 中的 ``toUpper`` 函数。]
+[译注：原文代码没有载入 ``Data.Char`` 中的 ``toUpper`` 函数。]
 
 来研究一下 ``map`` 是如何实现的。通过查看它的类型签名，可以发现很多有意思的信息：
 
@@ -290,3 +290,49 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
     "THE QUICK BROWN FOX"
 
 通过观察代码，并从中提炼出重复的抽象，是复用代码的一种良好方法。尽管对代码进行抽象并不是 Haskell 的“专利”，但高阶函数使得这种抽象变得非常容易。
+
+
+筛选列表元素
+^^^^^^^^^^^^^^^
+
+另一种对列表的常见操作是，对列表元素进行筛选，只保留那些符合条件的元素。
+
+以下函数接受一个列表作为参数，并返回这个列表里的所有奇数元素。代码的递归情形比之前的 ``map`` 函数要复杂一些，它使用守卫对元素进行条件判断，只有符合条件的元素，才会被加入进结果列表里：
+
+.. literalinclude:: /code/ch04/oddList.hs
+
+[译注：这里将原文代码的 ``oddList _ = []`` 改为 ``oddList [] = []`` ，原因和上一小节修改 ``map`` 函数的代码一样。]
+
+测试：
+
+::
+
+    Prelude> :load oddList.hs
+    [1 of 1] Compiling Main             ( oddList.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> oddList [1 .. 10]
+    [1,3,5,7,9]
+
+因为这种过滤模式也很常见，所以 ``Prelude`` 也定义了相应的函数 ``filter`` ：它接受一个谓词函数，并将它应用到列表里的每个元素，只有那些谓词函数求值返回 ``True`` 的元素才会被保留：
+
+::
+
+    Prelude> :type odd
+    odd :: Integral a => a -> Bool
+
+    Prelude> odd 1
+    True
+
+    Prelude> odd 2
+    False
+
+    Prelude> :type filter
+    filter :: (a -> Bool) -> [a] -> [a]
+
+    Prelude> filter odd [1 .. 10]
+    [1,3,5,7,9]
+
+[译注：谓词函数是指那种返回 ``Bool`` 类型值的函数。]
+
+稍后的章节会介绍如何定义 ``filter`` 。
