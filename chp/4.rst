@@ -248,5 +248,45 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 以上两个函数遵循了同一种处理列表的公共模式：基本情形处理（base case）空列表输入。而\ *递归情形*\ （recursive case）则处理列表非空时的情况，它对列表的头元素进行某种操作，然后递归地处理列表余下的其他元素。
 
 
+列表映射
+^^^^^^^^^^^
 
+前面定义的 ``square`` 和 ``upperCase`` 函数，都生成一个和输入列表同等长度的新列表，并且每次只对列表的一个元素进行处理。因为这种用法非常常见，所以 Haskell 的 ``Prelude`` 库定义了 ``map`` 函数来更方便地执行这种操作。 ``map`` 函数接受一个函数和一个列表作为参数，将输入函数应用到输入列表的每个元素上，并构建出一个新的列表。
 
+以下是使用 ``map`` 重写的 ``square`` 和 ``upperCase`` 函数：
+
+.. literalinclude:: /code/ch04/rewrite_by_map.hs
+
+[译注：原文代码再次忘记载入 ``Data.Char`` 中的 ``toUpper`` 函数。]
+
+来研究一下 ``map`` 是如何实现的。通过查看它的类型签名，可以发现很多有意思的信息：
+
+::
+
+    Prelude> :type map
+    map :: (a -> b) -> [a] -> [b]
+
+类型签名显示， ``map`` 接受两个参数：第一个参数是一个函数，这个函数接受一个 ``a`` 类型的值，并返回一个 ``b`` 类型的值[译注：这里只是说 ``a`` 和 ``b`` 类型可能不一样，但不是必须的。]。
+
+像 ``map`` 这种接受一个函数作为参数、又或者返回一个函数作为结果的函数，被称为\ *高阶*\ 函数。
+
+因为 ``map`` 的抽象出现在 ``square`` 和 ``upperCase`` 函数，所以可以通过观察这两个函数，找出它们之间的共同点，然后实现自己的 ``map`` 函数：
+
+.. literalinclude:: /code/ch04/myMap.hs
+
+[译注：在原文的代码里，第二个等式的定义为 ``myMap _ _ = []`` ，这并不是完全正确的，因为它可以适配于第二个参数不为列表的情况，比如 ``myMap f 1`` 。因此，这里遵循标准库里 ``map`` 的定义放进，将第二个等式修改为 ``myMap _ [] = []`` 。]
+
+在 ghci 测试这个 ``myMap`` 函数：
+
+::
+
+    Prelude> :load myMap.hs
+    [1 of 1] Compiling Main             ( myMap.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> :module +Data.Char
+
+    *Main Data.Char> myMap toUpper "The quick brown fox"
+    "THE QUICK BROWN FOX"
+
+通过观察代码，并从中提炼出重复的抽象，是复用代码的一种良好方法。尽管对代码进行抽象并不是 Haskell 的“专利”，但高阶函数使得这种抽象变得非常容易。
