@@ -394,6 +394,8 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 
 .. literalinclude:: /code/ch04/foldl.hs
 
+[译注：这个函数在载入 ghci 时会因为命名冲突而被拒绝，编写函数直接使用内置的 ``foldl`` 就可以了。]
+
 ``foldl`` 函数接受一个步骤（step）函数，一个累积器的初始化值，以及一个列表作为参数。步骤函数每次使用累积器和列表中的一个元素作为参数，并计算出新的累积器值，这个过程称为步进（stepper）。然后，将新的累积器作为参数，再次进行同样的计算，直到整个列表处理完为止。
 
 以下是使用 ``foldl`` 重写的 ``mySum`` 函数：
@@ -433,3 +435,93 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 以上观点同样适用于其他高阶函数库，包括前面介绍过的 ``map`` 和 ``filter`` 。因为这些函数都带有定义良好的行为，我们只需要学习怎样使用这些函数一次，以后每次碰到使用这些函数的代码，这些知识都可以加快我们对代码的理解。这种优势同样体现在代码的编写上：一旦我们能熟练使用高阶函数，那么写出更简洁的代码自然就不在话下。
 
 
+从右边开始折叠
+^^^^^^^^^^^^^^^^
+
+和 ``foldl`` 相对应的是 ``foldr`` ，它从一个列表的右边开始进行折叠。
+
+.. literalinclude:: /code/ch04/foldr.hs
+
+[译注：这个函数在载入 ghci 时会因为命名冲突而被拒绝，编写函数直接使用内置的 ``foldr`` 就可以了。]
+
+可以用 ``foldr`` 改写在《左折叠》一节定义的 ``niceSum`` 函数：
+
+.. literalinclude:: /code/ch04/niceSumFoldr.hs
+
+这个 ``niceSumFoldr`` 函数在输入为 ``[1, 2, 3]`` 时，产生以下计算序列：
+
+::
+
+    niceSumFoldr [1, 2, 3]
+        == foldr (+) 0 (1:2:3[])
+        == 1 +           foldr (+) 0 (2:3:[])
+        == 1 + (2 +      foldr (+) 0 (3:[]))
+        == 1 + (2 + (3 + foldr (+) 0 []))
+        == 1 + (2 + (3 + 0))
+
+可以通过观察括号的包围方式，以及累积器初始化值摆放的位置，来区分 ``foldl`` 和 ``foldr`` ：\ ``foldl`` 将处初始化值放在左边，括号也是从左边开始包围。另一方面，\ ``foldr`` 将初始化值放在右边，而括号也是从右边开始包围。
+
+还记得当年大明湖畔的 ``filter`` 函数吗？它可以用显式递归来定义：
+
+.. literalinclude:: /code/ch04/filter.hs
+
+[译注：这个函数在载入 ghci 时会因为命名冲突而被拒绝，编写函数直接使用内置的 ``filter`` 就可以了。]
+
+除此之外， ``filter`` 还可以通过 ``foldr`` 来定义：
+
+.. literalinclude:: /code/ch04/myFilter.hs
+
+来仔细分析一下 ``myFilter`` 函数的定义：和 ``foldl`` 一样， ``foldr`` 也接受一个函数、一个基本情形和一个列表作为参数。通过阅读 ``filter`` 函数的类型签名可以得知， ``myFilter`` 函数的输入和输出都使用同类型的列表，因此函数的基本情形，以及局部函数 ``step`` ，都必须返回这个类型的列表。
+
+``myFilter`` 里的 ``foldr`` 每次取出列表中的一个元素，并对他进行处理，如果这个元素经过条件判断为 ``True`` ，那么就将它放进累积的新列表里面，否则，它就略过这个元素，继续处理列表的其他剩余元素。
+
+所有可以用 ``foldr`` 定义的函数，统称为\ *主递归*\ （primitive recursive）。很大一部分列表处理函数都是主递归函数。比如说， ``map`` 就可以用 ``foldr`` 定义：
+
+.. literalinclude:: /code/ch04/myFoldrMap.hs
+
+更让人惊奇的是， ``foldl`` 甚至可以用 ``foldr`` 来表示：
+
+.. literalinclude:: /code/ch04/myFoldl.hs
+
+一种思考 ``foldr`` 的方式是，将它看成是对输入列表的一种\ *转换*\ （transform）：它的第一个参数决定了该怎么处理列表的 ``head`` 和 ``tail`` 部分；而它的第二个参数则决定了，当遇到空列表时，该用什么值来代替这个空列表。
+
+用 ``foldr`` 定义的恒等（identity）转换，在列表为空时，返回空列表本身；如果列表不为空，那么它就将列表构造器 ``(:)`` 应用于每个 ``head`` 和 ``tail`` 对（pair）：
+
+.. literalinclude:: /code/ch04/identity.hs
+
+最终产生的结果列表和原输入列表一模一样：
+
+::
+
+    Prelude> :load identity.hs
+    [1 of 1] Compiling Main             ( identity.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> identity [1, 2, 3]
+    [1,2,3]
+
+如果将 ``identity`` 函数定义中，处理空列表时返回的 ``[]`` 改为另一个列表，那么我们就得到了列表追加函数 ``append`` ：
+
+.. literalinclude:: /code/ch04/append.hs
+
+测试：
+
+::
+
+    Prelude> :load append.hs
+    [1 of 1] Compiling Main             ( append.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> append "the quick " "fox"
+    "the quick fox"
+
+这个函数的效果等同于 ``(++)`` 操作符：
+
+::
+
+    *Main> "the quick " ++ "fox"
+    "the quick fox"
+
+``append`` 函数依然对每个列表元素使用列表构造器，但是，当第一个输入列表为空时，它将第二个输入列表（而不是空列表元素）拼接到第一个输入列表的表尾。
+
+通过前面这些例子对 ``foldr`` 的介绍，我们应该可以了解到， ``foldr`` 函数和《列表处理》一节所介绍的基本列表操作函数一样重要。由于 ``foldr`` 可以增量地处理和产生列表，所以它对于惰性数据处理也非常有用。
