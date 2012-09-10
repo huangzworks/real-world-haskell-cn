@@ -603,3 +603,9 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
     500000000500000000
 
 就是这样。]
+
+
+延伸阅读
+^^^^^^^^^^^
+
+`A tutorial on the universality and expressiveness of fold <http://www.cs.nott.ac.uk/~gmh/fold.pdf>`_ 是一篇关于 fold 的优秀且深入的文章。它使用了很多例子来展示如何通过简单的系统化计算技术，将一些显式递归的函数转换成 fold 。
