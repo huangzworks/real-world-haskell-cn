@@ -669,6 +669,180 @@ Haskell 允许我们编写完全匿名的函数，这样就不必再费力地为
 部分函数应用和柯里化
 ------------------------
 
+类型签名里的 ``->`` 可能会让人感到奇怪：
+
+::
+
+    Prelude> :type dropWhile
+    dropWhile :: (a -> Bool) -> [a] -> [a]
+
+初看上去，似乎 ``->`` 既用于隔开 ``dropWhile`` 函数的各个参数（比如括号里的 ``a`` 和 ``Bool`` ），又用于隔开函数参数和返回值的类型（\ ``(a -> Bool) -> [a]`` 和 ``[a]``\ ）。
+
+但是，实际上 ``->`` 只有一种作用：它表示一个函数接受一个参数，并返回一个值。其中 ``->`` 符号的左边是参数的类型，右边是返回值的类型。
+
+理解 ``->`` 的含义非常重要：在 Haskell 中，\ *所有函数都只接受一个参数*\ 。尽管 ``dropWhile`` 看上去像是一个接受两个参数的函数，但实际上它是一个接受一个参数的函数，而这个函数的返回值是另一个函数，这个被返回的函数也只接受一个参数。
+
+以下是一个完全合法的 Haskell 表达式：
+
+::
+
+    Prelude> :module +Data.Char
+
+    Prelude Data.Char> :type dropWhile isSpace
+    dropWhile isSpace :: [Char] -> [Char]
+
+表达式 ``dropWhile isSpace`` 的值是一个函数，这个函数移除一个字符串的所有前置空白。作为一个例子，可以将它应用到一个高阶函数：
+
+::
+
+    Prelude Data.Char> map (dropWhile isSpace) [" a", "f", "    e"]
+    ["a","f","e"]
+
+每当我们将一个参数传给一个函数时，这个函数的类型签名最前面的一个元素就会被“移除掉”。这里用函数 ``zip3`` 来做例子，这个函数接受三个列表，并将它们压缩成一个包含三元组的列表：
+
+::
+
+    Prelude> :type zip3
+    zip3 :: [a] -> [b] -> [c] -> [(a, b, c)]
+
+    Prelude> zip3 "foo" "bar" "quux"
+    [('f','b','q'),('o','a','u'),('o','r','u')]
+
+如果只将一个参数应用到 ``zip3`` 函数，那么它就会返回一个接受两个参数的函数。无论之后将什么参数传给这个复合函数，之前传给它的第一个参数的值都不会改变。
+
+::
+
+    Prelude> :type zip3
+    zip3 :: [a] -> [b] -> [c] -> [(a, b, c)]
+
+    Prelude> :type zip3 "foo"
+    zip3 "foo" :: [b] -> [c] -> [(Char, b, c)]
+
+    Prelude> :type zip3 "foo" "bar"
+    zip3 "foo" "bar" :: [c] -> [(Char, Char, c)]
+
+    Prelude> :type zip3 "foo" "bar" "quux"
+    zip3 "foo" "bar" "quux" :: [(Char, Char, Char)]
+
+传入参数的数量，少于函数所能接受参数的数量，这种情况被称为函数的\ *部分应用*\ （partial application of the function）：函数正被它的其中几个参数所应用。
+
+在上面的例子中， ``zip3 "foo"`` 就是一个部分应用函数，它以 ``"foo"`` 作为第一个参数，部分应用了 ``zip3`` 函数；而 ``zip3 "foo" "bar"`` 也是另一个部分应用函数，它以 ``"foo"`` 和 ``"bar"`` 作为参数，部分应用了 ``zip3`` 函数。
+
+只要给部分函数补充上足够的参数，它就可以被成功求值：
+
+::
+
+    Prelude> let zip3foo = zip3 "foo"
+
+    Prelude> zip3foo "bar" "quux"
+    [('f','b','q'),('o','a','u'),('o','r','u')]
+
+    Prelude> let zip3foobar = zip3 "foo" "bar"
+
+    Prelude> zip3foobar "quux"
+    [('f','b','q'),('o','a','u'),('o','r','u')]
+
+    Prelude> zip3foobar [1, 2, 3]
+    [('f','b',1),('o','a',2),('o','r',3)]
+
+部分函数应用（partial function application）让我们免于编写烦人的一次性函数，而且它比起之前介绍的匿名函数要来得更有用。回顾之前的 ``isInAny`` 函数，以下是一个部分应用函数改写的版本，它既不需要匿名函数，也不需要辅助函数：
+
+.. literalinclude:: /code/ch04/isInAny3.hs
+
+表达式 ``isInfixOf needle`` 是部分应用函数，它以 ``needle`` 变量作为第一个参数，传给 ``isInfixOf`` ，并产生一个部分应用函数，这个部分应用函数的作用等同于 ``isInAny`` 定义的辅助函数，以及 ``isInAny2`` 定义的匿名函数。
+
+部分函数应用被称为柯里化（currying），以逻辑学家 Haskell Curry 命名（Haskell 语言的命名也是来源于他的名字）。
+
+以下是另一个使用柯里化的例子。先来回顾《左折叠》章节的 ``niceSum`` 函数：
+
+.. literalinclude:: /code/ch04/niceSum.hs
+
+实际上，并不需要完全应用 ``foldl`` [译注：完全应用是指提供函数所需的全部参数]，\ ``niceSum`` 函数的 ``xs`` 参数，以及传给 ``foldl`` 函数的 ``xs`` 参数，这两者都可以被省略，最终得到一个更紧凑的函数，它的类型也和原本的一样：
+
+.. literalinclude:: /code/ch04/niceSumPartial.hs
+
+测试：
+
+::
+
+    Prelude> :load niceSumPartial.hs
+    [1 of 1] Compiling Main             ( niceSumPartial.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> niceSumPartial [1 .. 10]
+    55
+
+
+节
+^^^^^
+
+Haskell 提供了一种方便的符号快捷方式，用于对中序函数进行部分应用：使用括号包围一个操作符，通过在括号里面提供左操作对象或者右操作对象，可以产生一个部分应用函数。这种类型的部分函数应用称之为节（section）。
+
+::
+
+    Prelude> (1+) 2
+    3
+
+    Prelude> map (*3) [24, 36]
+    [72,108]
+
+    Prelude> map (2^) [3, 5, 7, 9]
+    [8,32,128,512]
+
+如果向节提供左操作对象，那么得出的部分函数就会将接收到的参数应用为右操作对对象，反之亦然。
+
+以下两个表达式都计算 2 的 3 次方，但是第一个节接受的是左操作对象 ``2`` ，而第二个节接受的则是右操作对象 ``3`` 。
+
+::
+
+    Prelude> (2^) 3
+    8
+
+    Prelude> (^3) 2
+    8
+
+之前提到过，通过使用反括号来包围一个函数，可以将这个函数用作中序操作符。这种用法可以让节使用函数：
+
+::
+
+    Prelude> :type (`elem` ['a' .. 'z'])
+    (`elem` ['a' .. 'z']) :: Char -> Bool
+
+上面的定义将 ``['a' .. 'z']`` 传给 ``elem`` 作为第二个参数，表达式返回的函数可以用于检查一个给定字符值是否属于小写字母：
+
+::
+
+
+    Prelude> (`elem` ['a' .. 'z']) 'f'
+    True
+
+    Prelude> (`elem` ['a' .. 'z']) '1'
+    False
+
+还可以将这个节用作 ``all`` 函数的输入，这样就得到了一个检查给定字符串是否整个字符串都由小写字母组成的函数：
+
+::
+
+    Prelude> all (`elem` ['a' .. 'z']) "Haskell"
+    False
+
+    Prelude> all (`elem` ['a' .. 'z']) "haskell"
+    True
+
+通过这种用法，可以再一次提升 ``isInAny3`` 函数的可读性：
+
+.. literalinclude:: /code/ch04/isInAny4.hs
+
+[译注：根据前面部分函数部分提到的技术，这个 ``isInAny4`` 的定义还可以进一步精简，去除 ``haystack`` 参数：
+
+::
+
+    import Data.List (isInfixOf)
+    isInAny4Partial needle = any (needle `isInfixOf`)
+
+
+]
+
 
 As-模式
 ---------
