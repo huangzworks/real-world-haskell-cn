@@ -104,7 +104,7 @@ div.content {
     margin-left: 40px;
     margin-right: 40px;
     margin-bottom: 50px;
-    font-size: 0.9em;
+    font-size: 1.0em;
 }
 
 /* heading and navigation */
