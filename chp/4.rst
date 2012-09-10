@@ -609,3 +609,78 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 ^^^^^^^^^^^
 
 `A tutorial on the universality and expressiveness of fold <http://www.cs.nott.ac.uk/~gmh/fold.pdf>`_ 是一篇关于 fold 的优秀且深入的文章。它使用了很多例子来展示如何通过简单的系统化计算技术，将一些显式递归的函数转换成 fold 。
+
+
+匿名（lambda）函数
+-----------------------
+
+在前面章节定义的函数中，很多函数都带有一个简单的辅助函数：
+
+.. literalinclude:: /code/ch04/isInAny.hs
+
+Haskell 允许我们编写完全匿名的函数，这样就不必再费力地为辅助函数想名字了。因为匿名函数从 lambda 演算而来，所以匿名函数通常也被称为 lambda 函数。
+
+在 Haskell 中，匿名函数以反斜杠符号 ``\`` 为开始，后跟函数的参数（可以包含模式），而函数体定义在 ``->`` 符号之后。其中， ``\`` 符号读作 *lambda* 。
+
+以下是前面的 ``isInAny`` 函数用 lambda 改写的版本：
+
+.. literalinclude:: /code/ch04/isInAny2.hs
+
+定义使用括号包裹了整个匿名函数，确保 Haskell 可以知道匿名函数体在那里结束。
+
+匿名函数各个方面的行为都和带名称的函数基本一致，但是，匿名函数的定义受到几个严格的限制，其中最重要的一点是：普通函数可以通过多条语句来定义，而 lambda 函数的定义只能有一条语句。
+
+只能使用一条语句的局限性，限制了在 lambda 定义中可使用的模式。一个普通函数，通常要使用多条定义，来覆盖各种不同的模式：
+
+.. literalinclude:: /code/ch04/safeHead.hs
+
+而 lambda 只能覆盖其中一种情形：
+
+.. literalinclude:: /code/ch04/unsafeHead.hs
+
+如果一不小心，将这个函数应用到错误的模式上，它就会给我们带来麻烦：
+
+::
+
+    Prelude> :load unsafeHead.hs
+    [1 of 1] Compiling Main             ( unsafeHead.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> :type unsafeHead
+    unsafeHead :: [t] -> t
+
+    *Main> unsafeHead [1]
+    1
+
+    *Main> unsafeHead []
+    *** Exception: unsafeHead.hs:2:14-24: Non-exhaustive patterns in lambda
+
+因为这个 lambda 定义是完全合法的，它的类型也没有错误，所以它可以被顺利编译，而最终在运行期产生错误。这个故事说明，如果你要在 lambda 函数里使用模式，请千万小心，必须确保你的模式不会匹配失败。
+
+另外需要注意的是，在前面定义的 ``isInAny`` 函数和 ``isInAny2`` 函数里，带有辅助函数的 ``isInAny`` 要比使用 lambda 的 ``isInAny2`` 要更具可读性。带有名字的辅助函数不会破坏程序的代码流（flow），而且它的名字也可以传达更多的相关信息。
+
+相反，当在一个函数定义里面看到 lambda 时，我们必须慢下来，仔细阅读这个匿名函数的定义，弄清楚它都干了些什么。为了程序的可读性和可维护性考虑，我们在很多情况下都会避免使用 lambda 。
+
+当然，这并不是说 lambda 函数完全没用，只是在使用它们的时候，必须小心谨慎。
+
+很多时候，部分应用函数可以很好地代替 lambda 函数，避免不必要的函数定义，粘合起不同的函数，并产生更清晰和更可读的代码。下一节就会介绍部分应用函数。
+
+
+部分函数应用和柯里化
+------------------------
+
+
+As-模式
+---------
+
+
+通过函数复合来进行代码重用
+------------------------------
+
+
+编写可读代码的提示
+--------------------
+
+
+空间泄漏和严格求值
+--------------------
