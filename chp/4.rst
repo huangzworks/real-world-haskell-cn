@@ -895,12 +895,135 @@ As-模式可以提升代码的可读性，作为对比，以下是一个没有�
 
 除了增强可读性之外， as-模式还有其他作用：它可以对输入数据进行共享，而不是复制它。在 ``noAsPattern`` 函数的定义中，当 ``(x:xs)`` 匹配时，在函数体里需要复制一个 ``(x:xs)`` 的副本。这个动作会引起内存分配。虽然这个分配动作可能很廉价，但它并不是免费的。相反，当使用 ``suffixes`` 函数时，我们通过变量 ``xs`` 重用匹配了 as-模式的输入值，因此就避免了内存分配。
 
-通过函数复合来进行代码重用
+
+通过组合函数来进行代码复用
 ------------------------------
+
+前面的 ``suffixes`` 函数实际上有一种更简单的实现方式。
+
+回忆前面在《使用列表》一节里介绍的 ``init`` 函数，它可以返回一个列表中除了最后一个元素之外的其他元素。而组合使用 ``init`` 和 ``tails`` ，可以给出一个 ``suffixes`` 函数的更简单实现：
+
+.. literalinclude:: /code/ch04/suffixes2.hs
+
+``suffixes2`` 和 ``suffixes`` 函数的行为完全一样，但  ``suffixes2`` 的定义只需一行：
+
+::
+
+    Prelude> :load suffixes2.hs
+    [1 of 1] Compiling Main             ( suffixes2.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> suffixes2 "foobar"
+    ["foobar","oobar","obar","bar","ar","r"]
+
+如果仔细地观察，就会发现这里隐含着一个模式：我们先应用一个函数，然后又将这个函数得出的结果应用到另一个函数。可以将这个模式定义为一个函数：
+
+.. literalinclude:: /code/ch04/compose.hs
+
+``compose`` 函数可以用于粘合两个函数：
+
+::
+
+    Prelude> :load compose.hs
+    [1 of 1] Compiling Main             ( compose.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> :m +Data.List
+
+    *Main Data.List> let suffixes3 xs = compose init tails xs
+
+通过柯里化，可以丢掉 ``xs`` 函数：
+
+::
+
+    *Main Data.List> let suffixes4 = compose init tails
+
+更棒的是，其实我们并不需要自己编写 ``compose`` 函数，因为 Haskell 已经内置在了 ``Prelude`` 里面，使用 ``(.)`` 操作符就可以组合起两个函数：
+
+::
+
+    *Main Data.List> let suffixes5 = init . tails
+
+``(.)`` 操作符并不是什么特殊语法，它只是一个普通的操作符：
+
+::
+
+    *Main Data.List> :type (.)
+    (.) :: (b -> c) -> (a -> b) -> a -> c
+
+    *Main Data.List> :type suffixes5
+    suffixes5 :: [a] -> [[a]]
+
+    *Main Data.List> suffixes5 "foobar"
+    ["foobar","oobar","obar","bar","ar","r"]
+
+在任何时候，都可以通过使用 ``(.)`` 来组合函数，并产生新函数。组合链的长度并没有限制，只要 ``(.)`` 符号右边函数的输出值类型适用于 ``(.)`` 符号左边函数的输入值类型就可以了。
+
+也即是，对于 ``f . g`` 来说， ``g`` 的输出值必须是 ``f`` 能接受的类型，这样的组合就是合法的， ``(.)`` 的类型签名也显示了这一点。
+
+作为例子，再来解决一个非常常见的问题：计算字符串中以大写字母开头的单词的个数：
+
+::
+
+    Prelude> :module +Data.Char
+
+    Prelude Data.Char> let capCount = length . filter (isUpper . head) . words
+
+    Prelude Data.Char> capCount "Hello there, Mon!"
+    2
+
+来逐步分析 ``capCount`` 函数的组合过程。因为 ``(.)`` 操作符是右关联的，因此我们从组合链的最右边开始研究：
+
+::
+
+    Prelude Data.Char> :type words
+    words :: String -> [String]
+
+``words`` 返回一个 ``[String]`` 类型值，因此 ``(.)`` 的左边的函数必须能接受这个参数。
+
+::
+
+    Prelude Data.Char> :type isUpper . head
+    isUpper . head :: [Char] -> Bool
+
+上面的组合函数在输入字符串以大写字母开头时返回 ``True`` ，因此 ``filter (isUpper . head)`` 表达式会返回所有以大写字母开头的字符串：
+
+::
+
+    Prelude Data.Char> :type filter (isUpper . head)
+    filter (isUpper . head) :: [[Char]] -> [[Char]]
+
+因为这个表达式返回一个列表，而 ``length`` 函数用于统计列表的长度，所以 ``length . filter (isUpper . head)`` 就计算出了所有以大写字母开头的字符串的个数。
+
+以下是另一个例子，它从 libpcap —— 一个流行的网络包过滤库中提取 C 文件头中给定格式的宏名字。这些头文件带有很多以下格式的宏：
+
+.. code-block:: c
+
+    #define DLT_EN10MB      1       /* Ethernet (10Mb) */
+    #define DLT_EN3MB       2       /* Experimental Ethernet (3Mb) */
+    #define DLT_AX25        3       /* Amateur Radio AX.25 */
+
+我们的目标是提取出所有像 ``DLT_AX25`` 和 ``DLT_EN3MB`` 这种名字。以下是程序的定义，它将整个文件看作是一个字符串，先使用 ``lines`` 对文件进行按行分割，再将 ``foldr step []`` 应用到各行当中，其中 ``step`` 辅助函数用于过滤和提取符合格式的宏名字：
+
+.. literalinclude:: /code/ch04/dlts.hs
+
+程序通过守卫表达式来过滤输入：如果输入字符串符合给定格式，就将它加入到结果列表里；否则，就略过这个字符串，继续处理剩余的输入字符串。
+
+至于 ``secondWord`` 函数，它先取出一个列表的 ``tail`` 部分，得出一个新列表。再取出新列表的 ``head`` 部分，等同于取出一个列表的第二个元素。
+
+[译注：书本的这个程序弱爆了，以下是 ``dlts`` 的一个更直观的版本，它使用 ``filter`` 来过滤输入，只保留符合格式的输入，而不是使用复杂且难看的显式递归和守卫来进行过滤：
+
+.. literalinclude:: /code/ch04/dlts2.hs
+
+]
+
+.. 这里省略掉 use your head wisely 一节，因为没什么用，使用 ``filter`` 来进行过滤完全可以避免这里的问题： ``dlts`` 实现所带来的问题都是原作者自己造成的。
 
 
 编写可读代码的提示
 --------------------
+
+
 
 
 空间泄漏和严格求值
