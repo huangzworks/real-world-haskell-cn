@@ -291,3 +291,57 @@ SimpleJSON 模块已经有了 JSON 类型的表示了，那么下一步要做的
 除了风格上的考虑之外，将翻译代码和实际打印代码分开，也有助于提升灵活性。比如说，如果想在数据写出之前进行压缩，那么只需要修改 ``putJValue`` 就可以了，不必改动整个 ``renderJValue`` 函数。
 
 分离纯代码和不纯代码的想法非常有效，并且在 Haskell 代码中无处不在。现有的一些 Haskell 压缩模块，它们都拥有简单的接口：压缩函数接受一个未压缩的字符串，并返回一个压缩后的字符串。通过组合使用不同的函数，可以在打印 JSON 值之前，对数据进行各种不同的处理。
+
+
+.. _type-inference-is-a-double-edge-sword:
+
+类型推导是一把双刃剑
+---------------------------
+
+Haskell 编译器的类型推导能力非常强大也非常有价值。在刚开始的时候，我们通常会倾向于尽可能地省略所有类型签名，让类型推导去决定所有函数的类型定义。
+
+但是，这种做法是有缺陷的，它通常是 Haskell 新手引发类型错误的主要来源。
+
+如果我们省略显式的类型信息时，那么编译器就必须猜测我们的意图：它会推导出合乎逻辑且相容的（consistent）类型，但是，这些类型可能并不是我们想要的。一旦程序员和编译器之间的想法产生了分歧，那么寻找 bug 的工作就会变得更困难。
+
+作为例子，假设有一个函数，它预计会返回 ``String`` 类型的值，但是没有显式地为它编写类型签名：
+
+::
+
+    -- file: ch05/Trouble.hs
+
+    import Data.Char (toUpper)
+
+    upcaseFirst (c:cs) = toUpper c  -- 这里忘记了 ":cs"
+
+这个函数试图将输入单词的第一个字母设置为大写，但是它在设置之后，忘记了重新拼接字符串的后续部分 ``xs`` 。在我们的预想中，这个函数的类型应该是 ``String -> String`` ，但编译器推导出的类型却是 ``String -> Char`` 。
+
+现在，有另一个函数调用这个 ``upcaseFirst`` 函数：
+
+::
+
+    -- file: ch05/Trouble.hs
+
+    camelCase :: String -> String
+    camelCase xs = concat (map upcaseFirst (words xs))
+
+这段代码在载入 ghci 时会发生错误：
+
+::
+
+    Prelude> :load Trouble.hs
+    [1 of 1] Compiling Main             ( Trouble.hs, interpreted )
+
+    Trouble.hs:8:28:
+        Couldn't match expected type `[Char]' with actual type `Char'
+        Expected type: [Char] -> [Char]
+            Actual type: [Char] -> Char
+        In the first argument of `map', namely `upcaseFirst'
+        In the first argument of `concat', namely            `(map upcaseFirst (words xs))'
+    Failed, modules loaded: none.
+
+请注意，如果不是 ``upcaseFirst`` 被其他函数所调用的话，它的错误可能并不会被发现！相反，如果我们之前为 ``upcaseFirst`` 编写了类型签名的话，那么 ``upcaseFirst`` 的类型错误就会立即被捕捉到，并且可以即刻定位出错误发生的位置。
+
+为函数编写类型签名，既可以移除我们实际想要的类型和编译器推导出的类型之间的分歧，也可以作为函数的一种文档，帮助阅读和理解函数的行为。
+
+这并不是说要巨细无遗地为所有函数都编写类型签名。不过，为所有顶层（top-level）函数添加类型签名通常是一种不错的做法。在刚开始的时候最好尽可能地为函数添加类型签名，然后随着对类型系统了解的加深，逐步放松要求。
