@@ -234,3 +234,60 @@ Ghc 会自动找到所需的文件，进行编译和链接，然后产生可执�
 
     $ ./simple 
     JObject [("foo",JNumber 1.0),("bar",JBool False)]
+
+
+打印 JSON 数据
+------------------
+
+SimpleJSON 模块已经有了 JSON 类型的表示了，那么下一步要做的就是将 Haskell 值翻译（render）成 JSON 数据。
+
+有好几种方法可以将 Haskell 值翻译成 JSON 数据，最直接的一种是编写翻译函数，以 JSON 格式来打印 Haskell 值。稍后会介绍完成这个任务的其他更有趣方法。
+
+::
+
+    module PutJSON where
+
+    import Data.List (intercalate)
+    import SimpleJSON
+
+    renderJValue :: JValue -> String
+
+    renderJValue (JString s)   = show s
+    renderJValue (JNumber n)   = show n
+    renderJValue (JBool True)  = "true"
+    renderJValue (JBool False) = "false"
+    renderJValue JNull         = "null"
+
+    renderJValue (JObject o) = "{" ++ pairs o ++ "}"
+      where pairs [] = ""
+        pairs ps = intercalate ", " (map renderPair ps)
+        renderPair (k,v)   = show k ++ ": " ++ renderJValue v
+
+    renderJValue (JArray a) = "[" ++ values a ++ "]"
+      where values [] = ""
+        values vs = intercalate ", " (map renderJValue vs)
+
+分割纯代码和带有 IO 的代码是一种良好的 Haskell 风格。这里我们用 ``putJValue`` 来进行打印操作，这样就不会影响 ``renderJValue`` 的纯洁性：
+
+::
+
+    putJValue :: JValue -> IO ()
+    putJValue v = putStrLn (renderJValue v)
+
+现在打印 JSON 值变得容易得多了：
+
+::
+
+    Prelude SimpleJSON> :load PutJSON
+    [2 of 2] Compiling PutJSON          ( PutJSON.hs, interpreted )
+    Ok, modules loaded: PutJSON, SimpleJSON.
+
+    *PutJSON> putJValue (JString "a")
+    "a"
+
+    *PutJSON> putJValue (JBool True)
+    true
+
+除了风格上的考虑之外，将翻译代码和实际打印代码分开，也有助于提升灵活性。比如说，如果想在数据写出之前进行压缩，那么只需要修改 ``putJValue`` 就可以了，不必改动整个 ``renderJValue`` 函数。
+
+分离纯代码和不纯代码的想法非常有效，并且在 Haskell 代码中无处不在。现有的一些 Haskell 压缩模块，它们都拥有简单的接口：压缩函数接受一个未压缩的字符串，并返回一个压缩后的字符串。通过组合使用不同的函数，可以在打印 JSON 值之前，对数据进行各种不同的处理。
