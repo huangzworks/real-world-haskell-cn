@@ -345,3 +345,82 @@ Haskell 编译器的类型推导能力非常强大也非常有价值。在刚开
 为函数编写类型签名，既可以移除我们实际想要的类型和编译器推导出的类型之间的分歧，也可以作为函数的一种文档，帮助阅读和理解函数的行为。
 
 这并不是说要巨细无遗地为所有函数都编写类型签名。不过，为所有顶层（top-level）函数添加类型签名通常是一种不错的做法。在刚开始的时候最好尽可能地为函数添加类型签名，然后随着对类型系统了解的加深，逐步放松要求。
+
+
+.. _a-more-general-look-at-rendering:
+
+更通用的转换方式
+--------------------
+
+在前面构造 SimpleJSON 库时，我们的目标主要是按照 JSON 的格式，将 Haskell 数据转换为 JSON 值。而这些转换所得值的输出可能并不是那么适合人去阅读。有一些被称为美观打印器（pretty printer）的库，它们的输出既适合机器读入，也适合人类阅读。我们这就来编写一个美观打印器，学习库设计和函数式编程的相关技术。
+
+这个美观打印器库命名为 Prettify ，它被包含在 ``Prettify.hs`` 文件里。为了让 Prettify 适用于实际需求，我们先编写一个新的 JSON 转换器，它使用 Prettify 提供的 API 。等完成这个 JSON 转换器之后，再转过头来补充 Prettify 模块的细节。
+
+和前面的 SimpleJSON 模块不同，Prettify 模块将数据转换为一种称为 ``Doc`` 类型的抽象数据，而不是字符串：抽象类型允许我们随意选择不同的实现，最大化灵活性和效率，而且在更改实现时，不会影响到用户。
+
+新的 JSON 转换模块被命名为 ``PrettyJSON.hs`` ，转换的工作依然由 ``renderJValue`` 函数进行，它的定义和之前一样简单直观：
+
+::
+
+    -- file: ch05/PrettyJSON.hs
+    renderJValue :: JValue -> Doc
+    renderJValue (JBool True)  = text "true"
+    renderJValue (JBool False) = text "false"
+    renderJValue JNull         = text "null"
+    renderJValue (JNumber num) = double num
+    renderJValue (JString str) = string str
+
+其中 ``text`` 、 ``double`` 和 ``string`` 都由 Prettify 模块提供。
+
+
+.. _developing-haskell-code-without-going-nuts:
+
+Haskell 开发诀窍
+----------------------
+
+在刚开始进行 Haskell 开发的时候，通常需要面对大量崭新、不熟悉的概念，要一次性完成程序的编写，并顺利通过编译器检查，难度非常的高。
+
+在每次完成一个功能点时，花几分钟停下来，对程序进行编译，是非常有益的：因为 Haskell 是强类型语言，如果程序能成功通过编译，那么说明程序和我们预想中的目标相去不远。
+
+编写函数和类型的占位符（placeholder）版本，对于快速原型开发非常有效。举个例子，前文断言， ``string`` 、 ``text`` 和 ``double`` 函数都由 ``Prettify`` 模块提供，如果 ``Prettify`` 模块里不定义这些函数，或者不定义 ``Doc`` 类型，那么对程序的编译就会失败，我们的“早编译，常编译”战术就没有办法施展。通过编写占位符代码，可以避免这些问题：
+
+::
+
+    -- file: ch05/PrettyStub.hs
+    import SimpleJSON
+
+    data Doc = ToBeDefined
+             deriving (Show)
+
+     string :: String -> Doc
+     string str = undefined
+
+     text :: String -> Doc
+     text str = undefined
+
+     double :: Double -> Doc
+     double num = undefined
+
+特殊值 ``undefined`` 的类型为 ``a`` ，因此它可以让代码顺利通过类型检查。因为它只是一个占位符，没有什么实际作用，所以对它进行求值只会产生错误：
+
+::
+
+    *Main> :type undefined
+    undefined :: a
+
+    *Main> undefined
+    *** Exception: Prelude.undefined
+
+    *Main> :load PrettyStub.hs
+    [2 of 2] Compiling Main             ( PrettyStub.hs, interpreted )
+    Ok, modules loaded: Main, SimpleJSON.
+
+    *Main> :type double
+    double :: Double -> Doc
+
+    *Main> double 3.14
+    *** Exception: Prelude.undefined
+
+尽管程序里还没有任何实际可执行的代码，但是编译器的类型检查器可以保证程序中类型的正确性，这为接下来的进一步开发奠定了良好基础。
+
+
