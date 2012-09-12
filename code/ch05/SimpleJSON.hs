@@ -1,5 +1,17 @@
 -- file: ch05/SimpleJSON.hs
 
+module SimpleJSON
+    (
+        JValue(..)
+    ,   getString
+    ,   getInt
+    ,   getDouble
+    ,   getBool
+    ,   getObject
+    ,   getArray
+    ,   isNull
+    ) where
+
 data JValue = JString String
             | JNumber Double
             | JBool Bool
@@ -14,6 +26,9 @@ getString _           = Nothing
 
 getInt (JNumber n) = Just (truncate n)
 getInt _           = Nothing
+
+getDouble (JNumber d) = Just d
+getDouble _           = Nothing
 
 getBool (JBool b) = Just b
 getBool _         = Nothing
