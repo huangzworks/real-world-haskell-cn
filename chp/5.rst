@@ -1,0 +1,30 @@
+第五章：编写 JSON 库
+=========================
+
+
+JSON 简介
+-----------
+
+在这一章，我们将开发一个小而完整的 Haskell 库，这个库用于处理和序列化 JSON 数据。
+
+JSON （JavaScript 对象符号）是一种小型、表示简单、便于存储和发送的语言。它通常用于从 web 服务向阅览器 JavaScript 程序传送数据。JSON 的格式由 `www.json.org <www.json.org>`_ 描述，而细节由 `RFC 4627 <http://www.ietf.org/rfc/rfc4627.txt>`_ 补充。
+
+JSON 支持四种基本类型值：字符串、数字、布尔值和一个特殊值， ``null`` 。
+
+.. code-block:: json
+
+    "a string"
+
+    12345
+
+    true
+
+    null
+
+JSON 还提供了两种符合类型：数组是值的一种有序序列，而对象则是“名字/值对”的无序收集器（unordered collection of name/value pairs），其中对象的名字必须是字符串，而对象和数组的值则可以是任何 JSON 类型。
+
+.. code-block:: json
+
+    [-3.14, true, null, "a string"]
+
+    {"numbers": [1,2,3,4,5], "useful": false}
