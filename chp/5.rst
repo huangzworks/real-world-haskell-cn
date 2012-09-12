@@ -28,3 +28,110 @@ JSON 还提供了两种符合类型：数组是值的一种有序序列，而对
     [-3.14, true, null, "a string"]
 
     {"numbers": [1,2,3,4,5], "useful": false}
+
+
+在 Haskell 中表示 JSON 数据
+--------------------------------
+
+要在 Haskell 中处理 JSON 数据，可以用一个代数数据类型来表示 JSON 的各个数据类型：
+
+::
+
+    -- file: ch05/SimpleJSON.hs
+    data JValue = JString String
+                | JNumber Double
+                | JBool Bool
+                | JNull
+                | JObject [(String, JValue)]
+                | JArray [JValue]
+                  deriving (Eq, Ord, Show)
+
+[译注：这里的 ``JObject [(String, JValue)]`` 不能改为 ``JObject [(JString, JValue)]`` ，因为值构造器里面声明的是类构造器，不能是值构造器。
+
+另外，严格来说， ``JObject`` 并不是完全无序的，因为它的定义使用了列表来包围，在书本的后面会介绍 ``Map`` 类型，它可以创建一个无序的键-值对结构。]
+
+对于每个 JSON 类型，代码都定义了一个单独的值构造器。部分构造器带有参数，比如说，如果你要创建一个 JSON 字符串，那么就要给 ``JString`` 值构造器传入一个 ``String`` 类型值作为参数。
+
+将这些定义载入到 ghci 试试看：
+
+::
+
+    Prelude> :load SimpleJSON
+    [1 of 1] Compiling Main             ( SimpleJSON.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> JString "the quick brown fox"
+    JString "the quick brown fox"
+
+    *Main> JNumber 3.14
+    JNumber 3.14
+
+    *Main> JBool True
+    JBool True
+
+    *Main> JNull
+    JNull
+
+    *Main> JObject [("language", JString "Haskell"), ("complier", JString "GHC")]
+    JObject [("language",JString "Haskell"),("complier",JString "GHC")]
+
+    *Main> JArray [JString "Haskell", JString "Clojure", JString "Python"]
+    JArray [JString "Haskell",JString "Clojure",JString "Python"]
+
+前面代码中的构造器将一个 Haskell 值转换为一个 ``JValue`` 。反过来，同样可以通过模式匹配，从 ``JValue`` 中取出 Haskell 值。
+
+以下函数试图从一个 ``JString`` 值中取出一个 Haskell 字符串：如果 ``JValue`` 真的包含一个字符串，那么程序返回一个用 ``Just`` 构造器包裹的字符串；否则，它返回一个 ``Nothing`` 。
+
+::
+
+    -- file: ch05/SimpleJSON.hs
+    getString :: JValue -> Maybe String
+    getString (JString s) = Just s
+    getString _           = Nothing
+
+保存修改过的源码文件，然后使用 ``:reload`` 命令重新载入 ``SimpleJSON.hs`` 文件。（\ ``:reload`` 会自动记忆最近一次载入的文件）：
+
+::
+
+    *Main> :reload
+    [1 of 1] Compiling Main             ( SimpleJSON.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> getString (JString "hello")
+    Just "hello"
+
+    *Main> getString (JNumber 3)
+    Nothing
+
+在加上一些其他函数，初步完成一些基本功能：
+
+::
+        
+    -- file: ch05/SimpleJSON.hs
+    getInt (JNumber n) = Just (truncate n)
+    getInt _           = Nothing
+
+    getBool (JBool b) = Just b
+    getBool _         = Nothing
+
+    getObject (JObject o) = Just o
+    getObject _           = Nothing
+
+    getArray (JArray a) = Just a
+    getArray _          = Nothing
+
+    isNull v            = v == JNull
+
+``truncate`` 函数通过将浮点数或者有理数的小数位丢掉来获得一个整数返回值：
+
+::
+
+    Prelude> truncate 5.8
+    5
+
+    Prelude> :module +Data.Ratio
+
+    Prelude Data.Ratio> truncate (22 % 7)
+    3
+
+
