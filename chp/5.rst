@@ -177,3 +177,22 @@ Haskell 模块
 ::
 
     module ExportNothing () where
+
+
+编译 Haskell 代码
+------------------
+
+除了 ghci 之外， GHC 还包括一个生成本地码（navie code）的编译器： ghc 。如果你熟悉 gcc 或者 cl （微软 Visual Studio 使用的 C++ 编译器组件）之类的编译器，那么你对 ghc 应该不会感到陌生。
+
+编译一个 Haskell 源码文件可以通过 ``ghc`` 命令来完成：
+
+::
+
+    $ ghc -c SimpleJSON.hs 
+
+    $ ls
+    SimpleJSON.hi  SimpleJSON.hs  SimpleJSON.o
+
+``-c`` 表示让 ghc 只生成目标代码。如果省略 ``-c`` 选项，那么 ghc 就会试图生成一个完整的可执行文件，这会造成失败，因为目前的 ``SimpleJSON.hs`` 还没有定义 ``main`` 函数，而 GHC 在执行一个独立程序时会调用这个 ``main`` 函数。
+
+在编译完成之后，会生成两个新文件。其中 ``SimpleJSON.hi`` 是\ *接口文件*\ （interface file）， ghc 以机器可读的格式，将模块中导出名字的信息保存在这个文件。而 ``SimpleJSON.o`` 则是\ *目标文件*\ （object file），它包含了已生成的机器码。
