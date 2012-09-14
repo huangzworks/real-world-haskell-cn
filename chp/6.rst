@@ -1,3 +1,5 @@
+.. _using-typeclasses:
+
 第六章：类型类
 ================
 
@@ -7,6 +9,8 @@
 
 在讨论如何使用类型类之前，先来看看它能做什么。
 
+
+.. _the-need-for-typeclasses:
 
 类型类的作用
 ----------------
@@ -62,3 +66,132 @@
 还有很重要的一点是，如果在之后添加通用函数对新类型的支持，那么原来的代码应该不需要进行修改。
 
 Haskell 的类型类可以满足以上提到的所有要求。
+
+
+.. _what-are-typeclasses:
+
+什么是类型类？
+-----------------
+
+类型类定义了一集函数，这些函数对于不同类型的值使用不同的函数实现。它和其他语言的接口和多态方法有些类似。
+
+[译注：这里原文是将“面向对象编程中的对象”和 Haskell 的类型类进行类比，但实际上这种类比并不太恰当，类比成接口和多态方法更适合一点。]
+
+我们定义一个类型类来解决前面提到的相等性测试问题：
+
+::
+
+    class BasicEq a where
+        isEqual :: a -> a -> Bool
+
+类型类使用 ``class`` 关键字来定义，跟在 ``class`` 之后的 ``BasicEq`` 是这个类型类的名字，之后的 ``a`` 是这个类型类的实例类型（instance type）。
+
+``BasicEq`` 使用类型变量 ``a`` 来表示实例类型，说明它并不将这个类型类限定于某个类型：任何一个类型，只要它实现了这个类型类中定义的函数，那么它就是这个类型类的实例类型。
+
+实例类型所使用的名字可以随意选择，但是它和类型类中定义函数签名时所使用的名字应该保持一致。比如说，我们使用 ``a`` 来表示实例类型，那么函数签名中也必须使用 ``a`` 来代表这个实例类型。
+
+``BasicEq`` 类型类只定义了 ``isEqual`` 一个函数 —— 它接受两个参数作为输入，并且这两个参数都指向同一种实例类型：
+
+::
+
+    Prelude> :load BasicEq_1.hs
+    [1 of 1] Compiling Main             ( BasicEq_1.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> :type isEqual
+    isEqual :: BasicEq a => a -> a -> Bool
+
+作为演示，以下代码将 ``Bool`` 类型作为 ``BasicEq`` 的实例类型，实现了 ``isEqual`` 函数：
+
+::
+
+    instance BasicEq Bool where
+        isEqual True  True  = True
+        isEqual False False = True
+        isEqual _     _     = False
+
+在 ghci 里验证这个程序：
+
+::
+
+    *Main> isEqual True True
+    True
+
+    *Main> isEqual False True
+    False
+
+如果试图将不是 ``BasicEq`` 实例类型的值作为输入调用 ``isEqual`` 函数，那么就会引发错误：
+
+::
+
+    *Main> isEqual "hello" "moto"
+
+    <interactive>:5:1:
+        No instance for (BasicEq [Char])
+              arising from a use of `isEqual'
+        Possible fix: add an instance declaration for (BasicEq [Char])
+        In the expression: isEqual "hello" "moto"
+        In an equation for `it': it = isEqual "hello" "moto"
+
+错误信息提醒我们， ``[Char]`` 并不是 ``BasicEq`` 的实例类型。
+
+稍后的一节会介绍更多关于类型类实例的定义方式，这里先继续前面的例子。这一次，除了 ``isEqual`` 之外，我们还想定义不等测试函数 ``isNotEqual`` ：
+
+::
+
+    class BasicEq a where
+        isEqual    :: a -> a -> Bool
+        isNotEqual :: a -> a -> Bool
+
+同时定义 ``isEqual`` 和 ``isNotEqual`` 两个函数产生了一些不必要的工作：从逻辑上讲，对于任何类型，只要知道 ``isEqual`` 或 ``isNotEqual`` 的任意一个，就可以计算出另外一个。因此，一种更省事的办法是，为 ``isEqual`` 和 ``isNotEqual`` 两个函数提供默认值，这样 ``BasicEq`` 的实例类型只要实现这两个函数中的一个，就可以顺利使用这两个函数：
+
+::
+
+    class BasicEq a where
+        isEqual :: a -> a -> Bool
+        isEqual x y = not (isNotEqual x y)
+
+        isNotEqual :: a -> a -> Bool
+        isNotEqual x y = not (isEqual x y)
+
+以下是将 ``Bool`` 作为 ``BasicEq`` 实例类型的例子：
+
+::
+
+    instance BasicEq Bool where
+        isEqual False False = True
+        isEqual True  True  = True
+        isEqual _     _     = False
+
+我们只要定义 ``isEqual`` 函数，就可以“免费”得到 ``isNotEqual`` ：
+
+::
+
+    Prelude> :load BasicEq_3.hs
+    [1 of 1] Compiling Main             ( BasicEq_3.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> isEqual True True
+    True
+
+    *Main> isEqual False False
+    True
+
+    *Main> isNotEqual False True
+    True
+
+当然，如果闲着没事，你仍然可以自己亲手定义这两个函数。但是，你至少要定义两个函数中的一个，否则两个默认的函数就会互相调用，直到程序崩溃。
+
+Haskell Report 定义了 ``Eq`` 作为 ``==`` 操作和 ``/=`` 操作的类型类，它的定义和 ``BasicEq`` 非常相似：
+
+::
+
+    class  Eq a  where
+        (==), (/=) :: a -> a -> Bool
+
+    -- Minimal complete definition:
+    --     (==) or (/=)
+    x /= y     =  not (x == y)
+    x == y     =  not (x /= y)
+
+
