@@ -1,0 +1,64 @@
+第六章：类型类
+================
+
+类型类（type class）是 Haskell 最强大的功能之一：它用于定义通用接口，为各种不同的类型提供一组公共特性集。
+
+类型类是某些基本语言特性的核心，比如相等性测试和数值操作符。
+
+在讨论如何使用类型类之前，先来看看它能做什么。
+
+
+类型类的作用
+----------------
+
+假设这样一个场景：我们想对 ``Color`` 类型的值进行对比，但 Haskell 的语言设计者却没有实现 ``==`` 操作。
+
+要解决这个问题，必须亲自实现一个相等性测试函数：
+
+.. literalinclude:: /code/ch06/colorEq.hs
+
+在 ghci 里测试：
+
+::
+
+    Prelude> :load colorEq.hs
+    [1 of 1] Compiling Main             ( colorEq.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> colorEq Green Green
+    True
+
+    *Main> colorEq Blue Red
+    False
+
+过了一会，程序又添加了一个新类型 —— 职位：它对公司中的各个员工进行分类。
+
+在执行像是工资计算这类任务是，又需要用到相等性测试，所以又需要再次为职位类型定义相等性测试函数：
+
+.. literalinclude:: /code/ch06/roleEq.hs
+
+测试：
+
+::
+
+    Prelude> :load roleEq.hs
+    [1 of 1] Compiling Main             ( roleEq.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> roleEq Boss Boss
+    True
+
+    *Main> roleEq Boss Employee
+    False
+
+``colorEq`` 和 ``roleEq`` 的定义揭示了一个问题：对于每个不同的类型，我们都需要为它们专门定义一个对比函数。
+
+这种做法非常低效，而且烦人。如果同一个对比函数（比如 ``==`` ）可以用于对比任何类型的值，这样就会方便得多。
+
+另一方面，一般来说，如果定义了相等测试函数（比如 ``==`` ），那么不等测试函数（比如 ``/=`` ）的值就可以直接对相等测试函数取反（使用 ``not`` ）来计算得出。因此，如果可以通过相等测试函数来定义不等测试函数，那么会更方便。
+
+通用函数还可以让代码变得更通用：如果同一段代码可以用于不同类型的输入值，那么程序的代码量将大大减少。
+
+还有很重要的一点是，如果在之后添加通用函数对新类型的支持，那么原来的代码应该不需要进行修改。
+
+Haskell 的类型类可以满足以上提到的所有要求。
