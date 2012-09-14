@@ -1,5 +1,6 @@
 .. _using-typeclasses:
 
+
 第六章：类型类
 ================
 
@@ -182,7 +183,42 @@ Haskell 的类型类可以满足以上提到的所有要求。
 
 当然，如果闲着没事，你仍然可以自己亲手定义这两个函数。但是，你至少要定义两个函数中的一个，否则两个默认的函数就会互相调用，直到程序崩溃。
 
-Haskell Report 定义了 ``Eq`` 作为 ``==`` 操作和 ``/=`` 操作的类型类，它的定义和 ``BasicEq`` 非常相似：
+
+.. _declaring-typeclass-instances:
+
+定义类型类实例
+----------------
+
+定义一个类型为某个类型类的实例，指的就是，为某个类型实现给定类型类所声明的全部函数。
+
+比如在前面， ``BasicEq`` 类型类定义了两个函数 ``isEqual`` 和 ``isNotEqual`` ：
+
+::
+
+    class BasicEq a where
+        isEqual :: a -> a -> Bool
+        isEqual x y = not (isNotEqual x y)
+
+        isNotEqual :: a -> a -> Bool
+        isNotEqual x y = not (isEqual x y)
+
+在前一节，我们成功将 ``Bool`` 类型实现为 ``BasicEq`` 的实例类型，要使 ``Color`` 类型也成为 ``BasicEq`` 类型类的实例，就需要另外为 ``Color`` 类型实现 ``isEqual`` 和 ``isNotEqual`` ：
+
+::
+
+    instance BasicEq Color where
+        isEqual Red Red = True
+        isEqual Blue Blue = True
+        isEqual Green Green = True
+        isEqual _ _ = True
+
+注意，这里的函数定义和之前的 ``colorEq`` 函数定义实际上没有什么不同，唯一的区别是，它使得 ``isEqual`` 不仅可以对 ``Bool`` 类型进行对比测试，还可以对 ``Color`` 类型进行对比测试。
+
+更一般地说，只要为相应的类型实现 ``BasicEq`` 类型类中的定义，那么 ``isEqual`` 就可以用于对比\ *任何*\ 我们想对比的类型。
+
+不过在实际中，通常并不使用 ``BasicEq`` 类型类，而是使用 Haskell Report 中定义的 ``Eq`` 类型类：它定义了 ``==`` 和 ``/=`` 操作符，这两个操作符才是 Haskell 中最常用的测试函数。
+
+以下是 ``Eq`` 类型类的定义：
 
 ::
 
@@ -194,4 +230,4 @@ Haskell Report 定义了 ``Eq`` 作为 ``==`` 操作和 ``/=`` 操作的类型�
     x /= y     =  not (x == y)
     x == y     =  not (x /= y)
 
-
+稍后会介绍更多使用 ``Eq`` 类型类的信息。
