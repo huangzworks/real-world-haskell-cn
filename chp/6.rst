@@ -231,3 +231,314 @@ Haskell 的类型类可以满足以上提到的所有要求。
     x == y     =  not (x /= y)
 
 稍后会介绍更多使用 ``Eq`` 类型类的信息。
+
+
+.. _important-built-in-typeclasses:
+
+几个重要的内置类型类
+----------------------
+
+前面两节分别介绍了类型类的定义，以及如何让某个类型成为给定类型类的实例类型。
+
+正本节会介绍几个 ``Prelude`` 库中包含的类型类。如本章开始时所说的，类型类是 Haskell 语言某些特性的奠基石，本节就会介绍几个这方面的例子。
+
+更多信息可以参考 Haskell 的函数参考，那里一般都给出了类型类的详细介绍，并且说明，要成为这个类型类的实例，需要实现那些函数。
+
+
+Show
+^^^^^^^^
+
+``Show`` 类型类用于将值转换为字符串，它最重要的函数是 ``show`` 。
+
+``show`` 函数使用单个参数接收输入数据，并返回一个表示该输入数据的字符串：
+
+::
+
+    Main> :type show
+    show :: Show a => a -> String
+
+以下是一些 ``show`` 函数调用的例子：
+
+::
+
+    Main> show 1
+    "1"
+
+    Main> show [1, 2, 3]
+    "[1,2,3]"
+
+    Main> show (1, 2)
+    "(1,2)"
+
+Ghci 输出一个值，实际上就是对这个值调用 ``putStrLn`` 和 ``show`` ：
+
+::
+ 
+    Main> 1
+    1
+
+    Main> show 1
+    "1"
+
+    Main> putStrLn (show 1)
+    1
+
+因此，如果你定义了一种新的数据类型，并且希望通过 ghci 来显示它，那么你就应该将这个类型实现为 ``Show`` 类型类的实例，否则 ghci 就会向你抱怨，说它不知道该怎样用字符串的形式表示这种数据类型：
+
+::
+
+    Main> data Color = Red | Green | Blue;
+
+    Main> show Red
+
+    <interactive>:10:1:
+        No instance for (Show Color)
+            arising from a use of `show'
+        Possible fix: add an instance declaration for (Show Color)
+        In the expression: show Red
+        In an equation for `it': it = show Red
+
+    Prelude> Red
+
+    <interactive>:5:1:
+        No instance for (Show Color)
+            arising from a use of `print'
+        Possible fix: add an instance declaration for (Show Color)
+        In a stmt of an interactive GHCi command: print it
+
+通过实现 ``Color`` 类型的 ``show`` 函数，让 ``Color`` 类型成为 ``Show`` 的类型实例，可以解决以上问题：
+
+::
+
+    instance Show Color where
+        show Red   = "Red"
+        show Green = "Green"
+        show Blue  = "Blue"
+
+当然， ``show`` 函数的打印值并不是非要和类型构造器一样不可，比如 ``Red`` 值并不是非要表示为 ``"Red"`` 不可，以下是另一种实例化 ``Show`` 类型类的方式：
+
+::
+
+    instance Show Color where
+        show Red   = "Color 1: Red"
+        show Green = "Color 2: Green"
+        show Blue  = "Color 3: Blue"
+
+
+Read
+^^^^^^^
+
+``Read`` 和 ``Show`` 类型类的作用正好相反，它将字符串转换为值。
+
+``Read`` 最有用的函数是 ``read`` ：它接受一个字符串作为参数，对这个字符串进行处理，并返回一个值，这个值的类型为 ``Read`` 实例类型的成员（所有实例类型中的一种）。
+
+::
+
+    Prelude> :type read
+    read :: Read a => String -> a
+
+以下代码展示了 ``read`` 的用法：
+
+::
+
+    Prelude> read "3"
+
+    <interactive>:5:1:
+        Ambiguous type variable `a0' in the constraint:
+              (Read a0) arising from a use of `read'
+        Probable fix: add a type signature that fixes these type variable(s)
+        In the expression: read "3"
+        In an equation for `it': it = read "3"
+
+    Prelude> (read "3")::Int
+    3
+
+    Prelude> :type it
+    it :: Int
+
+    Prelude> (read "3")::Double
+    3.0
+
+    Prelude> :type it
+    it :: Double
+
+注意在第一次调用 ``read`` 的时候，我们并没有显式地给定类型签名，这时对 ``read "3"`` 的求值会引发错误。这是因为有非常多的类型都是 ``Read`` 的实例，而编译器在 ``read`` 函数读入 ``"3"`` 之后，不知道应该将这个值转换成什么类型，于是编译器就会向我们发牢骚。
+
+因此，为了让 ``read`` 函数返回正确类型的值，必须给它指示正确的类型。
+
+.. 这里省略了 readsPrec 库的介绍，对初学者来说太复杂了
+
+
+使用 ``Read`` 和 ``Show`` 进行序列化
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+很多时候，程序需要将内存中的数据保存为文件，又或者，反过来，需要将文件中的数据转换为内存中的数据实体。这种转换过程称为\ *序列化*\ 和\ *反序列化*\  .
+
+通过将类型实现为 ``Read`` 和 ``Show`` 的实例类型， ``read`` 和 ``show`` 两个函数可以成为非常好的序列化工具。
+
+作为例子，以下代码将一个内存中的列表序列化到文件中：
+
+::
+
+    Prelude> let years = [1999, 2010, 2012]
+
+    Prelude> show years
+    "[1999,2010,2012]"
+
+    Prelude> writeFile "years.txt" (show years)
+
+``writeFile`` 将给定内容写入到文件当中，它接受两个参数，第一个参数是文件路径，第二个参数是写入到文件的字符串内容。
+
+观察文件 ``years.txt`` 可以看到， ``(show years)`` 所产生的文本被成功保存到了文件当中：
+
+::
+
+    $ cat years.txt
+    [1999,2010,2012]
+
+使用以下代码可以对 ``years.txt`` 进行反序列化操作：
+
+::
+
+    Prelude> input <- readFile "years.txt"
+
+    Prelude> input                  -- 读入的字符串
+    "[1999,2010,2012]"
+
+    Prelude> (read input)::[Int]    -- 将字符串转换成列表
+    [1999,2010,2012]
+
+``readFile`` 读入给定的 ``years.txt`` ，并将它的内存传给 ``input`` 变量，最后，通过使用 ``read`` ，我们成功将字符串反序列化成一个列表。
+
+
+数字类型
+^^^^^^^^^^^^^
+
+Haskell 有一集非常强大的数字类型：从速度飞快的 32 位或 64 位整数，到任意精度的有理数，包罗万有。
+
+除此之外，Haskell 还有一系列通用算术操作符，这些操作符可以用于几乎所有数字类型。而对数字类型的这种强有力的支持就是建立在类型类的基础上的。
+
+作为一个额外的好处（side benefit），用户可以定义自己的数字类型，并且获得和内置数字类型完全平等的权利。
+
+以下表格显示了 Haskell 中最常用的一些数字类型：
+
+**表格 6.1 ： 部分数字类型**
+
+========    =====================================================================
+类型        介绍
+========    =====================================================================
+Double      双精度浮点数。表示浮点数的常见选择。
+Float       单精度浮点数。通常在对接 C 程序时使用。
+Int         固定精度带符号整数；最小范围在 -2^29 至 2^29-1 。相当常用。
+Int8        8 位带符号整数
+Int16       16 位带符号整数
+Int32       32 位带符号整数
+Int64       64 位带符号整数
+Integer     任意精度带符号整数；范围由机器的内存限制。相当常用。
+Rational    任意精度有理数。保存为两个整数之比（ratio）。
+Word        固定精度无符号整数。占用的内存大小和 ``Int`` 相同
+Word8       8 位无符号整数
+Word16      16 位无符号整数
+Word32      32 位无符号整数
+Word64      64 位无符号整数
+========    =====================================================================
+
+大部分算术操作都可以用于任意数字类型，少数的一部分函数，比如 ``asin`` ，只能用于浮点数类型。
+
+以下表格列举了操作各种数字类型的常见函数和操作符：
+
+**表格 6.2 ： 部分数字函数和**
+
+============== =========================================== =========== ===================================================================
+项              类型                                        模块        描述
+============== =========================================== =========== ===================================================================
+(+)             Num a => a -> a -> a                        Prelude     加法
+(-)             Num a => a -> a -> a                        Prelude     减法
+(*)             Num a => a -> a -> a                        Prelude     乘法
+(/)             Fractional a => a -> a -> a                 Prelude     份数除法
+(**)            Floating a => a -> a -> a                   Prelude     乘幂
+(^)             (Num a, Integral b) => a -> b -> a          Prelude     计算某个数的非负整数次方
+(^^)            (Fractional a, Integral b) => a -> b -> a   Prelude     份数的任意整数次方
+(%)             Integral a => a -> a -> Ratio a             Data.Ratio  创建比率
+(.&.)           Bits a => a -> a -> a                       Data.Bits   二进制并操作
+(.|.)           Bits a => a -> a -> a                       Data.Bits   二进制或操作
+abs             Num a => a -> a                             Prelude     绝对值操作
+approxRational  RealFrac a => a -> a -> Rational            Data.Ratio  通过分数的分子和分母计算出近似有理数
+cos             Floating a => a -> a                        Prelude     余弦函数。另外还有 acos 、 cosh 和 acosh ，类型和 cos 一样。
+div             Integral a => a -> a -> a                   Prelude     整数除法，总是截断小数位。
+fromInteger     Num a => Integer -> a                       Prelude     将一个 Integer 值转换为任意数字类型。
+fromIntegral    (Integral a, Num b) => a -> b               Prelude     一个更通用的转换函数，将任意 Integral 值转为任意数字类型。
+fromRational    Fractional a => Rational -> a               Prelude     将一个有理数转换为分数。可能会有精度损失。
+log             Floating a => a -> a                        Prelude     自然对数算法。
+logBase         Floating a => a -> a -> a                   Prelude     计算指定底数对数。
+maxBound        Bounded a => a                              Prelude     有限长度数字类型的最大值。
+minBound        Bounded a => a                              Prelude     有限长度数字类型的最小值。
+mod             Integral a => a -> a -> a                   Prelude     整数取模。
+pi              Floating a => a                             Prelude     圆周率常量。
+quot            Integral a => a -> a -> a                   Prelude     整数除法；商数的分数部分截断为 0 。
+recip           Fractional a => a -> a                      Prelude     分数的倒数。
+rem             Integral a => a -> a -> a                   Prelude     整数除法的余数。
+round           (RealFrac a, Integral b) => a -> b          Prelude     四舍五入到最近的整数。
+shift           Bits a => a -> Int -> a                     Bits        输入为正整数，就进行左移。如果为负数，进行右移。
+sin             Floating a => a -> a                        Prelude     正弦函数。还提供了 asin 、 sinh 和 asinh ，和 sin 类型一样。
+sqrt            Floating a => a -> a                        Prelude     平方根
+tan             Floating a => a -> a                        Prelude     正切函数。还提供了 atan 、 tanh 和 atanh ，和 tan 类型一样。
+toInteger       Integral a => a -> Integer                  Prelude     将任意 Integral 值转换为 Integer
+toRational      Real a => a -> Rational                     Prelude     从实数到有理数的有损转换
+truncate        (RealFrac a, Integral b) => a -> b          Prelude     向下取整
+xor             Bits a => a -> a -> a                       Data.Bits   二进制异或操作
+============== =========================================== =========== ===================================================================
+
+数字类型及其对应的类型类列举在下表：
+
+**表格 6.3 ： 数字类型的类型类实例**
+
+========================= ==== ========= ======== ============ ======== ==== ===== ===========
+类型                      Bits  Bounded  Floating  Fractional  Integral  Num  Real  RealFrac
+========================= ==== ========= ======== ============ ======== ==== ===== ===========
+Double                                      X       X                    X    X     X
+Float                                       X       X                    X    X     X
+Int                        X    X                               X        X    X
+Int16                      X    X                               X        X    X
+Int32                      X    X                               X        X    X
+Int64                      X    X                               X        X    X
+Integer                    X                                    X        X    X
+Rational or any Ratio                               X                    X    X     X
+Word                       X    X                               X        X    X
+Word16                     X    X                               X        X    X
+Word32                     X    X                               X        X    X
+Word64                     X    X                               X        X    X
+========================= ==== ========= ======== ============ ======== ==== ===== ===========
+
+表格 6.2 列举了一些数字类型之间进行转换的函数，以下表格是一个汇总：
+
+**表格 6.4 ： 数字类型之间的转换**
+
++--------------+---------------------------------------------------------------------------------+
+|源类型        | 目标类型                                                                        |
+|              +---------------------------+--------------+---------------+----------------------+
+|              | Double, Float             | Int, Word    |  Integer      |  Rational            |
++--------------+---------------------------+--------------+---------------+----------------------+
+|Double, Float | fromRational . toRational | truncate *   |  truncate *   |  toRational          |
+|Int, Word     | fromIntegral              | fromIntegral |  fromIntegral |  fromIntegral        |
+|Integer       | fromIntegral              | fromIntegral |  N/A          |  fromIntegral        |
+|Rational      | fromRational              | truncate *   |  truncate *   |  N/A                 |
++--------------+---------------------------+--------------+---------------+----------------------+
+
+\* 除了 ``truncate`` 之外，还可以使用 ``round`` 、 ``ceiling`` 或者 ``float`` 。
+
+第十三章会说明，怎样用自定义数据类型来扩展数字类型。
+
+
+相等性，有序和对比
+^^^^^^^^^^^^^^^^^^^^^
+
+除了前面介绍的通用算术符号之外，相等测试、不等测试、大于和小于等对比操作也是非常常见的。
+
+其中， ``Eq`` 类型类定义了 ``==`` 和 ``/=`` 操作，而 ``>=`` 和 ``<=`` 等对比操作，则由 ``Ord`` 类型类定义。
+
+需要将对比操作和相等性测试分开用两个类型类来定义的原因是，对于某些类型，它们只对相等性测试和不等测试有兴趣，比如 ``Handle`` 类型，而部分有序操作（particular ordering， 大于、小于等）对它来说是没有意义的。
+
+所有 ``Ord`` 实例都可以使用 ``Data.List.sort`` 来排序。
+
+几乎所有 Haskell 内置类型都是 ``Eq`` 类型类的实例，而 ``Ord`` 实例的类型也不在少数。
