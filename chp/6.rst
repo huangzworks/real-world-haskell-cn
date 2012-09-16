@@ -542,3 +542,97 @@ Word64                     X    X                               X        X    X
 所有 ``Ord`` 实例都可以使用 ``Data.List.sort`` 来排序。
 
 几乎所有 Haskell 内置类型都是 ``Eq`` 类型类的实例，而 ``Ord`` 实例的类型也不在少数。
+
+
+自动派生
+-------------
+
+对于简单的数据类型， Haskell 编译器可以自动将类型派生（derivation）为 ``Read`` 、 ``Show`` 、 ``Bounded`` 、 ``Enum`` 、 ``Eq`` 和 ``Ord`` 的实例。
+
+以下代码将 ``Color`` 类型派生为 ``Read`` 、 ``Show`` 、 ``Eq`` 和 ``Ord`` 的实例：
+
+::
+    
+    data Color = Red | Green | Blue
+        deriving (Read, Show, Eq, Ord)
+
+测试：
+
+::
+
+    *Main> show Red
+    "Red"
+
+    *Main> (read "Red")::Color
+    Red
+
+    *Main> (read "[Red, Red, Blue]")::[Color]
+    [Red,Red,Blue]
+
+    *Main> Red == Red
+    True
+
+    *Main> Data.List.sort [Blue, Green, Blue, Red]
+    [Red,Green,Blue,Blue]
+
+    *Main> Red < Blue
+    True
+
+注意 ``Color`` 类型的排序位置由定义类型时值构造器的排序决定。
+
+自动派生并不总是可用的。比如说，如果定义类型 ``data MyType = MyType (Int -> Bool)`` ，那么编译器就没办法派生 ``MyType`` 为 ``Show`` 的实例，因为它不知道该怎么将 ``MyType`` 函数的输出转换成字符串，这会造成编译错误。
+
+除此之外，当使用自动推导将某个类型设置为给定类型类的实例时，定义这个类型时所使用的其他类型，也必须是给定类型类的实例（通过自动推导或手动添加的都可以）。
+
+举个例子，以下代码不能使用自动推导：
+
+::
+
+    data Book = Book
+
+    data BookInfo = BookInfo Book
+                    deriving (Show)
+
+Ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， ``BookInfo`` 才能对 ``Show`` 进行自动推导：
+
+::
+
+    Prelude> :load cant_ad.hs
+    [1 of 1] Compiling Main             ( cant_ad.hs, interpreted )
+
+    ad.hs:4:27:
+        No instance for (Show Book)
+              arising from the 'deriving' clause of a data type declaration
+        Possible fix:
+            add an instance declaration for (Show Book)
+            or use a standalone 'deriving instance' declaration,
+            so you can specify the instance context yourself
+        When deriving the instance for (Show BookInfo)
+    Failed, modules loaded: none.
+
+相反，以下代码可以使用自动推导，因为它对 ``Book`` 类型也使用了自动推导，使得 ``Book`` 类型变成了 ``Show`` 的实例：
+
+::
+
+    data Book = Book
+                deriving (Show)
+
+    data BookInfo = BookInfo Book
+                    deriving (Show)
+
+使用 ``:info`` 命令在 ghci 中确认两种类型都是 ``Show`` 的实例：
+
+::
+
+    Prelude> :load ad.hs
+    [1 of 1] Compiling Main             ( ad.hs, interpreted )
+    Ok, modules loaded: Main.
+
+    *Main> :info Book
+    data Book = Book    -- Defined at ad.hs:1:6
+    instance Show Book -- Defined at ad.hs:2:23
+
+    *Main> :info BookInfo
+    data BookInfo = BookInfo Book   -- Defined at ad.hs:4:6
+    instance Show BookInfo -- Defined at ad.hs:5:27
+
