@@ -13,11 +13,10 @@ Real World Haskell 中文版
    :scale: 45
 
 
-本文档是 Bryan O'Sullivan 、 Don Stewart 和 John Goerzen 三人编写的 `Real World Haskell <http://book.realworldhaskell.org/>`_ 一书的简体中文翻译。
+本文档是 `Real World Haskell <http://book.realworldhaskell.org/>`_ 一书的简体中文翻译版本。
 
-本文档和原书一样，通过 CC-BY-NC 协议授权。
 
-目录（未翻译的部分保留英文标题）：
+目录：
 
 .. toctree::
    :maxdepth: 3
@@ -26,12 +25,17 @@ Real World Haskell 中文版
    chp/2
    chp/3
    chp/4
+   chp/5
+   chp/6
    chp/13
+   convention
 
-Indices and tables
-==================
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+关于
+--------
 
+本文档由 huangz 翻译，和原书一样，通过 CC-BY-NC 协议授权。
+
+可以通过地址 `https://github.com/huangz1990/real-world-haskell-cn <https://github.com/huangz1990/real-world-haskell-cn>`_ 来关注项目的最新进展。
+
+欢迎意见、建议和 bug 反馈。
