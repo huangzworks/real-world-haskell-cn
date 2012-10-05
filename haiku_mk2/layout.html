@@ -60,6 +60,8 @@
         </div>
         {%- endif %}#}
         {% block body %}{% endblock %}
+        <h2>评论</h2>
+        {% include "disqus.html" %}
       </div>
       <div class="bottomnav">
       {{ nav() }}
