@@ -115,3 +115,10 @@
 通用函数    generic function
 
 部分有序    particular ordering
+
+
+第二十八章
+--------
+
+软件事务内存    Software transactional memory
+

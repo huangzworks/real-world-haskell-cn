@@ -1,0 +1,139 @@
+第二十八章：软件事务内存 (STM)
+==============
+
+在传统的并发编程的线程模型中，当我们需要在线程之间共享数据的时，需要通过锁的方式来保持一致性(consistent)。如果数据被修改了，则通过一些条件变量来通知线程。Haskell的``MVar``技术一定程度上是基于以上这些工具的增强，然而在同步编程的时候，``MVar``同样会遇到这些问题。
+
+* 由于忘记使用锁而导致条件竞争(Race Conditions)
+
+* 由于不一致的顺序的锁而导致死锁(Deadlocks)
+
+* 由于为捕捉的异常而导致的损坏(Corruption)
+
+* 由于忽略通知而丢失了唤醒
+
+这些问题即使在很小的并发程序里也会经常发生，而在更加庞大的代码库或是高负载的情况下，这些问题会引发更加糟糕的难题。
+
+比如，书写和调试一个带有少许大范围的锁的程序在一定程度还是容易处理的，可是在高负载的情况下，连接之间的锁会让事情变得一团糟。如果我们采用精细程度(fineo-grained)的锁机制，保持软件正常工作将会变得非常困难。即使负载轻的情况, 额外的簿记也会严重影响性能.
+
+
+基础知识
+---------
+
+软件事务内存(Software transactional memory)提供了一些简单但强大的工具。通过这些工具我们可以解决前面提到的大多数问题。通过``atomically``组合器(combinator), 我们可以在一个事务内执行一批操作。当这一组操作开始执行的时候，其他线程是觉察不到这些操作所产生的任何修改，直到所有操作完成。同样的，当前线程也无法察觉其他线程的所产生的修改。这些性质表明的操作的隔离性(isolated)。
+
+当从一个事务退出的时候，只会发生以下情况中的一种:
+
+* 如果没有其他线程修改了同样的数据，当前线程产生的修改将会对所有其他线程可见。
+
+* 否则，当前线程的所产生的改动会被丢弃，然后这组操作会被重新执行。
+
+``atomically``这种全有或全无(all-or-nothing)的天性被称之为原子性(atomic)，``atomically``也因为得名。如果你使用过支持事务的数据库，你会觉得STM使用起来非常熟悉。
+
+
+一些简单的例子
+---------
+
+在多玩家角色扮演的游戏里， 一个玩家的角色会有许多属性，比如健康，财产以及金钱。
+让我们从基于游戏人物属性的一些简单的函数和类型开始去了解STM的精彩内容。随着学习的深入，我们也会不断地改进我们的代码。
+
+STM的API位于``stm``包，模块``Control.Concurrent.STM``。
+
+::
+
+    -- file: ch28/GameInventory.hs
+    {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
+    import Control.Concurrent.STM
+    import Control.Monad
+
+    data Item = Scroll
+              | Wand
+              | Banjo
+                deriving (Eq, Ord, Show)
+
+    newtype Gold = Gold Int
+        deriving (Eq, Ord, Show, Num)
+
+    newtype HitPoint = HitPoint Int
+        deriving (Eq, Ord, Show, Num)
+
+    type Inventory = TVar [Item]
+    type Health = TVar HitPoint
+    type Balance = TVar Gold
+
+    data Player = Player {
+          balance :: Balance,
+          health :: Health,
+          inventory :: Inventory
+    }
+
+
+参数化类型``TVar``是一个可变量，可以在``atomically``块中读取或者修改。为了简单起见，我们把玩家的背包(Inventory)定义为物品的列表。同时注意到，我们用到了``newtype``，这样不会混淆财富和健康属性。
+
+当需要在两个账户(Balance)之间转账，我们所要的做的就只是调整下各自的``Tvar``。
+
+::
+
+    -- file: ch28/GameInventory.hs
+    basicTransfer qty fromBal toBal = do
+      fromQty <- readTVar fromBal
+      toQty   <- readTVar toBal
+      writeTVar fromBal (fromQty - qty)
+      writeTVar toBal   (toQty + qty)
+
+
+让我们写个简单的测试函数
+
+::
+
+    -- file: ch28/GameInventory.hs
+    transferTest = do
+      alice <- newTVar (12 :: Gold)
+      bob   <- newTVar 4
+      basicTransfer 3 alice bob
+      liftM2 (,) (readTVar alice) (readTVar bob)
+
+
+如果我们在ghci里执行下这个函数，应该有如下的结果
+
+::
+
+    ghci> :load GameInventory
+    [1 of 1] Compiling Main             ( GameInventory.hs, interpreted )
+    Ok, modules loaded: Main.
+    ghci> atomically transferTest
+    Loading package array-0.4.0.0 ... linking ... done.
+    Loading package stm-2.3 ... linking ... done.
+    (Gold 9,Gold 7)
+
+原子性和隔离性保证了当其他线程同时看到``bob``的账户和``alice``的账户被修改了。
+
+即使在并发程序里，我们也努力保持代码尽量的纯函数化。这使得我们的代码更加容易推到和测试。由于数据并没有事务性，这也让底层的STM做更少的事。以下的纯函数实现了从我们来表示玩家背包的数列里移除一个物品。
+
+::
+
+    -- file: ch28/GameInventory.hs
+    removeInv :: Eq a => a -> [a] -> Maybe [a]
+    removeInv x xs =
+        case takeWhile (/= x) xs of
+          (_:ys) -> Just ys
+          []     -> Nothing
+
+这里返回值用了``Maybe``类型，它可以用来表示物品是否在玩家的背包里。
+
+下面这个事务性的函数实现了把一个物品给另外一个玩家。这个函数有一点点复杂因为需要判断捐赠的人是否有这个物品。
+
+::
+
+    -- file: ch28/GameInventory.hs
+    maybeGiveItem item fromInv toInv = do
+      fromList <- readTVar fromInv
+      case removeInv item fromList of
+        Nothing      -> return False
+        Just newList -> do
+          writeTVar fromInv newList
+          destItems <- readTVar toInv
+          writeTVar toInv (item : destItems)
+          return True
+      
+
