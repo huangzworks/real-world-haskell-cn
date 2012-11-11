@@ -239,5 +239,140 @@ STM的安全性
 选择替代方案
 -------------------------
 
+有时候我们并不总是希望重启 ``atomically`` 操作即使调用了 ``retry`` 或者由于其他线程的同步修改而导致的失败。比如函数 ``sellItem`` 会不断地重试，只要没有满足其条件：要有物品并且余额足够。然而我们可能更希望只重试一次。
+
+``orElse`` 组合器允许我们在主操作失败的情况下，执行一个"备用"操作。
+
+::
+
+    ghci> :type orElse
+    orElse :: STM a -> STM a -> STM a
+
+我们对 ``sellItem`` 做了一点修改：如果 ``sellItem`` 失败， 则 ``orElse`` 执行 ``return False`` 的动作从而使这个sale函数立即返回。
+
+::
+
+    trySellItem :: Item -> Gold -> Player -> Player -> STM Bool
+    trySellItem item price buyer seller =
+       sellItem item price buyer seller >> return True
+      `orElse`
+       return False
 
 
+在事务中使用高阶代码
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+假设我们想做稍微有挑战的事情，从一系列的物品中，选取第一个卖家拥有的并且买家能承担费用的物品进行购买，如果没有这样的物品则什么都不做。显然我们可以很直观的给出实现。
+
+::
+
+    -- file: ch28/GameInventory.hs
+    crummyList :: [(Item, Gold)] -> Player -> Player
+                 -> STM (Maybe (Item, Gold))
+    crummyList list buyer seller = go list
+        where go []                         = return Nothing
+              go (this@(item,price) : rest) = do
+                  sellItem item price buyer seller
+                  return (Just this)
+               `orElse`
+                  go rest
+
+在这个实现里，我们有碰到了一个熟悉的问题：把我们的需求和如果实现混淆在一个。再深入一点观察，则会发现两个可重复使用的模式。
+
+第一个就是让事务失败而不是重试。
+
+::
+
+    -- file: ch28/GameInventory.hs
+    maybeSTM :: STM a -> STM (Maybe a)
+    maybeSTM m = (Just `liftM` m) `orElse` return Nothing
+
+第二个，我们要对一系列的对象执行否一个操作，直到有一个成功为止。如果全部都失败，则执行 ``retry`` 操作。由于 ``STM`` 是 ``MonadPlus`` 类型类的一个实例，所以显得很方便。
+
+::
+
+    -- file: ch28/STMPlus.hs
+    instance MonadPlus STM where
+      mzero = retry
+      mplus = orElse
+
+``Control.Monad`` 模块定义了一个 ``msum`` 函数，而它就是我们所需要的。
+
+::
+
+    -- file: ch28/STMPlus.hs
+    msum :: MonadPlus m => [m a] -> m a
+    msum =  foldr mplus mzero
+
+有了这些重要的工具，我们就可以写出更加简洁的实现了。
+
+::
+
+    -- file: ch28/GameInventory.hs
+    shoppingList :: [(Item, Gold)] -> Player -> Player
+                 -> STM (Maybe (Item, Gold))
+    shoppingList list buyer seller = maybeSTM . msum $ map sellOne list
+        where sellOne this@(item,price) = do
+                sellItem item price buyer seller
+                return this
+
+既然 ``STM`` 是 ``MonadPlus`` 类型类的实例，我们可以改进 ``maybeSTM`` ，这样就可以适用于任何 ``MonadPlus`` 的实例。
+
+::
+
+    -- file: ch28/GameInventory.hs
+    maybeM :: MonadPlus m => m a -> m (Maybe a)
+    maybeM m = (Just `liftM` m) `mplus` return Nothing
+
+这个函数会在很多不同情况下显得非常有用。
+
+
+I/O 和 STM
+-------------------------
+
+``STM`` monad 禁止任意的I/O操作，因为I/O操作会破坏原子性和隔离性。当然I/O的操作还是需要的，只是我们需要非常的谨慎。
+
+大多数时候，我们会执行I/O操作是由于我们在 ``atomically`` 块中产生的一个结果。 在这些情况下，正确的做法通常是 ``atomically`` 返回一些数据，在I/O monad里的调用者则根据这些数据知道如何继续下一步动作。我们甚至可以返回需要被操作的动作 (action)， 因为他们是第一类值(First Class vaules)。
+
+::
+
+    -- file: ch28/STMIO.hs
+    someAction :: IO a
+
+    stmTransaction :: STM (IO a)
+    stmTransaction = return someAction
+
+    doSomething :: IO a
+    doSomething = join (atomically stmTransaction)
+
+我们偶尔也需要在 ``STM`` 里进行I/O操作。比如从一个肯定存在的文件里读取一些非可变数据，这样的操作并不会违背 ``STM`` 保证原子性和隔离性的原则。在这些情况，我们可以使用 ``unsafeIOToSTM`` 来执行一个 ``IO`` 操作。这个函数位于偏底层的一个模块 ``GHC.Conc`` ，所以要谨慎使用。
+
+
+::
+
+    ghci> :m +GHC.Conc
+    ghci> :type unsafeIOToSTM
+    unsafeIOToSTM :: IO a -> STM a
+
+我们所执行的这个 ``IO`` 动作绝对不能打开另外一个 ``atomically`` 事务。如果一个线程尝试嵌套的事务，系统就会抛出异常。
+
+由于类型系统无法帮助我们确保 ``IO`` 代码没有执行一些敏感动作，最安全的做法就是我们尽量的限制使用 ``unsafeIOToSTM`` 。下面的例子展示了在 ``atomically`` 中执行 ``IO`` 的典型错误。
+
+::
+
+    -- file: ch28/STMIO.hs
+    launchTorpedoes :: IO ()
+
+    notActuallyAtomic = do
+      doStuff
+      unsafeIOToSTM launchTorpedoes
+      mightRetry
+
+如果 ``mightRetry`` 会引发事务的重启，那么 ``launchTorpedoes`` 会被调用多次。 事实上，我们无法预见它会被调用多少次， 因为重试是由运行时系统所处理的。解决方案就是在事务中不要有这种类型的non-idempotent I/O操作。
+
+线程之间的通讯
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+并发网络链接检查器
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

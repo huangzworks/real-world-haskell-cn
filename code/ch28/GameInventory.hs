@@ -97,3 +97,33 @@ sellItem item price buyer seller = do
   giveItem item (inventory seller) (inventory buyer)
   transfer price (balance buyer) (balance seller)
   
+trySellItem :: Item -> Gold -> Player -> Player -> STM Bool
+trySellItem item price buyer seller =
+   sellItem item price buyer seller >> return True
+  `orElse`
+   return False
+
+
+crummyList :: [(Item, Gold)] -> Player -> Player
+             -> STM (Maybe (Item, Gold))
+crummyList list buyer seller = go list
+    where go []                         = return Nothing
+          go (this@(item,price) : rest) = do
+              sellItem item price buyer seller
+              return (Just this)
+           `orElse`
+              go rest
+
+maybeSTM :: STM a -> STM (Maybe a)
+maybeSTM m = (Just `liftM` m) `orElse` return Nothing
+
+
+shoppingList :: [(Item, Gold)] -> Player -> Player
+             -> STM (Maybe (Item, Gold))
+shoppingList list buyer seller = maybeSTM . msum $ map sellOne list
+    where sellOne this@(item,price) = do
+            sellItem item price buyer seller
+            return this
+
+maybeM :: MonadPlus m => m a -> m (Maybe a)
+maybeM m = (Just `liftM` m) `mplus` return Nothing
