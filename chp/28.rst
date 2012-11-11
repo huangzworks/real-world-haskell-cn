@@ -1,5 +1,5 @@
 第二十八章：软件事务内存 (STM)
-==============
+==============================
 
 在传统的并发编程的线程模型中，当我们需要在线程之间共享数据的时，需要通过锁的方式来保持一致性(consistent)。如果数据被修改了，则通过一些条件变量来通知线程。Haskell的 ``MVar`` 技术一定程度上是基于以上这些工具的增强，然而在同步编程的时候， ``MVar`` 同样会遇到这些问题。
 
@@ -17,7 +17,7 @@
 
 
 基础知识
----------
+-------------------------
 
 软件事务内存(Software transactional memory)提供了一些简单但强大的工具。通过这些工具我们可以解决前面提到的大多数问题。通过 ``atomically`` 组合器(combinator), 我们可以在一个事务内执行一批操作。当这一组操作开始执行的时候，其他线程是觉察不到这些操作所产生的任何修改，直到所有操作完成。同样的，当前线程也无法察觉其他线程的所产生的修改。这些性质表明的操作的隔离性(isolated)。
 
@@ -31,7 +31,7 @@
 
 
 一些简单的例子
----------
+-------------------------
 
 在多玩家角色扮演的游戏里， 一个玩家的角色会有许多属性，比如健康，财产以及金钱。
 让我们从基于游戏人物属性的一些简单的函数和类型开始去了解STM的精彩内容。随着学习的深入，我们也会不断地改进我们的代码。
@@ -138,17 +138,19 @@ STM的API位于 ``stm`` 包，模块 ``Control.Concurrent.STM`` 。
       
 
 STM的安全性
----------
+-------------------------
 
 既然我们提供了有原子性和隔离型的事务，那么保证我们不能有意或是无意的从 ``atomically`` 执行块从脱离显得格外重要。借由 ``STM`` monad，Haskell的类型系统保证了我们这种行为。
 
 ::
+
     ghci> :type atomically
     atomically :: STM a -> IO a
 
 ``atomically`` 接受一个 ``STM`` monad的动作， 然后执行并让我们可以从 ``IO`` monad里拿到这个结果。 ``STM`` monad是所有事务相关代码执行的地方。比如这些操作 ``TVar`` 值的函数都在 ``STM`` monad里被执行。
 
 ::
+
     ghci> :type newTVar
     newTVar :: a -> STM (TVar a)
     ghci> :type readTVar
@@ -159,6 +161,7 @@ STM的安全性
 我们之前定义的事务性函数也有这个特性
 
 ::
+
     -- file: ch28/GameInventory.hs
     basicTransfer :: Gold -> Balance -> Balance -> STM ()
     maybeGiveItem :: Item -> Inventory -> Inventory -> STM Bool
@@ -167,7 +170,7 @@ STM的安全性
 
 
 重试一个事务
----------
+-------------------------
 
 ``maybeGiveItem`` 这个函数看上去稍微有点怪异。 只有当角色有这个物品时才会将它给另外一个角色，这看上去还算合理，然后返回一个 ``Bool`` 值使调用这个函数的代码变得复杂。下面这个函数调用了 ``maybeGiveItem``, 它必须根据 ``maybeGiveItem`` 的返回结果来决定如何继续执行。
 
@@ -184,20 +187,20 @@ STM的安全性
 
 我们不仅要检查物品是否给到了另一个玩家，而且还得把是否成功这个信号传递给调用者。这就意味了复杂性被延续到了更外层。
 
-下面我们来看看如何用更加优雅的方式处理事务无法成功进行的情况。 ``STM`` API 提供了一个 ``retry`` 函数，它可以立即中断一个 无法成功进行的 ``atomically`` 执行块。正如这个函数名本身所指明的意思，当它发生时，执行块会被重新执行，所有在这之前的操作都不会被记录。我们使用 ``retry`` 重新实现了 ``maybeGiveItem``。
+下面我们来看看如何用更加优雅的方式处理事务无法成功进行的情况。 ``STM`` API 提供了一个 ``retry`` 函数，它可以立即中断一个 无法成功进行的 ``atomically`` 执行块。正如这个函数名本身所指明的意思，当它发生时，执行块会被重新执行，所有在这之前的操作都不会被记录。我们使用 ``retry`` 重新实现了 ``maybeGiveItem`` 。
 
 ::
 
-    -- file: ch28/GameInventory.hs
-    giveItem :: Item -> Inventory -> Inventory -> STM ()
-
-    giveItem item fromInv toInv = do
-      fromList <- readTVar fromInv
-      case removeInv item fromList of
-        Nothing -> retry
-        Just newList -> do
-          writeTVar fromInv newList
-          readTVar toInv >>= writeTVar toInv . (item :)
+	-- file: ch28/GameInventory.hs
+	giveItem :: Item -> Inventory -> Inventory -> STM ()
+	
+	giveItem item fromInv toInv = do
+	    fromList <- readTVar fromInv
+	    case removeInv item fromList of
+	        Nothing -> retry
+	        Just newList -> do
+	            writeTVar fromInv newList
+	            readTVar toInv >>= writeTVar toInv . (item :)
 
 
 我们之前实现的 ``basicTransfer`` 有一个缺陷：没有检查发送者的账户是否有足够的资金。我们可以使用 ``retry`` 来纠正这个问题并保持方法签名不变。
@@ -217,22 +220,24 @@ STM的安全性
 使用 ``retry`` 后，销售物品的函数就显得简单很多。
 
 ::
+
     sellItem :: Item -> Gold -> Player -> Player -> STM ()
     sellItem item price buyer seller = do
       giveItem item (inventory seller) (inventory buyer)
       transfer price (balance buyer) (balance seller)
 
 
-这个实现和之前的稍微有点不同。如果有必要会会阻塞以至卖家有东西可卖并且买家有足够的余额支付， 而不是在发现卖家没这个物品可销售时马上返回 ``False``。
+这个实现和之前的稍微有点不同。如果有必要会会阻塞以至卖家有东西可卖并且买家有足够的余额支付， 而不是在发现卖家没这个物品可销售时马上返回 ``False`` 。
 
 ``retry`` 时到底发生了什么?
-^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``retry`` 不仅仅使得代码更加简洁：它似乎有魔力般的内部实现。当我们调用 ``retry`` 的时候，它并不是马上重启事务，而是会先阻塞线程，一直到那些在 ``retry`` 之前被访问过的变量被其他线程修改。
 
-比如，如果我们调用 ``transfer`` 而发现余额不足， ``retry`` 会自发的等待，直到账户余额的变动，然后会重新启动事务。 同样的，对于函数 ``giveItem``， 如果卖家没有那个物品，线程就会阻塞直到他有了那个物品。
+比如，如果我们调用 ``transfer`` 而发现余额不足， ``retry`` 会自发的等待，直到账户余额的变动，然后会重新启动事务。 同样的，对于函数 ``giveItem`` ， 如果卖家没有那个物品，线程就会阻塞直到他有了那个物品。
 
 选择替代方案
--------------------
+-------------------------
+
 
 
