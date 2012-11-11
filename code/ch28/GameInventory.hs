@@ -25,12 +25,24 @@ data Player = Player {
       inventory :: Inventory
     }
 
+basicTransfer :: Gold -> Balance -> Balance -> STM ()
 basicTransfer qty fromBal toBal = do
   fromQty <- readTVar fromBal
   toQty   <- readTVar toBal
   writeTVar fromBal (fromQty - qty)
   writeTVar toBal   (toQty + qty)
+
+-- | Fix a flaw in `basicTransfer` via `retry`.
+-- 
+transfer :: Gold -> Balance -> Balance -> STM ()
+transfer qty fromBal toBal = do
+  fromQty <- readTVar fromBal
+  when (qty > fromQty) $
+    retry
+  writeTVar fromBal (fromQty - qty)
+  readTVar toBal >>= writeTVar toBal . (qty +)
   
+transferTest :: STM (Gold, Gold)  
 transferTest = do
   alice <- newTVar (12 :: Gold)
   bob   <- newTVar 4
@@ -43,6 +55,9 @@ removeInv x xs =
       (_:ys) -> Just ys
       []     -> Nothing
 
+-- | Give an @Item@ to another player.
+--   
+maybeGiveItem :: Item -> Inventory -> Inventory -> STM Bool
 maybeGiveItem item fromInv toInv = do
   fromList <- readTVar fromInv
   case removeInv item fromList of
@@ -52,4 +67,33 @@ maybeGiveItem item fromInv toInv = do
       destItems <- readTVar toInv
       writeTVar toInv (item : destItems)
       return True
-      
+
+-- | Give an @Item@ to another player.
+--   Rewrite in terms of `retry`.
+--       
+giveItem :: Item -> Inventory -> Inventory -> STM ()
+giveItem item fromInv toInv = do
+  fromList <- readTVar fromInv
+  case removeInv item fromList of
+    Nothing -> retry
+    Just newList -> do
+      writeTVar fromInv newList
+      readTVar toInv >>= writeTVar toInv . (item :)
+
+
+-- |
+-- 
+maybeSellItem :: Item -> Gold -> Player -> Player -> STM Bool
+maybeSellItem item price buyer seller = do
+  given <- maybeGiveItem item (inventory seller) (inventory buyer)
+  if given
+    then do
+      basicTransfer price (balance buyer) (balance seller)
+      return True
+    else return False
+
+sellItem :: Item -> Gold -> Player -> Player -> STM ()
+sellItem item price buyer seller = do
+  giveItem item (inventory seller) (inventory buyer)
+  transfer price (balance buyer) (balance seller)
+  

@@ -137,3 +137,102 @@ STM的API位于 ``stm`` 包，模块 ``Control.Concurrent.STM`` 。
           return True
       
 
+STM的安全性
+---------
+
+既然我们提供了有原子性和隔离型的事务，那么保证我们不能有意或是无意的从 ``atomically`` 执行块从脱离显得格外重要。借由 ``STM`` monad，Haskell的类型系统保证了我们这种行为。
+
+::
+    ghci> :type atomically
+    atomically :: STM a -> IO a
+
+``atomically`` 接受一个 ``STM`` monad的动作， 然后执行并让我们可以从 ``IO`` monad里拿到这个结果。 ``STM`` monad是所有事务相关代码执行的地方。比如这些操作 ``TVar`` 值的函数都在 ``STM`` monad里被执行。
+
+::
+    ghci> :type newTVar
+    newTVar :: a -> STM (TVar a)
+    ghci> :type readTVar
+    readTVar :: TVar a -> STM a
+    ghci> :type writeTVar
+    writeTVar :: TVar a -> a -> STM ()
+
+我们之前定义的事务性函数也有这个特性
+
+::
+    -- file: ch28/GameInventory.hs
+    basicTransfer :: Gold -> Balance -> Balance -> STM ()
+    maybeGiveItem :: Item -> Inventory -> Inventory -> STM Bool
+
+在``STM`` monad里是不允许执行I/O操作或者是修改非事务性的可变状态，比如 ``MVar`` 的值。这就使得我们可以避免那些违背事务完整的操作。
+
+
+重试一个事务
+---------
+
+``maybeGiveItem`` 这个函数看上去稍微有点怪异。 只有当角色有这个物品时才会将它给另外一个角色，这看上去还算合理，然后返回一个 ``Bool`` 值使调用这个函数的代码变得复杂。下面这个函数调用了 ``maybeGiveItem``, 它必须根据 ``maybeGiveItem`` 的返回结果来决定如何继续执行。
+
+::
+
+    maybeSellItem :: Item -> Gold -> Player -> Player -> STM Bool
+    maybeSellItem item price buyer seller = do
+      given <- maybeGiveItem item (inventory seller) (inventory buyer)
+      if given
+        then do
+          basicTransfer price (balance buyer) (balance seller)
+          return True
+        else return False
+
+我们不仅要检查物品是否给到了另一个玩家，而且还得把是否成功这个信号传递给调用者。这就意味了复杂性被延续到了更外层。
+
+下面我们来看看如何用更加优雅的方式处理事务无法成功进行的情况。 ``STM`` API 提供了一个 ``retry`` 函数，它可以立即中断一个 无法成功进行的 ``atomically`` 执行块。正如这个函数名本身所指明的意思，当它发生时，执行块会被重新执行，所有在这之前的操作都不会被记录。我们使用 ``retry`` 重新实现了 ``maybeGiveItem``。
+
+::
+
+    -- file: ch28/GameInventory.hs
+    giveItem :: Item -> Inventory -> Inventory -> STM ()
+
+    giveItem item fromInv toInv = do
+      fromList <- readTVar fromInv
+      case removeInv item fromList of
+        Nothing -> retry
+        Just newList -> do
+          writeTVar fromInv newList
+          readTVar toInv >>= writeTVar toInv . (item :)
+
+
+我们之前实现的 ``basicTransfer`` 有一个缺陷：没有检查发送者的账户是否有足够的资金。我们可以使用 ``retry`` 来纠正这个问题并保持方法签名不变。
+
+::
+
+    -- file: ch28/GameInventory.hs
+    transfer :: Gold -> Balance -> Balance -> STM ()
+
+    transfer qty fromBal toBal = do
+      fromQty <- readTVar fromBal
+      when (qty > fromQty) $
+        retry
+      writeTVar fromBal (fromQty - qty)
+      readTVar toBal >>= writeTVar toBal . (qty +)
+
+使用 ``retry`` 后，销售物品的函数就显得简单很多。
+
+::
+    sellItem :: Item -> Gold -> Player -> Player -> STM ()
+    sellItem item price buyer seller = do
+      giveItem item (inventory seller) (inventory buyer)
+      transfer price (balance buyer) (balance seller)
+
+
+这个实现和之前的稍微有点不同。如果有必要会会阻塞以至卖家有东西可卖并且买家有足够的余额支付， 而不是在发现卖家没这个物品可销售时马上返回 ``False``。
+
+``retry`` 时到底发生了什么?
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``retry`` 不仅仅使得代码更加简洁：它似乎有魔力般的内部实现。当我们调用 ``retry`` 的时候，它并不是马上重启事务，而是会先阻塞线程，一直到那些在 ``retry`` 之前被访问过的变量被其他线程修改。
+
+比如，如果我们调用 ``transfer`` 而发现余额不足， ``retry`` 会自发的等待，直到账户余额的变动，然后会重新启动事务。 同样的，对于函数 ``giveItem``， 如果卖家没有那个物品，线程就会阻塞直到他有了那个物品。
+
+选择替代方案
+-------------------
+
+
