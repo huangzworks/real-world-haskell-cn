@@ -370,9 +370,156 @@ I/O 和 STM
 
 如果 ``mightRetry`` 会引发事务的重启，那么 ``launchTorpedoes`` 会被调用多次。 事实上，我们无法预见它会被调用多少次， 因为重试是由运行时系统所处理的。解决方案就是在事务中不要有这种类型的non-idempotent I/O操作。
 
+
 线程之间的通讯
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+正如基础类型 ``TVar`` 那样， ``stm`` 包也提供了两个更有用的类型用于线程之间的通讯， ``TMVar`` 和 ``TChan`` 。 ``TMVar`` 是 STM世界的 ``MVar`` ， 它可以保存一个 ``Maybe`` 类型的值， 即 ``Just`` 值或者 ``Nothing`` 。 ``TChan`` 则是 ``STM`` 世界里的 ``Chan`` ，它实现了一个有类型的先进先出(FIFO)通道。
 
 
 并发网络链接检查器
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+作为一个使用 ``STM`` 的实际例子， 我们将开发一个检查HTML文件里不正确链接的程序， 这里不正确的链接是指那些链接指向了一个错误的网页或是无法访问到其指向的服务器。用并发的方式解决这个问题非常得合适：如果我们尝试和已经下线的服务器(dead server)通讯，需要有两分钟的超时时间。如果使用多线程，即使有一两个线程由于和响应很慢或者下线的服务器通讯而停住(stuck)，
+我们还是可以继续进行一些有用的事情。
+
+我们不能简单直观的给每一个URL新建一个线程，因为由于（也是我们预想的）大多数链接是正确的， 那么这样做就会导致CPU或是网络连接超负荷。 因此，我们只会创建固定数量的线程，这些线程会从一个队列里拿URL做检查。
+
+
+::
+
+    -- file: ch28/Check.hs
+    {-# LANGUAGE FlexibleContexts, GeneralizedNewtypeDeriving,
+                 PatternGuards #-}
+
+    import Control.Concurrent (forkIO)
+    import Control.Concurrent.STM
+    import Control.Exception (catch, finally)
+    import Control.Monad.Error
+    import Control.Monad.State
+    import Data.Char (isControl)
+    import Data.List (nub)
+    import Network.URI
+    import Prelude hiding (catch)
+    import System.Console.GetOpt
+    import System.Environment (getArgs)
+    import System.Exit (ExitCode(..), exitWith)
+    import System.IO (hFlush, hPutStrLn, stderr, stdout)
+    import Text.Printf (printf)
+    import qualified Data.ByteString.Lazy.Char8 as B
+    import qualified Data.Set as S
+
+    -- This requires the HTTP package, which is not bundled with GHC
+    import Network.HTTP
+
+    type URL = B.ByteString
+
+    data Task = Check URL | Done
+
+
+``main`` 函数显示了这个程序的主体脚手架(scaffolding)。
+
+::
+
+    -- file: ch28/Check.hs
+    main :: IO ()
+    main = do
+        (files,k) <- parseArgs
+        let n = length files
+
+        -- count of broken links
+        badCount <- newTVarIO (0 :: Int)
+
+        -- for reporting broken links
+        badLinks <- newTChanIO
+
+        -- for sending jobs to workers
+        jobs <- newTChanIO
+
+        -- the number of workers currently running
+        workers <- newTVarIO k
+
+        -- one thread reports bad links to stdout
+        forkIO $ writeBadLinks badLinks
+
+        -- start worker threads
+        forkTimes k workers (worker badLinks jobs badCount)
+
+        -- read links from files, and enqueue them as jobs
+        stats <- execJob (mapM_ checkURLs files)
+                         (JobState S.empty 0 jobs)
+
+        -- enqueue "please finish" messages
+        atomically $ replicateM_ k (writeTChan jobs Done)
+
+        waitFor workers
+
+        broken <- atomically $ readTVar badCount
+
+        printf fmt broken
+                   (linksFound stats)
+                   (S.size (linksSeen stats))
+                   n
+      where
+        fmt   = "Found %d broken links. " ++
+                "Checked %d links (%d unique) in %d files.\n"
+
+
+当我们处于 ``IO`` monad时，可以使用 ``newTVarIO`` 函数新建一个 ``TVar`` 值。 同样的，也有类似的函数可以新建 ``TMVar`` 和 ``TChan`` 值。
+
+在程序用了 ``printf`` 函数打印出最后的结果。 和C语言里类似函数 ``printf`` 不同的是Haskell这个版本会在运行时检查参数的个数以及其类型。
+
+::
+
+    ghci> :m +Text.Printf
+    ghci> printf "%d and %d\n" (3::Int)
+    3 and *** Exception: Printf.printf: argument list ended prematurely
+    ghci> printf "%s and %d\n" "foo" (3::Int)
+    foo and 3
+
+在 **ghci** 里试试 ``printf "%d" True`` , 看看会得到什么结果。
+
+支持 ``main`` 函数的是几个短小的函数。
+
+::
+
+    -- file: ch28/Check.hs
+    modifyTVar_ :: TVar a -> (a -> a) -> STM ()
+    modifyTVar_ tv f = readTVar tv >>= writeTVar tv . f
+
+    forkTimes :: Int -> TVar Int -> IO () -> IO ()
+    forkTimes k alive act =
+      replicateM_ k . forkIO $
+        act
+        `finally`
+        (atomically $ modifyTVar_ alive (subtract 1))
+
+``forkTimes`` 函数新建特定数量的相同的工作线程，每当一个线程推出时，则"活动"线程的计数器相应的减一。我们使用 ``finally`` 组合器确保无论线程是如何终止的，都会减少"活动"线程的数量。
+
+下一步， ``writeBadLinks`` 会把每个失效或者死亡(dead)的链接打印到 ``stdout`` 。
+
+::
+
+    -- file: ch28/Check.hs
+    writeBadLinks :: TChan String -> IO ()
+    writeBadLinks c =
+      forever $
+        atomically (readTChan c) >>= putStrLn >> hFlush stdout
+
+上面我们使用了 ``forever`` 组合器使一个操作永远的执行。
+
+::
+
+    ghci> :m +Control.Monad
+    ghci> :type forever
+    forever :: (Monad m) => m a -> m ()
+
+``waitFor`` 函数使用了 ``check`` ， 当它的参数是 ``False`` 时会调用 ``retry`` 。
+
+::
+
+    -- file: ch28/Check.hs
+    waitFor :: TVar Int -> IO ()
+    waitFor alive = atomically $ do
+      count <- readTVar alive
+      check (count == 0)
