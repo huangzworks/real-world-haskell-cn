@@ -523,3 +523,256 @@ I/O 和 STM
     waitFor alive = atomically $ do
       count <- readTVar alive
       check (count == 0)
+
+检查一个链接
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+这个原生的函数实现了如何检查一个链接的状态。 代码和 [第二十二章  Chapter 22, Extended Example: Web Client Programming] 里的 ``podcatcher`` 相似但有一点不同。
+
+::
+
+    -- file: ch28/Check.hs
+    getStatus :: URI -> IO (Either String Int)
+    getStatus = chase (5 :: Int)
+      where
+        chase 0 _ = bail "too many redirects"
+        chase n u = do
+          resp <- getHead u
+          case resp of
+            Left err -> bail (show err)
+            Right r ->
+              case rspCode r of
+                (3,_,_) ->
+                   case findHeader HdrLocation r of
+                     Nothing -> bail (show r)
+                     Just u' ->
+                       case parseURI u' of
+                         Nothing -> bail "bad URL"
+                         Just url -> chase (n-1) url
+                (a,b,c) -> return . Right $ a * 100 + b * 10 + c
+
+        bail = return . Left
+
+    getHead :: URI -> IO (Result Response)
+    getHead uri = simpleHTTP Request { rqURI = uri,
+                                       rqMethod = HEAD,
+                                       rqHeaders = [],
+                                       rqBody = "" }
+
+为了避免无尽的重定向相应，我们只允许固定次数的重定向请求。我们通过查看HTTP标准HEAD信息来确认链接的有效性， 比起一个完整的GET请求，这样做可以减少网络流量。
+
+这个代码是典型的"marching off the left of the screen"风格。正如之前我们提到的，需要谨慎使用这样的风格。下面我们用 ``ErrorT`` monad transformer 和几个通用一点的方法进行了重新实现，它看上去简洁了很多。
+
+::
+
+    -- file: ch28/Check.hs
+    getStatusE = runErrorT . chase (5 :: Int)
+      where
+        chase :: Int -> URI -> ErrorT String IO Int
+        chase 0 _ = throwError "too many redirects"
+        chase n u = do
+          r <- embedEither show =<< liftIO (getHead u)
+          case rspCode r of
+            (3,_,_) -> do
+                u'  <- embedMaybe (show r)  $ findHeader HdrLocation r
+                url <- embedMaybe "bad URL" $ parseURI u'
+                chase (n-1) url
+            (a,b,c) -> return $ a*100 + b*10 + c    
+
+    -- Some handy embedding functions.
+    embedEither :: (MonadError e m) => (s -> e) -> Either s a -> m a
+    embedEither f = either (throwError . f) return
+
+    embedMaybe :: (MonadError e m) => e -> Maybe a -> m a
+    embedMaybe err = maybe (throwError err) return
+
+
+工作者线程
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+每个工作者线程(Worker Thread)从一个共享队列里拿一个任务，这个任务要么检查链接有效性，要么让线程推出。
+
+::
+
+    -- file: ch28/Check.hs
+    worker :: TChan String -> TChan Task -> TVar Int -> IO ()
+    worker badLinks jobQueue badCount = loop
+      where
+        -- Consume jobs until we are told to exit.
+        loop = do
+            job <- atomically $ readTChan jobQueue
+            case job of
+                Done  -> return ()
+                Check x -> checkOne (B.unpack x) >> loop
+
+        -- Check a single link.
+        checkOne url = case parseURI url of
+            Just uri -> do
+                code <- getStatus uri `catch` (return . Left . show) 
+                case code of
+                    Right 200 -> return ()
+                    Right n   -> report (show n)
+                    Left err  -> report err
+            _ -> report "invalid URL"
+
+            where report s = atomically $ do
+                               modifyTVar_ badCount (+1)
+                               writeTChan badLinks (url ++ " " ++ s)
+
+查找链接
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+我们构造了基于 ``IO`` monad 的 状态 monad transformer栈用于查找链接。这个状态会记录我们已经找到过的链接(避免重复)、链接的数量以及一个队列，我们会把需要做检查的链接放到这个队列里。
+
+::
+
+    -- file: ch28/Check.hs
+    data JobState = JobState { linksSeen :: S.Set URL,
+                               linksFound :: Int,
+                               linkQueue :: TChan Task }
+
+    newtype Job a = Job { runJob :: StateT JobState IO a }
+        deriving (Monad, MonadState JobState, MonadIO)
+
+    execJob :: Job a -> JobState -> IO JobState
+    execJob = execStateT . runJob
+
+严格来说，对于对立运行的小型程序，我们并不需要用到 ``newtype`` ，然后我们还是将它作为一个好的编码实践的例子放在这里。(毕竟也只多了几行代码)
+
+``main`` 函数实现了对每个输入文件调用一次 ``checkURLs`` 方法，所以 ``checkURLs`` 的参数就是单个文件。
+
+::
+
+    -- file: ch28/Check.hs
+    checkURLs :: FilePath -> Job ()
+    checkURLs f = do
+        src <- liftIO $ B.readFile f
+        let urls = extractLinks src
+        filterM seenURI urls >>= sendJobs
+        updateStats (length urls)
+
+    updateStats :: Int -> Job ()
+    updateStats a = modify $ \s ->
+        s { linksFound = linksFound s + a }
+
+    -- | Add a link to the set we have seen.
+    insertURI :: URL -> Job ()
+    insertURI c = modify $ \s ->
+        s { linksSeen = S.insert c (linksSeen s) }
+
+    -- | If we have seen a link, return False.  Otherwise, record that we
+    -- have seen it, and return True.
+    seenURI :: URL -> Job Bool
+    seenURI url = do
+        seen <- (not . S.member url) `liftM` gets linksSeen
+        insertURI url
+        return seen
+
+    sendJobs :: [URL] -> Job ()
+    sendJobs js = do
+        c <- gets linkQueue
+        liftIO . atomically $ mapM_ (writeTChan c . Check) js
+
+``extractLinks`` 函数并没有尝试去准确的去解析一个HTMP或是文本文件，而只是匹配那些看上去像URL的字符串。我们认为这样做就够了。
+
+::
+
+    -- file: ch28/Check.hs
+    extractLinks :: B.ByteString -> [URL]
+    extractLinks = concatMap uris . B.lines
+      where uris s      = filter looksOkay (B.splitWith isDelim s)
+            isDelim c   = isControl c || c `elem` " <>\"{}|\\^[]`"
+            looksOkay s = http `B.isPrefixOf` s
+            http        = B.pack "http:"
+
+
+命令行的实现
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+我们使用了 ``System.Console.GetOpt`` 模块来解析命令行参数。这个模块提供了很多解析命令行参数的很有用的方法，不过使用起来稍微有点繁琐。
+
+::
+
+    -- file: ch28/Check.hs
+    data Flag = Help | N Int
+                deriving Eq
+
+    parseArgs :: IO ([String], Int)
+    parseArgs = do
+        argv <- getArgs
+        case parse argv of
+            ([], files, [])                     -> return (nub files, 16)
+            (opts, files, [])
+                | Help `elem` opts              -> help
+                | [N n] <- filter (/=Help) opts -> return (nub files, n)
+            (_,_,errs)                          -> die errs
+      where
+        parse argv = getOpt Permute options argv
+        header     = "Usage: urlcheck [-h] [-n n] [file ...]"
+        info       = usageInfo header options
+        dump       = hPutStrLn stderr
+        die errs   = dump (concat errs ++ info) >> exitWith (ExitFailure 1)
+        help       = dump info                  >> exitWith ExitSuccess
+
+``getOpt`` 函数接受三个参数
+
+  - 参数顺序的定义。 它定义了选项(Option)是否可以和其他参数混淆使用(就是我们上面用到的 ``Permute`` )或者是选项必须出现在参数之前。
+
+  - 选项的定义。 每个选项有这四个部分组成： 简称，全称，选项的描述(比如是否接受参数) 以及用户说明。
+
+  - 参数和选项数组，类似于 ``getArgs`` 的返回值。
+
+这个函数返回一个三元组，包括用户输入的选项，参数以及错误信息(如果有的话)。
+
+我们使用 ``Flag`` 代数类型(Algebraic Data Type)表示程序所能接收的选项。
+
+::
+
+    -- file: ch28/Check.hs
+    options :: [OptDescr Flag]
+    options = [ Option ['h'] ["help"] (NoArg Help)
+                       "Show this help message",
+                Option ['n'] []       (ReqArg (\s -> N (read s)) "N")
+                       "Number of concurrent connections (default 16)" ]
+
+``options`` 列表保存了每个程序能接收选项的描述。每个描述必须要生成一个 ``Flag`` 值。参考上面例子中是如何使用 ``NoArg`` 和 ``ReqArg`` 。 ``GetOpt`` 模块的 ``ArgDescr`` 类型有很多构造函数(Constructors)。
+
+::
+
+    -- file: ch28/GetOpt.hs
+    data ArgDescr a = NoArg a
+                    | ReqArg (String -> a) String
+                    | OptArg (Maybe String -> a) String
+
+
+  - ``NoArg`` 接受一个参数用来表示这个选项。在我们这个例子中，如果用户在调用程序时输入 ``-h`` 或者 ``--help`` , 我们就用 ``Help`` 值表示。
+
+  - ``ReqArg`` 的第一个函数作为参数，这个函数把用户输入的参数转化成相应的值；第二个参数是用来说明的。 这里我们是将字符串转换为数值(integer)，然后再给类型 ``Flag`` 的构造函数 ``N`` 。
+
+  - ``OptArg`` 和 ``ReqArg`` 很相似，但它允许选项没有对应的参数。
+
+
+模式守卫 (Pattern guards)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+函数 ``parseArgs`` 的定义里其实潜在了一个语言扩展(Language Extension)。用Pattern guards可以写出更加简要的guard expressions. 它通过语言扩展 ``PatternGuards`` 来使用。
+
+一个Pattern Guard有三个组成部分： 一个模式(Pattern)， 一个 ``<-`` 符号以及一个表达式。
+表达式会被解释然后和模式相匹配。 如果成功，在模式的定义的变量会被赋值。我们可以单一个guard里同时使用 Pattern guard 和普通的 ``Bool`` guard expressions。
+
+::
+
+    -- file: ch28/PatternGuard.hs
+    {-# LANGUAGE PatternGuards #-}
+
+    testme x xs | Just y <- lookup x xs, y > 3 = y
+                | otherwise                    = 0
+
+
+::
+
+    -- file: ch28/PatternGuard.hs
+    testme_noguards x xs = case lookup x xs of
+                             Just y | y > 3 -> y
+                             _              -> 0
+
