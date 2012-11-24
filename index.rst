@@ -52,7 +52,13 @@ Real World Haskell 中文版
 关于
 --------
 
-本文档由 `huangz <http://huangz.me>`_ 翻译，并在原书的基础上做了以下改进：
+以下人员参与了本文档的翻译工作：
+
+- `huangz <https://github.com/huangz1990>`_
+
+- `Haisheng, Wu <http://freizl.github.com/>`_
+
+除了进行翻译之外，本文档还在原书的基础上做了以下改进：
 
 * 修正原文正文和代码中的错误
 
@@ -60,9 +66,8 @@ Real World Haskell 中文版
 
 * 在一些比较复杂的地方添加注释，帮助理解
 
-关注项目最新进展，请到项目的 github 页面： `https://github.com/huangz1990/real-world-haskell-cn <https://github.com/huangz1990/real-world-haskell-cn>`_
-
-欢迎意见、建议或 bug 反馈。
+关注项目进度 / 反馈意见或建议 / 提交你的翻译贡献，
+请访问\ `项目的 github 页面 <https://github.com/huangz1990/real-world-haskell-cn>`_\ 。
 
 本文档的部分内容参考了 `AlbertLee <http://www.feime.net/>`_ 的译本，在此对他表示感谢。
 
