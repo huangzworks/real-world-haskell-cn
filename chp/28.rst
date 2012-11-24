@@ -755,10 +755,10 @@ I/O 和 STM
 模式守卫 (Pattern guards)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-函数 ``parseArgs`` 的定义里其实潜在了一个语言扩展(Language Extension)。用Pattern guards可以写出更加简要的guard expressions. 它通过语言扩展 ``PatternGuards`` 来使用。
+函数 ``parseArgs`` 的定义里其实潜在了一个语言扩展(Language Extension), Pattern guards。用它可以写出更加简要的guard expressions. 它通过语言扩展 ``PatternGuards`` 来使用。
 
 一个Pattern Guard有三个组成部分： 一个模式(Pattern)， 一个 ``<-`` 符号以及一个表达式。
-表达式会被解释然后和模式相匹配。 如果成功，在模式的定义的变量会被赋值。我们可以单一个guard里同时使用 Pattern guard 和普通的 ``Bool`` guard expressions。
+表达式会被解释然后和模式相匹配。 如果成功，在模式中定义的变量会被赋值。我们可以在一个guard里同时使用pattern guards和普通的 ``Bool`` guard expressions。
 
 ::
 
@@ -768,6 +768,7 @@ I/O 和 STM
     testme x xs | Just y <- lookup x xs, y > 3 = y
                 | otherwise                    = 0
 
+在上面的例子中，当关键字 ``x`` 存在于alist ``xs`` 并且大于等于3，则返回它所对应的值。下面的定义实现了同样的功能。
 
 ::
 
@@ -776,3 +777,98 @@ I/O 和 STM
                              Just y | y > 3 -> y
                              _              -> 0
 
+Pattern guards 使得我们可以把一系列的guards和 ``case`` 表达式组合到单个guard，从而写出更加简洁并容易理解的guards。
+
+
+STM的实践意义
+-------------------------
+
+至此我们还并未提及STM所提供的特别优越的地方。比如它在做组合(*composes*)方面就表现的很好：当需要向一个事务中增加逻辑时，只需要用到常见的函数 ``(>>=)`` 和 ``(>>)`` 。
+
+组合的概念在构建模块化软件是显得格外重要。如果我们把俩段都没有问题的代码组合在一起，也应该是能很好工作的。常规的线程编程技术无法实现组合，然而由于STM提供了一些很关键的前提，从而使在线程编程时使用组合变得可能。
+
+STM monad防止了我们意外的非事务性的I/O。我们不再需要关心锁的顺序，因为代码里根本没有锁机制。我们可以忘记丢失唤醒，因为不再有条件变量了。如果有异常发生，我们则可以用函数 ``catchSTM`` 捕捉到，或者是往上级传递。 最后，我们可以用 ``retry`` 和 ``orElse`` 以更加漂亮的方式组织代码。
+
+采用STM机制的代码不会死锁，但是导致饥饿还是有可能的。一个长事务导致另外一个事务不停的 ``retry`` 。为了解决这样的问题，需要尽量的短事务并保持数据一致性。
+
+
+合理的放弃控制权
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+无论是同步管理还是内存管理，经常会遇到保留控制权的情况：一些软件需要对延时或是内存使用记录有很强的保证，因此就必须花很多时间和精力去管理和调试显式的代码。然后对于软件的大多数实际情况，垃圾回收(Garbage Collection)和STM已经做的足够好了。
+
+STM并不是一颗完美的灵丹妙药。当我们选择垃圾回收而不是显式的内存管理， 我们是放弃了控制权从而获得更加安全的代码。 同样的，当使用STM时，我们放弃了底层的细节，从而希望代码可读性更好，更加容易理解。
+
+
+使用不变量
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+STM并不能消除某些类型的bug。比如，我们在一个 ``atomically`` 事务中从某个账号中取钱，然后返回到 ``IO`` monad，然后在另一个 ``atomicall`` 事务中把钱存到另一个账号，那么代码就会产生不一致性，因为会在某个特定时刻，这部分钱不会出现的任意一个账号里。
+
+::
+
+    -- file: ch28/GameInventory.hs
+    bogusTransfer qty fromBal toBal = do
+      fromQty <- atomically $ readTVar fromBal
+      -- window of inconsistency
+      toQty   <- atomically $ readTVar toBal
+      atomically $ writeTVar fromBal (fromQty - qty)
+      -- window of inconsistency
+      atomically $ writeTVar toBal   (toQty + qty)
+
+    bogusSale :: Item -> Gold -> Player -> Player -> IO ()
+    bogusSale item price buyer seller = do
+      atomically $ giveItem item (inventory seller) (inventory buyer)
+      bogusTransfer price (balance buyer) (balance seller)
+
+在同步程序中，这类问题显然很难而且不容易重现。比如上述例子中的不一致性问题通常只存在一段很短的时间内。在开发阶段通常不会出现这类问题，而往往只有在负载很高的产品环境才有可能发生。
+
+我们可以用函数 ``alwaysSucceeds`` 定义一个不变量，它是永远为真的一个数据属性。
+
+::
+    ghci> :type alwaysSucceeds
+    alwaysSucceeds :: STM a -> STM ()
+
+当创建一个不变量时，它马上会被检查。如果要失败，那么这个不变量会抛出异常。更有意思的是，不变量会在经后每个事务完成时自动被检查。如果在任何一个点上失败，事务就会推出，不变量抛出的异常也会被传递下去。这就意味着当不变量的条件被违反时，我们就可以马上得到反馈。
+
+比如，下面两个函数给本章开始时定义的游戏世界增加玩家
+
+::
+
+    -- file: ch28/GameInventory.hs
+    newPlayer :: Gold -> HitPoint -> [Item] -> STM Player
+    newPlayer balance health inventory =
+        Player `liftM` newTVar balance
+                  `ap` newTVar health
+                  `ap` newTVar inventory
+
+    populateWorld :: STM [Player]
+    populateWorld = sequence [ newPlayer 20 20 [Wand, Banjo],
+                               newPlayer 10 12 [Scroll] ]
+
+下面的函数则返回了一个不变量，通过它我们可以保证整个游戏世界资金总是平衡的：即任何时候的资金总量和游戏建立时的总量是一样的。
+
+::
+
+    -- file: ch28/GameInventory.hs
+    consistentBalance :: [Player] -> STM (STM ())
+    consistentBalance players = do
+        initialTotal <- totalBalance
+        return $ do
+          curTotal <- totalBalance
+          when (curTotal /= initialTotal) $
+            error "inconsistent global balance"
+      where totalBalance   = foldM addBalance 0 players
+            addBalance a b = (a+) `liftM` readTVar (balance b)
+
+下面我们写个函数来试验。
+
+::
+
+    -- file: ch28/GameInventory.hs
+    tryBogusSale = do
+      players@(alice:bob:_) <- atomically populateWorld
+      atomically $ alwaysSucceeds =<< consistentBalance players
+      bogusSale Wand 5 alice bob
+
+由于在函数 ``bogusTransfer`` 中不正确地使用了 ``atomically`` 而会导致不一致性， 当我们在 **ghci** 里运行这个方法时则会检测到这个不一致性。
