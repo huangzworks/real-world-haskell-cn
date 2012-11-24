@@ -873,3 +873,8 @@ STM并不能消除某些类型的bug。比如，我们在一个 ``atomically`` �
       bogusSale Wand 5 alice bob
 
 由于在函数 ``bogusTransfer`` 中不正确地使用了 ``atomically`` 而会导致不一致性， 当我们在 **ghci** 里运行这个方法时则会检测到这个不一致性。
+
+::
+
+    ghci> tryBogusSale
+    *** Exception: inconsistent global balance
