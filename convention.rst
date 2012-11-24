@@ -118,7 +118,6 @@
 
 
 第二十八章
---------
+------------------
 
 软件事务内存    Software transactional memory
-
