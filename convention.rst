@@ -121,3 +121,17 @@
 ------------------
 
 软件事务内存    Software transactional memory
+
+一致性  consistent
+
+条件变量    condition variable
+
+条件竞争    race condition
+
+死锁    deadblock
+
+程序崩溃    corruption
+
+细粒度  fineo-grained
+
+簿记    book-keeping
