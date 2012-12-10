@@ -27,6 +27,7 @@ Real World Haskell 中文版
 .. toctree::
    :maxdepth: 3
 
+   chp/1
    chp/4
    chp/28
 
@@ -35,7 +36,6 @@ Real World Haskell 中文版
 .. toctree::
    :maxdepth: 3
 
-   chp/1
    chp/3
    chp/5
    chp/6
