@@ -128,7 +128,7 @@
 
 条件竞争    race condition
 
-死锁    deadblock
+死锁    deadlock
 
 程序崩溃    corruption
 
