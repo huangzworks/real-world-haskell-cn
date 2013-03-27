@@ -425,12 +425,14 @@ notation)*\ 来表示一系列元素，Haskell则会自动填充内容。
 
     ghci> [1.0,1.25..2.0]
     [1.0,1.25,1.5,1.75,2.0]
+
     ghci> [1,4..15]
     [1,4,7,10,13]
+
     ghci> [10,9..1]
     [10,9,8,7,6,5,4,3,2,1]
 
-上述的当中这个例子中，终点元素并未包含的列表内，是由于它不属于我们定义的系列元素。
+上述的第二个例子中，终点元素并未包含的列表内，是由于它不属于我们定义的系列元素。
 
 我们可以省略列举的终点(end point)。如果类型没有自然的“上限”(upper
 bound)，那么会生成无穷列表。
@@ -681,6 +683,14 @@ Haskell 的整数类型为 ``Integer`` 。 ``Integer``
 写的行计数程序。如果暂时看不太懂源码也没关系，先照着代码写写程序，热热身就行了。
 
 使用编辑器，输入以下内容，并将它保存为 ``WC.hs`` ：
+
+::
+
+    -- file: ch01/WC.hs
+    -- lines beginning with "--" are comments.
+
+    main = interact wordCount
+        where wordCount input = show (length (lines input)) ++ "\n"
 
 再创建一个 ``quux.txt`` ，包含以下内容：
 
