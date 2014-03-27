@@ -242,3 +242,11 @@ texinfo_documents = [
 #texinfo_show_urls = 'footnote'
 
 highlight_language = 'haskell'
+
+epub_author = "Bryan O'Sullivan, Don Stewart, and John Goerzen"
+epub_basename = 'rwh_zh'
+epub_copyright = '2014, huangz1990'
+epub_identifier = 'f0f8e04f-5262-4858-9f46-adb4212fa3f6'
+epub_publisher = 'Anonymous'
+epub_scheme = 'uuid'
+epub_uid = 'uuid_id'
