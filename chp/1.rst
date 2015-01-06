@@ -592,7 +592,8 @@ Haskell 的整数类型为 ``Integer`` 。 ``Integer``
     11 % 29
     it :: Ratio Integer
 
-这里的 ``:m`` 是 ``:module`` 的缩写，用于载入一个给定模块。Ghci
+以上操作需要载入模块`Data.Ratio`，执行命令是`:module Data.Ratio`。
+这里，可以用 ``:m``这个缩写 来替代 ``:module``。``:m``跟着模块名，表示用于载入一个给定模块，若不给模块名，则是卸载模块。Ghci
 还提供了很多这类缩写，方便使用者。
 
 为了方便起见， ghci 给很多命令都提供了缩写，这里的 ``:m`` 就是 ``:module``
