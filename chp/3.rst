@@ -416,6 +416,11 @@ C 和 C++ 里的 ``enum`` 通常用于表示一系列符号值排列。代数数
 
 .. code-block:: c
 
+    struct vector {
+        float x;
+        float y;
+    };
+    
     enum shape_type {
         shape_circle,
         shape_poly,
