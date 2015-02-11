@@ -588,6 +588,7 @@ Haskell 的整数类型为 ``Integer`` 。 ``Integer``
 
 ::
 
+    Prelude> :m +Data.Ratio
     Prelude Data.Ratio> 11 % 29
     11 % 29
     it :: Ratio Integer
