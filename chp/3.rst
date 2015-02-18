@@ -130,7 +130,7 @@
 ::
 
     -- file: ch03/BookStore.hs
-    type CustomerID = Int 
+    type CustomerID = Int
     type ReviewBody = String
 
     data BetterReview = BetterReview BookInfo CustomerID ReviewBody
@@ -143,7 +143,7 @@
 
     -- file: ch03/BookStore.hs
     type BookRecord = (BookInfo, BookReview)
-   
+
 需要注意的是，类型别名只是为已有类型提供了一个新名字，创建值的工作还是由原来类型的值构造器进行。[注：如果你熟悉 C 或者 C++ ，可以将 Haskell 的类型别名看作是 ``typedef`` 。]
 
 
@@ -301,7 +301,7 @@ ghci 抱怨我们没有给 ``Invoice`` 值构造器足够的参数。
 ::
 
     Prelude> -- 第一个元组使用 Cartesian 表示，第二个元组使用 Polar 表示
-    Prelude> (1, 2) == (1, 2)   
+    Prelude> (1, 2) == (1, 2)
     True
 
 类型系统不会察觉到，我们正错误地对比两种不同表示方式的值，因为对两个类型相同的元组进行对比是完全合法的！
@@ -524,7 +524,7 @@ C 和 C++ 里的 ``enum`` 通常用于表示一系列符号值排列。代数数
 
 让我们稍微慢下探索新特性的脚步，花些时间，了解构造一个值、和对这个值进行模式匹配之间的关系。
 
-我们通过应用值构造器来构建值：表达式 ``Book 9 "Close Calls" ["John Long"]`` 应用 ``Book`` 构造器到值 ``9`` 、 ``"Close Calls`` 和 ``["John Long"]`` 上面，从而产生一个新的 ``BookInfo`` 类型的值。
+我们通过应用值构造器来构建值：表达式 ``Book 9 "Close Calls" ["John Long"]`` 应用 ``Book`` 构造器到值 ``9`` 、 ``"Close Calls"`` 和 ``["John Long"]`` 上面，从而产生一个新的 ``BookInfo`` 类型的值。
 
 另一方面，当对 ``Book`` 构造器进行模式匹配时，我们\ *逆转*\ （reverse）它的构造过程：首先，检查这个值是否由 ``Book`` 构造器生成 —— 如果是的话，那么就对这个值进行探查（inspect），并取出创建这个值时，提供给构造器的各个值。
 
@@ -628,6 +628,64 @@ C 和 C++ 里的 ``enum`` 通常用于表示一系列符号值排列。代数数
 
 当你阅读那些进行模式匹配的函数时，经常会发现像是 ``(x:xs)`` 或是 ``(d:ds)`` 这种类型的名字。这是一个流行的命名规则，其中的 ``s`` 表示“元素的复数”。以 ``(x:xs)`` 来说，它用 ``x`` 来表示列表的第一个元素，剩余的列表元素则用 ``xs`` 表示。
 
+通配符模式匹配
+^^^^^^^^^^^^^^
+
+如果在匹配模式中我们不在乎某个值的类型，那么可以用下划线字符 “_” 作为符号来进行标识，它也叫做*通配符*。它的用法如下。
+
+::
+
+    -- file: ch03/BookStore.hs
+    nicerID      (Book id _     _      ) = id
+    nicerTitle   (Book _  title _      ) = title
+    nicerAuthors (Book _  _     authors) = authors
+
+于是，我们将之前介绍过的访问器函数改得更加简明了。现在能很清晰的看出各个函数究竟使用到了哪些元素。
+
+在模式匹配里，通配符的作用和变量类似，但是它并不会绑定成一个新的变量。就像上面的例子展示的那样，在一个模式匹配里可以使用一个或多个通配符。
+
+使用通配符还有另一个好处。如果我们在一个匹配模式中引入了一个变量，但没有在函数体中用到它的话，Haskell 编译器会发出一个警告。定义一个变量但忘了使用通常意味着存在潜在的 bug，因此这是个有用的功能。假如我们不准备使用一个变量，那就不要用变量，而是用通配符，这样编译器就不会报错。
+
+穷举匹配模式和通配符
+^^^^^^^^^^^^^^^^^^^^^
+
+在给一个类型写一组匹配模式时，很重要的一点就是一定要涵盖构造器的所有可能情况。例如，如果我们需要探查一个列表，就应该写一个匹配非空构造器 (:) 的方程和一个匹配空构造器 [] 的方程。
+
+假如我们没有涵盖所有情况会发生什么呢。下面，我们故意漏写对 [] 构造器的检查。
+
+::
+
+    -- file: ch03/BadPattern.hs
+    badExample (x:xs) = x + badExample xs
+
+如果我们将其作用于一个不能匹配的值，运行时就会报错：我们的软件有 bug！
+
+::
+
+    ghci> badExample []
+    *** Exception: BadPattern.hs:4:0-36: Non-exhaustive patterns in function badExample
+
+在上面的例子中，函数定义时的方程里没有一个可以匹配 [] 这个值。
+
+如果在某些情况下，我们并不在乎某些特定的构造器，我们就可以用通配符匹配模式来定义一个默认的行为。
+
+::
+
+    -- file: ch03/BadPattern.hs
+    goodExample (x:xs) = x + goodExample xs
+    goodExample _      = 0
+
+上面例子中的通配符可以匹配 [] 构造器，因此应用这个函数不会导致程序崩溃。
+
+::
+
+    ghci> goodExample []
+    0
+    ghci> goodExample [1,2]
+    3
+
+Record syntax
+-------------
 
 Parameterized Types
 ---------------------
