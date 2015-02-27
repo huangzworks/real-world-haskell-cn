@@ -70,6 +70,10 @@
 
 公式化  boilerplate
 
+样板代码  boilerplate code
+
+访问器函数    accessor function
+
 
 第四章
 -------

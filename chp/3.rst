@@ -684,8 +684,117 @@ C 和 C++ 里的 ``enum`` 通常用于表示一系列符号值排列。代数数
     ghci> goodExample [1,2]
     3
 
-Record syntax
--------------
+记录语法
+-------
+
+给一个数据类型的每个成分写访问器函数是令人感觉重复而且乏味的事情。
+
+：：
+
+    -- file: ch03/BookStore.hs
+    nicerID      (Book id _     _      ) = id
+    nicerTitle   (Book _  title _      ) = title
+    nicerAuthors (Book _  _     authors) = authors
+
+我们把这种代码叫做“样板代码（boilerplate code）”：尽管是必需的，但是又长又烦。Haskell 程序员不喜欢样板代码。幸运的是，语言的设计者提供了避免这个问题的方法：我们在定义一种数据类型的同时，就可以定义好每个成分的访问器。（逗号的位置是一个风格问题，如果你喜欢的话，也可以把它放在每行的最后。）
+
+::
+
+    -- file: ch03/BookStore.hs
+    data Customer = Customer {
+          customerID      :: CustomerID
+        , customerName    :: String
+        , customerAddress :: Address
+        } deriving (Show)
+
+以上代码和下面这段我们更熟悉的代码的意义几乎是完全一致的。
+
+::
+
+    -- file: ch03/AltCustomer.hs
+    data Customer = Customer Int String [String]
+                    deriving (Show)
+
+    customerID :: Customer -> Int
+    customerID (Customer id _ _) = id
+
+    customerName :: Customer -> String
+    customerName (Customer _ name _) = name
+
+    customerAddress :: Customer -> [String]
+    customerAddress (Customer _ _ address) = address
+
+Haskell 会使用我们在定义类型的每个字段时的命名，相应生成与该命名相同的该字段的访问器函数。
+
+::
+
+    ghci> :type customerID
+    customerID :: Customer -> CustomerID
+
+我们仍然可以如往常一样使用应用语法来新建一个此类型的值。
+
+：：
+
+    -- file: ch03/BookStore.hs
+    customer1 = Customer 271828 "J.R. Hacker"
+                ["255 Syntax Ct",
+                 "Milpitas, CA 95134",
+                 "USA"]
+
+记录语法还新增了一种更详细的标识法来新建一个值。这种标识法通常都会提升代码的可读性。
+
+::
+
+    -- file: ch03/BookStore.hs
+    customer2 = Customer {
+                  customerID = 271828
+                , customerAddress = ["1048576 Disk Drive",
+                                     "Milpitas, CA 95134",
+                                     "USA"]
+                , customerName = "Jane Q. Citizen"
+                }
+
+如果使用这种形式，我们还可以调换字段列表的顺序。比如在上面的例子里，name 和 address 字段的顺序就被移动过，和定义类型时的顺序不一样了。
+
+当我们使用记录语法来定义类型时，还会影响到该类型的打印格式。
+
+::
+    ghci> customer1
+    Customer {customerID = 271828, customerName = "J.R. Hacker", customerAddress = ["255 Syntax Ct","Milpitas, CA 95134","USA"]}
+
+让我们打印一个 BookInfo 类型的值来做个比较；这是没有使用记录语法时的打印格式。
+
+::
+
+    ghci> cities
+    Book 173 "Use of Weapons" ["Iain M. Banks"]
+
+我们在使用记录语法的时候“免费”得到的访问器函数，实际上都是普通的 Haskell 函数。
+
+::
+
+    ghci> :type customerName
+    customerName :: Customer -> String
+    ghci> customerName customer1
+    "J.R. Hacker"
+
+标准库里的 System.Time 模块就是一个使用记录语法的好例子。例如其中定义了这样一个类型：
+
+::
+
+    data CalendarTime = CalendarTime {
+      ctYear                      :: Int,
+      ctMonth                     :: Month,
+      ctDay, ctHour, ctMin, ctSec :: Int,
+      ctPicosec                   :: Integer,
+      ctWDay                      :: Day,
+      ctYDay                      :: Int,
+      ctTZName                    :: String,
+      ctTZ                        :: Int,
+      ctIsDST                     :: Bool
+    }
+
+假如没有记录语法，从一个如此复杂的类型中抽取某个字段将是一件非常痛苦的事情。这种标识法使我们在使用大型结构的过程中更方便了。
 
 Parameterized Types
 ---------------------
