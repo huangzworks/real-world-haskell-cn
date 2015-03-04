@@ -4,7 +4,7 @@
 第六章：类型类
 ================
 
-类型类（type class）是 Haskell 最强大的功能之一：它用于定义通用接口，为各种不同的类型提供一组公共特性集。
+类型类（typeclass）是 Haskell 最强大的功能之一：它用于定义通用接口，为各种不同的类型提供一组公共特性集。
 
 类型类是某些基本语言特性的核心，比如相等性测试和数值操作符。
 
@@ -74,7 +74,7 @@ Haskell 的类型类可以满足以上提到的所有要求。
 什么是类型类？
 -----------------
 
-类型类定义了一集函数，这些函数对于不同类型的值使用不同的函数实现。它和其他语言的接口和多态方法有些类似。
+类型类定义了一系列函数，这些函数对于不同类型的值使用不同的函数实现。它和其他语言的接口和多态方法有些类似。
 
 [译注：这里原文是将“面向对象编程中的对象”和 Haskell 的类型类进行类比，但实际上这种类比并不太恰当，类比成接口和多态方法更适合一点。]
 
@@ -458,8 +458,8 @@ Word64      64 位无符号整数
 (/)             Fractional a => a -> a -> a                 Prelude     份数除法
 (**)            Floating a => a -> a -> a                   Prelude     乘幂
 (^)             (Num a, Integral b) => a -> b -> a          Prelude     计算某个数的非负整数次方
-(^^)            (Fractional a, Integral b) => a -> b -> a   Prelude     份数的任意整数次方
-(%)             Integral a => a -> a -> Ratio a             Data.Ratio  创建比率
+(^^)            (Fractional a, Integral b) => a -> b -> a   Prelude     分数的任意整数次方
+(%)             Integral a => a -> a -> Ratio a             Data.Ratio  构成比率
 (.&.)           Bits a => a -> a -> a                       Data.Bits   二进制并操作
 (.|.)           Bits a => a -> a -> a                       Data.Bits   二进制或操作
 abs             Num a => a -> a                             Prelude     绝对值操作
