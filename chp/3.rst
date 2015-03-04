@@ -759,6 +759,7 @@ Haskell 会使用我们在定义类型的每个字段时的命名，相应生成
 当我们使用记录语法来定义类型时，还会影响到该类型的打印格式。
 
 ::
+
     ghci> customer1
     Customer {customerID = 271828, customerName = "J.R. Hacker", customerAddress = ["255 Syntax Ct","Milpitas, CA 95134","USA"]}
 
