@@ -797,8 +797,49 @@ Haskell 会使用我们在定义类型的每个字段时的命名，相应生成
 
 假如没有记录语法，从一个如此复杂的类型中抽取某个字段将是一件非常痛苦的事情。这种标识法使我们在使用大型结构的过程中更方便了。
 
-Parameterized Types
----------------------
+参数化的类型
+--------------
+
+我们曾不止一次地提到列表类型是多态的：列表中的元素可以是任何类型。我们也可以给自定义的类型添加多态性。只要在类型定义中使用类型变量就可以做到这一点。Prelude 中定义了一种叫做 Maybe 的类型：它用来表示这样一种值——既可以有值也可能空缺，比如数据库中某行的某字段就可能为空。
+
+::
+
+    -- file: ch03/Nullable.hs
+    data Maybe a = Just a
+                 | Nothing
+    译注：Maybe，Just，Nothing 都是 Prelude 中已经定义好的类型
+    这段代码是不能在 ghci 里面执行的
+    这段代码简单的展示了标准库是怎么定义 Maybe 这种类型的
+
+这里的变量不是普通的变量：它是一个类型变量。它意味着 Maybe 类型使用另一种类型作为它的参数。从而使得 Maybe 可以作用于任何类型的值。
+
+::
+
+    -- file: ch03/Nullable.hs
+    someBool = Just True
+    someString = Just "something"
+
+和往常一样，我们可以在 **ghci** 里试着用一下这种类型。
+
+::
+
+    ghci> Just 1.5
+    Just 1.5
+    ghci> Nothing
+    Nothing
+    ghci> :type Just "invisible bike"
+    Just "invisible bike" :: Maybe [Char]
+
+Maybe 是一个多态，或者称作泛型，的类型。我们向 Maybe 的类型构造器传入某种类型作为参数，例如 Maybe Int 或 Maybe [Bool]。 如我们所希望的那样，这些都是不同的类型（译注：可能省略了“但是都可以成功传入作为参数”）。
+
+我们可以嵌套使用参数化的类型，但要记得使用括号标识嵌套的顺序，以便 Haskell 编译器知道如何解析这样的表达式。
+
+::
+
+    -- file: ch03/Nullable.hs
+    wrapped = Just (Just "wrapped")
+
+再补充说明一下，如果和其它更常见的语言做个类比，参数化类型就相当于 C++ 中的模板（template），和 Java 中的泛型（generics）。请注意这仅仅是个大概的比喻。这些语言都是在被发明之后很久再加上模板和泛型的，因此在使用时会感到有些别扭。Haskell 则是从诞生之日起就有了参数化类型，因此更简单易用。
 
 Recursive Types
 -------------------
