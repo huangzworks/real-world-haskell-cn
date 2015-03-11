@@ -829,7 +829,7 @@ Haskell 会使用我们在定义类型的每个字段时的命名，相应生成
     ghci> :type Just "invisible bike"
     Just "invisible bike" :: Maybe [Char]
 
-`Maybe` 是一个多态，或者称作泛型，的类型。我们向 `Maybe` 的类型构造器传入某种类型作为参数，例如 `Maybe Int` 或 `Maybe [Bool]`。 如我们所希望的那样，这些都是不同的类型（译注：可能省略了“但是都可以成功传入作为参数”）。
+`Maybe` 是一个多态，或者称作泛型的类型。我们向 `Maybe` 的类型构造器传入某种类型作为参数，例如 `Maybe Int` 或 `Maybe [Bool]`。 如我们所希望的那样，这些都是不同的类型（译注：可能省略了“但是都可以成功传入作为参数”）。
 
 我们可以嵌套使用参数化的类型，但要记得使用括号标识嵌套的顺序，以便 Haskell 编译器知道如何解析这样的表达式。
 
@@ -840,8 +840,126 @@ Haskell 会使用我们在定义类型的每个字段时的命名，相应生成
 
 再补充说明一下，如果和其它更常见的语言做个类比，参数化类型就相当于 C++ 中的模板（template），和 Java 中的泛型（generics）。请注意这仅仅是个大概的比喻。这些语言都是在被发明之后很久再加上模板和泛型的，因此在使用时会感到有些别扭。Haskell 则是从诞生之日起就有了参数化类型，因此更简单易用。
 
-Recursive Types
--------------------
+递归类型
+------------
+
+列表这种常见的类型就是\ *递归*\的：即它用自己来定义自己。为了深入了解其中的含义，让我们自己来设计一个类列表类型。我们将用 `Cons` 替换 `(:)` 构造器，用 `Nil` 替换 `[]` 构造器。
+
+::
+
+    -- file: ch03/ListADT.hs
+    data List a = Cons a (List a)
+                | Nil
+                  deriving (Show)
+
+`List a` 在 `=` 符号的左右两侧都有出现，我们可以说该类型的定义引用了它自己。当我们使用 `Cons` 构造器来创建一个值时，我们必须提供一个 `a` 的值作为参数一，以及一个 `List a` 类型的值作为参数二。接下来我们看一个实例。
+
+我们能创建的 `List a` 类型的最简单的值就是 Nil。请将上面的代码保存为一个文件，然后打开 **ghci** 并加载它。
+
+::
+
+    ghci> Nil
+    Nil
+
+由于 `Nil` 是一个 `List a` 类型（译注：原文是 `List` 类型，可能是漏写了 `a`），因此我们可以将它作为 `Cons` 的第二个参数。
+
+::
+
+    ghci> Cons 0 Nil
+    Cons 0 Nil
+
+然后 `Cons 0 Nil` 也是一个 `List a` 类型，我们也可以将它作为 `Cons` 的第二个参数。
+
+::
+
+    ghci> Cons 1 it
+    Cons 1 (Cons 0 Nil)
+    ghci> Cons 2 it
+    Cons 2 (Cons 1 (Cons 0 Nil))
+    ghci> Cons 3 it
+    Cons 3 (Cons 2 (Cons 1 (Cons 0 Nil)))
+
+我们可以一直这样写下去，得到一个很长的 `Cons` 链，其中每个子链的末位元素都是一个 `Nil`。
+
+.. tip::
+
+    List 可以被当作是 list 吗？
+
+    让我们来简单的证明一下 `List a` 类型和内置的 list 类型 `[a]` 拥有相同的构型。让我们设计一个函数能够接受任何一个 [a] 类型的值作为输入参数，并返回 `List a` 类型的一个值。
+
+    ::
+
+        -- file: ch03/ListADT.hs
+        fromList (x:xs) = Cons x (fromList xs)
+        fromList []     = Nil
+
+    通过查看上述实现，能清楚的看到它将每个 `(:)` 替换成 `Cons`，将每个 `[]` 替换成 `Nil`。这样就涵盖了内置 list 类型的全部构造器。因此我们可以说二者是同构的，它们有着相同的构型。
+
+    ::
+
+        ghci> fromList "durian"
+        Cons 'd' (Cons 'u' (Cons 'r' (Cons 'i' (Cons 'a' (Cons 'n' Nil)))))
+        ghci> fromList [Just True, Nothing, Just False]
+        Cons (Just True) (Cons Nothing (Cons (Just False) Nil))
+
+为了说明什么是递归类型，我们再来看第三个例子——定义一个二叉树类型。
+
+::
+
+    -- file: ch03/Tree.hs
+    data Tree a = Node a (Tree a) (Tree a)
+                | Empty
+                  deriving (Show)
+
+二叉树是指这样一种节点：该节点有两个子节点，这两个子节点要么也是二叉树节点，要么是空节点。
+
+这次我们将和另一种常见的语言进行比较来寻找灵感。以下是在 Java 中实现类似数据结构的类定义。
+
+::
+
+    class Tree<A>
+    {
+        A value;
+        Tree<A> left;
+        Tree<A> right;
+
+        public Tree(A v, Tree<A> l, Tree<A> r)
+        {
+        value = v;
+        left = l;
+        right = r;
+        }
+    }
+
+稍有不同的是，Java 中使用特殊值 `null` 表示各种“没有值”, 因此我们可以使用 `null` 来表示一个节点没有左子节点或没有右子节点。下面这个简单的函数能够构建一个有两个叶节点（叶节点这个词习惯上是指没有子节点的节点）的树。
+
+::
+
+    class Example
+    {
+        static Tree<String> simpleTree()
+        {
+        return new Tree<String>(
+                "parent",
+            new Tree<String>("left leaf", null, null),
+            new Tree<String>("right leaf", null, null));
+        }
+    }
+
+Haskell 没有与 `null` 对应的概念。尽管我们可以使用 `Maybe` 达到类似的效果，但后果是模式匹配将变得十分臃肿。因此我们决定使用一个没有参数的 `Empty` 构造器。在上述 Tree 类型的 Java 实现中使用到 null 的地方，在 Haskell 中都改用 `Empty`。
+
+::
+
+    -- file: ch03/Tree.hs
+    simpleTree = Node "parent" (Node "left child" Empty Empty)
+                               (Node "right child" Empty Empty)
+
+练习
+^^^^^^
+
+1. 请给 `List` 类型写一个与 `fromList` 作用相反的函数：传入一个 `List a` 类型的值，返回一个 `[a]`。
+
+2. 仿造 Java 示例里那样，定义一种只需要一个构造器的树类型。不要使用 `Empty` 构造器，而是用 `Maybe` 表示节点的子节点。
 
 Reporting Errors
 ------------------
