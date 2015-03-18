@@ -23,6 +23,7 @@ Real World Haskell 中文版
    chp/1
    chp/2
    chp/4
+   chp/7
    chp/28
 
 正在翻译的章节：
