@@ -961,8 +961,96 @@ Haskell 没有与 `null` 对应的概念。尽管我们可以使用 `Maybe` 达�
 
 2. 请仿造 Java 示例，定义一种只需要一个构造器的树类型。不要使用 `Empty` 构造器，而是用 `Maybe` 表示节点的子节点。
 
-Reporting Errors
-------------------
+报告错误
+----------
+
+当我们的代码中出现严重错误时可以调用 Haskell 提供的标准函数 ``error :: String -> a``。我们将希望打印出来的错误信息作为一个字符串参数传入。而该函数的类型签名看上去有些特别：它是怎么做到仅从一个字符串类型的值就生成任意类型 ``a`` 的返回值的呢？
+
+由于它的结果是返回类型 ``a``，因此无论我们在哪里调用它都能得到正确类型的返回值。然而，它并不像普通函数那样返回一个值，而是立即中止求值过程，并将我们提供的错误信息打印出来。
+
+``mySecond`` 函数返回输入列表参数的第二个元素，假如输入列表长度不够则失败。
+
+::
+
+    -- file: ch03/MySecond.hs
+    mySecond :: [a] -> a
+
+    mySecond xs = if null (tail xs)
+                  then error "list too short"
+                  else head (tail xs)
+
+和之前一样，我们来看看这个函数在 **ghci** 中的使用效果如何。
+
+::
+
+  ghci> mySecond "xi"
+  'i'
+  ghci> mySecond [2]
+  *** Exception: list too short
+  ghci> head (mySecond [[9]])
+  *** Exception: list too short
+
+注意上面的第三种情况，我们试图将调用 ``mySecond`` 的结果作为参数传入另一个函数。求值过程也同样中止了，并返回到 **ghci** 提示符。这就是使用 ``error`` 的最主要的问题：它并不允许调用者根据错误是可修复的还是严重到必须中止的来区别对待。
+
+正如我们之前所看到的，模式匹配失败也会造成类似的不可修复错误。
+
+::
+
+  ghci> mySecond []
+  *** Exception: Prelude.tail: empty list
+
+让过程更可控的方法
+^^^^^^^^^^^^^^^^^^^^
+
+我们可以使用 ``Maybe`` 类型来表示有可能出现错误的情况。
+
+如果我们想指出某个操作可能会失败，可以使用 ``Nothing`` 构造器。反之则使用 ``Just`` 构造器将值包裹起来。
+
+让我们看看如果返回 ``Maybe`` 类型的值而不是调用 ``error``，这样会给 ``mySecond`` 函数带来怎样的变化。
+
+::
+
+  -- file: ch03/MySecond.hs
+  safeSecond :: [a] -> Maybe a
+
+  safeSecond [] = Nothing
+  safeSecond xs = if null (tail xs)
+                  then Nothing
+                  else Just (head (tail xs))
+
+当传入的列表太短时，我们将 ``Nothing`` 返回给调用者。然后由他们来决定接下来做什么，假如调用 ``error`` 的话则会强制程序崩溃。
+
+::
+
+  ghci> safeSecond []
+  Nothing
+  ghci> safeSecond [1]
+  Nothing
+  ghci> safeSecond [1,2]
+  Just 2
+  ghci> safeSecond [1,2,3]
+  Just 2
+
+复习一下前面的章节，我们还可以使用模式匹配继续增强这个函数的可读性。
+
+::
+
+  -- file: ch03/MySecond.hs
+  tidySecond :: [a] -> Maybe a
+
+  tidySecond (_:x:_) = Just x
+  tidySecond _       = Nothing
+
+::
+
+  译注：(_:x:_) 相当于 (_:(x:_))，考虑到列表的元素只能是同一种类型
+       假想第一个 _ 是 a 类型，那么这个模式匹配的是 (a:(a:[a, a, ...])) 或 (a:(a:[]))
+       即元素是 a 类型的值的一个列表，并且至少有 2 个元素
+       那么如果第一个 _ 匹配到了 []，有没有可能使最终匹配到得列表只有一个元素呢？
+       ([]:(x:_)) 说明 a 是列表类型，那么 x 也必须是列表类型，x 至少是 []
+       而 ([]:([]:[])) -> ([]:[[]]) -> [[], []]，还是 2 个元素
+
+第一个模式仅仅匹配那些至少有两个元素的列表（因为它有两个列表构造器），并将列表的第二个元素的值绑定给 变量 ``x``。如果第一个模式匹配失败了，则匹配第二个模式。
 
 Intruducing Local Variables
 -------------------------------
