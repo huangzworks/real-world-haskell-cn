@@ -1052,8 +1052,125 @@ Haskell 没有与 `null` 对应的概念。尽管我们可以使用 `Maybe` 达�
 
 第一个模式仅仅匹配那些至少有两个元素的列表（因为它有两个列表构造器），并将列表的第二个元素的值绑定给 变量 ``x``。如果第一个模式匹配失败了，则匹配第二个模式。
 
-Intruducing Local Variables
--------------------------------
+引入局部变量
+--------------
+
+在函数体内部，我们可以在任何地方使用 ``let`` 表达式引入新的局部变量。请看下面这个简单的函数，它用来检查我们是否可以向顾客出借现金。我们需要确保剩余的保证金不少于 100 元的情况下，才能出借现金，并返回减去出借金额后的余额。
+
+::
+
+  -- file: ch03/Lending.hs
+  lend amount balance = let reserve    = 100
+                            newBalance = balance - amount
+                        in if balance < reserve
+                           then Nothing
+                           else Just newBalance
+
+这段代码中使用了 ``let`` 关键字标识一个变量声明区块的开始，用 ``in`` 关键字标识这个区块的结束。每行引入了一个局部变量。变量名在 ``=`` 的左侧，右侧则是该变量所绑定的表达式。
+
+
+.. note::
+
+    特别提示
+
+    请特别注意我们的用词：在 ``let`` 区块中，变量名被绑定到了一个表达式而不是一个\ *值*\ 。由于 Haskell 是一门惰性求值的语言，变量名所对应的表达式一直到被用到时才会求值。在上面的例子里，如果没有满足保证金的要求，就不会计算 ``newBalance`` 的值。
+
+    当我们在一个 ``let`` 区块中定义一个变量时，我们称之为\ *``let`` 范围内*\ 的变量。顾名思义即是：我们将这个变量限制在这个 ``let`` 区块内。
+
+    另外，上面这个例子中对空白和缩进的使用也值得特别注意。在下一节 “The offside rule and white space in an expression” 中我们会着重讲解其中的奥妙。
+
+在 ``let`` 区块内定义的变量，既可以在定义区内使用，也可以在紧跟着 ``in`` 关键字的表达式中使用。
+
+一般来说，我们将代码中可以使用一个变量名的地方称作这个变量名的\ *作用域（scope）*\ 。如果我们能使用，则说明在\* 作用域*\ 内，反之则说明\ *在作用域外* \。如果一个变量名在整个源代码的任意处都可以使用，则说明它位于\ *最高层*\ 的作用域。
+
+屏蔽
+^^^^^^
+
+我们可以在表达式中使用嵌套的 ``let`` 区块。
+
+::
+
+    -- file: ch03/NestedLets.hs
+    foo = let a = 1
+          in let b = 2
+             in a + b
+
+上面的写法是完全合法的；但是在嵌套的 ``let`` 表达式里重复使用相同的变量名并不明智。
+
+::
+
+    -- file: ch03/NestedLets.hs
+    bar = let x = 1
+          in ((let x = "foo" in x), x)
+
+如上，内部的 ``x`` 隐藏了，或称作\ *屏蔽（shadowing）*\ , 外部的 ``x``。它们的变量名一样，但后者拥有完全不同的类型和值。
+
+::
+
+    ghci> bar
+    ("foo",1)
+
+我们同样也可以屏蔽一个函数的参数，并导致更加奇怪的结果。你认为下面这个函数的类型是什么？
+
+::
+
+    -- file: ch03/NestedLets.hs
+    quux a = let a = "foo"
+             in a ++ "eek!"
+
+在函数的内部，由于 ``let``-绑定的变量名 ``a`` 屏蔽了函数的参数，使得参数 ``a`` 没有起到任何作用，因此该参数可以是任何类型的。
+
+::
+
+    ghci> :type quux
+    quux :: t -> [Char]
+
+.. tip::
+
+    编译器警告是你的朋友
+
+    显然屏蔽会导致混乱和恶心的 bug，因此 GHC 设置了一个有用的选项 -fwarn-name-shadowing。如果你开启了这个功能，每当屏蔽某个变量名时，GHC 就会打印出一条警告。
+
+where 从句
+^^^^^^^^^^^^
+
+还有另一种方法也可以用来引入局部变量：``where`` 从句。``where`` 从句中的定义在其\ *所跟随*\ 的主句中有效。下面是和 ``lend`` 函数类似的一个例子，不同之处是使用了 ``where`` 而不是 ``let``。
+
+::
+
+    -- file: ch03/Lending.hs
+    lend2 amount balance = if amount < reserve * 0.5
+                           then Just newBalance
+                           else Nothing
+        where reserve    = 100
+              newBalance = balance - amount
+
+尽管刚开始使用 ``where`` 从句通常会有异样的感觉，但它对于提升可读性有着巨大的帮助。它使得读者的注意力首先能集中在表达式的一些重要的细节上，而之后再补上支持性的定义。经过一段时间以后，如果再用回那些没有 ``where`` 从句的语言，你就会怀念它的存在了。
+
+与 ``let`` 表达式一样，``where`` 从句中的空白和缩进也十分重要。 在下一节 “The offside rule and white space in an expression” 中我们会着重讲解其中的奥妙。
+
+局部函数与全局变量
+^^^^^^^^^^^^^^^^^^^^
+
+你可能已经注意到了，在 Haskell 的语法里，定义变量和定义函数的方式非常相似。这种相似性也存在于 ``let`` 和 ``where`` 区块里：定义局部\ *函数*\ 就像定义局部\ *变量*\ 那样简单。
+
+::
+
+    -- file: ch03/LocalFunction.hs
+    pluralise :: String -> [Int] -> [String]
+    pluralise word counts = map plural counts
+        where plural 0 = "no " ++ word ++ "s"
+              plural 1 = "one " ++ word
+              plural n = show n ++ " " ++ word ++ "s"
+
+我们定义了一个由多个等式构成的局部函数 ``plural``。局部函数可以自由地使用其被封装在内的作用域内的任意变量：在本例中，我们使用了在外部函数 ``pluralise`` 中定义的变量 ``word``。在 ``pluralise`` 的定义里，``map`` 函数（我们将在下一章里再来讲解它的用法）将局部函数 ``plural`` 逐一应用于 ``counts`` 列表的每个元素。
+
+我们也可以在代码的一开始就定义变量，语法和定义函数是一样的。
+
+::
+
+    -- file: ch03/GlobalVariable.hs
+    itemName = "Weighted Companion Cube"
 
 The Offside Rule and Whitespace in an Expression
 ---------------------------------------------------------
