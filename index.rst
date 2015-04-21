@@ -52,7 +52,7 @@ Real World Haskell 中文版
 
 - `Haisheng, Wu <https://github.com/freizl>`_
 
-- `Albert <https://github.com/shuaishuai>`_
+- `Albert <https://github.com/hbrls>`_
 
 除了进行翻译之外，本文档还在原书的基础上做了以下改进：
 
