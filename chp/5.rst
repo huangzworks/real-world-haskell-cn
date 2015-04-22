@@ -7,7 +7,7 @@ JSON 简介
 
 在这一章，我们将开发一个小而完整的 Haskell 库，这个库用于处理和序列化 JSON 数据。
 
-JSON （JavaScript 对象符号）是一种小型、表示简单、便于存储和发送的语言。它通常用于从 web 服务向阅览器 JavaScript 程序传送数据。JSON 的格式由 `www.json.org <www.json.org>`_ 描述，而细节由 `RFC 4627 <http://www.ietf.org/rfc/rfc4627.txt>`_ 补充。
+JSON （JavaScript 对象符号）是一种小型、表示简单、便于存储和发送的语言。它通常用于从 web 服务向基于浏览器的 JavaScript 程序传送数据。JSON 的格式由 `www.json.org <www.json.org>`_ 描述，而细节由 `RFC 4627 <http://www.ietf.org/rfc/rfc4627.txt>`_ 补充。
 
 JSON 支持四种基本类型值：字符串、数字、布尔值和一个特殊值， ``null`` 。
 
@@ -21,7 +21,7 @@ JSON 支持四种基本类型值：字符串、数字、布尔值和一个特殊
 
     null
 
-JSON 还提供了两种符合类型：数组是值的一种有序序列，而对象则是“名字/值对”的无序收集器（unordered collection of name/value pairs），其中对象的名字必须是字符串，而对象和数组的值则可以是任何 JSON 类型。
+JSON 还提供了两种复合类型：\ *数组*\ 是值的有序序列，而\ *对象*\ 则是“名字/值”对的无序收集器（unordered collection of name/value pairs）。其中对象的名字必须是字符串，而对象和数组的值则可以是任何 JSON 类型。
 
 .. code-block:: json
 
@@ -89,7 +89,7 @@ JSON 还提供了两种符合类型：数组是值的一种有序序列，而对
     getString (JString s) = Just s
     getString _           = Nothing
 
-保存修改过的源码文件，然后使用 ``:reload`` 命令重新载入 ``SimpleJSON.hs`` 文件。（\ ``:reload`` 会自动记忆最近一次载入的文件）：
+保存修改过的源码文件，然后使用 ``:reload`` 命令重新载入 ``SimpleJSON.hs`` 文件（\ ``:reload`` 会自动记忆最近一次载入的文件）：
 
 ::
 
@@ -103,7 +103,7 @@ JSON 还提供了两种符合类型：数组是值的一种有序序列，而对
     *Main> getString (JNumber 3)
     Nothing
 
-在加上一些其他函数，初步完成一些基本功能：
+再加上一些其他函数，初步完成一些基本功能：
 
 ::
         
@@ -122,7 +122,7 @@ JSON 还提供了两种符合类型：数组是值的一种有序序列，而对
 
     isNull v            = v == JNull
 
-``truncate`` 函数通过将浮点数或者有理数的小数位丢掉来获得一个整数返回值：
+``truncate`` 函数返回浮点数或者有理数的整数部分：
 
 ::
 
@@ -140,7 +140,7 @@ Haskell 模块
 
 一个 Haskell 文件可以包含一个模块定义，模块可以决定模块中的哪些名字可以被外部访问。
 
-模块的定义必须放在其他别的定义之前：
+模块的定义必须放在其它定义之前：
 
 ::
 
@@ -163,7 +163,7 @@ Haskell 模块
 
 导出列表决定模块中的哪些名字对于外部模块是可见的，使得私有代码可以隐藏在模块的内部。跟在 ``JValue`` 之后的 ``(..)`` 符号表示导出 ``JValue`` 类型以及它的所有值构造器。
 
-事实上，模块甚至可以只导出类型的名字（类构造器），而不导出这个类型的值构造器。这种能力非常重要：它允许模块对用户隐藏类型的细节，将一个类型变得\ *抽象*\ 。如果用户看不见类型的值构造器，它就没办法对类型的值进行模式匹配，也不能使用值构造器显式创建这种类型的值[译注：只能通过相应的 API 来创建这种类型的值]。本章的稍后部分会说明，在什么情况下， 我们需要将一个类型变为抽象。
+事实上，模块甚至可以只导出类型的名字（类构造器），而不导出这个类型的值构造器。这种能力非常重要：它允许模块对用户隐藏类型的细节，将一个类型变得\ *抽象*\ 。如果用户看不见类型的值构造器，他就没办法对类型的值进行模式匹配，也不能使用值构造器显式创建这种类型的值[译注：只能通过相应的 API 来创建这种类型的值]。本章稍后会说明，在什么情况下，我们需要将一个类型变得抽象。
 
 如果省略掉模块定义中的导出部分，那么所有名字都会被导出：
 
@@ -193,7 +193,7 @@ Haskell 模块
     $ ls
     SimpleJSON.hi  SimpleJSON.hs  SimpleJSON.o
 
-``-c`` 表示让 ghc 只生成目标代码。如果省略 ``-c`` 选项，那么 ghc 就会试图生成一个完整的可执行文件，这会造成失败，因为目前的 ``SimpleJSON.hs`` 还没有定义 ``main`` 函数，而 GHC 在执行一个独立程序时会调用这个 ``main`` 函数。
+``-c`` 表示让 ghc 只生成目标代码。如果省略 ``-c`` 选项，那么 ghc 就会试图生成一个完整的可执行文件，这会失败，因为目前的 ``SimpleJSON.hs`` 还没有定义 ``main`` 函数，而 GHC 在执行一个独立程序时会调用这个 ``main`` 函数。
 
 在编译完成之后，会生成两个新文件。其中 ``SimpleJSON.hi`` 是\ *接口文件*\ （interface file）， ghc 以机器可读的格式，将模块中导出名字的信息保存在这个文件。而 ``SimpleJSON.o`` 则是\ *目标文件*\ （object file），它包含了已生成的机器码。
 
@@ -201,7 +201,7 @@ Haskell 模块
 载入模块和生成可执行文件
 ---------------------------------
 
-既然已经成功编译了 ``SimpleJSON`` 库，是时候写个小程序来执行它了。打开的编辑器，将以下内容保存为 ``Main.hs`` ：
+既然已经成功编译了 ``SimpleJSON`` 库，是时候写个小程序来执行它了。打开编辑器，将以下内容保存为 ``Main.hs`` ：
 
 .. literalinclude:: /code/ch05/Main.hs
 
@@ -215,16 +215,13 @@ Haskell 模块
 
 ::
 
-    $ ghc Main.hs 
-    [1 of 2] Compiling SimpleJSON       ( SimpleJSON.hs, SimpleJSON.o )
-    [2 of 2] Compiling Main             ( Main.hs, Main.o )
-    Linking Main ...
+    ghc -o simple Main.hs
 
-这次编译没有使用 ``-c`` 选项，因此 ghc 会尝试生成一个可执行程序，这个过程被称为\ *链接*\ （linking）。Ghc 可以在一条命令中同时完成编译和链接的任务。
+这次编译没有使用 ``-c`` 选项，因此 ghc 会尝试生成一个可执行程序，这个过程被称为\ *链接*\ （linking）。ghc 可以在一条命令中同时完成编译和链接的任务。
 
 ``-o`` 选项用于指定可执行程序的名字。在 Windows 平台下，它会生成一个 ``.exe`` 后缀的文件，而 UNIX 平台的文件则没有后缀。
 
-Ghc 会自动找到所需的文件，进行编译和链接，然后产生可执行文件，我们唯一要做的就是提供 ``Main.hs`` 文件。
+ghc 会自动找到所需的文件，进行编译和链接，然后产生可执行文件，我们唯一要做的就是提供 ``Main.hs`` 文件。
 
 [译注：在原文中说到，编译时必须手动列出所有相关文件，但是在新版 GHC 中，编译时提供 ``Main.hs`` 就可以了，编译器会自动找到、编译和链接相关代码。因此，本段内容做了相应的修改。]
 
@@ -290,7 +287,7 @@ SimpleJSON 模块已经有了 JSON 类型的表示了，那么下一步要做的
 
 除了风格上的考虑之外，将翻译代码和实际打印代码分开，也有助于提升灵活性。比如说，如果想在数据写出之前进行压缩，那么只需要修改 ``putJValue`` 就可以了，不必改动整个 ``renderJValue`` 函数。
 
-分离纯代码和不纯代码的想法非常有效，并且在 Haskell 代码中无处不在。现有的一些 Haskell 压缩模块，它们都拥有简单的接口：压缩函数接受一个未压缩的字符串，并返回一个压缩后的字符串。通过组合使用不同的函数，可以在打印 JSON 值之前，对数据进行各种不同的处理。
+将纯代码和不纯代码分离的理念非常强大，并且在 Haskell 代码中无处不在。现有的一些 Haskell 压缩模块，它们都拥有简单的接口：压缩函数接受一个未压缩的字符串，并返回一个压缩后的字符串。通过组合使用不同的函数，可以在打印 JSON 值之前，对数据进行各种不同的处理。
 
 
 .. _type-inference-is-a-double-edge-sword:
@@ -422,5 +419,124 @@ Haskell 开发诀窍
     *** Exception: Prelude.undefined
 
 尽管程序里还没有任何实际可执行的代码，但是编译器的类型检查器可以保证程序中类型的正确性，这为接下来的进一步开发奠定了良好基础。
+
+美观打印字符串
+----------------------
+
+当需要美观地打印字符串时，我们需要遵守JSON的转义规则。字符串，顾名思义，仅仅是一串被包含在引号中的字符而已。
+
+::
+
+    -- file: ch05/PrettyJSON.hs
+    string :: String -> Doc
+    string = enclose '"' '"' . hcat . map oneChar
+
+``enclose`` 函数把一个 ``Doc`` 值用初始字符和终止字符包起来。
+
+::
+
+    -- file: ch05/PrettyJSON.hs
+    enclose :: Char -> Char -> Doc -> Doc
+    enclose left right x = char left <> x <> char right
+
+我们的美观打印库将会提供 ``(<>)`` 函数。它将两个 ``Doc`` 值拼接起来。也就是说，它是 ``Doc`` 中的 ``++`` 函数。
+
+::
+
+    -- file: ch05/PrettyStub.hs
+    (<>) :: Doc -> Doc -> Doc
+    a <> b = undefined
+
+    char :: Char -> Doc
+    char c = undefined
+
+我们的美观打印库也会提供 ``hcat`` 函数。它将多个 ``Doc`` 值拼接成一个，类似列表中的 ``concat`` 函数。
+
+::
+
+    -- file: ch05/PrettyStub.hs
+    hcat :: [Doc] -> Doc
+    hcat xs = undefined
+
+``string`` 函数将 ``oneChar`` 函数应用于字符串的每一个字符，然后把拼接起来的结果放入引号中。 ``oneChar`` 函数将一个单独的字符进行转义（escape）或转换（render）。
+
+::
+
+    -- file: ch05/PrettyJSON.hs
+    oneChar :: Char -> Doc
+    oneChar c = case lookup c simpleEscapes of
+                  Just r -> text r
+                  Nothing | mustEscape c -> hexEscape c
+                          | otherwise    -> char c
+        where mustEscape c = c < ' ' || c == '\x7f' || c > '\xff'
+
+    simpleEscapes :: [(Char, String)]
+    simpleEscapes = zipWith ch "\b\n\f\r\t\\\"/" "bnfrt\\\"/"
+        where ch a b = (a, ['\\',b])
+
+``simpleEscapes`` 是一个序对组成的列表。我们把由序对组成的列表称为\ *关联列表（association list）*\，或简称为\ *alist*\。我们的 alist 将字符和其对应的转义形式关联起来。
+
+::
+
+    ghci> take 4 simpleEscapes
+    [('\b',"\\b"),('\n',"\\n"),('\f',"\\f"),('\r',"\\r")]
+
+``case`` 表达式试图确定一个字符是否存在于 alist 当中。如果存在，我们就返回它对应的转义形式，否则我们就要用更复杂的方法来转义它。当两种转义都不需要时我们返回字符本身。保守地说，我们返回的非转义字符只包含可打印的 ASCII 字符。
+
+上文提到的复杂的转义是将一个 Unicode 字符转为一个 “\u” 加上四个表示它编码16进制数字。
+
+::
+
+    -- file: ch05/PrettyJSON.hs
+    smallHex :: Int -> Doc
+    smallHex x  = text "\\u"
+               <> text (replicate (4 - length h) '0')
+               <> text h
+        where h = showHex x ""
+
+``showHex`` 函数来自于 ``Numeric`` 库（需要在 ``Prettify.hs`` 开头载入)，它返回一个数字的16进制表示。
+
+::
+
+    ghci> showHex 114111 ""
+    "1bdbf"
+
+``replicate`` 函数由 ``Prelude`` 提供，它创建一个长度确定的重复列表。
+
+::
+
+    ghci> replicate 5 "foo"
+    ["foo","foo","foo","foo","foo"]
+
+有一点需要注意： ``smallHex`` 提供的4位数字编码仅能够表示 ``0xffff`` 范围之内的 Unicode 字符。而合法的 Unicode 字符范围可达 ``0x10ffff`` 。为了使用 JSON 字符串表示这部分字符，我们需要遵循一些复杂的规则将它们一分为二。这使得我们有机会对 Haskell 数字进行一些位操作(bit-level manipulation)。
+
+::
+
+    -- file: ch05/PrettyJSON.hs
+    astral :: Int -> Doc
+    astral n = smallHex (a + 0xd800) <> smallHex (b + 0xdc00)
+        where a = (n `shiftR` 10) .&. 0x3ff
+              b = n .&. 0x3ff
+
+``shiftR`` 函数来自 ``Data.bits`` 模块，它把一个数字右移一位。同样来自于 ``Data.bits`` 模块的 ``(.&.)`` 函数将两个数字进行按位与操作。
+
+::
+
+    ghci> 0x10000 `shiftR` 4   :: Int
+    4096
+    ghci> 7 .&. 2   :: Int
+    2
+
+有了 ``smallHex`` 和 ``astral`` ，我们可以如下定义 ``hexEscape`` ：
+
+::
+
+    -- file: ch05/PrettyJSON.hs
+    hexEscape :: Char -> Doc
+    hexEscape c | d < 0x10000 = smallHex d
+                | otherwise   = astral (d - 0x10000)
+        where d = ord c
+
+
 
 
