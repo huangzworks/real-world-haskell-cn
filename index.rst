@@ -53,7 +53,7 @@ Real World Haskell 中文版
 
 - `Haisheng, Wu <https://github.com/freizl>`_
 
-- `Albert <https://github.com/shuaishuai>`_
+- `Albert <https://github.com/hbrls>`_
 
 - `Guang Yang <https://github.com/yanguango>`_
 
