@@ -1172,14 +1172,18 @@ where 从句
     -- file: ch03/GlobalVariable.hs
     itemName = "Weighted Companion Cube"
 
+
 The Offside Rule and Whitespace in an Expression
 ---------------------------------------------------------
 
 The Case Expression
----------------------
+---------------------------------------------------------
 
 Common Beginner Mistakes with Patterns
------------------------------------------
+---------------------------------------------------------
 
 Conditional Evaluation with Guards
--------------------------------------
+---------------------------------------------------------
+
+Exercises
+---------------------------------------------------------
