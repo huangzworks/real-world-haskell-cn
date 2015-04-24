@@ -538,5 +538,17 @@ Haskell 开发诀窍
         where d = ord c
 
 
+Arrays and objects, and the module header
+---------------------------------------------
 
+Writing a module header
+---------------------------------------------
 
+Fleshing out the pretty printing library
+---------------------------------------------
+
+Creating a package
+---------------------------------------------
+
+Practical pointers and further reading
+---------------------------------------------
