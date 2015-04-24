@@ -636,3 +636,21 @@ Ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， 
     data BookInfo = BookInfo Book   -- Defined at ad.hs:4:6
     instance Show BookInfo -- Defined at ad.hs:5:27
 
+
+Typeclasses at work: making JSON easier to use
+--------------------------------------------------------
+
+Lving in an open world
+--------------------------------------------------------
+
+How to give a type a new identity
+--------------------------------------------------------
+
+JSON typeclasses without overlapping instances
+--------------------------------------------------------
+
+The dreaded monomorphism restriction
+--------------------------------------------------------
+
+Conclusion
+--------------------------------------------------------
