@@ -15,26 +15,18 @@ Real World Haskell 中文版
 
 本文档是 `Real World Haskell <http://book.realworldhaskell.org/>`_ 一书的简体中文翻译版本。
 
-已完成翻译的章节：
-
 .. toctree::
    :maxdepth: 3
 
    chp/1
    chp/2
-   chp/4
-   chp/7
-   chp/28
-
-正在翻译的章节：
-
-.. toctree::
-   :maxdepth: 3
-
    chp/3
+   chp/4
    chp/5
    chp/6
+   chp/7
    chp/13
+   chp/28
 
 
 翻译约定
