@@ -120,6 +120,10 @@
 
 部分有序    particular ordering
 
+编译选项    pragma
+
+身份       Identity
+
 
 第二十八章
 ------------------
