@@ -770,6 +770,7 @@ Haskell 允许我们编写完全匿名的函数，这样就不必再费力地为
     *Main> niceSumPartial [1 .. 10]
     55
 
+.. _sections:
 
 节
 ^^^^^
