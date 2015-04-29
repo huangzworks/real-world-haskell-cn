@@ -637,14 +637,288 @@ Ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， 
     instance Show BookInfo -- Defined at ad.hs:5:27
 
 
-Typeclasses at work: making JSON easier to use
+类型类实战：让 JSON 更好用
 --------------------------------------------------------
 
-Lving in an open world
+我们在 :ref:`representing-json-data-in-haskell` 一节介绍的 ``JValue`` 用起来还不够简便。这里是一段由搜索引擎返回的实际 JSON 数据。删除重整之后：
+
+.. code-block:: json
+
+    {
+        "query": "awkward squad haskell",
+        "estimatedCount": 3920,
+        "moreResults": true,
+        "results":
+        [{
+            "title": "Simon Peyton Jones: papers",
+            "snippet": "Tackling the awkward squad: monadic input/output ...",
+            "url": "http://research.microsoft.com/~simonpj/papers/marktoberdorf/",
+        },
+        {
+            "title": "Haskell for C Programmers | Lambda the Ultimate",
+            "snippet": "... the best job of all the tutorials I've read ...",
+            "url": "http://lambda-the-ultimate.org/node/724",
+        }]
+    }
+
+进一步简化之，并用 Haskell 表示：
+
+::
+
+    -- file: ch06/SimpleResult.hs
+    import SimpleJSON
+
+    result :: JValue
+    result = JObject [
+        ("query", JString "awkward squad haskell"),
+        ("estimatedCount", JNumber 3920),
+        ("moreResults", JBool True),
+        ("results", JArray [
+            JObject [
+            ("title", JString "Simon Peyton Jones: papers"),
+            ("snippet", JString "Tackling the awkward ..."),
+            ("url", JString "http://.../marktoberdorf/")
+            ]])
+        ]
+
+由于 Haskell 不原生支持包含不同类型值的列表，我们不能直接表示包含不同类型值的 JSON 对象。
+我们需要把每个值都用 JValue 构造器包装起来。但这样我们的灵活性就受到了限制：如果我们想把数字 ``3920`` 转换成字符串 ``"3,920"``，
+我们就必须把 ``JNumber`` 构造器换成 ``JString`` 构造器。
+
+Haskell 的类型类提供了一个诱人的解决方案：
+
+::
+
+    -- file: ch06/JSONClass.hs
+    type JSONError = String
+
+    class JSON a where
+        toJValue :: a -> JValue
+        fromJValue :: JValue -> Either JSONError a
+
+    instance JSON JValue where
+        toJValue = id
+        fromJValue = Right
+
+现在，我们无需再用 ``JNumber`` 等构造器去包装值了，直接使用 ``toJValue`` 函数即可。
+如果我们更改值的类型，编译器会自动选择相应的 ``toJValue`` 实现。
+
+我们也提供了 ``fromJValue`` 函数，它把 ``JValue`` 值转换成我们希望的类型。
+
+.. _more-helpful-errors:
+
+让错误信息更有用
+^^^^^^^^^^^^^^^^^^^^^^
+
+``fromJValue`` 函数的返回类型为 ``Either``。跟 ``Maybe`` 一样，这个类型是预定义的。我们经常用它来表示可能会失败的计算。
+
+虽然 ``Maybe`` 也用作这个目的，但它在错误发生时没有给我们足够有用的信息：我们只得到一个 ``Nothing``。
+``Either`` 类型的结构相同，但它在错误发生时会调用 ``Left`` 构造器，并且还接受一个参数。
+
+::
+
+    -- file: ch06/DataEither.hs
+    data Maybe a = Nothing
+                 | Just a
+                   deriving (Eq, Ord, Read, Show)
+
+    data Either a b = Left a
+                    | Right b
+                      deriving (Eq, Ord, Read, Show)
+
+我们经常使用 ``String`` 作为 ``a`` 参数的类型，以便在出错时提供有用的描述。
+为了说明在实际中怎么使用 ``Either`` 类型，我们来看一个简单实例。
+
+::
+
+    -- file: ch06/JSONClass.hs
+    instance JSON Bool where
+        toJValue = JBool
+        fromJValue (JBool b) = Right b
+        fromJValue _ = Left "not a JSON boolean"
+
+[译注：读者若想在 **ghci** 中尝试 ``fromJValue``，需要为其提供类型标注，例如 ``(fromJValue(toJValue True))::Either JSONError Bool``。]
+
+.. _making-an-instance-with-a-type-synonym:
+
+使用类型别名创建实例
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Haskell 98标准不允许我们用下面的形式声明实例，尽管它看起来没什么问题：
+
+::
+
+    -- file: ch06/JSONClass.hs
+    instance JSON String where
+        toJValue               = JString
+
+        fromJValue (JString s) = Right s
+        fromJValue _           = Left "not a JSON string"
+
+``String`` 是 ``[Char]`` 的别名，因此它的类型是 ``[a]``，并用 ``Char`` 替换了类型变量 ``a``。
+根据 Haskell 98的规则，我们在声明实例的时候不能用具体类型替代类型变量。
+也就是说，我们可以给 ``[a]`` 声明实例，但给 ``[Char]`` 不行。
+
+尽管 GHC 默认遵守 Haskell 98标准，但是我们可以在文件顶部添加特殊格式的注释来解除这个限制。
+
+::
+
+    -- file: ch06/JSONClass.hs
+    {-# LANGUAGE TypeSynonymInstances #-}
+
+这条注释是一条编译器指令，称为\ *编译选项（pragma）*\，它告诉编译器允许这项语言扩展。
+上面的代码因为``TypeSynonymInstances`` 这项语言扩展而合法。
+我们在本章（本书）还会碰到更多的语言扩展。
+
+[译注：作者举的这个例子实际上牵涉到了两个问题。第一，Haskell 98不允许类型别名，这个问题可以通过上述方法解决。
+第二，Haskell 98不允许 ``[Char]`` 这种形式的类型，这个问题需要通过增加另外一条编译选项 ``{-# LANGUAGE FlexibleInstances #-}`` 来解决。]
+
+Living in an open world
 --------------------------------------------------------
 
-How to give a type a new identity
+.. _how-to-give-a-type-a-new-identity:
+
+如何给类型定义新身份（Identity）
 --------------------------------------------------------
+
+除了熟悉的 ``data`` 关键字外，Haskell 还允许我们用 ``newtype`` 关键字来创建新类型。
+
+::
+
+    -- file: ch06/Newtype.hs
+    data DataInt = D Int
+        deriving (Eq, Ord, Show)
+
+    newtype NewtypeInt = N Int
+        deriving (Eq, Ord, Show)
+
+``newtype`` 声明的作用是重命名现有类型，并给它一个新身份。可以看出，它的用法和使用 ``data`` 关键字进行类型声明看起来很相似。
+
+.. note::
+
+    type 和 newtype 关键字
+
+在声明 ``newtype`` 时，我们必须决定暴露被重命名类型的哪些类型类实例。
+这里，我们让 ``NewtypeInt`` 提供 ``Int`` 类型的 ``Eq``， ``Ord`` 和 ``Show`` 实例。
+这样，我们就可以比较和打印 ``NewtypeInt`` 类型的值了。
+
+::
+
+    *Main> N 1 < N 2
+    True
+
+由于我们没有暴露 ``Int`` 的 ``Num`` 或 ``Integral`` 实例，``NewtypeInt`` 类型的值并不是数字。
+例如，我们不能做加法。
+
+::
+
+    *Main> N 313 + N 37
+
+    <interactive>:9:7:
+        No instance for (Num NewtypeInt) arising from a use of ‘+’
+        In the expression: N 313 + N 37
+        In an equation for ‘it’: it = N 313 + N 37
+
+跟用 ``data`` 关键字一样，我们可以用 ``newtype`` 的值构造器创建新值，或者对现有值进行模式匹配。
+
+如果 ``newtype`` 没用自动派生来暴露对应类型的类型类实现的话，我们可以自己写一个新实例或者干脆不实现那个类型类。
+
+.. _data-and-newtype:
+
+data 和 newtype 的区别
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``newtype`` 关键字给现有类型一个不同的身份，相比起 ``data``，它使用时的限制更多。具体来讲，``newtype`` 只能有一个值构造器，
+并且这个构造器只能有一个字段。
+
+::
+
+    -- file: ch06/NewtypeDiff.hs
+    -- 可以：任意数量的构造器和字段
+    data TwoFields = TwoFields Int Int
+
+    -- 可以：一个字段
+    newtype Okay = ExactlyOne Int
+
+    -- 可以：使用类型变量
+    newtype Param a b = Param (Either a b)
+
+    -- 可以：使用记录语法
+    newtype Record = Record {
+            getInt :: Int
+        }
+
+    -- 不可以：没有字段
+    newtype TooFew = TooFew
+
+    -- 不可以：多于一个字段
+    newtype TooManyFields = Fields Int Int
+
+    -- 不可以：多于一个构造器
+    newtype TooManyCtors = Bad Int
+                         | Worse Int
+
+除此之外，``data`` 和 ``newtype`` 还有一个重要区别。由 ``data`` 关键字创建的类型在运行时有一个簿记开销，
+如记录某个值是用哪个构造器创建的。而 ``newtype`` 只有一个构造器，所以不需要这个额外开销。
+这使得它在运行时更省时间和空间。
+
+由于 ``newtype`` 的构造器只在编译时使用，运行时甚至不存在，
+用 ``newtype`` 定义的类型和用 ``data`` 定义的类型在匹配 ``undefined`` 时会有不同的行为。
+
+为了理解它们的不同点，我们首先回顾一下普通数据类型的行为。我们已经非常熟悉，在运行时对 ``undefined`` 求值会导致崩溃。
+
+::
+
+    Prelude> undefined
+    *** Exception: Prelude.undefined
+
+我们把 ``undefined`` 放进 ``D`` 构造器创建一个 ``DataInt``，然后对它进行模式匹配。
+
+::
+
+    *Main> case (D undefined) of D _ -> 1
+    1
+
+由于我们的模式匹配只匹配构造器而不管里面的值，``undefined`` 未被求值，因而不会抛出异常。
+
+下面的例子没有使用 ``D`` 构造器，因而模式匹配时 ``undefined`` 被求值，异常抛出。
+
+::
+
+    *Main> case undefined of D _ -> 1
+    *** Exception: Prelude.undefined
+
+当我们用 ``N`` 构造器创建 ``NewtypeInt`` 值时，它的行为与使用 ``DataInt`` 类型的 ``D`` 构造器相同：没有异常。
+
+::
+
+    *Main> case (N undefined) of N _ -> 1
+    1
+
+但当我们把表达式中的 ``N`` 去掉，并对 ``undefined`` 进行模式匹配时，关键的不同点来了。
+
+::
+
+    *Main> case undefined of N _ -> 1
+    1
+
+没有崩溃！由于运行时不存在构造器，匹配 ``N _`` 实际上就是在匹配通配符 ``_``：由于通配符总可以被匹配，所以表达式是不需要被求值的。
+
+.. _summary-the-three-ways-of-naming-types:
+
+命名类型的三种方式
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+这里简要回顾一下 haskell 引入新类型名的三种方式。
+
+- ``data`` 关键字定义一个真正的代数数据类型。
+
+- ``type`` 关键字给现有类型定义别名。类型和别名可以通用。
+
+- ``newtype`` 关键字给现有类型定义一个不同的身份（distinct identity）。原类型和新类型不能通用。
+
+
+
 
 JSON typeclasses without overlapping instances
 --------------------------------------------------------
