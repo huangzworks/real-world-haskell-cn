@@ -773,8 +773,175 @@ Haskell 98标准不允许我们用下面的形式声明实例，尽管它看起�
 [译注：作者举的这个例子实际上牵涉到了两个问题。第一，Haskell 98不允许类型别名，这个问题可以通过上述方法解决。
 第二，Haskell 98不允许 ``[Char]`` 这种形式的类型，这个问题需要通过增加另外一条编译选项 ``{-# LANGUAGE FlexibleInstances #-}`` 来解决。]
 
-Living in an open world
+.. _living-in-an-open-world:
+
+生活在开放世界
 --------------------------------------------------------
+
+Haskell 的设计允许我们任意创建类型类实例。
+
+::
+
+    -- file: ch06/JSONClass.hs
+    doubleToJValue :: (Double -> a) -> JValue -> Either JSONError a
+    doubleToJValue f (JNumber v) = Right (f v)
+    doubleToJValue _ _ = Left "not a JSON number"
+
+    instance JSON Int where
+        toJValue = JNumber . realToFrac
+        fromJValue = doubleToJValue round
+
+    instance JSON Integer where
+        toJValue = JNumber . realToFrac
+        fromJValue = doubleToJValue round
+
+    instance JSON Double where
+        toJValue = JNumber
+        fromJValue = doubleToJValue id
+
+我们可以在任意地方创建新实例，而不仅限于在定义了类型类的模块中。类型类系统的这个特性被称为\ *开放世界假设*\ （open world assumption）。
+如果有方法表示“这个类型类只存在这些实例”，那我们将得到一个\ *封闭的*\ 世界。
+
+我们希望把列表转为 JSON 数组。现在先不用关心实现细节，暂时用 ``undefined`` 替代函数内容即可。
+
+::
+
+    -- file: ch06/BrokenClass.hs
+    instance (JSON a) => JSON [a] where
+        toJValue = undefined
+        fromJValue = undefined
+
+我们也希望能将键/值对列表转为 JSON 对象。
+
+::
+
+    -- file: ch06/BrokenClass.hs
+    instance (JSON a) => JSON [(String, a)] where
+        toJValue = undefined
+        fromJValue = undefined
+
+.. _when-do-overlapping-instances-cause-problems:
+
+什么时候重叠实例（Overlapping instances）会出问题？
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+如果我们把这些定义放进文件中并在 **ghci** 里载入，初看起来没什么问题。
+
+::
+
+    *JSONClass> :l BrokenClass.hs
+    [1 of 2] Compiling JSONClass        ( JSONClass.hs, interpreted )
+    [2 of 2] Compiling BrokenClass      ( BrokenClass.hs, interpreted )
+    Ok, modules loaded: JSONClass, BrokenClass
+
+然而，当我们使用序对列表实例时，麻烦来了。
+
+::
+
+    *BrokenClass> toJValue [("foo","bar")]
+
+    <interactive>:10:1:
+        Overlapping instances for JSON [([Char], [Char])]
+            arising from a use of ‘toJValue’
+        Matching instances:
+            instance JSON a => JSON [(String, a)]
+                -- Defined at BrokenClass.hs:13:10
+            instance JSON a => JSON [a] -- Defined at BrokenClass.hs:8:10
+        In the expression: toJValue [("foo", "bar")]
+        In an equation for ‘it’: it = toJValue [("foo", "bar")]
+
+\ *重叠实例*\ 问题是由 Haskell 的开放世界假设造成的。
+这里有一个更简单的例子来说明发生了什么。
+
+::
+
+    -- file: ch06/Overlap.hs
+    class Borked a where
+        bork :: a -> String
+
+    instance Borked Int where
+        bork = show
+
+    instance Borked (Int, Int) where
+        bork (a, b) = bork a ++ ", " ++ bork b
+
+    instance (Borked a, Borked b) => Borked (a, b) where
+        bork (a, b) = ">>" ++ bork a ++ " " ++ bork b ++ "<<"
+
+对于序对，我们有两个 ``Borked`` 类型类实例：一个是 ``Int`` 序对，另一个是任意类型的序对，只要这个类型是 ``Borked`` 类型类的实例。
+
+假设我们想把 ``bork`` 应用于 ``Int`` 序对。编译器必须选择一个实例来用。由于这两个实例都能用，所以看上去它好像只要选那个更相关（specific）的实例就可以了。
+
+但是，``GHC`` 默认是保守的。它坚持只能有一个可用实例。这样，当我们试图使用 ``bork`` 时，它就会报错。
+
+.. note::
+
+    重叠实例什么时候会出问题？
+
+    之前我们提到，我们可以把某个类型类的实例分散在几个模块中。GHC 并不会在意重叠实例的存在。
+    相反，只有当我们使用受影响的类型类的函数，GHC 被迫要选择使用哪个实例时，它才会报错。
+
+.. _relaxing-some-restrictions-on-typeclasses:
+
+取消类型类的一些限制
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+通常，我们不能给多态类型（polymorphic type）的特化版本（specialized version）写类型类实例。
+``[Char]`` 类型就是多态类型 ``[a]`` 特化成 ``Char`` 的结果。因此我们禁止声明 ``[Char]`` 为某个类型类的实例。
+这非常不方便，因为字符串在代码中无处不在。
+
+``FlexibleInstances`` 语言扩展取消了这个限制，它允许我们写这样的实例。
+
+GHC 支持另外一个有用的语言扩展，``OverlappingInstances``，它解决了重叠实例带来的问题。
+如果存在重叠实例，编译器会选择最相关的（specific）那一个。
+
+我们经常把这个扩展和 ``TypeSynonymInstances`` 放在一起使用。下面是一个例子。
+
+::
+
+    -- file: ch06/SimpleClass.hs
+    {-# LANGUAGE TypeSynonymInstances, OverlappingInstances #-}
+
+    import Data.List
+
+    class Foo a where
+        foo :: a -> String
+
+    instance Foo a => Foo [a] where
+        foo = concat . intersperse ", " . map foo
+
+    instance Foo Char where
+        foo c = [c]
+
+    instance Foo String where
+        foo = id
+
+如果我们对 ``String`` 应用 ``foo``，编译器会选择 ``String`` 的特定实现。
+即使 ``[a]`` 和 ``Char`` 都是 ``Foo`` 的实例，但由于 ``String`` 实例更相关，因此 GHC 选择了它。
+
+即使开了 ``OverlappingInstances`` 扩展，如果 GHC 发现了多个同样相（equally specific）关的实例，它仍然会拒绝代码。
+
+.. _note:
+
+    何时使用 OverlappingInstances 扩展（to be added）
+
+.. _how-does-show-work-for-strings:
+
+字符串的 show 是如何工作的？
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``OverlappingInstances`` 和 ``TypeSynonymInstances`` 语言扩展是 GHC 特有的，Haskell 98 并不支持。
+然而，Haskell 98 中的 ``Show`` 类型类在转化 ``Char`` 列表和 ``Int`` 列表时却用了不同的方法。它用了一个聪明但简单的小技巧。
+
+``Show`` 类型类定义了转换单个值的 ``show`` 方法和转换列表的 ``showList`` 方法。
+``showList`` 默认使用中括号和逗号转换列表。
+
+``[a]`` 的 ``Show`` 实例使用 ``showList`` 实现。``Char`` 的 ``Show`` 实例提供了一个特殊的 ``showList`` 实现，
+它使用双引号，并转义非 ASCII 打印字符。
+
+结果是，如果有人想对 ``[Char]`` 应用 ``show``，编译器会选择 ``showList`` 的实现，并使用双引号正确转换这个字符串。
+
+这样，换个角度看问题，我们就能避免 ``OverlappingInstances`` 扩展了。
 
 .. _how-to-give-a-type-a-new-identity:
 
@@ -797,6 +964,21 @@ Living in an open world
 .. note::
 
     type 和 newtype 关键字
+
+    尽管名字类似，``type`` 和 ``newtype`` 关键字的作用却完全不同。
+    ``type`` 关键字给了我们另一种指代某个类型的方法，类似于给朋友起的绰号。
+    我们和编译器都知道 ``[Char]`` 和 ``String`` 指的是同一个类型。
+
+    相反，``newtype`` 关键字的存在是为了隐藏类型的本性。考虑这个 ``UniqueID`` 类型。
+
+    ::
+
+        -- file: ch06/Newtype.hs
+        newtype UniqueID = UniqueID Int
+            deriving (Eq)
+
+    编译器会把 ``UniqueID`` 当成和 ``Int`` 不同的类型。
+    作为 ``UniqueID`` 的用户，我们只知道它是一个唯一标识符；我们并不知道它是用 ``Int`` 来实现的。
 
 在声明 ``newtype`` 时，我们必须决定暴露被重命名类型的哪些类型类实例。
 这里，我们让 ``NewtypeInt`` 提供 ``Int`` 类型的 ``Eq``， ``Ord`` 和 ``Show`` 实例。
@@ -918,13 +1100,89 @@ data 和 newtype 的区别
 - ``newtype`` 关键字给现有类型定义一个不同的身份（distinct identity）。原类型和新类型不能通用。
 
 
-
+.. _json-typeclasses-without-overlapping-instances:
 
 JSON typeclasses without overlapping instances
 --------------------------------------------------------
 
-The dreaded monomorphism restriction
+
+
+.. _the_dreaded_monomorphism_restriction:
+
+可怕的单一同态限定（monomorphism restriction）
 --------------------------------------------------------
 
-Conclusion
+Haskell 98 有一个微妙的特性可能会在某些意想不到的情况下“咬”到我们。下面这个简单的函数展示了这个问题。
+
+::
+
+    -- file: ch06/Monomorphism.hs
+    myShow = show
+
+如果我们试图把它载入 **ghci**，会产生一个奇怪的错误：
+
+::
+
+    Prelude> :l Monomorphism.hs
+
+    [1 of 1] Compiling Main             ( Monomorphism.hs, interpreted )
+
+    Monomorphism.hs:2:10:
+        No instance for (Show a0) arising from a use of ‘show’
+        The type variable ‘a0’ is ambiguous
+        Relevant bindings include
+            myShow :: a0 -> String (bound at Monomorphism.hs:2:1)
+        Note: there are several potential instances:
+            instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
+            instance Show Ordering -- Defined in ‘GHC.Show’
+            instance Show Integer -- Defined in ‘GHC.Show’
+            ...plus 22 others
+        In the expression: show
+        In an equation for ‘myShow’: myShow = show
+        Failed, modules loaded: none.
+
+[译注：译者得到的输出和原文有出入，这里提供的是使用最新版本 GHC 得到的输出。]
+
+错误信息中提到的 “monomorphism” 是 Haskell 98 的一部分。
+\ *单一同态*\ 是多态（polymorphism）的反义词：它表明某个表达式只有一种类型。
+Haskell 有时会强制使某些声明不像我们预想的那么多态。
+
+我们在这里提单一同态是因为尽管它和类型类没有直接关系，但类型类给它提供了产生的环境。
+
+.. note::
+
+    在实际代码中可能很久都不会碰到单一同态，因此我们觉得你没必要记住这部分的细节，
+    只要在心里知道有这么回事就可以了，除非 GHC 真的报告了跟上面类似的错误。
+    如果真的发生了，记得在这儿曾读过这个错误，然后回过头来看就行了。
+
+我们不会试图去解释单一同态限制。Haskell 社区一致同意它并不经常出现；它解释起来很棘手（tricky)；
+它几乎没什么实际用处；它唯一的作用就是坑人。举个例子来说明它为什么棘手：尽管上面的例子违反了这个限制，
+下面的两个编译起来却毫无问题。
+
+::
+
+    -- file: ch06/Monomorphism.hs
+    myShow2 value = show value
+
+    myShow3 :: (Show a) => a -> String
+    myShow3 = show
+
+上面的定义表明，如果 GHC 报告单一同态限制错误，我们有三个简单的方法来处理。
+
+- 显式声明函数参数，而不是隐性。
+
+- 显式定义类型签名，而不是依靠编译器去推导。
+
+- 不改代码，编译模块的时候用上 ``NoMonomorphismRestriction`` 语言扩展。它取消了单一同态限制。
+
+没人喜欢单一同态限制，因此几乎可以肯定的是下一个版本的 Haskell 会去掉它。
+但这并不是说加上 ``NoMonomorphismRestriction`` 就可以一劳永逸：有些编译器（包括一些老版本的 GHC）
+识别不了这个扩展，但用另外两种方法就可以解决问题。如果这种可移植性对你不是问题，那么请务必打开这个扩展。
+
+.. _conclusion:
+
+结论
 --------------------------------------------------------
+
+在这章，你学到了类型类有什么用以及怎么用它们。我们讨论了如何定义自己的类型类，然后又讨论了一些 Haskell 库里定义的类型类。
+最后，我们展示了怎么让 Haskell 编译器给你的类型自动派生出某些类型类实例。
