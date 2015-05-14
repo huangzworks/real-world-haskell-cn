@@ -122,7 +122,11 @@
 
 编译选项    pragma
 
-身份       Identity
+重叠实例    overlapping instances
+
+身份       identity
+
+单一同态    monomorphism
 
 
 第二十八章

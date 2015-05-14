@@ -27,6 +27,7 @@ Real World Haskell 中文版
    chp/5
    chp/6
    chp/7
+   chp/11
    chp/13
    chp/28
 
