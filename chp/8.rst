@@ -24,9 +24,9 @@
 
 这个库提供两个模块。每个都定义了与 ``String`` 类型上函数对应的替代物。
 
-    * ``Data.ByteString`` 定义了一个名为 ``ByteString`` 的严格类型，其将一个字符串或二进制数据或文本表示为一个数组。
+    * ``Data.ByteString`` 定义了一个名为 ``ByteString`` 的严格类型，其将一个字符串或二进制数据或文本表示为一个 ``array``。
 
-    * ``Data.ByteString.Lazy`` 模块定义了一个惰性类型，同样命名为 ``ByteString`` 其将字符串数据表示为一个由 ``chunks`` 组成的列表，最大 64KB 大小的数组。
+    * ``Data.ByteString.Lazy`` 模块定义了一个惰性类型，同样命名为 ``ByteString`` 其将字符串数据表示为一个由 ``chunks`` 组成的列表，每个最大 64KB 大小的 ``array``。
 
 这两种 ``ByteString`` 适用于不同的场景。
 
