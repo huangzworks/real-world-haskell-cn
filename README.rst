@@ -1,5 +1,5 @@
-Real World Haskell 的中文翻译
-=====================================
+《Real World Haskell》中文翻译项目
+=======================================
 
 本文档是 `Real World Haskell <http://book.realworldhaskell.org/>`_ 一书的简体中文翻译版本， 翻译工作正在进行中， 欢迎加入。
 
