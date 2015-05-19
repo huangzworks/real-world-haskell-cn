@@ -74,7 +74,6 @@ We are writing in classic Haskell style, where our hasElfMagic function does not
      content <- L.readFile path
      return (hasElfMagic content)
 
-The L.readFile function is the lazy ByteString equivalent of readFile. It operates lazily, reading the file as data is demanded. It is also efficient, reading chunks of up to 64KB at once. The lazy ByteString is a good choice for our task: since we only need to read at most the first four bytes of the file, we can safely use this function on a file of any size.
 ``L.readFile`` 函数是 ``readFile`` 的惰性 ``ByteString`` 等价物。它是惰性执行的，将文件读取为数据是需求。它也很高效，立即读取 64KB 大小的块。对我们的任务，惰性 ``ByteString`` 是一个好选择，我们可以安全的将这个函数应用在任意大小的文件上。
 
 
