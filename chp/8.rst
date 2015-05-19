@@ -63,7 +63,6 @@
 
 ``L.pack`` 函数接受一个由 ``Word8`` 组成的列表，并将其装入一个惰性 ``ByteString`` （ ``L.unpack`` 函数的作用恰好相反。）。我们的 ``hasElfMagic`` 函数简单地将一个 ``ByteString`` 的前四字节与一个魔法数相比较。
 
-We are writing in classic Haskell style, where our hasElfMagic function does not perform I/O. Here is the function that uses it on a file. 
 我们使用了典型的 Haskell 风格编写 ``hasElfMagic`` 函数，其并不执行 I/O。这里是如何在真正的文件上使用它。
 
 ::
