@@ -59,6 +59,24 @@
 
 无论是否使用有限载入，我们始终可以使用模块的全名来识别某些混淆。例如， ``Data.ByteString.Lazy.length`` 和 ``L.length`` 表示相同的函数， ``Prelude.sum`` 和 ``sum`` 也是如此。
 
+``ByteString`` 模块为二进制 I/O 而设计。Haskell 中表达字节的类型是 ``Word8`` ；如果我们需要按名字引用它，需要将其从 ``Data.Word`` 模块载入。
+
+``L.pack`` 函数接受一个由 ``Word8`` 组成的列表，并将其装入一个惰性 ``ByteString`` （ ``L.unpack`` 函数的作用恰好相反。）。我们的 ``hasElfMagic`` 函数简单地将一个 ``ByteString`` 的前四字节与一个魔法数相比较。
+
+We are writing in classic Haskell style, where our hasElfMagic function does not perform I/O. Here is the function that uses it on a file. 
+我们使用了典型的 Haskell 风格编写 ``hasElfMagic`` 函数，其并不执行 I/O。这里是如何在真正的文件上使用它。
+
+::
+
+   -- file: ch08/ElfMagic.hs
+   isElfFile :: FilePath -> IO Bool
+   isElfFile path = do
+     content <- L.readFile path
+     return (hasElfMagic content)
+
+The L.readFile function is the lazy ByteString equivalent of readFile. It operates lazily, reading the file as data is demanded. It is also efficient, reading chunks of up to 64KB at once. The lazy ByteString is a good choice for our task: since we only need to read at most the first four bytes of the file, we can safely use this function on a file of any size.
+``L.readFile`` 函数是 ``readFile`` 的惰性 ``ByteString`` 等价物。它是惰性执行的，将文件读取为数据是需求。它也很高效，立即读取 64KB 大小的块。对我们的任务，惰性 ``ByteString`` 是一个好选择，我们可以安全的将这个函数应用在任意大小的文件上。
+
 
 注意，这些类型在他们的返回值里面都有IO。现在关键的是，你要从这里知道他们可能有副作用，或者他们用相同的参数调用可能返回不同的值，或者两者都有。 ``putStrLn`` 的类型看起来像一个函数，它接受一个 ``String`` 类型的参数，并返回 ``IO ()`` 类型的值。可是 ``IO ()`` 是什么呢？
 
