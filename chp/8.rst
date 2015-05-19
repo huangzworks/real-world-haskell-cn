@@ -24,31 +24,41 @@
 
 这个库提供两个模块。每个都定义了与 ``String`` 类型上函数对应的替代物。
 
-    * ``Data.ByteString`` 定义了一个名为 ``ByteString`` 的严格类型，其将一个字符串或二进制数据或文本表示为一个 ``array``。
+    * ``Data.ByteString`` 定义了一个名为 ``ByteString`` 的严格类型，其将一个字符串或二进制数据或文本用一个数组表示。
 
-    * ``Data.ByteString.Lazy`` 模块定义了一个惰性类型，同样命名为 ``ByteString`` 其将字符串数据表示为一个由 ``chunks`` 组成的列表，每个最大 64KB 大小的 ``array``。
+    * ``Data.ByteString.Lazy`` 模块定义了一个惰性类型，同样命名为 ``ByteString`` 。其将字符串数据表示为一个由 ``块`` 组成的列表，每个块是大小为 64KB 的数组。
 
-这两种 ``ByteString`` 适用于不同的场景。
+这两种 ``ByteString`` 适用于不同的场景。对于大体积的文件流(几百 MB 至几 TB)，最好使用惰性的 ``ByteString`` 。其块的大小被调整得对现代 CPU 的 L1 缓存特别友好，并且在流中已经被处理过块可以被垃圾收集器快速丢弃。
 
-你可以编译这个程序，变成一个单独的可执行文件，然后用 **runghc** 运行它，或者从 **ghci** 调用 ``main`` 。这里有一个使用**runghc**的例子：
+对于不在意内存占用而且需要随机访问的数据，最好使用严格的 ``ByteString`` 类型。
 
-::
+二进制 I/O 和有限载入
+--------------
 
-   $ runghc basicio.hs
-   Greetings!  What is your name?
-   John
-   Welcome to Haskell, John!
+让我们来开发一个小函数以说明 ``ByteString`` API 的一些用法。我们将监测一个文件是否是 ELF object 文件：这种文件类型几乎被所有现代类 Unix 系统作为可执行文件。
 
-这相单简单，结果很明显。你可以看到 ``putStrLn`` 输出一个 ``string`` ，后面跟了一个换行符。 ``getLine`` 从标准输入读取一行。 ``<-`` 语法对于你可能比较新。简单来看，它绑定一个I/O动作的结果到一个名字。我们用简单的列表串联运算符 ``++`` 来联合输入字符串和我们自己的文本。
-
-让我们来看一下 ``putStrLn`` 和 ``getLine`` 的类型。你可以在库参考手册里看到这些信息，或者直接问 ``ghci`` ：
+这个简单的问题可以通过查看文件头部的四个字节解决，看他们是否匹配某个特定的字节序列。表示某种文件类型的字节序列通常被称为 ``魔法数`` 。
 
 ::
 
-   ghci> :type putStrLn
-   putStrLn :: String -> IO ()
-   ghci> :type getLine
-   getLine :: IO String
+   -- file: ch08/ElfMagic.hs
+   import qualified Data.ByteString.Lazy as L
+   
+   hasElfMagic :: L.ByteString -> Bool
+   hasElfMagic content = L.take 4 content == elfMagic
+       where elfMagic = L.pack [0x7f, 0x45, 0x4c, 0x46]
+
+我们使用 Haskell 的 ``有限载入`` 语法载入 ``ByteString`` 模块， 像上面 ``import qualified`` 那句那样。这样我们可以把一个模块关联到另一个我们选定的名字。
+
+例如，当我们我们想使用到惰性 ``ByteString`` 模块的 ``take`` 函数时，要写成 ``L.take`` ，因为我们将这个模块引入到了 ``L`` 这个名字下。若没有明确指明使用哪个版本的函数，如此处的 ``take`` ，编译器会报错。
+
+我们将一直使用有限载入语法使用 ``ByteString`` 模块，因为其中提供的很多函数与 ``Prelude`` 模块中的函数重名。
+
+.. tip::
+   有限载入使得可以方便地切换两种 ``ByteString`` 类型。只需要在代码的头部改变 ``import`` 声明；剩余的代码可能无需任何修改。你可以方便地比较两种类型，以观察哪种类型更符合你程序的需要。
+
+无论是否使用有限载入，我们始终可以使用模块的全名来识别某些混淆。例如， ``Data.ByteString.Lazy.length`` 和 ``L.length`` 表示相同的函数， ``Prelude.sum`` 和 ``sum`` 也是如此。
+
 
 注意，这些类型在他们的返回值里面都有IO。现在关键的是，你要从这里知道他们可能有副作用，或者他们用相同的参数调用可能返回不同的值，或者两者都有。 ``putStrLn`` 的类型看起来像一个函数，它接受一个 ``String`` 类型的参数，并返回 ``IO ()`` 类型的值。可是 ``IO ()`` 是什么呢？
 
