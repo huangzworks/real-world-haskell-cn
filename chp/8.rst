@@ -161,8 +161,13 @@
    Nothing
 
 
-File name matching
+匹配文件名
 --------------
+
+很多面向操作系统的编程语言提供了监测某个文件名是否匹配给定模式的库函数，或者返回一个匹配给定模式的文件列表。在其他语言中，这个函数通常叫做 ``fmatch`` 。尽管 Haskell 标准库提供了很多有用的系统编程设施，但是并没有提供这类用于匹配文件名的函数。所以我们可以自己开发一个。
+
+The kinds of patterns we'll be dealing with are commonly referred to as glob patterns (the term we'll use), wild card patterns, or shell-style patterns. They have just a few simple rules. You probably already know them, but we'll quickly recap here. 3 comments
+
 
 注意，这些类型在他们的返回值里面都有IO。现在关键的是，你要从这里知道他们可能有副作用，或者他们用相同的参数调用可能返回不同的值，或者两者都有。 ``putStrLn`` 的类型看起来像一个函数，它接受一个 ``String`` 类型的参数，并返回 ``IO ()`` 类型的值。可是 ``IO ()`` 是什么呢？
 
