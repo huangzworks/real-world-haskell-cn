@@ -48,7 +48,7 @@
    hasElfMagic content = L.take 4 content == elfMagic
        where elfMagic = L.pack [0x7f, 0x45, 0x4c, 0x46]
 
-我们使用 Haskell 的 ``有限载入`` 语法载入 ``ByteString`` 模块， 像上面 ``import qualified`` 那句那样。这样我们可以把一个模块关联到另一个我们选定的名字。
+我们使用 Haskell 的 ``有限载入`` 语法载入 ``ByteString`` 模块， 像上面 ``import qualified`` 那句那样。这样可以把一个模块关联到另一个我们选定的名字。
 
 例如，当我们我们想使用到惰性 ``ByteString`` 模块的 ``take`` 函数时，要写成 ``L.take`` ，因为我们将这个模块引入到了 ``L`` 这个名字下。若没有明确指明使用哪个版本的函数，如此处的 ``take`` ，编译器会报错。
 
