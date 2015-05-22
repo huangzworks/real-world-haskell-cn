@@ -166,20 +166,25 @@
 
 很多面向操作系统的编程语言提供了监测某个文件名是否匹配给定模式的库函数，或者返回一个匹配给定模式的文件列表。在其他语言中，这个函数通常叫做 ``fmatch`` 。尽管 Haskell 标准库提供了很多有用的系统编程设施，但是并没有提供这类用于匹配文件名的函数。所以我们可以自己开发一个。
 
-我们需要处理的模式种类通常涉及到 glob 模式（我们将使用这种），通配符模式，或者 shell 风格模式。它们仅是一些简单规则。你可能已经了解它们，但是这里将做一个简要的回顾。
+我们需要处理的模式种类通常称为 glob 模式（我们将使用这个术语），通配符模式，或称 shell 风格模式。它们仅是一些简单规则。你可能已经了解了，但是这里将做一个简要的回顾。
 
-  * Matching a string against a pattern starts at the beginning of the string, and finishes at the end. 3 comments
+.. note::
+
+    * 对某个模式的匹配从字符串头部开始，在字符串尾部结束。
   
-  * Most literal characters match themselves. For example, the text foo in a pattern will match foo, and only foo, in an input string. No comments
+    * 多数文本字符匹配自身。例如，文本 ``foo`` 作为模式匹配其自身 ``foo`` ，且在一个输入字符串中仅匹配 ``foo`` 。
   
-  * The * (asterisk) character means “match anything”; it will match any text, including the empty string. For instance, the pattern foo* will match any string that begins with foo, such as foo itself, foobar, or foo.c. The pattern quux*.c will match any string that begins with quux and ends in .c, such as quuxbaz.c. 2 comments
+    *  ``*`` (星号) 意味着 “匹配所有”; 其将匹配所有文本，包括空字符串。 例如, 模式 ``foo*`` 将匹配任意以 ``foo`` 开头的字符串，比如 ``foo`` 自身， ``foobar`` ， 或 ``foo.c`` 。 模式 ``quux*.c`` 将匹配任何以 ``quux`` 开头且以 ``.c`` 结束的字符串，如 ``quuxbaz.c`` 。
  
-  * The ? (question mark) character matches any single character. The pattern pic??.jpg will match names like picaa.jpg or pic01.jpg. 2 comments
+    * ``?`` (问号) 匹配任意单个字符。模式 ``pic??.jpg`` 将匹配类似 ``picaa.jpg`` 或 ``pic01.jpg`` 的文件名。
  
-  * A [ (open square bracket) character begins a character class, which is ended by a ]. Its meaning is “match any character in this class”. A character class can be negated by following the opening [ with a !, so that it means “match any character not in this class”. 2 comments
+    * ``[`` (左方括号) 将开始定义一个字符类，以 ] 结束。其意思是 “匹配在这个字符类中的任意字符”。 ``[!`` 开启一个否定的字符类，其意为 “匹配不在这个字符类中的任意字符”。
  
-  As a shorthand, a character followed by a - (dash), followed by another character, denotes a range: “match any character within this set”. No comments
+    用 ``-`` (破折号) 连接的两个字符，是一种表示范围的速记方法，表示：“匹配这个围内的任意字符”。
   
-  Character classes have an added subtlety; they can't be empty. The first character after the opening [ or [! is part of the class, so we can write a class containing the ] character as []aeiou]. The pattern pic[0-9].[pP][nN][gG] will match a name consisting of the string pic, followed by a single digit, followed by any capitalization of the strig .png. 4 comments
+    字符类有一个附加的条件；其不可为空。在 ``[`` 或 ``[!`` 后的字符是这个字符类的一部分，所以我们可以编写包含 ``]`` 的字符类，如 ``[]aeiou]`` 。模式 ``pic[0-9].[pP][nN][gG]`` 将匹配由字符串 ``pic`` 开始，跟随单个数字，最后是字符串 ``.png`` 的任意大小写形式。
+
+尽管 Haskell 的标准库没有提供匹配 glob 模式的方法，但它提供了一个良好的正则表达式库。Glob 模式仅是一个从正则表达式中切分出来的略有不同的子集。很容易将 glob 模式转换为正则表达式，但在此之前，我们首先要了解怎样在 Haskell 中使用正则表达式。
+
 
 
