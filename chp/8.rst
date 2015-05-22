@@ -188,3 +188,10 @@
 
 
 
+Haskell 中的正则表达式
+--------------
+在这一节，我们将假设读者已经熟悉 Python、Perl 或 Java 等其他语言中的正则表达式。
+
+为了简洁，此后我们将 “regular expression” 简写为 regexp。
+
+我们将以与其他语言对比的方式介绍 Haskell 如何处理 regexp，而非从头讲解何为 regexp。Haskell 的正则表达式库比其他语言具备更加强大的表现力，所以我们有很多可以聊的。
