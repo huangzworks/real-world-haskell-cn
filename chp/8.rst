@@ -33,7 +33,7 @@
 对于不在意内存占用而且需要随机访问的数据，最好使用严格的 ``ByteString`` 类型。
 
 二进制 I/O 和有限载入
---------------
+^^^^^^^^^^^^^^^^^^^^
 
 让我们来开发一个小函数以说明 ``ByteString`` API 的一些用法。我们将检测一个文件是否是 ELF object 文件：这种文件类型几乎被所有现代类 Unix 系统作为可执行文件。
 
@@ -76,7 +76,7 @@
 ``L.readFile`` 函数是 ``readFile`` 的惰性 ``ByteString`` 等价物。它是惰性执行的，将文件读取为数据是需求。它也很高效，立即读取 64KB 大小的块。对我们的任务而言，惰性 ``ByteString`` 是一个好选择，我们可以安全的将这个函数应用在任意大小的文件上。
 
 文本 I/O
---------------
+^^^^^^^^^^^^^^^^^^^^
 
 方便起见， ``bytestring`` 库提供两个具有有限文本 I/O 功能的模块， ``Data.ByteString.Char8`` 和 ``Data.ByteSring.Lazy.Char8`` 。它们将每个字符串的元素暴露为 ``Char`` 而非 ``Word8`` 。
 
@@ -195,3 +195,18 @@ Haskell 中的正则表达式
 为了简洁，此后我们将 “regular expression” 简写为 regexp。
 
 我们将以与其他语言对比的方式介绍 Haskell 如何处理 regexp，而非从头讲解何为 regexp。Haskell 的正则表达式库比其他语言具备更加强大的表现力，所以我们有很多可以聊的。
+
+在我们对 regexp 库的探索开始时，只需使用 ``Text.Regex.Posix`` 工作。一般通过在 ``ghci`` 进行交互是探索一个模块最方便的办法。
+
+
+::
+
+   ghci> :module +Text.Regex.Posix
+
+可能正则表达式匹配函数是我们平时需要使用的唯一的函数，其以中缀预算符 ``(=~)`` (``从 Perl 中借鉴``) 表示。要克服的第一个障碍是 Haskell 的 regexp 库重度使用了多态。其结果就是， ``(=~)`` 的类型签名非常难懂，所以我们在此对其不做解释。
+
+多种类型的结果
+^^^^^^^^^^^^^^
+
+The =~ operator is polymorphic in its return type, so the Haskell compiler needs some way to know what type of result we would like. In real code, it may be able to infer the right type, due to the way we subsequently use the result. But such cues are often lacking when we're exploring with ghci. If we omit a specific type for the result, we'll get an error from the interpreter, as it does not have enough information to successfuly infer the result type. 2 comments
+
