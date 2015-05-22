@@ -205,8 +205,9 @@ Haskell 中的正则表达式
 
 可能正则表达式匹配函数是我们平时需要使用的唯一的函数，其以中缀预算符 ``(=~)`` (``从 Perl 中借鉴``) 表示。要克服的第一个障碍是 Haskell 的 regexp 库重度使用了多态。其结果就是， ``(=~)`` 的类型签名非常难懂，所以我们在此对其不做解释。
 
-多种类型的结果
+结果的多种类型
 ^^^^^^^^^^^^^^
 
-The =~ operator is polymorphic in its return type, so the Haskell compiler needs some way to know what type of result we would like. In real code, it may be able to infer the right type, due to the way we subsequently use the result. But such cues are often lacking when we're exploring with ghci. If we omit a specific type for the result, we'll get an error from the interpreter, as it does not have enough information to successfuly infer the result type. 2 comments
+``=~`` 操作符的返回类型是多态的，所以 Haskell 编译器需要一通过一些途径知道我们想获得哪种类型的结果。实际编码中，可以通过我们如何使用匹配结果推导出它的类型。但是当我们通过 ``ghci`` 进行探索时，缺少类型推导的线索。如果不指明匹配结果的类型，ghci 将因其无法获得足够信息对匹配结果进行类型推导而报错。
 
+When ghci can't infer the target type, we tell it what we'd like the type to be. If we want a result of type Bool, we'll get a pass/fail answer. 1 comment
