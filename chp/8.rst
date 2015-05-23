@@ -230,4 +230,20 @@ When ghci can't infer the target type, we tell it what we'd like the type to be.
    ghci> "your right hand" =~ "(hand|foot)" :: Bool
    True
 
+在 ``regexp`` 库内部，有一种类型类名为 ``RegexContext`` ，其描述了目标类型的行为。基础库定义了很多这个类型类的实例。 ``Bool`` 型是这种类型类的一个实例，so we get back a usable result. 另一个实例是 ``Int`` ，可以描述正则表达式匹配了多少次。
 
+::
+
+   ghci> "a star called henry" =~ "planet" :: Int
+   0
+   ghci> "honorificabilitudinitatibus" =~ "[aeiou]" :: Int
+   13
+
+If we ask for a String result, we'll get the first substring that matches, or an empty string if nothing matches. No comments
+
+::
+
+   ghci> "I, B. Ionsonii, uurit a lift'd batch" =~ "(uu|ii)" :: String
+   "ii"
+   ghci> "hi ludi, F. Baconis nati, tuiti orbi" =~ "Shakespeare" :: String
+   ""
