@@ -10,9 +10,9 @@ Monad提供了一种强大途径以构建带效果的计算。虽然各个标准
 
 普通的 ``State`` monad不允许我们提早退出，因为其只负责状态的携带。其使用的是 ``fail`` 函数的默认实现：直接调用 ``error`` 抛出异常 － 这一异常无法在纯函数式的代码中捕获。因此，尽管 ``State`` monad似乎允许错误，但是这一能力并没有什么用。（再次强调：请尽量避免使用 ``fail`` 函数！）
 
-理想情况下，我们希望能使用标准的 ``State`` monad，并为其加上实用的错误处理能力以代替手动地大量定制各种monad。虽然在 ``mtl`` 库中的标准monad不能可合并使用，但使用库中提供了一系列的monad变换器可以达到相同的效果。
+理想情况下，我们希望能使用标准的 ``State`` monad，并为其加上实用的错误处理能力以代替手动地大量定制各种monad。虽然在 ``mtl`` 库中的标准monad不可合并使用，但使用库中提供了一系列的monad变换器可以达到相同的效果。
 
-Monad变换器和常规的monad很类似，但它们并不是各自独立的实体。相反，monad变换器可以修改其以为基础的monad的行为。 大部分 ``mtl`` 库中的monad都有其对应的等价变换器。习惯上变换器以其等价的monad名为基础，加以 ``T`` 结尾。 例如，与 ``State`` 等价的变换器版本称作 ``StateT`` ； 它可以为其下层monad增加可变状态。此外，若将 ``WriterT`` monad变换器叠加于其他（或许不支持数据输出的）monad之上，输出数据将成为可能。
+Monad变换器和常规的monad很类似，但它们并不是独立的实体。相反，monad变换器可以修改其以为基础的monad的行为。 大部分 ``mtl`` 库中的monad都有对应的变换器。习惯上变换器以其等价的monad名为基础，加以 ``T`` 结尾。 例如，与 ``State`` 等价的变换器版本称作 ``StateT`` ； 它可以为其下层monad增加可变状态。此外，若将 ``WriterT`` monad变换器叠加于其他（或许不支持数据输出的）monad之上，输出数据将成为可能。
 
 [注：``mtl`` 意为monad变换器函数库(Monad Transformer Library)]
 
@@ -27,8 +27,7 @@ Monad变换器和常规的monad很类似，但它们并不是各自独立的实�
 
 现在看看如何使用 ``Writer`` monad 实现相同的目标。由于这个monad允许随时记下数值，所以并不需要我们显示地去构建结果。
 
-
-为了遍历目录，这个函数必须在 ``IO`` monad中执行，因此我们无法直接使用 ``Writer`` monad。但我们可以用 ``WriterT`` 将记录信息的能力赋予 ``IO`` 。一种简单的理解方法是看看涉及的类型。
+为了遍历目录，这个函数必须在 ``IO`` monad中执行，因此我们无法直接使用 ``Writer`` monad。但我们可以用 ``WriterT`` 将记录信息的能力赋予 ``IO`` 。一种简单的理解方法是首先理解涉及的类型。
 
 通常 ``Writer`` monad有两个类型参数，因此写作 ``Writer w a`` 更为恰当。其中参数 ``w`` 用以指明我们想要记录的数值的类型。而另一类型参数 ``a`` 是monad类型类所要求的。因此 ``Writer [(FilePath，Int)] a`` 是个记录一列目录名和目录大小的writer monad。
 
@@ -54,23 +53,22 @@ Monad变换器和常规的monad很类似，但它们并不是各自独立的实�
 
 因为并没有 ``IOT`` 这样的monad变换器，所以此处我们在 ``IO`` 之上使用 ``WriterT`` 。一旦要用 ``IO`` monad和其他的一个或多个monad变换器结合， ``IO`` 一定在monad栈的最底下。
 
-[译注：“monad栈”由monad和一个或多个monad变换器叠加而成，形成一个栈的结构。若在monad栈中需要 ``IO`` monad，
-由于其不存在对应的monad变换器（ ``IOT`` ），所以 ``IO`` monad只能位于这个monad栈的最底下。]
+[译注：“monad栈”由monad和一个或多个monad变换器叠加而成，形成一个栈的结构。若在monad栈中需要 ``IO`` monad，由于其不存在对应的monad变换器（ ``IOT`` ），所以 ``IO`` monad只能位于整个monad栈的最底下。]
 
 Monad 和 Monad Transformer 中的常见模式
 ----------------------------------------------------
 
-在 ``mtl`` 库中的大部分monad与monad变换器遵从着一些关于命名和类型类的模式。
+在 ``mtl`` 库中的大部分monad与monad变换器遵从一些关于命名和类型类的模式。
 
 为说明这些规则，我们将注意力聚焦在一个简单的monad上： ``reader`` monad。 ``reader`` monad的具体API位于 ``MonadReader`` 中。大部分 ``mtl`` 中的monad都有一个名称相对的类型类。例如 ``MonadWriter`` 定义了writer monad的API，以此类推。
 
 .. literalinclude:: /code/ch18/Reader.hs
 
-其中类型变量 ``r`` 表示reader monad所附带的不变状态， ``Reader r`` monad是个 ``MonadReader`` 的实例，同时 ``ReaderT r m`` monad变换器也是一个。这个模式同样也在其他的 ``mtl`` monad中重复着： 通常有个具体的monad，和其对应的monad变换器，而他们都是相应命令的类型类的实例。这个类型类定义了功能相同的monad的API。
+其中类型变量 ``r`` 表示reader monad所附带的不变状态， ``Reader r`` monad是个 ``MonadReader`` 的实例，同时 ``ReaderT r m`` monad变换器也是一个。这个模式同样也在其他的 ``mtl`` monad中重复着： 通常有个具体的monad，和其对应的monad变换器，而它们都是相应命令的类型类的实例。这个类型类定义了功能相同的monad的API。
 
 回到我们reader monad的例子中，我们之前尚未讨论过 ``local`` 函数。
 通过一个类型为 ``r -> r`` 的函数，它可临时修改当前的环境，
-并在这一临时环境中执行其动作。以下是个具体的例子：
+并在这一临时环境中执行其动作。举个具体的例子：
 
 .. literalinclude:: /code/ch18/LocalReader.hs
 
@@ -96,15 +94,14 @@ Monad 和 Monad Transformer 中的常见模式
     instance (MonadPlus m) => MonadPlus (ReaderT r m) where
         ...
 
-再次说明，为方便使用，大部分的mtl monad变换器都定义了诸如此类的实例。
+再次说明：为方便使用，大部分的 ``mtl`` monad变换器都定义了诸如此类的实例。
 
 叠加多个 Monad 变换器
 ---------------------------
 
-之前提到过，在常规monad上叠加monad变换器可得到另一个monad。由于混合的结果也是个monad，我们可以以此为基础再叠加上一层monad变换器。事实上，这么做十分常见。但在什么情况下才需要创建这样的monad呢？
+之前提到过，在常规monad上叠加monad变换器可得到另一个monad。由于混合的结果也是个monad，我们可以凭此为基础再叠加上一层monad变换器。事实上，这么做十分常见。但在什么情况下才需要创建这样的monad呢？
 
-* 若代码想和外界打交道，便需要 ``IO`` 作为这个monad栈的基础。
-  否则普通的monad便可以满足需求。
+* 若代码想和外界打交道，便需要 ``IO`` 作为这个monad栈的基础。否则普通的monad便可以满足需求。
 
 * 加上一层 ``ReaderT`` ，便有了访问只读配置信息的能力。
 
@@ -139,7 +136,7 @@ Monad 和 Monad Transformer 中的常见模式
     -- file: ch18/UglyStack.hs
     type App = ReaderT AppConfig (StateT AppState IO)
 
-我们的变换器以 ``IO`` 为基础，依次叠加 ``StateT`` 与 ``ReaderT`` 。在此例中，栈顶是 ``ReaderT`` 还是 ``WriterT`` 并不重要，但是 ``IO`` 必须作为基础monad。
+我们的变换器以 ``IO`` 为基础，依次叠加 ``StateT`` 与 ``ReaderT`` 。在此例中，栈顶是 ``ReaderT`` 还是 ``WriterT`` 并不重要，但是 ``IO`` 必须作为最底层monad。
 
 仅仅几个monad变换器的叠加，也会使类型签名迅速变得复杂起来。故此处以 ``type`` 关键字定义类型别名，以简化类型的书写。
 
@@ -148,18 +145,16 @@ Monad 和 Monad Transformer 中的常见模式
 缺失的类型参数呢？
 ^^^^^^^^^^^^^^^^^^
 
-或许你已注意到，此处的类型别名并没有我们为monad类型所常添加的 ``a``：
+或许你已注意到，此处的类型别名并没有我们为monad类型所常添加的类型参数 ``a``：
 
 .. code-block:: haskell
 
     -- file: ch18/UglyStack.hs
     type App2 a = ReaderT AppConfig (StateT AppState IO) a
 
-在常规的类型签名下， ``App`` 和 ``App2`` 不会遇到。
-但如果想以此类型为基础构建其他类型，两者的区别就显现出来了。
+在常规的类型签名用例下， ``App`` 和 ``App2`` 不会遇到问题。但如果想以此类型为基础构建其他类型，两者的区别就显现出来了。
 
-例如我们想另加一层monad变换器，编译器会允许 ``WriterT [String] App a``
-但拒绝 ``WriterT [String] App2 a`` 。
+例如我们想另加一层monad变换器，编译器会允许 ``WriterT [String] App a`` 但拒绝 ``WriterT [String] App2 a`` 。
 
 其中的理由是：Haskell不允许对类型别名的部分应用。 ``App`` 不需要类型参数，故没有问题。另一方面，因为 ``App2`` 需要一个类型参数，若想基于 ``App2`` 构造其他的类型，则必须为这个类型参数提供一个类型。
 
@@ -204,7 +199,7 @@ Monad 和 Monad Transformer 中的常见模式
               else return []
         return $ (path, length contents) : concat rest
 
-在这个例子中如此运用monad变换器确实有些小题大做，因为这仅仅是个简单函数，其并没有因此得到太多的好处。但是这个方法的实用性在于，其可以轻易扩展以解决更加复杂的问题。
+在这个例子中如此运用monad变换器确实有些小题大做，因为这仅仅是个简单函数，其并没有因此得到太多的好处。但是这个方法的实用性在于，可以将其轻易扩展以解决更加复杂的问题。
 
 大部分指令式的应用可以使用和这里的 ``App`` monad类似的方法，在monad栈中编写。在实际的程序中，或许需要携带更复杂的配置数据，但依旧可以使用 ``ReaderT`` 以保持其只读，并只在需要时暴露配置；或许有更多可变状态需要管理，但依旧可以使用 ``StateT`` 封装它们。
 
@@ -292,7 +287,7 @@ Monad 和 Monad Transformer 中的常见模式
 
 这个函数接受来自monad栈中，当前栈下一层的monad动作，并将这个动作变成，或者说是 *抬举* 到现在的monad变换器中。每个monad变换器都是 ``MonadTrans`` 的实例。
 
-``lift`` 这个名字是基于此函数与 ``fmap`` 和 ``liftM`` 目的上的相似度的。这些函数都可以从类型系统的下一层中把东西提升到我们目前工作的这一层。他们的区别是：
+``lift`` 这个名字是基于此函数与 ``fmap`` 和 ``liftM`` 目的上的相似度的。这些函数都可以从类型系统的下一层中把东西提升到我们目前工作的这一层。它们的区别是：
 
 fmap
   将纯函数提升到functor层次
@@ -362,6 +357,7 @@ lift
 
     -- file: ch18/StackStack.hs
     type Bar = ReaderT Bool Foo
+
     barPut :: String -> Bar ()
     barPut = lift . lift . put
 
@@ -377,7 +373,7 @@ lift
 这个monad变换器修改monad的方法是：将底层monad ``m a`` 的类型参数
 包装在 ``Maybe`` 中，以得到类型 ``m (Maybe a)`` 。正如 ``Maybe`` monad一样，若在 ``MaybeT`` monad变换器中调用 ``fail`` ，则计算将提早结束执行。
 
-为使 ``m (Maybe a)`` 变成一个 ``Monad`` 实例，其必须有个独特的类型，这里我们通过 ``newtype`` 声明来实现：
+为使 ``m (Maybe a)`` 成为 ``Monad`` 的实例，其必须有个独特的类型。这里我们通过 ``newtype`` 声明来实现：
 
 .. code-block:: haskell
 
@@ -407,7 +403,7 @@ lift
           Nothing -> return Nothing
           Just y -> runMaybeT (f y)
 
-我们的 ``runMaybeT`` 函数解开了在 ``x`` 中包含的结果。进而，回忆起 ``<-`` 符号是 ``(>>=)`` 的语法糖：monad变换器必须使用其下层monad的 ``(>>=)`` 。而最后一部分对 ``unwrapped`` 的结构分析，决定了我们是要短路当前计算，还是将计算继续下去。最后，看看表达式的最外层。为了将底层monad再次藏起来，这里必须用 ``MaybeT`` 构造器包装结果。
+我们的 ``runMaybeT`` 函数解开了在 ``x`` 中包含的结果。进而，注意到 ``<-`` 符号是 ``(>>=)`` 的语法糖：monad变换器必须使用其下层monad的 ``(>>=)`` 。而最后一部分对 ``unwrapped`` 的结构分析（ ``case`` 表达式），决定了我们是要短路当前计算，还是将计算继续下去。最后，观察表达式的最外层。为了将底层monad再次藏起来，这里必须用 ``MaybeT`` 构造器包装结果。
 
 刚才展示的 ``do`` 标记看起来更容易阅读，但是其将我们依赖底层monad的 ``(>>=)`` 函数的事实也藏了起来。下面提供一个更符合语言习惯的 ``MaybeT`` 的 ``(>>=)`` 实现：
 
@@ -464,7 +460,7 @@ lift
     -- ... 对 MonadReader，MonadWriter等的实例定义同理 ...
 
 
-由于一些 ``mtl`` 类型类使用了函数式依赖，有些实例的声明需要GHC大大放宽其原有的类型检查规则。 (若我们忘记了其中任意的 ``LANGUAGE`` 指令，编译器会在其错误信息中提供建议。)
+由于一些 ``mtl`` 类型类使用了函数式依赖，有些实例的声明需要GHC大大放宽其原有的类型检查规则。(若我们忘记了其中任意的 ``LANGUAGE`` 指令，编译器会在其错误信息中提供建议。)
 
 .. code-block:: haskell
 
@@ -497,7 +493,7 @@ lift
 注意变换器堆叠顺序
 -------------------
 
-从我们早先使用 ``ReaderT`` 和 ``StateT`` 的例子中，你或许会认为叠加monad变换器的顺序并不重要。但是注意到当我们在 ``State`` 上叠加 ``StateT`` 时，你或许会更清晰地意识到堆叠的顺序确实产生了结果上的区别：类型 ``StateT Int (State String)`` 和类型 ``StateT String (State Int)`` 或许携带的信息相同，但它们却无法互换使用。叠加的顺序决定了我们是否要用 ``lift`` 来取得状态中的某个部分。
+从早先使用 ``ReaderT`` 和 ``StateT`` 的例子中，你或许会认为叠加monad变换器的顺序并不重要。事实并非如此，考虑在 ``State`` 上叠加 ``StateT`` 的情况，或许会助于你更清晰地意识到：堆叠的顺序确实产生了结果上的区别：类型 ``StateT Int (State String)`` 和类型 ``StateT String (State Int)`` 或许携带的信息相同，但它们却无法互换使用。叠加的顺序决定了我们是否要用 ``lift`` 来取得状态中的某个部分。
 
 下面的例子更加显著地阐明了顺序的重要性。假设有个可能失败的计算，而我们想记录下在什么情况下其会失败：
 
@@ -558,7 +554,7 @@ lift
 对纯代码的干涉
 ^^^^^^^^^^^^^^
 
-在实际编程中，使用monad的最恼人之处或许在于其阻碍了我们使用纯代码。很多实用的纯函数需要一个monad版的类似函数，而其monad版只是加上一个占位参数 ``m`` 给monad类型构造器填充：
+在实际编程中，使用monad的最恼人之处或许在于其阻碍了我们使用纯代码。很多实用的纯函数需要一个monad版的类似函数，而其monad版只是加上一个占位参数 ``m`` 供monad类型构造器填充：
 
 .. code-block:: haskell
 
@@ -567,12 +563,12 @@ lift
     ghci> :i filterM
     filterM :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
           -- Defined in Control.Monad
-    
+
 然而，这种覆盖是有限的：标准库中并不总能提供纯函数的monad版本。
 
-其中有一部分历史原因：Eugenio Moggi于1988年引入了使用monad编程的思想。而当时Haskell 1.0标准尚在开发中。现今版本的 ``Prelude`` 中的大部分函数可以追溯到于1990发布的Haskell 1.0。在1991年，Philip Wadler开始为更多的函数式编程听众写作文章，阐述monad的潜力。从那时起，monad开始用于实战。
+其中有一部分历史原因：Eugenio Moggi于1988年引入了使用monad编程的思想。而当时Haskell 1.0标准尚在开发中。现今版本的 ``Prelude`` 中的大部分函数可以追溯到于1990发布的Haskell 1.0。在1991年，Philip Wadler开始为更多的函数式编程听众作文，阐述monad的潜力。从那时起，monad开始用于实践。
 
-直到1996年Haskell 1.3标准发布之时，monad才得到了支持。但是在那时，语言的设计者已经受限于维护向前兼容性: 他们没法改变 ``Prelude`` 中的函数签名，因为那会破坏现有的代码。
+直到1996年Haskell 1.3标准发布之时，monad才得到了支持。但是在那时，语言的设计者已经受制于维护向前兼容性: 它们无法改变 ``Prelude`` 中的函数签名，因为那会破坏现有的代码。
 
 从那以后，Haskell社区学会了很多合适的抽象。因此我们可以写出不受这一纯函数／monad函数分裂影响的代码。你可以在 ``Data.Traversable`` 和 ``Data.Foldable`` 中找到这些思想的精华。
 
@@ -584,7 +580,7 @@ lift
 一些函数的类型签名会变得更加抽象（以GHC 7.10.1为例）：
 
 .. code-block:: haskell
-    
+
     ghci-7.10.1> :t mapM
     mapM :: (Monad m, Traversable t) => (a -> m b) -> t a -> m (t b)
     ghci-7.10.1> :t foldl
@@ -614,15 +610,13 @@ lift
     {-# LANGUAGE FlexibleContexts #-}
     import Control.Monad.Writer
     import MaybeT
-    
+
     problem :: MonadWriter [String] m => m ()
     problem = do
       tell ["this is where i fail"]
       fail "oops"
 
-因为我们在monad中执行， ``tell`` 的效果可以保证发生在 ``fail`` 之前。
-这里的问题在于，这个次序并不必要，但是我们却得到了这样的次序保证。
-编译器无法任意安排monad式代码的次序，即便这么做能使代码效率更高。
+因为我们在monad中执行， ``tell`` 的效果可以保证发生在 ``fail`` 之前。这里的问题在于，这个次序并不必要，但是我们却得到了这样的次序保证。编译器无法任意安排monad式代码的次序，即便这么做能使代码效率更高。
 
 [译注：解释一下这里的“次序并不必要”。回顾之前对叠加次序问题的讨论：
 
