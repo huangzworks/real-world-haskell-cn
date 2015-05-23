@@ -120,6 +120,14 @@
 
 部分有序    particular ordering
 
+编译选项    pragma
+
+重叠实例    overlapping instances
+
+身份       identity
+
+单一同态    monomorphism
+
 
 第二十八章
 ------------------

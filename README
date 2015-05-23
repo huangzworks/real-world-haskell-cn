@@ -1,8 +1,0 @@
-## Real World Haskell 的中文翻译
-
-[在线阅读](http://rwh.readthedocs.org/)
-
-# Build the book
-
-    $ pip install -r requirements.txt
-    $ make html

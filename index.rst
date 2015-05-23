@@ -13,28 +13,23 @@ Real World Haskell 中文版
    :scale: 45
 
 
-本文档是 `Real World Haskell <http://book.realworldhaskell.org/>`_ 一书的简体中文翻译版本。
-
-已完成翻译的章节：
+本文档是 `Real World Haskell <http://book.realworldhaskell.org/>`_ 一书的简体中文翻译版本，
+翻译工作正在进行中，
+欢迎加入： https://github.com/huangz1990/real-world-haskell-cn
 
 .. toctree::
    :maxdepth: 3
 
    chp/1
    chp/2
-   chp/4
-   chp/7
-   chp/28
-
-正在翻译的章节：
-
-.. toctree::
-   :maxdepth: 3
-
    chp/3
+   chp/4
    chp/5
    chp/6
+   chp/7
+   chp/11
    chp/13
+   chp/28
 
 
 翻译约定
@@ -56,6 +51,8 @@ Real World Haskell 中文版
 - `Albert <https://github.com/hbrls>`_
 
 - `Guang Yang <https://github.com/yanguango>`_
+
+- `labyrlnth <https://github.com/labyrlnth>`_
 
 除了进行翻译之外，本文档还在原书的基础上做了以下改进：
 

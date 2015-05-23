@@ -1,2 +1,6 @@
 *.swp
 _build/*
+.idea/
+*.iml
+*.o
+*.hi
