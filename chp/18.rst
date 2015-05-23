@@ -16,7 +16,7 @@ Monad变换器和常规的monad很类似，但它们并不是独立的实体。�
 
 [注：``mtl`` 意为monad变换器函数库(Monad Transformer Library)]
 
-[译注：Monad变换器需要依附在一已有monad上来构成新的monad，在接下来的行文中将使用“底层monad”或“下层monad”来称呼monad变换器所依附的那个monad]
+[译注：Monad变换器需要依附在一已有monad上来构成新的monad，在接下来的行文中将使用“下层monad”来称呼monad变换器所依附的那个monad]
 
 简单的Monad变换器实例
 ------------------------------
@@ -55,7 +55,7 @@ Monad变换器和常规的monad很类似，但它们并不是独立的实体。�
 
 [译注：“monad栈”由monad和一个或多个monad变换器叠加而成，形成一个栈的结构。若在monad栈中需要 ``IO`` monad，由于其不存在对应的monad变换器（ ``IOT`` ），所以 ``IO`` monad只能位于整个monad栈的最底下。]
 
-Monad 和 Monad Transformer 中的常见模式
+Monad和Monad变换器中的常见模式
 ----------------------------------------------------
 
 在 ``mtl`` 库中的大部分monad与monad变换器遵从一些关于命名和类型类的模式。
@@ -96,7 +96,7 @@ Monad 和 Monad Transformer 中的常见模式
 
 再次说明：为方便使用，大部分的 ``mtl`` monad变换器都定义了诸如此类的实例。
 
-叠加多个 Monad 变换器
+叠加多个Monad变换器
 ---------------------------
 
 之前提到过，在常规monad上叠加monad变换器可得到另一个monad。由于混合的结果也是个monad，我们可以凭此为基础再叠加上一层monad变换器。事实上，这么做十分常见。但在什么情况下才需要创建这样的monad呢？
@@ -136,7 +136,7 @@ Monad 和 Monad Transformer 中的常见模式
     -- file: ch18/UglyStack.hs
     type App = ReaderT AppConfig (StateT AppState IO)
 
-我们的变换器以 ``IO`` 为基础，依次叠加 ``StateT`` 与 ``ReaderT`` 。在此例中，栈顶是 ``ReaderT`` 还是 ``WriterT`` 并不重要，但是 ``IO`` 必须作为最底层monad。
+我们的变换器以 ``IO`` 为基础，依次叠加 ``StateT`` 与 ``ReaderT`` 。在此例中，栈顶是 ``ReaderT`` 还是 ``WriterT`` 并不重要，但是 ``IO`` 必须作为最下层monad。
 
 仅仅几个monad变换器的叠加，也会使类型签名迅速变得复杂起来。故此处以 ``type`` 关键字定义类型别名，以简化类型的书写。
 
@@ -249,7 +249,7 @@ Monad 和 Monad Transformer 中的常见模式
 [译注：第一题中的 ``StateT`` 原为 ``WriterT`` ，鉴于 ``App`` 定义中并无 ``WriterT`` ，此处应该指的是 ``StateT`` ]
 
 
-深入monad栈中
+深入Monad栈中
 ------------------------------
 
 至今，我们了解了对monad变换器的简单运用。对 ``mtl`` 库的便利组合拼接使我们免于了解monad栈构造的细节。我们确实已掌握了足以帮助我们简化大量常见编程任务的monad变换器相关知识。
@@ -263,7 +263,7 @@ Monad 和 Monad Transformer 中的常见模式
     -- file: ch18/CustomT.hs
     newtype CustomT m a = ...
 
-在 ``mtl`` 提供的框架中，每个位于栈上的monad变换器都将其底层monad的API暴露出来。这是通过提供大量的类型类实例来实现的。遵从这一模式的规则，我们也可以实现一系列的样板实例：
+在 ``mtl`` 提供的框架中，每个位于栈上的monad变换器都将其下层monad的API暴露出来。这是通过提供大量的类型类实例来实现的。遵从这一模式的规则，我们也可以实现一系列的样板实例：
 
 .. code-block:: haskell
 
@@ -274,7 +274,7 @@ Monad 和 Monad Transformer 中的常见模式
     instance MonadIO m => MonadIO (CustomT m) where
         ...
 
-若底层monad是 ``MonadReader`` 的实例，则 ``CustomT`` 也可作为 ``MonadReader`` 的实例： 实例化的方法是将所有相关的API调用转接给其底层实例的相应函数。经过实例化之后，上层的代码就可以将monad栈作为一个整体，当作 ``MonadReader`` 的实例，而不再需要了解或关心到底是其中的哪一层提供了具体的实现。
+若下层monad是 ``MonadReader`` 的实例，则 ``CustomT`` 也可作为 ``MonadReader`` 的实例： 实例化的方法是将所有相关的API调用转接给其下层实例的相应函数。经过实例化之后，上层的代码就可以将monad栈作为一个整体，当作 ``MonadReader`` 的实例，而不再需要了解或关心到底是其中的哪一层提供了具体的实现。
 
 不同于这种依赖类型类实例的方法，我们也可以显式指定想要使用的API。 ``MonadTrans`` 类型类定义了一个实用的函数 ``lift`` ：
 
@@ -343,7 +343,7 @@ lift
     outerPut :: Int -> Foo ()
     outerPut = put
 
-在这个情况下，唯一能访问底层 ``State`` monad的 ``put`` 函数的方法是使用 ``lift`` ：
+在这个情况下，唯一能访问下层 ``State`` monad的 ``put`` 函数的方法是使用 ``lift`` ：
 
 .. code-block:: haskell
 
@@ -370,7 +370,7 @@ lift
 
 [译注：如果想使用现成的 ``MaybeT`` ，现在你可以在 Hackage 上的 ``transformers`` 库中找到它。]
 
-这个monad变换器修改monad的方法是：将底层monad ``m a`` 的类型参数
+这个monad变换器修改monad的方法是：将下层monad ``m a`` 的类型参数
 包装在 ``Maybe`` 中，以得到类型 ``m (Maybe a)`` 。正如 ``Maybe`` monad一样，若在 ``MaybeT`` monad变换器中调用 ``fail`` ，则计算将提早结束执行。
 
 为使 ``m (Maybe a)`` 成为 ``Monad`` 的实例，其必须有个独特的类型。这里我们通过 ``newtype`` 声明来实现：
@@ -403,9 +403,9 @@ lift
           Nothing -> return Nothing
           Just y -> runMaybeT (f y)
 
-我们的 ``runMaybeT`` 函数解开了在 ``x`` 中包含的结果。进而，注意到 ``<-`` 符号是 ``(>>=)`` 的语法糖：monad变换器必须使用其下层monad的 ``(>>=)`` 。而最后一部分对 ``unwrapped`` 的结构分析（ ``case`` 表达式），决定了我们是要短路当前计算，还是将计算继续下去。最后，观察表达式的最外层。为了将底层monad再次藏起来，这里必须用 ``MaybeT`` 构造器包装结果。
+我们的 ``runMaybeT`` 函数解开了在 ``x`` 中包含的结果。进而，注意到 ``<-`` 符号是 ``(>>=)`` 的语法糖：monad变换器必须使用其下层monad的 ``(>>=)`` 。而最后一部分对 ``unwrapped`` 的结构分析（ ``case`` 表达式），决定了我们是要短路当前计算，还是将计算继续下去。最后，观察表达式的最外层。为了将下层monad再次藏起来，这里必须用 ``MaybeT`` 构造器包装结果。
 
-刚才展示的 ``do`` 标记看起来更容易阅读，但是其将我们依赖底层monad的 ``(>>=)`` 函数的事实也藏了起来。下面提供一个更符合语言习惯的 ``MaybeT`` 的 ``(>>=)`` 实现：
+刚才展示的 ``do`` 标记看起来更容易阅读，但是其将我们依赖下层monad的 ``(>>=)`` 函数的事实也藏了起来。下面提供一个更符合语言习惯的 ``MaybeT`` 的 ``(>>=)`` 实现：
 
 .. code-block:: haskell
 
@@ -429,10 +429,10 @@ lift
       (>>=) = bindMT
       fail = failM
 
-建立monad变换器
+建立Monad变换器
 ^^^^^^^^^^^^^^^^^
 
-为将我们的类型变成monad变换器，必须提供 ``MonadTrans`` 的实例，以使用户可以访问底层monad：
+为将我们的类型变成monad变换器，必须提供 ``MonadTrans`` 的实例，以使用户可以访问下层monad：
 
 .. code-block:: haskell
 
@@ -440,7 +440,7 @@ lift
     instance MonadTrans MaybeT where
         lift m = MaybeT (Just `liftM` m)
 
-底层monad以类型 ``a`` 开始：我们“注入” ``Just`` 构造器以使其变成需要的类型： ``Maybe a`` 。进而我们通过 ``MaybeT`` 藏起底层monad。
+下层monad以类型 ``a`` 开始：我们“注入” ``Just`` 构造器以使其变成需要的类型： ``Maybe a`` 。进而我们通过 ``MaybeT`` 藏起下层monad。
 
 更多的类型类实例
 ^^^^^^^^^^^^^^^^^
@@ -542,7 +542,7 @@ lift
     ghci> :t runWriter . runMaybeT
     runWriter . runMaybeT :: MaybeT (Writer w) a -> (Maybe a, w)
 
-在 ``Maybe`` 上叠加 ``WriterT`` 的策略使 ``Maybe`` 成为底层monad，因此 ``runWriterT`` 必须给我们以 ``Maybe`` 为类型的结果。在测试样例中，我们只会在不出现任何失败的情况下才能获得日志！
+在 ``Maybe`` 上叠加 ``WriterT`` 的策略使 ``Maybe`` 成为下层monad，因此 ``runWriterT`` 必须给我们以 ``Maybe`` 为类型的结果。在测试样例中，我们只会在不出现任何失败的情况下才能获得日志！
 
 叠加monad变换器类似于组合函数：如果我们改变函数应用的顺序，那么我们并不会对得到不同的结果感到意外。同样的道理也适用于对monad变换器的叠加。
 
@@ -641,7 +641,7 @@ lift
 
 最后，当我们使用monad和monad变换器时，需要付出一些效率的代价。 例如 ``State`` monad携带状态并将其放在一个闭包中。在Haskell的实现中，闭包的开销或许廉价但绝非免费。
 
-Monad变换器把其自身的开销附加在了其底层monad之上。每次我们使用 ``(>>=)`` 时，MaybeT变换器便需要包装和解包。而由 ``ReaderT`` ， ``StateT`` 和 ``MaybeT`` 依次叠加组成的monad栈，在每次使用 ``(>>=)`` 时，更是有一系列的簿记工作需要完成。
+Monad变换器把其自身的开销附加在了其下层monad之上。每次我们使用 ``(>>=)`` 时，MaybeT变换器便需要包装和解包。而由 ``ReaderT`` ， ``StateT`` 和 ``MaybeT`` 依次叠加组成的monad栈，在每次使用 ``(>>=)`` 时，更是有一系列的簿记工作需要完成。
 
 一个足够聪明的编译器或许可以将这些开销部分，甚至于全部消除。但是那种深度的复杂工作尚未广泛适用。
 
