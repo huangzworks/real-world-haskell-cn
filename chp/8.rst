@@ -259,7 +259,58 @@ When ghci can't infer the target type, we tell it what we'd like the type to be.
 
 .. note::
 
-    Watch out for String results
     注意 String 类型的结果
 
     指定结果为普通的字符串时，要当心。因为 (``=~``) 在表示 “无匹配” 时会返回空字符串，很明显这导致了难以处理可以匹配空字符串的正则表达式。这情况出现时，就需要使用另一种不同的结果类型，比如 [[String]]。
+
+以上是一些 “简单”的结果类型，不过还没说完。在继续讲解之前，我们先来定义一个在之后的例子中共同使用的模式串。可以在 ``ghci`` 中将这个模式串定义为一个变量，以便节省一些输入操作。
+
+::
+
+   ghci> let pat = "(foo[a-z]*bar|quux)"
+
+We can obtain quite a lot of information about the context in which a match occurs. If we ask for a (String, String, String) tuple, we'll get back the text before the first match, the text of that match, and the text that follows it. 1 comment
+当模式匹配了字符串时，可以获取很多关于上下文的信息。如果指定 ``(String,String,String)`` 类型的元组作为结果类型，可以获取字符串中首次匹配之前的部分，首次匹配的子串，和首次匹配之后的部分。
+
+::
+
+   ghci> "before foodiebar after" =~ pat :: (String,String,String)
+   ("before ","foodiebar"," after")
+
+If the match fails, the entire text is returned as the “before” element of the tuple, with the other two elements left empty. No comments
+若匹配失败，整个字符串会作为 “首次匹配之前” 的部分返回，元组的其他两个元素将为空字符串。
+
+::
+   ghci> "no match here" =~ pat :: (String,String,String)
+   ("no match here","","")
+
+使用四元组作为返回结果时，元组的第四个元素是一个包含了模式中所有分组的列表。
+
+::
+   ghci> "before foodiebar after" =~ pat :: (String,String,String,[String])
+   ("before ","foodiebar"," after",["foodiebar"])
+
+也可以获得关于匹配结果的数字信息。二元组类型的结果可以表示首次匹配在字符串中的偏移，以及匹配结果的长度。如果使用由这种二元组构成的列表作为结果类型，我们将得到所有字符串中所有匹配的此类信息。
+
+::
+
+   ghci> "before foodiebar after" =~ pat :: (Int,Int)
+   (7,9)
+   ghci> getAllMatches  ("i foobarbar a quux" =~ pat) :: [(Int,Int)]
+   [(2,9),(14,4)]
+
+二元组的首个元素（表示偏移的那个），其值为 ``-1`` 时，表示匹配失败。当指定返回值为列表时，空表表示失败。
+
+::
+
+   ghci> "eleemosynary" =~ pat :: (Int,Int)
+   (-1,0)
+   ghci> "mondegreen" =~ pat :: [(Int,Int)]
+   ()
+
+以上并非 ``RegexContext`` 类型类的内置实例的完整清单。完整的清单可以在 ``Text.Regex.Base.Context`` 模块的文档中找到。
+
+使函数具有多态返回值的能力对于一个静态类型语言来说是个不同寻常的特性。
+
+More about regular expressions
+------------------------
