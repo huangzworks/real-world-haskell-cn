@@ -239,7 +239,7 @@ When ghci can't infer the target type, we tell it what we'd like the type to be.
    ghci> "honorificabilitudinitatibus" =~ "[aeiou]" :: Int
    13
 
-If we ask for a String result, we'll get the first substring that matches, or an empty string if nothing matches. No comments
+如果指定结果类型为 ``String`` ，将得到第一个匹配的子串，或者表示无匹配的空字符串。
 
 ::
 
