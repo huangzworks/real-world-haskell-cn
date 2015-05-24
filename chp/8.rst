@@ -247,3 +247,19 @@ When ghci can't infer the target type, we tell it what we'd like the type to be.
    "ii"
    ghci> "hi ludi, F. Baconis nati, tuiti orbi" =~ "Shakespeare" :: String
    ""
+
+另一个合法的返回值类型是 ``[[Srtring]]`` ，将返回由所有匹配的的字符串组成的列表。
+
+::
+
+   ghci> "I, B. Ionsonii, uurit a lift'd batch" =~ "(uu|ii)" :: [[String]]
+   [["ii","ii"],["uu","uu"]]
+   ghci> "hi ludi, F. Baconis nati, tuiti orbi" =~ "Shakespeare" :: [[String]]
+   []
+
+.. note::
+
+    Watch out for String results
+    注意 String 类型的结果
+
+    指定结果为普通的字符串时，要当心。因为 (``=~``) 在表示 “无匹配” 时会返回空字符串，很明显这导致了难以处理可以匹配空字符串的正则表达式。这情况出现时，就需要使用另一种不同的结果类型，比如 [[String]]。
