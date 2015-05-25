@@ -6,7 +6,7 @@
 
 下面是个简单的基准测试，读取一个由数字构成的文本文件，并打印它们的和。
 
-::
+.. code-block:: haskell
 
     -- file: ch08/SumFile.hs
     main = do
@@ -39,7 +39,7 @@
 
 这个简单的问题可以通过查看文件头部的四个字节解决，看他们是否匹配某个特定的字节序列。表示某种文件类型的字节序列通常被称为 ``魔法数`` 。
 
-::
+.. code-block:: haskell
 
    -- file: ch08/ElfMagic.hs
    import qualified Data.ByteString.Lazy as L
@@ -65,7 +65,7 @@
 
 我们使用了典型的 Haskell 风格编写 ``hasElfMagic`` 函数，其并不执行 I/O。这里是如何在真正的文件上使用它。
 
-::
+.. code-block:: haskell
 
    -- file: ch08/ElfMagic.hs
    isElfFile :: FilePath -> IO Bool
@@ -88,7 +88,7 @@
 
 如何在这一系列记录中找到最高收盘价呢？收盘价位于以逗号分隔的第四列。以下函数从单行数据中获取收盘价。
 
-::
+.. code-block:: haskell
 
    -- file: ch08/HighestClose.hs
    import qualified Data.ByteString.Lazy.Char8 as L
@@ -97,7 +97,7 @@
 
 这个函数使用 ``point-free`` 风格编写，我们要从右向左阅读。 ``L.split`` 函数将一个惰性 ``ByteString`` 按某个分隔符切分为一个由 ``ByteString`` 组成的列表。 ``(!!)`` 操作符检索列表中的第 k 个元素。 ``readPrice``  函数将一个表示小数的字符串转换为一个数。
 
-::
+.. code-block:: haskell
 
    - file: ch08/HighestClose.hs
    readPrice :: L.ByteString -> Maybe Int
@@ -114,7 +114,7 @@
 
 查找最高收盘价的函数很容易编写。
 
-::
+.. code-block:: haskell
 
    -- file: ch08/HighestClose.hs
    highestClose = maximum . (Nothing:) . map closing . L.lines
@@ -125,7 +125,7 @@
 
 不能对空列表使用 ``maximum`` 函数，所以我们耍了点小把戏。
 
-::
+.. code-block:: haskell
 
    ghci> maximum [3,6,2,9]
    9
@@ -134,7 +134,7 @@
 
 我们想在没有股票数据时也不抛出异常，所以用 ``(Nothing:)`` 这个表达式来确保输入到 ``maximum`` 函数的由 ``Maybe Int`` 值构成的列表总是非空。
 
-::
+.. code-block:: haskell
 
    ghci> maximum [Nothing, Just 1]
    Just 1
@@ -143,7 +143,7 @@
 
 我们的函数工作正常吗？
 
-::
+.. code-block:: haskell
 
    ghci> :load HighestClose
    [1 of 1] Compiling Main             ( HighestClose.hs, interpreted )
@@ -155,7 +155,7 @@
 
 因为我们把逻辑和 I/O 分离开了，所以即使不创建一个空文件也可以测试无数据的情况。
 
-::
+.. code-block:: haskell
 
    ghci> highestClose L.empty
    Nothing
@@ -199,7 +199,7 @@ Haskell 中的正则表达式
 在我们对 regexp 库的探索开始时，只需使用 ``Text.Regex.Posix`` 工作。一般通过在 ``ghci`` 进行交互是探索一个模块最方便的办法。
 
 
-::
+.. code-block:: haskell
 
    ghci> :module +Text.Regex.Posix
 
@@ -214,7 +214,7 @@ Haskell 中的正则表达式
 
 当 ``ghci`` 无法推断目标的类型时，我们要告诉它想要哪种类型。若想知道正则匹配是否通过时，需要将结果类型指定为 ``Bool`` 型。
 
-::
+.. code-block:: haskell
 
    ghci> "my left foot" =~ "foo" :: Bool
    Loading package array-0.1.0.0 ... linking ... done.
@@ -231,7 +231,7 @@ Haskell 中的正则表达式
 
 在 ``regexp`` 库内部，有一种类型类名为 ``RegexContext`` ，其描述了目标类型的行为。基础库定义了很多这个类型类的实例。 ``Bool`` 型是这种类型类的一个实例，so we get back a usable result. 另一个实例是 ``Int`` ，可以描述正则表达式匹配了多少次。
 
-::
+.. code-block:: haskell
 
    ghci> "a star called henry" =~ "planet" :: Int
    0
@@ -240,7 +240,7 @@ Haskell 中的正则表达式
 
 如果指定结果类型为 ``String`` ，将得到第一个匹配的子串，或者表示无匹配的空字符串。
 
-::
+.. code-block:: haskell
 
    ghci> "I, B. Ionsonii, uurit a lift'd batch" =~ "(uu|ii)" :: String
    "ii"
@@ -249,14 +249,14 @@ Haskell 中的正则表达式
 
 另一个合法的返回值类型是 ``[[Srtring]]`` ，将返回由所有匹配的的字符串组成的列表。
 
-::
+.. code-block:: haskell
 
    ghci> "I, B. Ionsonii, uurit a lift'd batch" =~ "(uu|ii)" :: [[String]]
    [["ii","ii"],["uu","uu"]]
    ghci> "hi ludi, F. Baconis nati, tuiti orbi" =~ "Shakespeare" :: [[String]]
    []
 
-.. note::
+.. warning::
 
     注意 String 类型的结果
 
@@ -264,32 +264,32 @@ Haskell 中的正则表达式
 
 以上是一些 “简单”的结果类型，不过还没说完。在继续讲解之前，我们先来定义一个在之后的例子中共同使用的模式串。可以在 ``ghci`` 中将这个模式串定义为一个变量，以便节省一些输入操作。
 
-::
+.. code-block:: haskell
 
    ghci> let pat = "(foo[a-z]*bar|quux)"
 
 当模式匹配了字符串时，可以获取很多关于上下文的信息。如果指定 ``(String,String,String)`` 类型的元组作为结果类型，可以获取字符串中首次匹配之前的部分，首次匹配的子串，和首次匹配之后的部分。
 
-::
+.. code-block:: haskell
 
    ghci> "before foodiebar after" =~ pat :: (String,String,String)
    ("before ","foodiebar"," after")
 
 若匹配失败，整个字符串会作为 “首次匹配之前” 的部分返回，元组的其他两个元素将为空字符串。
 
-::
+.. code-block:: haskell
    ghci> "no match here" =~ pat :: (String,String,String)
    ("no match here","","")
 
 使用四元组作为返回结果时，元组的第四个元素是一个包含了模式中所有分组的列表。
 
-::
+.. code-block:: haskell
    ghci> "before foodiebar after" =~ pat :: (String,String,String,[String])
    ("before ","foodiebar"," after",["foodiebar"])
 
 也可以获得关于匹配结果的数字信息。二元组类型的结果可以表示首次匹配在字符串中的偏移，以及匹配结果的长度。如果使用由这种二元组构成的列表作为结果类型，我们将得到所有字符串中所有匹配的此类信息。
 
-::
+.. code-block:: haskell
 
    ghci> "before foodiebar after" =~ pat :: (Int,Int)
    (7,9)
@@ -298,12 +298,12 @@ Haskell 中的正则表达式
 
 二元组的首个元素（表示偏移的那个），其值为 ``-1`` 时，表示匹配失败。当指定返回值为列表时，空表表示失败。
 
-::
+.. code-block:: haskell
 
    ghci> "eleemosynary" =~ pat :: (Int,Int)
    (-1,0)
    ghci> "mondegreen" =~ pat :: [(Int,Int)]
-   ()
+   []
 
 以上并非 ``RegexContext`` 类型类的内置实例的完整清单。完整的清单可以在 ``Text.Regex.Base.Context`` 模块的文档中找到。
 
