@@ -373,8 +373,7 @@ Haskell 中的正则表达式
 
    Perl 风格和 POSIX 风格的正则表达式
 
-   If you're coming to Haskell from a language like Perl, Python, or Java, and you've used regular expressions in one of those languages, you should be aware that the POSIX regexps handled by the Text.Regex.Posix module are different in some significant ways from Perl-style regexps. Here are a few of the more notable differences. 5 comments
-   如果你此前用过其他语言，如 Perl，Python，或 Java，并且是用过其中的正则表达式， 你应该知道 Text.Regex.Posix 模块处理的 POSIX 风格的正则表达式在很多
+   如果你此前用过其他语言，如 Perl，Python，或 Java，并且使用过其中的正则表达式， 你应该知道 Text.Regex.Posix 模块处理的 POSIX 风格的正则表达式与 Perl 风格的正则表达式有一些显著的不同。
    
    Perl regexp engines perform left-biased matching when matching alternatives, whereas POSIX engines choose the greediest match. What this means is that given a regexp of (foo|fo*) and a text string of foooooo, a Perl-style engine will give a match of foo (the leftmost match), while a POSIX engine will match the entire string (the greediest match). 1 comment
    
