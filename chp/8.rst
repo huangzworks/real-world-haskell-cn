@@ -317,3 +317,65 @@ Haskell 中的正则表达式
 
 之前提到过， ``=~`` 操作符的输入和返回值都使用了类型类。我们可以在正则表达式和要匹配的文本中使用 ``String`` 或者严格的 ``ByteString`` 类型。
 
+.. code-block:: haskell
+
+   ghci> :module +Data.ByteString.Char8
+   ghci> :type pack "foo"
+   pack "foo" :: ByteString
+
+我们可以尝试不同的 ``String`` 和 ``ByteString`` 组合。
+
+.. code-block:: haskell
+
+   ghci> pack "foo" =~ "bar" :: Bool
+   False
+   ghci> "foo" =~ pack "bar" :: Int
+   0
+   ghci> getAllMatches (pack "foo" =~ pack "o") :: [(Int, Int)]
+   [(1,1),(2,1)]
+
+不过，我们需要注意，文本匹配的结果必须于被匹配的字符串类型一致。让我们实践一下，看这是什么意思。
+
+.. code-block:: haskell
+
+   ghci> pack "good food" =~ ".ood" :: [[ByteString]]
+   [["good"],["food"]]
+
+上面的例子中，我们使用 ``pack`` 将一个 ``String`` 转换为 ``ByteString`` 。这种情况可以通过类型检查，因为 ``ByteString`` 也是一种合法的结果类型。但是如果输入字符串类型为 ``String`` 类型，在尝试获得 ``ByteString`` 类型结果时将会失败。
+
+.. code-block:: haskell
+
+   ghci> "good food" =~ ".ood" :: [[ByteString]]
+
+   <interactive>:55:13:
+       No instance for (RegexContext Regex [Char] [[ByteString]])
+         arising from a use of ‘=~’
+       In the expression: "good food" =~ ".ood" :: [[ByteString]]
+       In an equation for ‘it’:
+           it = "good food" =~ ".ood" :: [[ByteString]]
+
+将结果类型指定为与被匹配字符串相同的 ``String`` 类型就可以轻松地解决这个问题。
+
+.. code-block:: haskell
+
+   ghci> "good food" =~ ".ood" :: [[String]]
+   [["good"],["food"]]
+
+
+对于正则表达式不存在这个限制。正则表达式可以是 ``String`` 或 ``ByteString`` ，而不必在意输入或结果是何种类型。
+
+你要知道的其他一些事情
+^^^^^^^^^^^^^^^^^^^^
+
+查阅 ``Haskell`` 的库文档，会发现很多和正则表达式有关的模块。 ``Text.Regex.Base`` 下的模块定义了供其他所有正则表达式库使用的通用 API 。可以同时安装许多不同实现的正则表达式模块。写作本书时， GHC 自带一个实现， ``Text.Regex.Posix`` 。正如其名字，这个模块提供了 ``POSIX`` 语义的正则表达式实现。
+
+.. Note::
+
+   Perl 风格和 POSIX 风格的正则表达式
+
+   If you're coming to Haskell from a language like Perl, Python, or Java, and you've used regular expressions in one of those languages, you should be aware that the POSIX regexps handled by the Text.Regex.Posix module are different in some significant ways from Perl-style regexps. Here are a few of the more notable differences. 5 comments
+   如果你此前用过其他语言，如 Perl，Python，或 Java，并且是用过其中的正则表达式， 你应该知道 Text.Regex.Posix 模块处理的 POSIX 风格的正则表达式在很多
+   
+   Perl regexp engines perform left-biased matching when matching alternatives, whereas POSIX engines choose the greediest match. What this means is that given a regexp of (foo|fo*) and a text string of foooooo, a Perl-style engine will give a match of foo (the leftmost match), while a POSIX engine will match the entire string (the greediest match). 1 comment
+   
+   POSIX regexps have less uniform syntax than Perl-style regexps. They also lack a number of capabilities provided by Perl-style regexps, such as zero-width assertions and control over greedy matching.
