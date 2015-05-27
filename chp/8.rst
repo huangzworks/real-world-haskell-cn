@@ -528,5 +528,103 @@ Hackage 上也有其他 Haskell 正则表达式包可供下载。其中一些比
 
 如果我们需要 "foo" ++ "bar" 这个表达式结果中的一个元素，函数定义中的第一个模式被匹配，返回表达式 x : (xs ++ ys)。因为 (:) 构造器是非严格的，xs ++ ys 的求值被延迟到当我们需要生成更多结果中的元素时。当生成了结果中的更多元素，我们不再需要 x ，垃圾收集器可以将其回收。因为我们按需要计算结果中的元素，且不保留已经计算出的结果，编译器可以用常数空间对我们的代码求值。
 
-Making use of our pattern matcher
+利用我们的模式匹配器
 --------------
+
+有一个函数可以匹配 glob 模式很好，但我们希望可以在实际中使用它。在类 Unix 系统中，glob 函数返回一个由匹配给定 glob 模式串的文件和目录组成的列表。让我们用 Haskell 构造一个类似的函数。按 Haskell 的描述性命名规范，我们将这个函数称为 ``namesMatching`` 。
+
+.. code-block:: haskell
+
+   -- file: ch08/Glob.hs
+   module Glob (namesMatching) where
+
+我们将 ``namesMatching`` 指定为我们的 Glob 模块中唯一对用户可见的名字。
+
+.. code-block:: haskell
+
+   -- file: ch08/Glob.hs
+   import System.Directory (doesDirectoryExist, doesFileExist,
+                         getCurrentDirectory, getDirectoryContents)
+
+System.FilePath 抽象了操作系统路径名称的惯例。(</>) 函数将两个部分组合为一个路径。
+
+.. code-block:: haskell
+
+   ghci> :m +System.FilePath
+   ghci> "foo" </> "bar"
+   Loading package filepath-1.1.0.0 ... linking ... done.
+   "foo/bar"
+
+The name of the dropTrailingPathSeparator function is perfectly descriptive. No comments
+``dropTrailingPathSeparator`` 函数的名字完美地描述了其作用。
+
+.. code-block:: haskell
+
+   ghci> dropTrailingPathSeparator "foo/"
+   "foo"
+
+``splitFileName`` 函数以路径中的最后一个斜线将路径分割为两部分。
+
+.. code-block:: haskell
+
+   ghci> splitFileName "foo/bar/Quux.hs"
+   ("foo/bar/","Quux.hs")
+   ghci> splitFileName "zippity"
+   ("","zippity")
+
+配合 ``Systems.FilePath`` 和 ``Systems.Directory`` 两个模块，我们可以编写一个在类 Unix 和 Windows 系统上都可以运行的可移植的 ``namesMatching`` 函数。
+
+.. code-block:: haskell
+
+   -- file: ch08/Glob.hs
+   import System.FilePath (dropTrailingPathSeparator, splitFileName, (</>))
+
+在这个模块中，我们将模拟一个 “for” 循环；首次尝试在 Haskell 中处理异常；当然还会用到我们刚写的 ``matchesGlob`` 函数。
+
+.. code-block:: haskell
+
+   -- file: ch08/Glob.hs
+   import Control.Exception (handle)
+   import Control.Monad (forM)
+   import GlobRegex (matchesGlob)
+
+目录和文件存在于各种带有副作用的活动的“真实世界”，我们的 glob 模式处理函数的返回值类型中将必须带有 IO 。
+
+如果的输入字符串中不包含模式字符，我们简单的在文件系统中检查输入的名字是否已经建立。（注意，此处使用 Haskell 的 guard 语法可以编写精细整齐的定义。“if” 语句也可以做到，但是在美学上不能令人满意。 ）
+
+.. code-block:: haskell
+
+   -- file: ch08/Glob.hs
+   isPattern :: String -> Bool
+   isPattern = any (`elem` "[?*")
+
+   namesMatching pat
+     | not (isPattern pat) = do
+       exists <- doesNameExist pat
+       return (if exists then [pat] else [])
+
+``doesNameExist`` 是一个我们将要简要定义的函数的名字。
+
+如果字符串是一个 glob 模式呢？继续定义我们的函数。
+
+.. code-block:: haskell
+
+   -- file: ch08/Glob.hs
+     | otherwise = do
+       case splitFileName pat of
+         ("", baseName) -> do
+             curDir <- getCurrentDirectory
+             listMatches curDir baseName
+         (dirName, baseName) -> do
+             dirs <- if isPattern dirName
+                     then namesMatching (dropTrailingPathSeparator dirName)
+                     else return [dirName]
+             let listDir = if isPattern baseName
+                           then listMatches
+                           else listPlain
+             pathNames <- forM dirs $ \dir -> do
+                              baseNames <- listDir dir baseName
+                              return (map (dir </>) baseNames)
+             return (concat pathNames)
+
+We use splitFileName to split the string into a pair of “everything but the final name” and “the final name”. If the first element is empty, we're looking for a pattern in the current directory. Otherwise, we must check the directory name and see if it contains patterns. If it does not, we create a singleton list of the directory name. If it contains a pattern, we list all of the matching directories. No comments
