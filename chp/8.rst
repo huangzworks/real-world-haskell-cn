@@ -472,7 +472,7 @@ Hackage 上也有其他 Haskell 正则表达式包可供下载。其中一些比
    ghci> "taste.txt" =~ globToRegex "t[ea]s*" :: Bool
    True
 
-It works! Now let's play around a little with ghci. We can create a temporary definition for fnmatch and try it out.
+奏效了！现在让我们在 ghci 里玩耍一下。我们可以临时定义一个 ``fnmatch`` 函数，并且试用它。
 
 .. code-block:: haskell
 
@@ -482,5 +482,12 @@ It works! Now let's play around a little with ghci. We can create a temporary de
    ghci> fnmatch "d*" "myname"
    False
 
-The name fnmatch doesn't really have the “Haskell nature”, though. By far the most common Haskell style is for functions to have descriptive, “camel cased” names. Camel casing concatenates words, capitalising all but possibly the first word. For instance, the words “file name matches” would become the name fileNameMatches. The name “camel case” comes from the “humps” introduced by the capital letters. In our library, we'll give this function the name matchesGlob.
+但是 ``fnmatch`` 没有真正的 “Haskell 味道”。目前为止，最常见的 Haskell 风格是赋予函数具有描述性的，“驼峰式” 命名。将单词连接为驼峰状，首字母小写后面每个单词的首字母大写。例如，“file name matches” 这几个词将转换为 ``fileNameMatch`` 这个名字。 “驼峰式” 这种说法来自与大写字母形成的“驼峰”。在我们的库中，将使用 ``matchesGlob`` 这个函数名。
 
+.. code-block:: haskell
+
+   -- file: ch08/GlobRegex.hs
+   matchesGlob :: FilePath -> String -> Bool
+   name `matchesGlob` pat = name =~ globToRegex pat
+
+你可能注意到目前为止我们使用的都是短变量名。从经验来看，描述性的名字在更长的函数定义中更有用，它们有助于可读性。对一个仅有两行的函数来说，长变量名价值较小。
