@@ -412,7 +412,6 @@ Hackage 上也有其他 Haskell 正则表达式包可供下载。其中一些比
 
    Haskell 不需要在使用某个值或函数时，并不需要其在之前的源码中被声明。在某个值首次被使用之后才定义它是很平常的。Haskell 编译器并不关心这个层面上的顺序。这使我们可以用最符合逻辑的方式灵活地组织代码，而不是为使编译器作者更轻松而遵守某种顺序。
 
-   Haskell module writers often use this flexibility to put “more important” code earlier in a source file, relegating “plumbing” to later. This is exactly how we are presenting the globToRegex function and its helpers here.
    Haskell 模块的作者们经常利用这种灵活性，将“更重要的”代码放在源码文件更靠前的位置，将繁琐的实现放在后面。这也是我们实现 ``globToRegex'`` 函数及其辅助函数的方法。
 
 ``globToRegex'`` 将使用正则表达式做大部分的翻译工作。我们将使用 Haskell 的模式匹配特性轻松第穷举出需要处理的每一种情况
@@ -433,5 +432,4 @@ Hackage 上也有其他 Haskell 正则表达式包可供下载。其中一些比
    
    globToRegex' (c:cs) = escape c ++ globToRegex' cs
 
-Our first clause stipulates that if we hit the end of our glob pattern (by which time we'll be looking at the empty string), we return $, the regular expression symbol for “match end-of-line”. Following this is a series of clauses that switch our pattern from glob syntax to regexp syntax. The last clause passes every other character through, possibly escaping it first
-
+我们的第一条规则是，如果触及 glob 模式的尾部（也就是说当输入为空字符串时），我们返回 $ ，正则表达式中表示“匹配行尾”的符号。我们按照这样一系列规则将模式串由 glob 语法转化为正则表达式语法。最后一条规则匹配所有字符，首先将可转义字符进行转义。
