@@ -433,3 +433,54 @@ Hackage 上也有其他 Haskell 正则表达式包可供下载。其中一些比
    globToRegex' (c:cs) = escape c ++ globToRegex' cs
 
 我们的第一条规则是，如果触及 glob 模式的尾部（也就是说当输入为空字符串时），我们返回 $ ，正则表达式中表示“匹配行尾”的符号。我们按照这样一系列规则将模式串由 glob 语法转化为正则表达式语法。最后一条规则匹配所有字符，首先将可转义字符进行转义。
+
+``escape`` 函数确保正则表达式引擎不会按照普通字符串解释构成正则表达式语法的字符。
+
+.. code-block:: haskell
+
+   -- file: ch08/GlobRegex.hs
+   charClass :: String -> String
+   charClass (']':cs) = ']' : globToRegex' cs
+   charClass (c:cs)   = c : charClass cs
+   charClass []       = error "unterminated character class"
+
+现在我们已经完成了 ``globToRegex`` 函数及其辅助函数的定义，让我们在 ghci 中装载并且实验一下。
+
+.. code-block:: haskell
+
+   ghci> :load GlobRegex.hs
+   [1 of 1] Compiling GlobRegex        ( GlobRegex.hs, interpreted )
+   Ok, modules loaded: GlobRegex.
+   ghci> :module +Text.Regex.Posix
+   ghci> globToRegex "f??.c"
+   Loading package array-0.1.0.0 ... linking ... done.
+   Loading package containers-0.1.0.1 ... linking ... done.
+   Loading package bytestring-0.9.0.1 ... linking ... done.
+   Loading package mtl-1.1.0.0 ... linking ... done.
+   Loading package regex-base-0.93.1 ... linking ... done.
+   Loading package regex-posix-0.93.1 ... linking ... done.
+   "^f..\\.c$"
+
+果然，看上去像是一个合理的正则表达式。可以使用她来匹配某个字符串码？
+
+.. code-block:: haskell
+
+   ghci> "foo.c" =~ globToRegex "f??.c" :: Bool
+   True
+   ghci> "test.c" =~ globToRegex "t[ea]s*" :: Bool
+   True
+   ghci> "taste.txt" =~ globToRegex "t[ea]s*" :: Bool
+   True
+
+It works! Now let's play around a little with ghci. We can create a temporary definition for fnmatch and try it out.
+
+.. code-block:: haskell
+
+   ghci> let fnmatch pat name  =  name =~ globToRegex pat :: Bool
+   ghci> :type fnmatch
+   fnmatch :: (RegexLike Regex source1) => String -> source1 -> Bool
+   ghci> fnmatch "d*" "myname"
+   False
+
+The name fnmatch doesn't really have the “Haskell nature”, though. By far the most common Haskell style is for functions to have descriptive, “camel cased” names. Camel casing concatenates words, capitalising all but possibly the first word. For instance, the words “file name matches” would become the name fileNameMatches. The name “camel case” comes from the “humps” introduced by the capital letters. In our library, we'll give this function the name matchesGlob.
+
