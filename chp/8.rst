@@ -375,6 +375,63 @@ Haskell 中的正则表达式
 
    如果你此前用过其他语言，如 Perl，Python，或 Java，并且使用过其中的正则表达式， 你应该知道 Text.Regex.Posix 模块处理的 POSIX 风格的正则表达式与 Perl 风格的正则表达式有一些显著的不同。
    
-   Perl regexp engines perform left-biased matching when matching alternatives, whereas POSIX engines choose the greediest match. What this means is that given a regexp of (foo|fo*) and a text string of foooooo, a Perl-style engine will give a match of foo (the leftmost match), while a POSIX engine will match the entire string (the greediest match). 1 comment
+   当有多个匹配结果候选时，Perl 的正则表达式引擎表现为左侧最小匹配，而 POSIX 引擎会选择贪婪匹配（最长匹配）。当使用正则表达式 (foo|fo*) 匹配字符串 foooooo 时，Perl 风格引擎将返回 foo (最左的匹配)，而 POSIX 引擎将返回的结果将包含整个字符串 (贪婪匹配)。
    
-   POSIX regexps have less uniform syntax than Perl-style regexps. They also lack a number of capabilities provided by Perl-style regexps, such as zero-width assertions and control over greedy matching.
+   POSIX 正则表达式比 Perl 风格的正则表达式缺少一些格式语法。它们也缺少一些 Perl 风格正则表达式的功能，比如零宽度断言和对贪婪匹配的控制。
+
+
+Hackage 上也有其他 Haskell 正则表达式包可供下载。其中一些比内置的 POSIX 引擎拥有更好的执行效率 (如 regex-tdfa); 另外一些提供了大多数程序员熟悉的 Perl 风格正则匹配 (如 regex-pcre)。它们都按照我们这节提到的 API 编写。
+
+将 glob 模式翻译为正则表达式
+--------------
+
+我们已经看到了用正则表达式匹配文本的多种方法，现在让我们将注意力回到 glob 模式。我们要编写一个函数，接收一个 glob 模式座位输入，返回其对应的正则表达式。glob 模式和正则表达式都以文本字符串表示，所以这个函数的类型应该已经清楚了。
+
+.. code-block:: haskell
+   -- file: ch08/GlobRegex.hs
+   module GlobRegex
+       (
+         globToRegex
+       , matchesGlob
+       ) where
+   
+   import Text.Regex.Posix ((=~))
+   
+   globToRegex :: String -> String
+  
+我们生成的正则表达式必须被锚定，所以它要对一个字符串从头到尾完整匹配。
+
+.. code-block:: haskell
+   -- file: ch08/GlobRegex.hs
+   globToRegex cs = '^' : globToRegex' cs ++ "$"
+
+回想一下， ``String`` 仅是 ``[Char]`` 的同义词，一个由字符组成的数组。 ``:`` 操作符将一个值加入某个列表头部，此处是将字符 ``^`` 加入 ``globToRegex'`` 函数返回的列表头部。
+
+.. Note::
+   在定义之前使用一个值
+
+   Haskell 不需要在使用某个值或函数时，并不需要其在之前的源码中被声明。在某个值首次被使用之后才定义它是很平常的。Haskell 编译器并不关心这个层面上的顺序。这使我们可以用最符合逻辑的方式灵活地组织代码，而不是为使编译器作者更轻松而遵守某种顺序。
+
+   Haskell module writers often use this flexibility to put “more important” code earlier in a source file, relegating “plumbing” to later. This is exactly how we are presenting the globToRegex function and its helpers here.
+   Haskell 模块的作者们经常利用这种灵活性，将“更重要的”代码放在源码文件更靠前的位置，将繁琐的实现放在后面。这也是我们实现 ``globToRegex'`` 函数及其辅助函数的方法。
+
+``globToRegex'`` 将使用正则表达式做大部分的翻译工作。我们将使用 Haskell 的模式匹配特性轻松第穷举出需要处理的每一种情况
+
+.. code-block:: haskell
+   -- file: ch08/GlobRegex.hs
+
+   globToRegex' :: String -> String
+   globToRegex' "" = ""
+   
+   globToRegex' ('*':cs) = ".*" ++ globToRegex' cs
+   
+   globToRegex' ('?':cs) = '.' : globToRegex' cs
+   
+   globToRegex' ('[':'!':c:cs) = "[^" ++ c : charClass cs
+   globToRegex' ('[':c:cs)     = '['  :  c : charClass cs
+   globToRegex' ('[':_)        = error "unterminated character class"
+   
+   globToRegex' (c:cs) = escape c ++ globToRegex' cs
+
+Our first clause stipulates that if we hit the end of our glob pattern (by which time we'll be looking at the empty string), we return $, the regular expression symbol for “match end-of-line”. Following this is a series of clauses that switch our pattern from glob syntax to regexp syntax. The last clause passes every other character through, possibly escaping it first
+
