@@ -584,7 +584,7 @@ The name of the dropTrailingPathSeparator function is perfectly descriptive. No 
 .. code-block:: haskell
 
    -- file: ch08/Glob.hs
-   import Control.Exception (handle)
+   import Control.Exception (handle, SomeException)
    import Control.Monad (forM)
    import GlobRegex (matchesGlob)
 
@@ -633,8 +633,8 @@ The name of the dropTrailingPathSeparator function is perfectly descriptive. No 
 .. note::
 
    注意事项
-   The System.FilePath module can be a little tricky. Above is a case in point; the splitFileName function leaves a trailing slash on the end of the directory name that it returns. No comments
-   ``System.FilePath`` 模块稍有点诡异。
+
+   ``System.FilePath`` 模块稍有点诡异。上面的情况就是一个例子。 ``splitFileName`` 函数在其返回值的目录名部分的结尾保留了一个斜线。
 
    .. code-block:: haskell
 
@@ -644,8 +644,85 @@ The name of the dropTrailingPathSeparator function is perfectly descriptive. No 
       ("foo/","bar")
 
    If we didn't remember (or know enough) to remove that slash, we'd recurse endlessly in namesMatching, because of the following behaviour of splitFileName. 1 comment
+   如果忘记（或不够了解）要去掉这个斜线，我们将在 ``namesMatching`` 函数中进行无止尽的递归匹配，看看后面演示的 ``splitFileName`` 的行为你就会明白。
    
    .. code-block:: haskell
+
       ghci> splitFileName "foo/"
       ("foo/","")
-   You can guess what happened to us that led us to add this note!
+
+   你或许能够想想想象是什么促使我们加入这份注意事项。
+
+最终，我们将每个目录中的匹配收集起来，得到一个由列表组成的列表，然后将它们连接为一个单独的由文件名组成的列表。
+
+上面那个函数中出现的陌生的 ``forM`` 函数，其行为有些像 “for” 循环：它将其第二个参数（一个动作）映射到其第一个参数（一个列表），并返回由其结果组成的列表。
+
+我们还剩余一些零散的目标需要完成。首先是上面用到过的 ``doesNameExist`` 函数的定义。 ``System.Directory`` 函数无法检查一个名字是否已经在文件系统中建立。它强制我们明确要检查的是一个文件还是目录。这个 API 设计的很丑陋，所以我们必须在一个函数中完成两次检验。出于效率考虑，我们首先检查文件名，因为文件比目录更常见。
+
+.. code-block:: haskell
+
+   -- file: ch08/Glob.hs
+   doesNameExist :: FilePath -> IO Bool
+   
+   doesNameExist name = do
+       fileExists <- doesFileExist name
+       if fileExists
+         then return True
+         else doesDirectoryExist name
+
+还有两个函数需要定义，返回值都是由某个目录下的名字组成的列表。 ``listMatches`` 函数返回由某目录下全部匹配给定 glob 模式的文件名组成的列表。
+
+.. code-block:: haskell
+
+   -- file: ch08/Glob.hs
+   listMatches :: FilePath -> String -> IO [String]
+   listMatches dirName pat = do
+       dirName' <- if null dirName
+                   then getCurrentDirectory
+                   else return dirName
+       handle (const (return [])::(SomeException->IO [String]))
+              $ do names <- getDirectoryContents dirName'
+                   let names' = if isHidden pat
+                                then filter isHidden names
+                                else filter (not . isHidden) names
+                   return (filter (`matchesGlob` pat) names')
+   
+   isHidden ('.':_) = True
+   isHidden _       = False
+
+``listPlain`` 接收的函数名若存在，则返回由这个文件名组成的单元素列表，否则返回空列表。
+
+.. code-block:: haskell
+
+   -- file: ch08/Glob.hs
+   listPlain :: FilePath -> String -> IO [String]
+   listPlain dirName baseName = do
+       exists <- if null baseName
+                 then doesDirectoryExist dirName
+                 else doesNameExist (dirName </> baseName)
+       return (if exists then [baseName] else [])
+  
+仔细观察 ``listMatches`` 函数的定义，将发现一个名为 ``handle`` 的函数。之前，我们从 ``Control.Exception`` 模块中将其载入。正如其暗示的那样，这个函数让我们初次体验了 Haskell 中的异常处理。把它扔进 ghci 中看我们会发现什么。
+
+.. code-block:: haskell
+
+   ghci> :module +Control.Exception
+   ghci> :type handle
+   handle :: (Exception -> IO a) -> IO a -> IO a
+
+可以看出 ``handle`` 接受两个参数。首先是一个函数，其接受一个异常值，且有副作用（其返回值类型带有 IO 标签）；这是一个异常处理器。第二个参数是可能会抛出异常的代码。
+
+关于异常处理器，异常处理器的类型限制其必须返回与抛出异常的代码相同的类型。所以它只能选择或是抛出一个异常，或像在我们的例子中返回一个由字符串组成的列表。
+
+``const`` 函数接受两个参数；无论第二个参数是什么，其始终返回第一个参数。 
+
+.. code-block:: haskell
+
+   ghci> :type const
+   const :: a -> b -> a
+   ghci> :type return []
+   return [] :: (Monad m) => m [a]
+   ghci> :type handle (const (return []))
+   handle (const (return [])) :: IO [a] -> IO [a]
+
+我们使用 ``const`` 编写异常处理器忽略任何向其传入的异常。取而代之，当我们捕获异常时，返回一个空列表。
