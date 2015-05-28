@@ -627,4 +627,25 @@ The name of the dropTrailingPathSeparator function is perfectly descriptive. No 
                               return (map (dir </>) baseNames)
              return (concat pathNames)
 
-We use splitFileName to split the string into a pair of “everything but the final name” and “the final name”. If the first element is empty, we're looking for a pattern in the current directory. Otherwise, we must check the directory name and see if it contains patterns. If it does not, we create a singleton list of the directory name. If it contains a pattern, we list all of the matching directories. No comments
+我们使用 ``splitFileName`` 将字符串分割为目录名和文件名。如果第一个元素为空，说明我们正在当前目录寻找符合模式的文件。否则，我们必须检查目录名，观察其是否包含模式。若不含模式，我们建立一个只由目录名一个元素组成的列表。如果含有模式，我们列出所有匹配的目录。
+
+
+.. note::
+
+   注意事项
+   The System.FilePath module can be a little tricky. Above is a case in point; the splitFileName function leaves a trailing slash on the end of the directory name that it returns. No comments
+   ``System.FilePath`` 模块稍有点诡异。
+
+   .. code-block:: haskell
+
+      ghci> :module +System.FilePath
+      ghci> splitFileName "foo/bar"
+      Loading package filepath-1.1.0.0 ... linking ... done.
+      ("foo/","bar")
+
+   If we didn't remember (or know enough) to remove that slash, we'd recurse endlessly in namesMatching, because of the following behaviour of splitFileName. 1 comment
+   
+   .. code-block:: haskell
+      ghci> splitFileName "foo/"
+      ("foo/","")
+   You can guess what happened to us that led us to add this note!
