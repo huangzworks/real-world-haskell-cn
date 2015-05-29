@@ -731,20 +731,11 @@ The name of the dropTrailingPathSeparator function is perfectly descriptive. No 
 
 练习
 ^^^^^^^^^^^^^^^^^^^^
-1.
-    
 
-Although we've gone to some lengths to write a portable namesMatching function, the function uses our case sensitive globToRegex function. Find a way to modify namesMatching to be case sensitive on Unix, and case insensitive on Windows, without modifying its type signature. 12 comments
-    
+1. 尽管我们已经编写了一个可移植 ``namesMatching`` 函数，这个函数使用了我们的大小写敏感的 ``globToRegex`` 函数。尝试在不改变其类型签名的前提下，使 ``namesMatching`` 在 Unix 下大小写敏感，在 Windows 下大小写不敏感。
 
-Hint: consider reading the documentation for System.FilePath to look for a variable that tells us whether we're running on a Unix-like system, or on Windows. 3 comments
+提示：查阅一下 ``System.FilePath`` 的文档，其中有一个变量可以告诉我们程序是运行在类 Unix 系统上还是在 Windows 系统上。
 
-2.
-    
+2. 如果你在使用类 Unix 系统，查阅 ``System.Posix.Files`` 模块的文档，看是否能找到一个 ``doesNameExist`` 的替代品。
 
-If you're on a Unix-like system, look through the documentation for the System.Posix.Files module, and see if you can find a replacement for the doesNameExist function. 1 comment
-
-3.
-    
-
-The * wild card only matches names within a single directory. Many shells have an extended wild card syntax, **, that matches names recursively in all directories. For example, **.c would mean “match a name ending in .c in this directory or any subdirectory at any depth”. Implement matching on ** wildcards
+3. ``*`` 通配符，仅匹配一个单独目录中的名字。很多 shell 可以提供扩展通配符语法， ``**`` ，其将在所有目录中进行递归匹配。举个例子，``**.c`` 意为 “在当前目录及其任意深度的子目录下匹配一个 ``.c`` 结尾的文件名”。实现 ``**`` 通配符匹配。
