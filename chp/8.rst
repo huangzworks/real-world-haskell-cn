@@ -773,17 +773,66 @@ Handling errors through API design
 
 ``globToRegex`` 的返回值将为两种情况之一，或者为 ``Left "出错信息"`` 或者为 ``Right "一个合法正则表达式"`` 。这种返回值类型，强制我们的调用者处理可能出现的错误。（你会发现这是 ``Haskell`` 代码中 ``Either`` 类型最广泛的用途。）
 
-Exercises
+练习
+^^^^^^^^^^^^^^^^^^^^
 
-1.
-    
+1. 编写一个使用上面那种类型签名的 ``globToRegex`` 版本。
 
-Write a version of globToRegex that uses the type signature above. 5 comments
+2.  改变 ``namesMatching`` 的类型签名，使其可以处理畸形的正则表达式，并使用它重写 ``globToRegex`` 函数。
 
-2.
-    
+.. tip::
 
-Modify the type signature of namesMatching so that it encodes the possibility of a bad pattern, and make it use your rewritten globToRegex function. 3 comments
-[Tip]   Tip
+   你会发现牵扯到的工作量大得惊人。别怕，我们将在后面的章节介绍更多简单老练的处理错误的方式。
 
-You may find the amount of work involved to be surprisingly large. Don't worry; we will introduce more concise and sophisticated ways of dealing with errors in later chapters. No comments
+让我们的代码工作
+--------------------
+
+``namesMatching`` 函数本身并不是很令人兴奋，但它是一个很有用的构建模块。将它与稍多点的函数组合在一起，就会让我们做出有趣的东西。
+
+这里有个例子。定义一个 ``renameWith`` 函数，并不简单的重命名一个文件，取而代之，对文件名执行一个函数，并将返回值作为新的文件名。
+
+.. code-block:: haskell
+
+   -- file: ch08/Useful.hs
+   import System.FilePath (replaceExtension)
+   import System.Directory (doesFileExist, renameDirectory, renameFile)
+   import Glob (namesMatching)
+   
+   renameWith :: (FilePath -> FilePath)
+              -> FilePath
+              -> IO FilePath
+   
+   renameWith f path = do
+       let path' = f path
+       rename path path'
+       return path'
+
+我们再一次通过一个辅助函数使用 ``System.Directory`` 中难看的文件/目录函数
+
+.. code-block:: haskell
+
+   -- file: ch08/Useful.hs
+   rename :: FilePath -> FilePath -> IO ()
+   
+   rename old new = do
+       isFile <- doesFileExist old
+       let f = if isFile then renameFile else renameDirectory
+       f old new
+
+``System.FilePath`` 模块提供了很多有用的函数用于操作文件名。这些函数洽好漏过了我们的 ``renameWith`` 和 ``namesMatching`` 函数，所以我们可以通过将他们组合起来的方式来快速的创建新函数。例如，这个简洁的函数修改了 C++ 源码文件的后缀名。
+
+.. code-block:: haskell
+
+   -- file: ch08/Useful.hs
+   cc2cpp =
+     mapM (renameWith (flip replaceExtension ".cpp")) =<< namesMatching "*.cc"
+
+
+ ``cc2cpp`` 函数使用了几个我们已经见过多次的函数。 ``flip`` 函数接受另一个函数作为参数，交换其参数的顺序（可以在 ghci 中调查 replaceExtension 的类型以了解详情）。 ``=<<`` 函数将其右侧动作的结果喂给其左侧的动作。
+
+练习
+^^^^^^^^^^^^^^^^^^^^
+
+1. Glob 模式解释器来很简单，用 ``Haskell`` 可以很容易的直接写出其匹配器，正则表达式则不然。试一下编写正则匹配。
+
+
