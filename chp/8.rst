@@ -434,7 +434,17 @@ Hackage 上也有其他 Haskell 正则表达式包可供下载。其中一些比
 
 我们的第一条规则是，如果触及 glob 模式的尾部（也就是说当输入为空字符串时），我们返回 $ ，正则表达式中表示“匹配行尾”的符号。我们按照这样一系列规则将模式串由 glob 语法转化为正则表达式语法。最后一条规则匹配所有字符，首先将可转义字符进行转义。
 
-``escape`` 函数确保正则表达式引擎不会按照普通字符串解释构成正则表达式语法的字符。
+``escape`` 函数确保正则表达式引擎不会将普通字符串解释为构成正则表达式语法的字符。
+
+.. code-block:: haskell
+
+   -- file: ch08/GlobRegex.hs
+   escape :: Char -> String
+   escape c | c `elem` regexChars = '\\' : [c]
+            | otherwise = [c]
+       where regexChars = "\\+()^$.{}]|"
+
+``charClass`` 辅助函数仅检查一个字符类是否正确地结束。这个并不改变其输入，直到遇到一个 ``]`` 字符，其将控制流交还给 ``globToRegex'``
 
 .. code-block:: haskell
 
@@ -739,3 +749,41 @@ The name of the dropTrailingPathSeparator function is perfectly descriptive. No 
 2. 如果你在使用类 Unix 系统，查阅 ``System.Posix.Files`` 模块的文档，看是否能找到一个 ``doesNameExist`` 的替代品。
 
 3. ``*`` 通配符，仅匹配一个单独目录中的名字。很多 shell 可以提供扩展通配符语法， ``**`` ，其将在所有目录中进行递归匹配。举个例子，``**.c`` 意为 “在当前目录及其任意深度的子目录下匹配一个 ``.c`` 结尾的文件名”。实现 ``**`` 通配符匹配。
+
+
+Handling errors through API design
+--------------------
+
+向 ``globToRegex`` 传入一个畸形的正则表达式未必会是一场灾难。用户的表达式可能会有输入错误，这时我们更希望得到有意义的报错信息。
+
+当这类问题出现时，调用 ``error`` 函数会有很激烈的反应（其结果在 Q: 1 这个练习中探索过。）。 ``error`` 函数会抛出一个异常。纯函数式的 ``Haskell`` 代码无法处理异常，所以控制流会突破我们的纯函数代码直接交给处于距离最近一层 ``IO``  中并且安装有合适的异常处理器的调用者。如果没有安装异常处理器， ``Haskell`` 运行时的默认动作是终结我们的程序（如果是在 ghci 中，则会打出一条令人不快的错误信息。）
+
+所以，调用 ``error`` 有点像是落下了战斗机的座椅弹射手柄。我们从一个无法优雅处理的灾难性场景中逃离，而等我们着地时会撒出很多燃烧着的残骸。
+
+我们已经确定了 ``error`` 是为灾难情场景准备的，但我们仍旧在 ``globToRegex`` 中使用它。畸形的输入将被拒绝，但不会导致大问题。处理这种情况有更好的方式吗？
+
+``Haskell`` 的类型系统和库来救你了！我们可以使用内置的 ``Either`` 类型，在 ``globToRegex`` 函数的类型签名中描述失败的可能性。
+
+.. code-block:: haskell
+
+   -- file: ch08/GlobRegexEither.hs
+   type GlobError = String
+   
+   globToRegex :: String -> Either GlobError String
+
+``globToRegex`` 的返回值将为两种情况之一，或者为 ``Left "出错信息"`` 或者为 ``Right "一个合法正则表达式"`` 。这种返回值类型，强制我们的调用者处理可能出现的错误。（你会发现这是 ``Haskell`` 代码中 ``Either`` 类型最广泛的用途。）
+
+Exercises
+
+1.
+    
+
+Write a version of globToRegex that uses the type signature above. 5 comments
+
+2.
+    
+
+Modify the type signature of namesMatching so that it encodes the possibility of a bad pattern, and make it use your rewritten globToRegex function. 3 comments
+[Tip]   Tip
+
+You may find the amount of work involved to be surprisingly large. Don't worry; we will introduce more concise and sophisticated ways of dealing with errors in later chapters. No comments
