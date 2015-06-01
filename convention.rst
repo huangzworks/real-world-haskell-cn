@@ -128,6 +128,28 @@
 
 单一同态    monomorphism
 
+第十八章
+----------
+
+monad变换器   monad transformer
+
+monad栈      monad transformer stack / monad stack
+
+下层monad    underlying monad
+
+派生         derive / deriving
+
+类型类       typeclass
+
+抬举         lift
+
+第八章
+------------------
+
+字符类  character class
+
+多态    polymorphism
+
 
 第八章
 ------------------
