@@ -10,4 +10,46 @@
 调用外部程序
 -----------------
 
- It is possible to invoke external commands from Haskell. To do that, we suggest using rawSystem from the System.Cmd module. This will invoke a specified program, with the specified arguments, and return the exit code from that program. You can play with it in ghci: 1 comment
+Haskell 可以调用外部命令。为了这么做，我们建议使用 ``System.Cmd`` 模块中的 ``rawSystem`` 。其用特定的参数调用特定的程序，并将返回程序的退出状态码。你可以在 ghci 中练习一下。
+
+.. code-block:: haskell
+
+   ghci> :module System.Cmd
+   ghci> rawSystem "ls" ["-l", "/usr"]
+   Loading package old-locale-1.0.0.0 ... linking ... done.
+   Loading package old-time-1.0.0.0 ... linking ... done.
+   Loading package filepath-1.1.0.0 ... linking ... done.
+   Loading package directory-1.0.0.0 ... linking ... done.
+   Loading package unix-2.3.0.0 ... linking ... done.
+   Loading package process-1.0.0.0 ... linking ... done.
+   total 124
+   drwxr-xr-x   2 root root  49152 2008-08-18 11:04 bin
+   drwxr-xr-x   2 root root   4096 2008-03-09 05:53 games
+   drwxr-sr-x  10 jimb guile  4096 2006-02-04 09:13 guile
+   drwxr-xr-x  47 root root   8192 2008-08-08 08:18 include
+   drwxr-xr-x 107 root root  32768 2008-08-18 11:04 lib
+   lrwxrwxrwx   1 root root      3 2007-09-24 16:55 lib64 -> lib
+   drwxrwsr-x  17 root staff  4096 2008-06-24 17:35 local
+   drwxr-xr-x   2 root root   8192 2008-08-18 11:03 sbin
+   drwxr-xr-x 181 root root   8192 2008-08-12 10:11 share
+   drwxrwsr-x   2 root src    4096 2007-04-10 16:28 src
+   drwxr-xr-x   3 root root   4096 2008-07-04 19:03 X11R6
+   ExitSuccess
+
+此处，我们相当于执行了 shell 命令 ``ls -l /usr`` 。 ``rawSystem`` 并不从字符串解析输入参数或是扩展通配符。取而代之，其接受一个包含所有参数的列表。如果不想提供参数，可以像这样简单地输入一个空列表。
+
+.. code-block:: haskell
+
+   ghci> rawSystem "ls" []
+   calendartime.ghci  modtime.ghci    rp.ghci    RunProcessSimple.hs
+   cmd.ghci       posixtime.hs    rps.ghci   timediff.ghci
+   dir.ghci       rawSystem.ghci  RunProcess.hs  time.ghci
+   ExitSuccess
+
+
+目录和文件信息
+-----------------
+
+``System.Directory`` 模块包含了相当多可以从文件系统获取信息的函数。你可以获取某目录包含的文件列表，重命名或删除文件，复制文件，改变当前工作路径，或者建立新目录。 ``System.Directory`` 是可移植的，在可以跑 GHC 的平台都可以使用。
+
+ The library reference for System.Directory provides a comprehensive list of the functions available. Let's use ghci to demonstrate a few of them. Most of these functions are straightforward equivalents to C library calls or shell commands. 5 comments
