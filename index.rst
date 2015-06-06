@@ -28,6 +28,7 @@ Real World Haskell 中文版
    chp/6
    chp/7
    chp/8
+   chp/9
    chp/10
    chp/11
    chp/13
@@ -60,6 +61,8 @@ Real World Haskell 中文版
 - `Javran Cheng <https://github.com/Javran>`_
 
 - `bladewang <https://github.com/bladewang>`_
+
+- `spectator <https://github.com/spectatorwatcher>`_
 
 除了进行翻译之外，本文档还在原书的基础上做了以下改进：
 
