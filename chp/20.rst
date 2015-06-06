@@ -36,7 +36,7 @@ Haskell 可以调用外部命令。为了这么做，我们建议使用 ``System
    drwxr-xr-x   3 root root   4096 2008-07-04 19:03 X11R6
    ExitSuccess
 
-此处，我们相当于执行了 shell 命令 ``ls -l /usr`` 。 ``rawSystem`` 并不从字符串解析输入参数或是扩展通配符。取而代之，其接受一个包含所有参数的列表。如果不想提供参数，可以像这样简单地输入一个空列表。
+此处，我们相当于执行了 shell 命令 ``ls -l /usr`` 。 ``rawSystem`` 并不从字符串解析输入参数或是扩展通配符 [43]_ 。取而代之，其接受一个包含所有参数的列表。如果不想提供参数，可以像这样简单地输入一个空列表。
 
 .. code-block:: haskell
 
@@ -52,4 +52,12 @@ Haskell 可以调用外部命令。为了这么做，我们建议使用 ``System
 
 ``System.Directory`` 模块包含了相当多可以从文件系统获取信息的函数。你可以获取某目录包含的文件列表，重命名或删除文件，复制文件，改变当前工作路径，或者建立新目录。 ``System.Directory`` 是可移植的，在可以跑 GHC 的平台都可以使用。
 
- The library reference for System.Directory provides a comprehensive list of the functions available. Let's use ghci to demonstrate a few of them. Most of these functions are straightforward equivalents to C library calls or shell commands. 5 comments
+`System.Directory 的库文档 <http://hackage.haskell.org/package/directory-1.0.0.0/docs/System-Directory.html>`_ 中含有一份详尽的函数列表。让我们通过 ghci 来对其中一些进行演示。这些函数大多数简单的等价于其对应的 C 语言库函数或 shell 命令。
+
+
+
+
+
+.. rubric:: 注
+.. [43] 也有一个 ``system`` 函数，接受单个字符串为参数，并将其传入 shell 解析。我们推荐使用 ``rawSystem`` ，因为某些字符在 shell 中具有特殊含义，可能会导致安全隐患或者意外的行为。
+
