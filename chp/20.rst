@@ -107,15 +107,17 @@ Haskell 可以调用外部命令。为了这么做，我们建议使用 ``System
 
 不过，你需要对状态码进行更细粒度的控制。可能你需要对不同类型的错误返回不同的代码。 ``System.Exit`` 模块提供一个途径可以在程序退出时返回特定的状态码。通过调用 :samp:`exitWith ExitSuccess` 表示程序执行成功（POSIX 系统中的 0）。或者可以调用 :samp:`exitWith (ExitFailure 5)` ，表示将在程序退出时向系统返回 ``5`` 作为状态码。
 
-Dates and Times
+日期和时间
 -----------------
 
 Everything from file timestamps to business transactions involve dates and times. Haskell provides ways for manipulating dates and times, as well as features for obtaining date and time information from the system. No comments
+从文件时间戳到商业事务的很多事情都涉及到日期和时间。 除了从系统获取日期时间信息之外，Haskell 提供了很多关于时间日期的操作方法。
 
-ClockTime and CalendarTime
+ClockTime 和 CalendarTime
 ^^^^^^^^^^^^^^^^^
 
 In Haskell, the System.Time module is primarily responsible for date and time handling. It defines two types: ClockTime and CalendarTime. 2 comments
+
 
 
 
