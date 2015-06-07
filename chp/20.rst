@@ -119,6 +119,8 @@ ClockTime 和 CalendarTime
 
 ``ClockTime`` 是传统 POSIX 中时间戳的 Haskell 版本。 ``ClockTime`` 表示一个相对于 UTC 1970 年 1 月 1 日 零点的时间。负值的 ``ClockTime`` 表示在其之前的秒数，正值表示在其之后的秒数。
 
+ You can, for instance, check the ClockTime at the start of a long task, again at the end, and simply subtract the start time from the end time to determine how much time elapsed. You can then divide by 3600 and display the elapsed time as a count of hours if you wish. 7 comments
+``ClockTime`` 便于计算。因为它遵循协调世界时（Coordinated Universal Time，UTC），其不必调整本地时区、夏令时或其他时间处理中的特例。每天是精确的 (60 * 60 * 24) 或 86,400 秒 [44]_，这易于计算时间间隔。
 
 
 
@@ -128,4 +130,4 @@ ClockTime 和 CalendarTime
 
 .. rubric:: 注
 .. [43] 也有一个 ``system`` 函数，接受单个字符串为参数，并将其传入 shell 解析。我们推荐使用 ``rawSystem`` ，因为某些字符在 shell 中具有特殊含义，可能会导致安全隐患或者意外的行为。
-
+.. [44] 可能有人会注意到 UTC 定义了不规则的闰秒。在 Haskell 使用的 POSIX 标准中，规定了在其表示的时间中，每天必须都是精确的 86,400 秒，所以在执行日常计算时无需担心闰秒。精确的处理闰秒依赖于系统而且复杂，不过通常其可以被解释为一个“长秒”。这个问题大体上只是在执行精确的亚秒级计算时才需要关心。
