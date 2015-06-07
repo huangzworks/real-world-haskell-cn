@@ -110,13 +110,14 @@ Haskell 可以调用外部命令。为了这么做，我们建议使用 ``System
 日期和时间
 -----------------
 
-Everything from file timestamps to business transactions involve dates and times. Haskell provides ways for manipulating dates and times, as well as features for obtaining date and time information from the system. No comments
 从文件时间戳到商业事务的很多事情都涉及到日期和时间。 除了从系统获取日期时间信息之外，Haskell 提供了很多关于时间日期的操作方法。
 
 ClockTime 和 CalendarTime
 ^^^^^^^^^^^^^^^^^
 
-In Haskell, the System.Time module is primarily responsible for date and time handling. It defines two types: ClockTime and CalendarTime. 2 comments
+在 Haskell 中，日期和时间主要由 ``System.Time`` 模块处理。它定义了两个类型： ``ClockTime`` 和 ``CalendarTime`` 。
+
+``ClockTime`` 是传统 POSIX 中时间戳的 Haskell 版本。 ``ClockTime`` 表示一个相对于 UTC 1970 年 1 月 1 日 零点的时间。负值的 ``ClockTime`` 表示在其之前的秒数，正值表示在其之后的秒数。
 
 
 
