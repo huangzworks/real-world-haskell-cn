@@ -119,8 +119,44 @@ ClockTime 和 CalendarTime
 
 ``ClockTime`` 是传统 POSIX 中时间戳的 Haskell 版本。 ``ClockTime`` 表示一个相对于 UTC 1970 年 1 月 1 日 零点的时间。负值的 ``ClockTime`` 表示在其之前的秒数，正值表示在其之后的秒数。
 
- You can, for instance, check the ClockTime at the start of a long task, again at the end, and simply subtract the start time from the end time to determine how much time elapsed. You can then divide by 3600 and display the elapsed time as a count of hours if you wish. 7 comments
-``ClockTime`` 便于计算。因为它遵循协调世界时（Coordinated Universal Time，UTC），其不必调整本地时区、夏令时或其他时间处理中的特例。每天是精确的 (60 * 60 * 24) 或 86,400 秒 [44]_，这易于计算时间间隔。
+``ClockTime`` 便于计算。因为它遵循协调世界时（Coordinated Universal Time，UTC），其不必调整本地时区、夏令时或其他时间处理中的特例。每天是精确的 (60 * 60 * 24) 或 86,400 秒 [44]_，这易于计算时间间隔。举个例子，你可以简单的记录某个程序开始执行的时间和其结束的时间，相减即可确定程序的执行时间。如果需要的话，还可以除以 3600，这样就可以按小时显示。
+
+使用 ``ClockTime`` 的典型场景：
+
+    * 经过了多长时间？
+
+    * 相对此刻 14 天前是什么时间？
+
+    * 文件的最后修改时间是何时？
+
+    * 当下的精确时间是何时？
+
+ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时间。但是， ``ClockTime`` 不善于处理下列问题：
+
+    * 今天是周一吗？
+
+    * 明年 5 月 1 日是周几？
+
+    * 在我的时区当前是什么时间，考虑夏令时。
+
+``CalendarTime`` 按人类的方式存储时间：年，月，日，小时，分，秒，时区，夏令时信息。很容易的转换为便于显示的字符串，或者以上问题的答案。
+
+你可以任意转换 ``ClockTime`` 和 ``CalendarTime`` 。Haskell 将 ``ClockTime`` 可以按本地时区转换为 ``CalendarTime`` ，或者按 ``CalendarTime`` 格式表示的 UTC 时间。
+
+使用 ClockTime
+""""""""""""""""""""
+
+``ClockTime`` 在 ``System.Time`` 中被这样定义：
+
+.. code-block:: haskell
+
+   data ClockTime = TOD Integer Integer
+
+The first Integer represents the number of seconds since the epoch. The second Integer represents an additional number of picoseconds. Because ClockTime in Haskell uses the unbounded Integer type, it can effectively represent a date range limited only by computational resources. 4 comments
+
+
+
+
 
 
 
