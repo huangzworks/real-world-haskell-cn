@@ -164,6 +164,16 @@ ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时�
    Loading package old-time-1.0.0.0 ... linking ... done.
    Mon Aug 18 12:10:38 CDT 2008
 
+If you wait a second and run getClockTime again, you'll see it returning an updated time. Notice that the output from this command was a nice-looking string, complete with day-of-week information. That's due to the Show instance for ClockTime. Let's look at the ClockTime at a lower level: No comments
+
+.. code-block:: haskell
+
+   ghci> TOD 1000 0
+   Wed Dec 31 18:16:40 CST 1969
+   ghci> getClockTime >>= (\(TOD sec _) -> return sec)
+   1219079438
+
+
 
 
 
