@@ -146,13 +146,24 @@ ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时�
 使用 ClockTime
 """"""""""""""""""""
 
-``ClockTime`` 在 ``System.Time`` 中被这样定义：
+``ClockTime`` 在 ``System.Time`` 中这样定义：
 
 .. code-block:: haskell
 
    data ClockTime = TOD Integer Integer
 
-The first Integer represents the number of seconds since the epoch. The second Integer represents an additional number of picoseconds. Because ClockTime in Haskell uses the unbounded Integer type, it can effectively represent a date range limited only by computational resources. 4 comments
+第一个 ``Integer`` 表示从 Unix 纪元开始经过的秒数。第二个 ``Integer`` 表示附加的皮秒数。因为 Haskell 中的 ``ClockTime`` 使用无边界的 ``Integer`` 类型，所以其能够表示的数据范围仅受计算资源限制。
+
+让我们看看使用 ``ClockTime`` 的一些方法。首先是按系统时钟获取当前时间的 ``getClockTime`` 函数。
+
+.. code-block:: haskell
+
+   ghci> :module System.Time
+   ghci> getClockTime
+   Loading package old-locale-1.0.0.0 ... linking ... done.
+   Loading package old-time-1.0.0.0 ... linking ... done.
+   Mon Aug 18 12:10:38 CDT 2008
+
 
 
 
