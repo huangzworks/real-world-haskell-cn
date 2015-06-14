@@ -164,7 +164,7 @@ ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时�
    Loading package old-time-1.0.0.0 ... linking ... done.
    Mon Aug 18 12:10:38 CDT 2008
 
-If you wait a second and run getClockTime again, you'll see it returning an updated time. Notice that the output from this command was a nice-looking string, complete with day-of-week information. That's due to the Show instance for ClockTime. Let's look at the ClockTime at a lower level: No comments
+如果一秒钟再次运行 ``getClockTime`` ，它将返回一个更新后的时间。这条命令会输出一个便于观察的字符串，补全了周相关的信息。这是由于 ``ClockTime`` 的 ``Show`` 实例。让我们从更底层看一下 ``ClockTime`` ：
 
 .. code-block:: haskell
 
@@ -172,6 +172,58 @@ If you wait a second and run getClockTime again, you'll see it returning an upda
    Wed Dec 31 18:16:40 CST 1969
    ghci> getClockTime >>= (\(TOD sec _) -> return sec)
    1219079438
+
+这里我们先构建一个 ``ClockTime`` ，表示 UTC 时间 1970 年 1 月 1 日午夜后 1000 秒这个时间点。在你的时区这个时间相当于 1969 年 12 月 31 日晚。
+
+第二个例子演示如何从 ``getClockTime`` 返值中将秒数取出来。我们可以像这样操作它：
+
+.. code-block:: haskell
+
+   ghci> getClockTime >>= (\(TOD sec _) -> return (TOD (sec + 86400) 0))
+   Tue Aug 19 12:10:38 CDT 2008
+
+这将显精确示你的时区 24 小时后的时间，因为 24 小时等于 86,400 秒。
+
+Using CalendarTime
+""""""""""""""""""""
+
+正如其名字暗示的， ``CalendarTime`` 按日历上的方式表示时间。它包括年、月、日等信息。 ``CalendarTime`` 和其相关类型定义如下：
+
+.. code-block:: haskell
+   data CalendarTime = CalendarTime
+      {ctYear :: Int,         -- Year (post-Gregorian)
+       ctMonth :: Month, 
+       ctDay :: Int,          -- Day of the month (1 to 31)
+       ctHour :: Int,         -- Hour of the day (0 to 23)
+       ctMin :: Int,          -- Minutes (0 to 59)
+       ctSec :: Int,          -- Seconds (0 to 61, allowing for leap seconds)
+       ctPicosec :: Integer,  -- Picoseconds
+       ctWDay :: Day,         -- Day of the week
+       ctYDay :: Int,         -- Day of the year (0 to 364 or 365)
+       ctTZName :: String,    -- Name of timezone
+       ctTZ :: Int,           -- Variation from UTC in seconds
+       ctIsDST :: Bool        -- True if Daylight Saving Time in effect
+      }
+   
+   data Month = January | February | March | April | May | June 
+                | July | August | September | October | November | December
+   
+   data Day = Sunday | Monday | Tuesday | Wednesday
+              | Thursday | Friday | Saturday
+           
+关于以上结构有些事情需要强调：
+
+    * ``ctWDay``, ``ctYDay``, ``ctTZName`` 是被创建 ``CalendarTime`` 的库函数生成的，但是并不参与计算。如果你手工创建一个 ``CalendarTime`` ，不必向其中填写准确的值，除非你的计算依赖于它们。
+
+    * 这三个类型都是 ``Eq``, ``Ord``, ``Read``, ``Show`` 类型类的成员。另外， ``Month`` 和 ``Day`` 都被声明为 ``Enum`` 和 ``Bounded`` 类型类的成员。更多的信息请参考 “重要的类型类” 这一章节。
+
+
+
+
+
+
+
+
 
 
 
