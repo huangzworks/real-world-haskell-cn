@@ -234,7 +234,7 @@ Using CalendarTime
    ghci> nowUTC
    CalendarTime {ctYear = 2008, ctMonth = August, ctDay = 18, ctHour = 17, ctMin = 10, ctSec = 35, ctPicosec = 804267000000, ctWDay = Monday, ctYDay = 230, ctTZName = "UTC", ctTZ = 0, ctIsDST = False}
 
-我们使用 ``getClockTime`` 从系统获得当前的 ``ClockTime`` 。接下来， ``toCalendarTime`` 按本地时间区将 ``ClockTime`` 转换为 ``CalendarTime`` 。 ``toUTCtime`` 执行类似的转换，但其结果将以 UTC 时区表示。
+用 ``getClockTime`` 从系统获得当前的 ``ClockTime`` 。接下来， ``toCalendarTime`` 按本地时间区将 ``ClockTime`` 转换为 ``CalendarTime`` 。 ``toUTCtime`` 执行类似的转换，但其结果将以 UTC 时区表示。
 
 注意， ``toCalendarTime`` 是一个 ``IO`` 函数，但是 ``toUTCTime`` 不是。原因是 ``toCalendarTime`` 依赖本地时区返回不同的结果，但是针对相同的 ``ClockTime`` ， ``toUTCTime`` 将始终返回相同的结果。
 
@@ -249,7 +249,7 @@ Using CalendarTime
    ghci> (\(TOD sec _) -> sec) (toClockTime (nowCal {ctYear = 1960}))
    -295685365
 
-此处，先将之前的 ``CalendarTime`` 年份修改为 1960 。然后我们使用 ``toClockTime`` 将其初始值转换为一个 ``ClockTime`` ，接着转换新值，以便观察其差别。注意新值在转换为 ``ClockTime`` 后显示了一个负的秒数。这是意料中的， ``ClockTime`` 表示的是 UTC 时间 1970 年 1 月 1 日午夜之后的秒数。
+此处，先将之前的 ``CalendarTime`` 年份修改为 1960 。然后用 ``toClockTime`` 将其初始值转换为一个 ``ClockTime`` ，接着转换新值，以便观察其差别。注意新值在转换为 ``ClockTime`` 后显示了一个负的秒数。这是意料中的， ``ClockTime`` 表示的是 UTC 时间 1970 年 1 月 1 日午夜之后的秒数。
 
 也可以像这样手工创建 ``CalendarTime`` ：
 
@@ -268,6 +268,60 @@ Using CalendarTime
    ghci> toUTCTime . toClockTime $ newCT
    CalendarTime {ctYear = 2010, ctMonth = January, ctDay = 15, ctHour = 12, ctMin = 30, ctSec = 0, ctPicosec = 0, ctWDay = Friday, ctYDay = 14, ctTZName = "UTC", ctTZ = 0, ctIsDST = False}
 
+ClockTime 的 TimeDiff
+""""""""""""""""""""
+
+以对人类友好的方式难于处理 ClockTime 值之间的差异， ``System.Time`` 模块包括了一个 ``TimeDiff`` 类型。 ``TimeDiff`` 用于方便的处理这些差异。其定义如下：
+
+.. code-block:: haskell
+
+   data TimeDiff = TimeDiff
+      {tdYear :: Int,
+       tdMonth :: Int,
+       tdDay :: Int,
+       tdHour :: Int,
+       tdMin :: Int,
+       tdSec :: Int,
+       tdPicosec :: Integer}
+   
+``diffClockTimes`` 和 ``addToClockTime`` 两个函数接收一个 ``ClockTime`` 和一个 ``TimeDiff`` 并在内部将 ``ClockTime`` 转换为一个 UTC 时区的 ``CalendarTime`` ，在其上执行 ``TimeDiff`` ，最后将结果转换回一个 ``ClockTime`` 。
+
+看看它怎样工作：
+
+.. code-block:: haskell
+
+   ghci> :module System.Time
+   ghci> let feb5 = toClockTime $ CalendarTime 2008 February 5 0 0 0 0 Sunday 0 "UTC" 0 False
+   Loading package old-locale-1.0.0.0 ... linking ... done.
+   Loading package old-time-1.0.0.0 ... linking ... done.
+   ghci> feb5
+   Mon Feb  4 18:00:00 CST 2008
+   ghci> addToClockTime (TimeDiff 0 1 0 0 0 0 0) feb5
+   Tue Mar  4 18:00:00 CST 2008
+   ghci> toUTCTime $ addToClockTime (TimeDiff 0 1 0 0 0 0 0) feb5
+   CalendarTime {ctYear = 2008, ctMonth = March, ctDay = 5, ctHour = 0, ctMin = 0, ctSec = 0, ctPicosec = 0, ctWDay = Wednesday, ctYDay = 64, ctTZName = "UTC", ctTZ = 0, ctIsDST = False}
+   ghci> let jan30 = toClockTime $ CalendarTime 2009 January 30 0 0 0 0 Sunday 0 "UTC" 0 False
+   ghci> jan30
+   Thu Jan 29 18:00:00 CST 2009
+   ghci> addToClockTime (TimeDiff 0 1 0 0 0 0 0) jan30
+   Sun Mar  1 18:00:00 CST 2009
+   ghci> toUTCTime $ addToClockTime (TimeDiff 0 1 0 0 0 0 0) jan30
+   CalendarTime {ctYear = 2009, ctMonth = March, ctDay = 2, ctHour = 0, ctMin = 0, ctSec = 0, ctPicosec = 0, ctWDay = Monday, ctYDay = 60, ctTZName = "UTC", ctTZ = 0, ctIsDST = False}
+   ghci> diffClockTimes jan30 feb5
+   TimeDiff {tdYear = 0, tdMonth = 0, tdDay = 0, tdHour = 0, tdMin = 0, tdSec = 31104000, tdPicosec = 0}
+   ghci> normalizeTimeDiff $ diffClockTimes jan30 feb5
+   TimeDiff {tdYear = 0, tdMonth = 12, tdDay = 0, tdHour = 0, tdMin = 0, tdSec = 0, tdPicosec = 0}
+   
+首先我们生成一个 ``ClockTime`` 表示 UTC 时间 2008 年 2 月 5 日。注意，若你的时区不是 UTC，按你本地时区的格式，当其被显示的时候可能是 2 月 4 日晚。
+
+其次，我们用 ``addToClockTime`` 在其上加一个月。2008 是闰年，但系统可以正确的处理，然后我们得到了一个月后的相同日期。使用 ``toUTCTime`` ，我们可以看到以 UTC 时间表示的结果。
+
+第二个实验，设定一个表示 UTC 时间 2009 年 1 月 30 日午夜的时间。2009 年不是闰年，所以我们可能很好奇其加上一个月是什么结果。因为 2009 年没有 2 月 29 日和 2 月 30 日，所以我们得到了 3 月 2 日。
+
+最后，我们可以看到 ``diffClockTimes`` 怎样通过两个 ``ClockTime`` 值得到一个 ``TimeDiff`` ， 尽管其只包含秒和皮秒。 ``normalizeTimeDiff`` 函数接受一个 ``TimeDiff`` 将其重新按照人类的习惯格式化。
+
+文件修改日期
+""""""""""""""""""""
 
 
 
