@@ -217,6 +217,33 @@ Using CalendarTime
 
     * 这三个类型都是 ``Eq``, ``Ord``, ``Read``, ``Show`` 类型类的成员。另外， ``Month`` 和 ``Day`` 都被声明为 ``Enum`` 和 ``Bounded`` 类型类的成员。更多的信息请参考 “重要的类型类” 这一章节。
 
+有几种不同的途径可以生成 ``CalendarTime`` 。可以像这样将 ``ClockTime`` 转换为 ``CalendarTime`` ：
+
+.. code-block:: haskell
+
+   ghci> :module System.Time
+   ghci> now <- getClockTime
+   Loading package old-locale-1.0.0.0 ... linking ... done.
+   Loading package old-time-1.0.0.0 ... linking ... done.
+   Mon Aug 18 12:10:35 CDT 2008
+   ghci> nowCal <- toCalendarTime now
+   CalendarTime {ctYear = 2008, ctMonth = August, ctDay = 18, ctHour = 12, ctMin = 10, ctSec = 35, ctPicosec = 804267000000, ctWDay = Monday, ctYDay = 230, ctTZName = "CDT", ctTZ = -18000, ctIsDST = True}
+   ghci> let nowUTC = toUTCTime now
+   ghci> nowCal
+   CalendarTime {ctYear = 2008, ctMonth = August, ctDay = 18, ctHour = 12, ctMin = 10, ctSec = 35, ctPicosec = 804267000000, ctWDay = Monday, ctYDay = 230, ctTZName = "CDT", ctTZ = -18000, ctIsDST = True}
+   ghci> nowUTC
+   CalendarTime {ctYear = 2008, ctMonth = August, ctDay = 18, ctHour = 17, ctMin = 10, ctSec = 35, ctPicosec = 804267000000, ctWDay = Monday, ctYDay = 230, ctTZName = "UTC", ctTZ = 0, ctIsDST = False}
+
+我们使用 ``getClockTime`` 从系统获得当前的 ``ClockTime`` 。接下来， ``toCalendarTime`` 按本地时间区将 ``ClockTime`` 转换为 ``CalendarTime`` 。 ``toUTCtime`` 执行类似的转换，但其结果将以 UTC 时区表示。
+
+注意， ``toCalendarTime`` 是一个 ``IO`` 函数，但是 ``toUTCTime`` 不是。原因是 ``toCalendarTime`` 依赖本地时区返回不同的结果，但是针对相同的 ``ClockTime`` ， ``toUTCTime`` 将始终返回相同的结果。
+
+
+
+
+
+
+
 
 
 
