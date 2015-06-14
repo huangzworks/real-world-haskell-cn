@@ -261,7 +261,14 @@ Using CalendarTime
    ghci> (\(TOD sec _) -> sec) (toClockTime newCT)
    1263558600
 
-Note that even though January 15, 2010, isn't a Sunday -- and isn't day 0 in the year -- the system was able to process this just fine. In fact, if we convert the value to a ClockTime and then back to a CalendarTime, you'll find those fields properly filled in: No comments   
+注意，尽管 2010 年 1 月 15 日并不是一个周日 -- 并且也不是一年中的第 0 天 -- 系统可以很好的处理这些情况。实际上，如果将其转换为 ``ClockTime`` 后再转回 ``CalendarTime`` ，你将发现这些域已经被正确的处理了。
+
+.. code-block:: haskell
+
+   ghci> toUTCTime . toClockTime $ newCT
+   CalendarTime {ctYear = 2010, ctMonth = January, ctDay = 15, ctHour = 12, ctMin = 30, ctSec = 0, ctPicosec = 0, ctWDay = Friday, ctYDay = 14, ctTZName = "UTC", ctTZ = 0, ctIsDST = False}
+
+
 
 
 
