@@ -238,6 +238,31 @@ Using CalendarTime
 
 注意， ``toCalendarTime`` 是一个 ``IO`` 函数，但是 ``toUTCTime`` 不是。原因是 ``toCalendarTime`` 依赖本地时区返回不同的结果，但是针对相同的 ``ClockTime`` ， ``toUTCTime`` 将始终返回相同的结果。
 
+很容易改变一个 ``CalendarTime`` 的值
+
+.. code-block:: haskell
+
+   ghci> nowCal {ctYear = 1960}
+   CalendarTime {ctYear = 1960, ctMonth = August, ctDay = 18, ctHour = 12, ctMin = 10, ctSec = 35, ctPicosec = 804267000000, ctWDay = Monday, ctYDay = 230, ctTZName = "CDT", ctTZ = -18000, ctIsDST = True}
+   ghci> (\(TOD sec _) -> sec) (toClockTime nowCal)
+   1219079435
+   ghci> (\(TOD sec _) -> sec) (toClockTime (nowCal {ctYear = 1960}))
+   -295685365
+
+此处，先将之前的 ``CalendarTime`` 年份修改为 1960 。然后我们使用 ``toClockTime`` 将其初始值转换为一个 ``ClockTime`` ，接着转换新值，以便观察其差别。注意新值在转换为 ``ClockTime`` 后显示了一个负的秒数。这是意料中的， ``ClockTime`` 表示的是 UTC 时间 1970 年 1 月 1 日午夜之后的秒数。
+
+也可以像这样手工创建 ``CalendarTime`` ：
+
+.. code-block:: haskell
+
+   ghci> let newCT = CalendarTime 2010 January 15 12 30 0 0 Sunday 0 "UTC" 0 False
+   ghci> newCT
+   CalendarTime {ctYear = 2010, ctMonth = January, ctDay = 15, ctHour = 12, ctMin = 30, ctSec = 0, ctPicosec = 0, ctWDay = Sunday, ctYDay = 0, ctTZName = "UTC", ctTZ = 0, ctIsDST = False}
+   ghci> (\(TOD sec _) -> sec) (toClockTime newCT)
+   1263558600
+
+Note that even though January 15, 2010, isn't a Sunday -- and isn't day 0 in the year -- the system was able to process this just fine. In fact, if we convert the value to a ClockTime and then back to a CalendarTime, you'll find those fields properly filled in: No comments   
+
 
 
 
