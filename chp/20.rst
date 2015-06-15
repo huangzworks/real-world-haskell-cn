@@ -323,7 +323,45 @@ ClockTime 的 TimeDiff
 文件修改日期
 """"""""""""""""""""
 
+很多程序需要找出某些文件的最后修改日期。 ``ls`` 和图形化的文件管理器是典型的需要显示文件最后变更时间的程序。 ``System.Directory`` 模块包含一个跨平台的 ``getModificationTime`` 函数。其接受一个文件名，返回一个表示文件最后变更日期的 ``ClockTime`` 。例如：
 
+.. code-block:: haskell
+
+   ghci> :module System.Directory
+   ghci> getModificationTime "/etc/passwd"
+   Loading package old-locale-1.0.0.0 ... linking ... done.
+   Loading package old-time-1.0.0.0 ... linking ... done.
+   Loading package filepath-1.1.0.0 ... linking ... done.
+   Loading package directory-1.0.0.0 ... linking ... done.
+   Fri Aug 15 08:29:48 CDT 2008
+
+POSIX 平台不仅维护变更时间 (被称为 mtime)， 还有最后读或写访问时间 (atime)以及最后状态变更时间 (ctime)。这是 POSIX 平台独有的，所以跨平台的 ``System.Directory`` 模块无法访问它。取而代之，需要使用 ``System.Posix.Files`` 模块中的函数。下面有一个例子：
+
+.. code-block:: haskell
+
+   -- file: ch20/posixtime.hs
+   -- posixtime.hs
+   
+   import System.Posix.Files
+   import System.Time
+   import System.Posix.Types
+   
+   -- | Given a path, returns (atime, mtime, ctime)
+   getTimes :: FilePath -> IO (ClockTime, ClockTime, ClockTime)
+   getTimes fp =
+       do stat <- getFileStatus fp
+          return (toct (accessTime stat),
+                  toct (modificationTime stat),
+                  toct (statusChangeTime stat))
+   
+   -- | Convert an EpochTime to a ClockTime
+   toct :: EpochTime -> ClockTime
+   toct et = 
+       TOD (truncate (toRational et)) 0
+
+注意对 ``getFileStatus`` 的调用。 这个调用直接映射到 C 语言的 ``stat()`` 函数。其返回一个包含了大量不同种类信息的值，包括文件类型、权限、属主、组、和我们感性去的三种时间值。 ``System.Posix.Files`` 提供了 ``accessTime`` 等多个函数，可以将我们感兴趣的时间从 ``getFileStatus`` 返回的 ``FileStatus`` 类型中提取出来。
+
+ ``accessTime`` 等函数返回一个POSIX 平台特有的类型，称为 ``EpochTime`` ，  可以通过  ``toct`` 函数转换``ClockTime`` 。 ``System.Posix.Files`` 模块同样提供了 ``setFileTimes`` 函数，以设置文件的 ``atime`` 和 ``mtime`` 。 [45]_ 
 
 
 
@@ -353,3 +391,4 @@ ClockTime 的 TimeDiff
 .. rubric:: 注
 .. [43] 也有一个 ``system`` 函数，接受单个字符串为参数，并将其传入 shell 解析。我们推荐使用 ``rawSystem`` ，因为某些字符在 shell 中具有特殊含义，可能会导致安全隐患或者意外的行为。
 .. [44] 可能有人会注意到 UTC 定义了不规则的闰秒。在 Haskell 使用的 POSIX 标准中，规定了在其表示的时间中，每天必须都是精确的 86,400 秒，所以在执行日常计算时无需担心闰秒。精确的处理闰秒依赖于系统而且复杂，不过通常其可以被解释为一个“长秒”。这个问题大体上只是在执行精确的亚秒级计算时才需要关心。
+.. [45] POSIX 系统上通常无法设置 ``ctime`` 。
