@@ -184,7 +184,7 @@ ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时�
 
 这将显精确示你的时区 24 小时后的时间，因为 24 小时等于 86,400 秒。
 
-Using CalendarTime
+使用 CalendarTime
 """"""""""""""""""""
 
 正如其名字暗示的， ``CalendarTime`` 按日历上的方式表示时间。它包括年、月、日等信息。 ``CalendarTime`` 和其相关类型定义如下：
@@ -321,7 +321,7 @@ ClockTime 的 TimeDiff
 最后，我们可以看到 ``diffClockTimes`` 怎样通过两个 ``ClockTime`` 值得到一个 ``TimeDiff`` ， 尽管其只包含秒和皮秒。 ``normalizeTimeDiff`` 函数接受一个 ``TimeDiff`` 将其重新按照人类的习惯格式化。
 
 文件修改日期
-""""""""""""""""""""
+^^^^^^^^^^^^^^^^^^^^
 
 很多程序需要找出某些文件的最后修改日期。 ``ls`` 和图形化的文件管理器是典型的需要显示文件最后变更时间的程序。 ``System.Directory`` 模块包含一个跨平台的 ``getModificationTime`` 函数。其接受一个文件名，返回一个表示文件最后变更日期的 ``ClockTime`` 。例如：
 
@@ -363,7 +363,13 @@ POSIX 平台不仅维护变更时间 (被称为 mtime)， 还有最后读或写�
 
  ``accessTime`` 等函数返回一个POSIX 平台特有的类型，称为 ``EpochTime`` ，  可以通过  ``toct`` 函数转换``ClockTime`` 。 ``System.Posix.Files`` 模块同样提供了 ``setFileTimes`` 函数，以设置文件的 ``atime`` 和 ``mtime`` 。 [45]_ 
 
+延伸的例子: 管道
+--------------------
 
+我们已经了解了如何调用外部程序。有时候需要更多的控制。比如获得程序的标准输出、提供输入，甚至将不同的外部程序串起来调用。管道有助于实现所有这些需求。
+管道经常备用在 shell 脚本中。 在 shell 中设置一个管道，会调用多个程序。
+
+The output of the first program is sent to the input of the second. Its output is sent to the third as input, and so on. The last program's output normally goes to the terminal, or it could go to a file. Here's an example session with the POSIX shell to illustrate piping: 1 comment
 
 
 
