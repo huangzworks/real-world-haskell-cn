@@ -379,11 +379,17 @@ POSIX 平台不仅维护变更时间 (被称为 mtime)， 还有最后读或写�
 
 这条命令运行了三个程序，使用管道在它们之间传输数据。它以 ``ls/etc`` 开始，输出是 ``/etc`` 目录下全部文件和目录的列表。 ``ls`` 的输出被作为 ``grep`` 的输入。我们想 ``grep`` 输入一条正则使其只输出以 'm' 开头并且在某处包含 "ap" 的行。最后，其结果被传入 ``tr`` 。我们给 ``tr`` 设置一个选项，使其将所有字符转换为大写。 ``tr`` 的输出没有特殊的去处，所以直接在屏幕显示。
 
-In this situation, the shell handles setting up all the pipelines between programs. By using some of the POSIX tools in Haskell, we can accomplish the same thing. No comments
+这种情况下，程序之间的管道线路由 shell 设置。我们可以使用 Haskell 中的 POSIX 工具实现同的事情。
 
-Before describing how to do this, we should first warn you that the System.Posix modules expose a very low-level interface to Unix systems. The interfaces can be complex and their interactions can be complex as well, regardless of the programming language you use to access them. The full nature of these low-level interfaces has been the topic of entire books themselves, so in this chapter we will just scratch the surface
+在讲解如何实现之前，要提醒你一下， ``System.Posix`` 模块提供的是很低阶的 Unix 系统接口。无论使用何种编程语言，这些接口都可以相互组合，组合的结果也可以相互组合。这些低阶接口的完整性质可以用一整本书来讨论，这章中我们只会简单介绍。
 
 
+使用管道做重定向
+^^^^^^^^^^^^^^^^^^^^
+
+POSIX 定义了一个函数用于创建管道。这个函数返回两个文件描述符（FD），与 Haskell 中的句柄概念类似。一个 FD 用于读端，另一个用于写端。任何从写端写入的东西，都可以从读端读取。这些数据就是“通过管道推送”的。在 Haskell 中，你可以通过 ``createPipe`` 使用这个接口。
+
+Having a pipe is the first step to being able to pipe data between external programs. We must also be able to redirect the output of a program to a pipe, and the input of another program from a pipe. The Haskell function dupTo accomplishes this. It takes a FD and makes a copy of it at another FD number. POSIX FDs for standard input, standard output, and standard error have the predefined FD numbers of 0, 1, and 2, respectively. By renumbering an endpoint of a pipe to one of those numbers, we effectively can cause programs to have their input or output redirected. No comments
 
 
 
