@@ -393,6 +393,12 @@ POSIX 定义了一个函数用于创建管道。这个函数返回两个文件�
 
 不过还有问题需要解决。我们不能简单的只是在某个调用比如 ``rawSystem`` 之前使用 ``dupTo`` ，因为这回混淆我们的 Haskell 主程序的输入和输出。此外， ``rawSystem`` 会一直阻塞直到被调用的程序执行完毕，这让我们无法启动并行执行的进程。 为了解决这个问题，可以使用 ``forkProcess`` 。这是一个很特殊的函数。它实际上生成了一份当前进程的拷贝，并使这两份进程同时运行。 Haskell 的 ``forkProcess`` 函数接收一个函数，使其在新进程（称为子进程）中运行。我们让这个函数调用 ``dupTo`` 。之后，其调用 ``executeFile`` 调用真正希望执行的命令。这同样也是一个特殊的函数：如果一切顺利，他将不会返回。这是因为 ``executeFile`` 使用一个不同的程序替换了当前执行的进程。最后，初始的 Haskell 进程调用 ``getProcessStatus`` 以等待子进程结束，并获得其状态码。
 
+在 POSIX 系统中，无论何时你执行一条命令，不关是在命令上上敲 ``ls`` 还是在 Haskell 中使用 ``rawSystem`` ，其内部机理都是调用 ``forkProcess`` , ``executeFile`` , 和 ``getProcessStatusa`` (或是它们对应的 C 函数)。为了使用管道，我们复制了系统启动程序的进程，并且加入了一些调用和重定向管道的步骤。 
+
+There are a few other housekeeping things we must be careful about. When you call forkProcess, just about everything about your program is cloned[46] That includes the set of open file descriptors (handles). Programs detect when they're done receiving input from a pipe by checking the end-of-file indicator. When the process at the writing end of a pipe closes the pipe, the process at the reading end will receive an end-of-file indication. However, if the writing file descriptor exists in more than one process, the end-of-file indicator won't be sent until all processes have closed that particular FD. Therefore, we must keep track of which FDs are opened so we can close them all in the child processes. We must also close the child ends of the pipes in the parent process as soon as possible. No comments
+还有另外一些辅助步骤我们必须注意。
+
+
 
 
 
