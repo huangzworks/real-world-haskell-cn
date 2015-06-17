@@ -389,8 +389,7 @@ POSIX 平台不仅维护变更时间 (被称为 mtime)， 还有最后读或写�
 
 POSIX 定义了一个函数用于创建管道。这个函数返回两个文件描述符（FD），与 Haskell 中的句柄概念类似。一个 FD 用于读端，另一个用于写端。任何从写端写入的东西，都可以从读端读取。这些数据就是“通过管道推送”的。在 Haskell 中，你可以通过 ``createPipe`` 使用这个接口。
 
-Having a pipe is the first step to being able to pipe data between external programs. We must also be able to redirect the output of a program to a pipe, and the input of another program from a pipe. The Haskell function dupTo accomplishes this. It takes a FD and makes a copy of it at another FD number. POSIX FDs for standard input, standard output, and standard error have the predefined FD numbers of 0, 1, and 2, respectively. By renumbering an endpoint of a pipe to one of those numbers, we effectively can cause programs to have their input or output redirected. No comments
-
+在外部程序之间传递数据之前，要做的第一步是建立一个管道。同时还要将一个程序的输出重定向到管道，并将管道做为另一个程序的输入。 Haskell 的 ``dupTo`` 函数就是做这个的。其接收一个 FD 并将其拷贝为另一个 FD 号。 POSIX 的标准输入、标准输出和标准错误的 FD 分别被预定义为 0, 1, 2 。将管道的某一端设置为这些 FD 号，我们就可以有效的重定向程序的输入和输出。
 
 
 
