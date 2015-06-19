@@ -396,7 +396,7 @@ POSIX 定义了一个函数用于创建管道。这个函数返回两个文件�
 在 POSIX 系统中，无论何时你执行一条命令，不关是在命令上上敲 ``ls`` 还是在 Haskell 中使用 ``rawSystem`` ，其内部机理都是调用 ``forkProcess`` , ``executeFile`` , 和 ``getProcessStatusa`` (或是它们对应的 C 函数)。为了使用管道，我们复制了系统启动程序的进程，并且加入了一些调用和重定向管道的步骤。 
 
 There are a few other housekeeping things we must be careful about. When you call forkProcess, just about everything about your program is cloned[46] That includes the set of open file descriptors (handles). Programs detect when they're done receiving input from a pipe by checking the end-of-file indicator. When the process at the writing end of a pipe closes the pipe, the process at the reading end will receive an end-of-file indication. However, if the writing file descriptor exists in more than one process, the end-of-file indicator won't be sent until all processes have closed that particular FD. Therefore, we must keep track of which FDs are opened so we can close them all in the child processes. We must also close the child ends of the pipes in the parent process as soon as possible. No comments
-还有另外一些辅助步骤我们必须注意。
+还有另外一些辅助步骤我们必须注意。当调用 ``forkProcess`` 时，几乎和程序有关的一切都被复制 [46]_ 。包括所有已经打开的文件描述符（句柄）。
 
 
 
@@ -425,3 +425,4 @@ There are a few other housekeeping things we must be careful about. When you cal
 .. [43] 也有一个 ``system`` 函数，接受单个字符串为参数，并将其传入 shell 解析。我们推荐使用 ``rawSystem`` ，因为某些字符在 shell 中具有特殊含义，可能会导致安全隐患或者意外的行为。
 .. [44] 可能有人会注意到 UTC 定义了不规则的闰秒。在 Haskell 使用的 POSIX 标准中，规定了在其表示的时间中，每天必须都是精确的 86,400 秒，所以在执行日常计算时无需担心闰秒。精确的处理闰秒依赖于系统而且复杂，不过通常其可以被解释为一个“长秒”。这个问题大体上只是在执行精确的亚秒级计算时才需要关心。
 .. [45] POSIX 系统上通常无法设置 ``ctime`` 。
+.. [46] 主要的例外是线程，其不会被复制。
