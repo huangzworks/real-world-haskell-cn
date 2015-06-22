@@ -576,6 +576,7 @@ Let's experiment with this in ghci a bit before looking at how it works. 1 comme
  
    ghci> runIO $ ("pwd", []::[String])
    /Users/Blade/sandbox
+
    ghci> runIO $ ("ls", ["/usr"])
    NX
    X11
@@ -588,13 +589,32 @@ Let's experiment with this in ghci a bit before looking at how it works. 1 comme
    sbin
    share
    standalone
+
    ghci> runIO $ ("ls", ["/usr"]) -|- ("grep", ["^l"])
    lib
    libexec
    local
+
    ghci> runIO $ ("ls", ["/etc"]) -|- ("grep", ["m.*ap"]) -|- ("tr", ["a-z", "A-Z"])
    COM.APPLE.SCREENSHARING.AGENT.LAUNCHD  
 
+我们从一个简单的命令 ``pwd`` 开始，它会打印当前工作目录。我们将 [] 做为参数列表，因为 ``pwd`` 不需要任何参数。由于使用了类型类， Haskell 无法自动推导出 [] 的类型，所以我们说明其类型为字符串组成的列表。
+
+下面是一个更复杂些的例子。我们执行了 ``ls`` ，将其输出传入 ``grep`` 。最后我们通过管道，调用了一个与本节开始处 shell 内置管道的例子中相同的命令。不像 shell 中那样舒服，但是相对于 shell 我们的程序始终相对简单。
+
+让我们来读一下程序。起始处的 ``OPTIONS_GHC``  语句，作用与 ghc 或 ghci 开始时传入 ``-fglasgow-exts`` 参数相同。我们使用了一个 GHC 扩展，以允许使用  (String, [String]) 类型作为一个类型类的实例。将此类声明加入源码文件，就不用在每次调用这个模块的时候都要记得手工打开编译器开关。
+
+在载入了所需模块之后，我们定义了一些类型。首先，定义 ``type SysCommand = (String, [String])`` 作为一个别名。这是系统将接收并执行的命令的类型。例子中的每条领命都要用到这个类型的数据。 ``CommandResult`` 命令用于表示给定命令的执行结果， ``CloseFDs``  用于表示我们必须在新的子进程中关闭的文件描述符列表。
+
+Next, we define a class named CommandLike. This class will be used to run "things", where a "thing" might be a standalone program, a pipe set up between two or more programs, or in the future, even pure Haskell functions. To be a member of this class, only one function -- invoke -- needs to be present for a given type. This will let us use runIO to start either a standalone command or a pipeline. It will also be useful for defining a pipeline, since we may have a whole stack of commands on one or both sides of a given command. No comments
+
+Our piping infrastructure is going to use strings as the way of sending data from one process to another. We can take advantage of Haskell's support for lazy reading via hGetContents while reading data, and use forkIO to let writing occur in the background. This will work well, although not as fast as connecting the endpoints of two processes directly together.[48] It makes implementation quite simple, however. We need only take care to do nothing that would require the entire String to be buffered, and let Haskell's laziness do the rest. 1 comment
+
+Next, we define an instance of CommandLike for SysCommand. We create two pipes: one to use for the new process's standard input, and the other for its standard output. This creates four endpoints, and thus four file descriptors. We add the parent file descriptors to the list of those that must be closed in all children. These would be the write end of the child's standard input, and the read end of the child's standard output. Next, we fork the child process. In the parent, we can then close the file descriptors that correspond to the child. We can't do that before the fork, because then they wouldn't be available to the child. We obtain a handle for the stdinwrite file descriptor, and start a thread via forkIO to write the input data to it. We then define waitfunc, which is the action that the caller will invoke when it is ready to wait for the called process to terminate. Meanwhile, the child uses dupTo, closes the file descriptors it doesn't need, and executes the command. No comments
+
+Next, we define some utility functions to manage the list of file descriptors. After that, we define the tools that help set up pipelines. First, we define a new type PipeCommand that has a source and destination. Both the source and destination must be members of CommandLike. We also define the -|- convenience operator. Then, we make PipeCommand an instance of CommandLike. Its invoke implementation starts the first command with the given input, obtains its output, and passes that output to the invocation of the second command. It then returns the output of the second command, and causes the getExitStatus function to wait for and check the exit statuses from both commands. No comments
+
+We finish by defining runIO. This function establishes the list of FDs that must be closed in the client, starts the command, displays its output, and checks its exit status. No comments
 
 
 
