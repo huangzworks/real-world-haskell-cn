@@ -602,13 +602,16 @@ Let's experiment with this in ghci a bit before looking at how it works. 1 comme
 
 下面是一个更复杂些的例子。我们执行了 ``ls`` ，将其输出传入 ``grep`` 。最后我们通过管道，调用了一个与本节开始处 shell 内置管道的例子中相同的命令。不像 shell 中那样舒服，但是相对于 shell 我们的程序始终相对简单。
 
-让我们来读一下程序。起始处的 ``OPTIONS_GHC``  语句，作用与 ghc 或 ghci 开始时传入 ``-fglasgow-exts`` 参数相同。我们使用了一个 GHC 扩展，以允许使用  (String, [String]) 类型作为一个类型类的实例。将此类声明加入源码文件，就不用在每次调用这个模块的时候都要记得手工打开编译器开关。
+让我们读一下程序。起始处的 ``OPTIONS_GHC``  语句，作用与 ghc 或 ghci 开始时传入 ``-fglasgow-exts`` 参数相同。我们使用了一个 GHC 扩展，以允许使用  ``(String, [String])`` 类型作为一个类型类的实例 [47]_ 。将此类声明加入源码文件，就不用在每次调用这个模块的时候都要记得手工打开编译器开关。
 
-在载入了所需模块之后，我们定义了一些类型。首先，定义 ``type SysCommand = (String, [String])`` 作为一个别名。这是系统将接收并执行的命令的类型。例子中的每条领命都要用到这个类型的数据。 ``CommandResult`` 命令用于表示给定命令的执行结果， ``CloseFDs``  用于表示我们必须在新的子进程中关闭的文件描述符列表。
+在载入了所需模块之后，我们定义了一些类型。首先，定义 ``type SysCommand = (String, [String])`` 作为一个别名。这是系统将接收并执行的命令的类型。例子中的每条领命都要用到这个类型的数据。 ``CommandResult`` 命令用于表示给定命令的执行结果， ``CloseFDs``  用于表示必须在新的子进程中关闭的文件描述符列表。
 
-Next, we define a class named CommandLike. This class will be used to run "things", where a "thing" might be a standalone program, a pipe set up between two or more programs, or in the future, even pure Haskell functions. To be a member of this class, only one function -- invoke -- needs to be present for a given type. This will let us use runIO to start either a standalone command or a pipeline. It will also be useful for defining a pipeline, since we may have a whole stack of commands on one or both sides of a given command. No comments
+接着，我们定义一个类称为 ``CommandLike``  。这个类用来跑 “东西” ，这个“东西” 可以是独立的程序，可以是两个程序之间的管道，未来也可以跑纯 Haskell 函数。任何一个类型想为这个类的成员，只需实现一个函数 -- ``invoke`` 。这将允许以 ``runIO`` 启动一个独立命令或者一个管道。这在定义管道时也很有用，因为我们可以拥有某个管道的读写两端的完整调用栈。
 
-Our piping infrastructure is going to use strings as the way of sending data from one process to another. We can take advantage of Haskell's support for lazy reading via hGetContents while reading data, and use forkIO to let writing occur in the background. This will work well, although not as fast as connecting the endpoints of two processes directly together.[48] It makes implementation quite simple, however. We need only take care to do nothing that would require the entire String to be buffered, and let Haskell's laziness do the rest. 1 comment
+Our piping infrastructure is going to use strings as the way of sending data from one process to another.  We can take advantage of Haskell's support for lazy reading via hGetContents while reading data, and use forkIO to let writing occur in the background. This will work well, although not as fast as connecting the endpoints of two processes directly together.[48] 
+
+It makes implementation quite simple, however. We need only take care to do nothing that would require the entire String to be buffered, and let Haskell's laziness do the rest. 1 comment
+我们的管道基础设施将使用字符串在进程间传递数据。我们将通过 ``hGetContents`` 获得 Haskell 在延迟读取方面的优势，并使用 ``forkIO`` 在后台写入。这种设计工作得不错，尽管传输速度不像将两个进程的管道读写端直接连接起来那样快。[48]_
 
 Next, we define an instance of CommandLike for SysCommand. We create two pipes: one to use for the new process's standard input, and the other for its standard output. This creates four endpoints, and thus four file descriptors. We add the parent file descriptors to the list of those that must be closed in all children. These would be the write end of the child's standard input, and the read end of the child's standard output. Next, we fork the child process. In the parent, we can then close the file descriptors that correspond to the child. We can't do that before the fork, because then they wouldn't be available to the child. We obtain a handle for the stdinwrite file descriptor, and start a thread via forkIO to write the input data to it. We then define waitfunc, which is the action that the caller will invoke when it is ready to wait for the called process to terminate. Meanwhile, the child uses dupTo, closes the file descriptors it doesn't need, and executes the command. No comments
 
@@ -639,3 +642,5 @@ We finish by defining runIO. This function establishes the list of FDs that must
 .. [44] 可能有人会注意到 UTC 定义了不规则的闰秒。在 Haskell 使用的 POSIX 标准中，规定了在其表示的时间中，每天必须都是精确的 86,400 秒，所以在执行日常计算时无需担心闰秒。精确的处理闰秒依赖于系统而且复杂，不过通常其可以被解释为一个“长秒”。这个问题大体上只是在执行精确的亚秒级计算时才需要关心。
 .. [45] POSIX 系统上通常无法设置 ``ctime`` 。
 .. [46] 线程是一个主要例外，其不会被复制，所以说“几乎”。
+.. [47] Haskell 社区对这个扩展支持得很好。 Hugs 用户可以通过 ``hugs -98 +o`` 使用。
+.. [48] Haskell 的 HSH 库提供了与此相近的 API ，使用了更高效（也更复杂）的机构将外部进程使用管道直接连接起来，没有要传给 Haskell 处理的数据。shell 采用了相同的方法，而且这样可以降低处理管道的 CPU 负载。
