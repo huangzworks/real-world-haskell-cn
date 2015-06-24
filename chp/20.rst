@@ -604,17 +604,18 @@ Let's experiment with this in ghci a bit before looking at how it works. 1 comme
 
 让我们读一下程序。起始处的 ``OPTIONS_GHC``  语句，作用与 ghc 或 ghci 开始时传入 ``-fglasgow-exts`` 参数相同。我们使用了一个 GHC 扩展，以允许使用  ``(String, [String])`` 类型作为一个类型类的实例 [47]_ 。将此类声明加入源码文件，就不用在每次调用这个模块的时候都要记得手工打开编译器开关。
 
-在载入了所需模块之后，我们定义了一些类型。首先，定义 ``type SysCommand = (String, [String])`` 作为一个别名。这是系统将接收并执行的命令的类型。例子中的每条领命都要用到这个类型的数据。 ``CommandResult`` 命令用于表示给定命令的执行结果， ``CloseFDs``  用于表示必须在新的子进程中关闭的文件描述符列表。
+在载入了所需模块之后，定义了一些类型。首先，定义 ``type SysCommand = (String, [String])`` 作为一个别名。这是系统将接收并执行的命令的类型。例子中的每条领命都要用到这个类型的数据。 ``CommandResult`` 命令用于表示给定命令的执行结果， ``CloseFDs``  用于表示必须在新的子进程中关闭的文件描述符列表。
 
-接着，我们定义一个类称为 ``CommandLike``  。这个类用来跑 “东西” ，这个“东西” 可以是独立的程序，可以是两个程序之间的管道，未来也可以跑纯 Haskell 函数。任何一个类型想为这个类的成员，只需实现一个函数 -- ``invoke`` 。这将允许以 ``runIO`` 启动一个独立命令或者一个管道。这在定义管道时也很有用，因为我们可以拥有某个管道的读写两端的完整调用栈。
+接着，定义一个类称为 ``CommandLike``  。这个类用来跑 “东西” ，这个“东西” 可以是独立的程序，可以是两个程序之间的管道，未来也可以跑纯 Haskell 函数。任何一个类型想为这个类的成员，只需实现一个函数 -- ``invoke`` 。这将允许以 ``runIO`` 启动一个独立命令或者一个管道。这在定义管道时也很有用，因为我们可以拥有某个管道的读写两端的完整调用栈。
 
 我们的管道基础设施将使用字符串在进程间传递数据。我们将通过 ``hGetContents`` 获得 Haskell 在延迟读取方面的优势，并使用 ``forkIO`` 在后台写入。这种设计工作得不错，尽管传输速度不像将两个进程的管道读写端直接连接起来那样快 [48]_ 。但这让实现很简单。我们仅需要小心，不要做任何会让整个字符串被缓冲的操作，把接下来的工作完全交给 Haskell 的延迟特性。
 
 接下来，为 ``SysCommand`` 定义一个 ``CommandLike`` 实例。我们创建两个管道：一个用来作为新进程的标准输入，另一个用于其标准输出。将产生两个读端两个写端，四个文件描述符。我们将要在子进程中关闭的文件描述符加入列表。这包括子进程标准输入的写端，和子进程标准输出的读端。接着，我们 ``fork`` 出子进程。然后可以在父进程中关闭相关的子进程文件描述符。 ``fork`` 之前不能这样做，因为那时子进程还不可用。获取 ``stdinwrite`` 的句柄，并通过 ``forkIO`` 启动一个现成向其写入数据。接着定义 ``waitfunc`` , 其中定义了调用这在准备好等待子进程结束时要执行的动作。同时，子进程使用 ``dupTo`` ，关闭其不需要的文件描述符。并执行命令。
 
-Next, we define some utility functions to manage the list of file descriptors. After that, we define the tools that help set up pipelines. First, we define a new type PipeCommand that has a source and destination. Both the source and destination must be members of CommandLike. We also define the -|- convenience operator. Then, we make PipeCommand an instance of CommandLike. Its invoke implementation starts the first command with the given input, obtains its output, and passes that output to the invocation of the second command. It then returns the output of the second command, and causes the getExitStatus function to wait for and check the exit statuses from both commands. No comments
+然后定义一些工具函数用来管理文件描述符。此后，定义一些工具用于建立管道。首先，定义一个新类型 ``PipeCommand`` ，其有源和目的两个属性。源和目的都必须是 ``CommandLike`` 的成员。为了方便，我们还定义了 ``-|-`` 操作符。然后使 ``PipeCommand`` 成为 ``CommandLike`` 的实例。它调用第一个命令并获得输出，将其传入第二个命令。之后返回第二个命令的输出，并调用 ``getExitStatus`` 函数等待命令执行结束并检查整组命令执行之后的状态码。
 
-We finish by defining runIO. This function establishes the list of FDs that must be closed in the client, starts the command, displays its output, and checks its exit status. No comments
+最后以定义 ``runIO`` 结束。这个函数建立了需要在子进程中关闭的 FDS 列表，执行程序，显示输出，并检查其退出状态。
+
 
 
 
