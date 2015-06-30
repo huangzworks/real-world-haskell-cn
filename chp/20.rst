@@ -617,6 +617,18 @@ Let's experiment with this in ghci a bit before looking at how it works. 1 comme
 最后以定义 ``runIO`` 结束。这个函数建立了需要在子进程中关闭的 FDS 列表，执行程序，显示输出，并检查其退出状态。
 
 
+更好的管道
+^^^^^^^^^^^^^^^^^^^^
+
+上个例子中解决了一个类似 shell 的管道系统的基本需求。但是为它加上下面这些特点之后就更好了：
+
+    * 支持更多的 shell 语法。
+
+    * 使管道同时支持外部程序和正规 Haskell 函数，并使二者可以自由的混合使用。
+
+    * 以易于 Haskell 程序利用的方式返回运行的标准输出和退出状态码。
+
+Fortunately, we already have most of the pieces to support this in place. We need only add a few more instances of CommandLike to support this, and a few more functions similar to runIO. Here is a revised example that implements all of these features: No comments
 
 
 
