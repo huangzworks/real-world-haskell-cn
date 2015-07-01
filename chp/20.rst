@@ -407,8 +407,6 @@ POSIX 定义了一个函数用于创建管道。这个函数返回两个文件�
    {-# OPTIONS_GHC -XTypeSynonymInstances #-}
    {-# OPTIONS_GHC -XFlexibleInstances #-}
    
-   -- RunProcessSimple.hs
-   
    module RunProcessSimple where
    
    --import System.Process
@@ -633,14 +631,16 @@ Fortunately, we already have most of the pieces to support this in place. We nee
 
 .. code-block:: haskell
    -- file: ch20/RunProcess.hs
-   {-# OPTIONS_GHC -fglasgow-exts #-}
+   {-# OPTIONS_GHC -XDatatypeContexts #-}
+   {-# OPTIONS_GHC -XTypeSynonymInstances #-}
+   {-# OPTIONS_GHC -XFlexibleInstances #-}
    
    module RunProcess where
    
    import System.Process
    import Control.Concurrent
    import Control.Concurrent.MVar
-   import Control.Exception(evaluate)
+   import Control.Exception
    import System.Posix.Directory
    import System.Directory(setCurrentDirectory)
    import System.IO
@@ -725,7 +725,7 @@ Fortunately, we already have most of the pieces to support this in place. We nee
                       closeFd stdoutwrite
    
                       -- Close all the open FDs we inherited from the parent
-                      mapM_ (\fd -> catch (closeFd fd) (\_ -> return ())) closefds
+                      mapM_ (\fd -> catch (closeFd fd) (\(SomeException e) -> return ())) closefds
    
                       -- Start the program
                       executeFile cmd True args Nothing
@@ -870,7 +870,7 @@ Fortunately, we already have most of the pieces to support this in place. We nee
                     case rc of
                       Exited (ExitSuccess) -> return 0
                       Exited (ExitFailure x) -> return x
-                      Terminated x -> return (128 + (fromIntegral x))
+                      (Terminated x _) -> return (128 + (fromIntegral x))
                       Stopped x -> return (128 + (fromIntegral x))
    
    instance RunResult (IO Bool) where
