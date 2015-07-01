@@ -12,7 +12,7 @@
 
 Haskell 可以调用外部命令。为了这么做，我们建议使用 ``System.Cmd`` 模块中的 ``rawSystem`` 。其用特定的参数调用特定的程序，并将返回程序的退出状态码。你可以在 ghci 中练习一下。
 
-.. code-block:: haskell
+::
 
    ghci> :module System.Cmd
    ghci> rawSystem "ls" ["-l", "/usr"]
@@ -38,7 +38,7 @@ Haskell 可以调用外部命令。为了这么做，我们建议使用 ``System
 
 此处，我们相当于执行了 shell 命令 ``ls -l /usr`` 。 ``rawSystem`` 并不从字符串解析输入参数或是扩展通配符 [43]_ 。取而代之，其接受一个包含所有参数的列表。如果不想提供参数，可以像这样简单地输入一个空列表。
 
-.. code-block:: haskell
+::
 
    ghci> rawSystem "ls" []
    calendartime.ghci  modtime.ghci    rp.ghci    RunProcessSimple.hs
@@ -54,7 +54,7 @@ Haskell 可以调用外部命令。为了这么做，我们建议使用 ``System
 
 `System.Directory 的库文档 <http://hackage.haskell.org/package/directory-1.0.0.0/docs/System-Directory.html>`_ 中含有一份详尽的函数列表。让我们通过 ghci 来对其中一些进行演示。这些函数大多数简单的等价于其对应的 C 语言库函数或 shell 命令。
 
-.. code-block:: haskell
+::
 
    ghci> :module System.Directory
    ghci> setCurrentDirectory "/etc"
@@ -70,14 +70,14 @@ Haskell 可以调用外部命令。为了这么做，我们建议使用 ``System
 
 此处我们看到了改变工作目录和获取当前工作目录的命令。它们类似 POSIX shell 中的 ``cd`` 和 ``pwd`` 命令。
 
-.. code-block:: haskell
+::
 
    ghci> getDirectoryContents "/"
    [".","..","lost+found","boot","etc","media","initrd.img","var","usr","bin","dev","home","lib","mnt","proc","root","sbin","tmp","sys","lib64","srv","opt","initrd","vmlinuz",".rnd","www","ultra60","emul",".fonts.cache-1","selinux","razor-agent.log",".svn","initrd.img.old","vmlinuz.old","ugid-survey.bulkdata","ugid-survey.brief"]
 
 ``getDirectoryContents`` 返回一个列表，包含给定目录的所有内容。注意，在 POSIX 系统中，这个列表通常包含特殊值 "." 和 ".." 。通常在处理目录内容时，你可能会希望将他们过滤出去，像这样：
 
-.. code-block:: haskell
+::
 
    ghci> getDirectoryContents "/" >>= return . filter (`notElem` [".", ".."])
    ["lost+found","boot","etc","media","initrd.img","var","usr","bin","dev","home","lib","mnt","proc","root","sbin","tmp","sys","lib64","srv","opt","initrd","vmlinuz",".rnd","www","ultra60","emul",".fonts.cache-1","selinux","razor-agent.log",".svn","initrd.img.old","vmlinuz.old","ugid-survey.bulkdata","ugid-survey.brief"]
@@ -91,7 +91,7 @@ Haskell 可以调用外部命令。为了这么做，我们建议使用 ``System
 
 也可以向系统查询某些路径的位置。这将向底层操作系统发起查询相关信息。
 
-.. code-block:: haskell
+::
    
    ghci> getHomeDirectory
    "/home/bos"
@@ -113,7 +113,7 @@ Haskell 可以调用外部命令。为了这么做，我们建议使用 ``System
 从文件时间戳到商业事务的很多事情都涉及到日期和时间。 除了从系统获取日期时间信息之外，Haskell 提供了很多关于时间日期的操作方法。
 
 ClockTime 和 CalendarTime
-^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 在 Haskell 中，日期和时间主要由 ``System.Time`` 模块处理。它定义了两个类型： ``ClockTime`` 和 ``CalendarTime`` 。
 
@@ -148,7 +148,7 @@ ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时�
 
 ``ClockTime`` 在 ``System.Time`` 中这样定义：
 
-.. code-block:: haskell
+::
 
    data ClockTime = TOD Integer Integer
 
@@ -156,7 +156,7 @@ ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时�
 
 让我们看看使用 ``ClockTime`` 的一些方法。首先是按系统时钟获取当前时间的 ``getClockTime`` 函数。
 
-.. code-block:: haskell
+::
 
    ghci> :module System.Time
    ghci> getClockTime
@@ -166,7 +166,7 @@ ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时�
 
 如果一秒钟再次运行 ``getClockTime`` ，它将返回一个更新后的时间。这条命令会输出一个便于观察的字符串，补全了周相关的信息。这是由于 ``ClockTime`` 的 ``Show`` 实例。让我们从更底层看一下 ``ClockTime`` ：
 
-.. code-block:: haskell
+::
 
    ghci> TOD 1000 0
    Wed Dec 31 18:16:40 CST 1969
@@ -177,7 +177,7 @@ ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时�
 
 第二个例子演示如何从 ``getClockTime`` 返值中将秒数取出来。我们可以像这样操作它：
 
-.. code-block:: haskell
+::
 
    ghci> getClockTime >>= (\(TOD sec _) -> return (TOD (sec + 86400) 0))
    Tue Aug 19 12:10:38 CDT 2008
@@ -189,7 +189,8 @@ ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时�
 
 正如其名字暗示的， ``CalendarTime`` 按日历上的方式表示时间。它包括年、月、日等信息。 ``CalendarTime`` 和其相关类型定义如下：
 
-.. code-block:: haskell
+::
+
    data CalendarTime = CalendarTime
       {ctYear :: Int,         -- Year (post-Gregorian)
        ctMonth :: Month, 
@@ -219,7 +220,7 @@ ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时�
 
 有几种不同的途径可以生成 ``CalendarTime`` 。可以像这样将 ``ClockTime`` 转换为 ``CalendarTime`` ：
 
-.. code-block:: haskell
+::
 
    ghci> :module System.Time
    ghci> now <- getClockTime
@@ -240,7 +241,7 @@ ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时�
 
 很容易改变一个 ``CalendarTime`` 的值
 
-.. code-block:: haskell
+::
 
    ghci> nowCal {ctYear = 1960}
    CalendarTime {ctYear = 1960, ctMonth = August, ctDay = 18, ctHour = 12, ctMin = 10, ctSec = 35, ctPicosec = 804267000000, ctWDay = Monday, ctYDay = 230, ctTZName = "CDT", ctTZ = -18000, ctIsDST = True}
@@ -253,7 +254,7 @@ ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时�
 
 也可以像这样手工创建 ``CalendarTime`` ：
 
-.. code-block:: haskell
+::
 
    ghci> let newCT = CalendarTime 2010 January 15 12 30 0 0 Sunday 0 "UTC" 0 False
    ghci> newCT
@@ -263,17 +264,17 @@ ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时�
 
 注意，尽管 2010 年 1 月 15 日并不是一个周日 -- 并且也不是一年中的第 0 天 -- 系统可以很好的处理这些情况。实际上，如果将其转换为 ``ClockTime`` 后再转回 ``CalendarTime`` ，你将发现这些域已经被正确的处理了。
 
-.. code-block:: haskell
+::
 
    ghci> toUTCTime . toClockTime $ newCT
    CalendarTime {ctYear = 2010, ctMonth = January, ctDay = 15, ctHour = 12, ctMin = 30, ctSec = 0, ctPicosec = 0, ctWDay = Friday, ctYDay = 14, ctTZName = "UTC", ctTZ = 0, ctIsDST = False}
 
 ClockTime 的 TimeDiff
-""""""""""""""""""""
+"""""""""""""""""""""""""""""""""""
 
 以对人类友好的方式难于处理 ClockTime 值之间的差异， ``System.Time`` 模块包括了一个 ``TimeDiff`` 类型。 ``TimeDiff`` 用于方便的处理这些差异。其定义如下：
 
-.. code-block:: haskell
+::
 
    data TimeDiff = TimeDiff
       {tdYear :: Int,
@@ -288,7 +289,7 @@ ClockTime 的 TimeDiff
 
 看看它怎样工作：
 
-.. code-block:: haskell
+::
 
    ghci> :module System.Time
    ghci> let feb5 = toClockTime $ CalendarTime 2008 February 5 0 0 0 0 Sunday 0 "UTC" 0 False
@@ -325,7 +326,7 @@ ClockTime 的 TimeDiff
 
 很多程序需要找出某些文件的最后修改日期。 ``ls`` 和图形化的文件管理器是典型的需要显示文件最后变更时间的程序。 ``System.Directory`` 模块包含一个跨平台的 ``getModificationTime`` 函数。其接受一个文件名，返回一个表示文件最后变更日期的 ``ClockTime`` 。例如：
 
-.. code-block:: haskell
+::
 
    ghci> :module System.Directory
    ghci> getModificationTime "/etc/passwd"
@@ -337,7 +338,7 @@ ClockTime 的 TimeDiff
 
 POSIX 平台不仅维护变更时间 (被称为 mtime)， 还有最后读或写访问时间 (atime)以及最后状态变更时间 (ctime)。这是 POSIX 平台独有的，所以跨平台的 ``System.Directory`` 模块无法访问它。取而代之，需要使用 ``System.Posix.Files`` 模块中的函数。下面有一个例子：
 
-.. code-block:: haskell
+::
 
    -- file: ch20/posixtime.hs
    -- posixtime.hs
@@ -399,7 +400,7 @@ POSIX 定义了一个函数用于创建管道。这个函数返回两个文件�
 
 下面是一个用 Haskell 编写的管道系统的初始实现：
  
-.. code-block:: haskell
+::
    
    -- file: ch20/RunProcessSimple.hs
 
@@ -570,7 +571,7 @@ POSIX 定义了一个函数用于创建管道。这个函数返回两个文件�
    
 Let's experiment with this in ghci a bit before looking at how it works. 1 comment
    
-.. code-block:: haskell
+::
  
    ghci> runIO $ ("pwd", []::[String])
    /Users/Blade/sandbox
@@ -629,7 +630,8 @@ Let's experiment with this in ghci a bit before looking at how it works. 1 comme
 Fortunately, we already have most of the pieces to support this in place. We need only add a few more instances of CommandLike to support this, and a few more functions similar to runIO. Here is a revised example that implements all of these features: No comments
 幸运的是，支持这些功能的代码片段已经差不多就位了。只需要为 ``CommandLike`` 多加入几个实例，以及一些类西 ``runIO`` 的函数。下面是修订后实现了以上功能的例子代码：
 
-.. code-block:: haskell
+::
+
    -- file: ch20/RunProcess.hs
    {-# OPTIONS_GHC -XDatatypeContexts #-}
    {-# OPTIONS_GHC -XTypeSynonymInstances #-}
@@ -964,7 +966,8 @@ Fortunately, we already have most of the pieces to support this in place. We nee
 
 现在来试试这些新特性。首先确定一下之前例子中的命令是否还能工作。然后，使用新的类 shell 语法运行一下。
 
-.. code-block:: haskell
+::
+
    ghci> :load RunProcess.hs
    [1 of 1] Compiling RunProcess       ( RunProcess.hs, interpreted )
    Ok, modules loaded: RunProcess.
@@ -993,7 +996,7 @@ Fortunately, we already have most of the pieces to support this in place. We nee
 That was a lot easier to type. Let's try substituting our native Haskell implementation of grep and try out some other new features as well
 输入起来容易多了。试试使用 Haskell 实现的 grep 来试一下其它的新特性：
 
-.. code-block:: haskell
+::
 
    ghci> runIO $ "ls /usr/local/bin" -|- grep "m.*ap" -|- "tr a-z A-Z"
    DUMPCAP
