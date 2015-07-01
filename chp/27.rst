@@ -1,0 +1,79 @@
+
+第二七章：Socket 和 Syslog
+===========================================================
+
+基本网络
+-----------------
+本书的前几张，我们讨论了在网络上进行操作的服务。其中两个例子是数据库客户端/服务器和 web 服务。当需要设计新的协议，或者使用没有现成 Haskell 库的协议通信时，将需要使用 Haskell 库函数提供的底层网络工具。
+
+本章中，我们将讨论这些底层工具。网络通讯是大题目，可以用以正本书来讨论。本章中，我们将展示如何使用 Haskell 应用你已经知晓的底层网络知识。
+
+Haskell 的网络函数几乎始终与常见的 C 函数调用相符。像其他在 C 上层的语言一样，你将发现其接口很熟悉。
+
+使用 UDP 通信
+-----------------
+
+UDP 将数据打散为数据包。其不保证数据到达目的地，也不确保其到达的次数。其使用校验和确保到达的数据包没有损坏。 UDP 适合用于对性能和延迟敏感的应用中，此类场景中系统的整体性能比单个数据包更重要。其也可以用在 TCP 表现性能不高的场景，比如发送互不相关的短消息。适合使用 UDP 的系统的例子包括音频和视频会议，时间同步，网络文件系统，以及日志系统。
+
+UDP 客户端例子：syslog
+^^^^^^^^^^^^^^^^^
+
+传统 Unix syslog 服务允许程序通过网络向某个负责记录的中央服务器发送日志信息。某些程序对性能非常敏感，而且可能会生成大量日志消息。这样的程序，将日志的开销最小化比确保每条日志被记录更重要。此外，在日志服务器无法访问时，使程序依旧可以操作或许是一种可取的设计。因此，UDP 是一种 syslog 支持的日志传输协议。这种协议比较简单，这里有一个 Haskell 实现的客户端：
+
+.. code-block:: haskell
+
+   -- file: ch27/syslogclient.hs
+   import Data.Bits
+   import Network.Socket
+   import Network.BSD
+   import Data.List
+   import SyslogTypes
+   
+   data SyslogHandle = 
+       SyslogHandle {slSocket :: Socket,
+                     slProgram :: String,
+                     slAddress :: SockAddr}
+   
+   openlog :: HostName             -- ^ Remote hostname, or localhost
+           -> String               -- ^ Port number or name; 514 is default
+           -> String               -- ^ Name to log under
+           -> IO SyslogHandle      -- ^ Handle to use for logging
+   openlog hostname port progname =
+       do -- Look up the hostname and port.  Either raises an exception
+          -- or returns a nonempty list.  First element in that list
+          -- is supposed to be the best option.
+          addrinfos <- getAddrInfo Nothing (Just hostname) (Just port)
+          let serveraddr = head addrinfos
+   
+          -- Establish a socket for communication
+          sock <- socket (addrFamily serveraddr) Datagram defaultProtocol
+   
+          -- Save off the socket, program name, and server address in a handle
+          return $ SyslogHandle sock progname (addrAddress serveraddr)
+   
+   syslog :: SyslogHandle -> Facility -> Priority -> String -> IO ()
+   syslog syslogh fac pri msg =
+       sendstr sendmsg
+       where code = makeCode fac pri
+             sendmsg = "<" ++ show code ++ ">" ++ (slProgram syslogh) ++
+                       ": " ++ msg
+   
+             -- Send until everything is done
+             sendstr :: String -> IO ()
+             sendstr [] = return ()
+             sendstr omsg = do sent <- sendTo (slSocket syslogh) omsg
+                                       (slAddress syslogh)
+                               sendstr (genericDrop sent omsg)
+             
+   closelog :: SyslogHandle -> IO ()
+   closelog syslogh = sClose (slSocket syslogh)
+   
+   {- | Convert a facility and a priority into a syslog code -}
+   makeCode :: Facility -> Priority -> Int
+   makeCode fac pri =
+       let faccode = codeOfFac fac
+           pricode = fromEnum pri 
+           in
+             (faccode `shiftL` 3) .|. pricode
+
+
