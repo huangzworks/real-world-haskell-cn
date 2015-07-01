@@ -990,6 +990,46 @@ Fortunately, we already have most of the pieces to support this in place. We nee
    ghci> runIO $ "ls /etc" -|- "grep 'm.*ap'" -|- "tr a-z A-Z"
    COM.APPLE.SCREENSHARING.AGENT.LAUNCHD
 
+That was a lot easier to type. Let's try substituting our native Haskell implementation of grep and try out some other new features as well
+输入起来容易多了。试试使用 Haskell 实现的 grep 来试一下其它的新特性：
+
+.. code-block:: haskell
+
+   ghci> runIO $ "ls /usr/local/bin" -|- grep "m.*ap" -|- "tr a-z A-Z"
+   DUMPCAP
+   MERGECAP
+   NMAP
+
+   ghci> run $ "ls /usr/local/bin" -|- grep "m.*ap" -|- "tr a-z A-Z" :: IO String
+   "DUMPCAP\nMERGECAP\nNMAP\n"
+
+   ghci> run $ "ls /usr/local/bin" -|- grep "m.*ap" -|- "tr a-z A-Z" :: IO [String]
+   ["DUMPCAP","MERGECAP","NMAP"]
+
+   ghci> run $ "ls /usr" :: IO String
+   "X11\nX11R6\nbin\ninclude\nlib\nlibexec\nlocal\nsbin\nshare\nstandalone\ntexbin\n"
+
+   ghci> run $ "ls /usr" :: IO Int
+   X11
+   X11R6
+   bin
+   include
+   lib
+   libexec
+   local
+   sbin
+   share
+   standalone
+   texbin
+   0
+
+   ghci> runIO $ echo "Line1\nHi, test\n" -|- "tr a-z A-Z" -|- sortLines
+   HI, TEST
+   LINE1
+
+
+
+
 
 
 
