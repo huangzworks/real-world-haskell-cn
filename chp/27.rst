@@ -20,7 +20,7 @@ UDP 客户端例子：syslog
 
 传统 Unix syslog 服务允许程序通过网络向某个负责记录的中央服务器发送日志信息。某些程序对性能非常敏感，而且可能会生成大量日志消息。这样的程序，将日志的开销最小化比确保每条日志被记录更重要。此外，在日志服务器无法访问时，使程序依旧可以操作或许是一种可取的设计。因此，UDP 是一种 syslog 支持的日志传输协议。这种协议比较简单，这里有一个 Haskell 实现的客户端：
 
-.. code-block:: haskell
+::
 
    -- file: ch27/syslogclient.hs
    import Data.Bits
@@ -79,7 +79,8 @@ UDP 客户端例子：syslog
 
 这段程序需要 ``SyslogTypes.hs`` ，代码如下：
 
-.. code-block:: haskell
+::
+
    -- file: ch27/SyslogTypes.hs
    module SyslogTypes where
    {- | Priorities define how important a log message is. -}
@@ -161,7 +162,9 @@ UDP 客户端例子：syslog
 可以用 ghci 向本地的 syslog 服务器发送消息。服务器可以使用本章实现的例子，也可以使用其它的在 Linux 或者 POSIX 系统中的 syslog 服务器。注意，这些服务器默认禁用了 UDP 端口，你需要启用 UDP 以使 syslog 接收 UDP 消息。
 
 你可以使用下面这样的命令向本地 syslog 服务器发送一条消息：
-.. code-block:: haskell
+
+::
+
    ghci> :load syslogclient.hs
    [1 of 2] Compiling SyslogTypes      ( SyslogTypes.hs, interpreted )
    [2 of 2] Compiling Main             ( syslogclient.hs, interpreted )
@@ -178,7 +181,8 @@ UDP Syslog 服务器
 
 UDP 服务器会在服务器上绑定某个端口。其接收直接发到这个端口的包，并处理它们。UDP 是武装抬的，面向包的协议，程序员通常使用 ``recvFrom`` 这个调用接收消息和发送机信息，在发送响应时会用到发送机信息。
 
-.. code-block:: haskell
+::
+
    -- file: ch27/syslogserver.hs
    import Data.Bits
    import Network.Socket
