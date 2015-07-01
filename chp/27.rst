@@ -221,7 +221,6 @@ UDP 服务器会在服务器上绑定某个端口。其接收直接发到这个�
    plainHandler addr msg = 
        putStrLn $ "From " ++ show addr ++ ": " ++ msg
 
-You can run this in ghci. A call to serveLog "1514" plainHandler will set up a UDP server on port 1514 that will use plainHandler to print out every incoming UDP packet on that port. Ctrl-C will terminate the program. 
 这段程序可以在 ghci 中执行。执行 ``serveLog "1514" plainHandler`` 将建立一个监听 1514 端口的 UDP 服务器。其使用 ``plainHandler`` 将每条收到的 UDP 包打印出来。按下 ``Ctrl-C`` 可以终止这个程序。
 
 .. note::
@@ -229,10 +228,11 @@ You can run this in ghci. A call to serveLog "1514" plainHandler will set up a U
    执行时收到了 ``bind: permission denied`` 消息？确定端口值比 1024 大。某些操作系统不允许 root 之外的用于使用小于 1024 的端口。
    
 
-Communicating with TCP
+使用 TCP 通信
 -----------------
 
 TCP is designed to make data transfer over the Internet as reliable as possible. TCP traffic is a stream of data. While this stream gets broken up into individual packets by the operating system, the packet boundaries are neither known nor relevant to applications. TCP guarantees that, if traffic is delivered to the application at all, that it has arrived intact, unmodified, exactly once, and in order. Obviously, things such as a broken wire can cause traffic to not be delivered, and no protocol can overcome those limitations. No comments
+TCP 被设计为确保互联网上的数据尽可能可靠地传输。 TCP 是数据流传输。
 
 This brings with it some tradeoffs compared with UDP. First of all, there are a few packets that must be sent at the start of the TCP conversation to establish the link. For very short conversations, then, UDP would have a performance advantage. Also, TCP tries very hard to get data through. If one end of a conversation tries to send data to the remote, but doesn't receive an acknowledgment back, it will periodically re-transmit the data for some time before giving up. This makes TCP robust in the face of dropped packets. However, it also means that TCP is not the best choice for real-time protocols that involve things such as live audio or video. 1 comment
 
