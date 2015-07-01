@@ -568,7 +568,7 @@ POSIX 定义了一个函数用于创建管道。这个函数返回两个文件�
                Exited ExitSuccess -> return ()
                x -> fail $ "Exited: " ++ show x
    
-Let's experiment with this in ghci a bit before looking at how it works. 1 comment
+在了解其如何实现之前，先在 ghci 中体验一下：
    
 .. code-block:: haskell
  
