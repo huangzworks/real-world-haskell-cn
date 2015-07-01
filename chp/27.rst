@@ -179,7 +179,7 @@ UDP 客户端例子：syslog
 UDP Syslog 服务器
 ^^^^^^^^^^^^^^^^^
 
-UDP 服务器会在服务器上绑定某个端口。其接收直接发到这个端口的包，并处理它们。UDP 是武装抬的，面向包的协议，程序员通常使用 ``recvFrom`` 这个调用接收消息和发送机信息，在发送响应时会用到发送机信息。
+UDP 服务器会在服务器上绑定某个端口。其接收直接发到这个端口的包，并处理它们。UDP 是无状态的，面向包的协议，程序员通常使用 ``recvFrom`` 这个调用接收消息和发送机信息，在发送响应时会用到发送机信息。
 
 ::
 
@@ -235,10 +235,9 @@ UDP 服务器会在服务器上绑定某个端口。其接收直接发到这个�
 使用 TCP 通信
 -----------------
 
-TCP is designed to make data transfer over the Internet as reliable as possible. TCP traffic is a stream of data. While this stream gets broken up into individual packets by the operating system, the packet boundaries are neither known nor relevant to applications. TCP guarantees that, if traffic is delivered to the application at all, that it has arrived intact, unmodified, exactly once, and in order. Obviously, things such as a broken wire can cause traffic to not be delivered, and no protocol can overcome those limitations. No comments
-TCP 被设计为确保互联网上的数据尽可能可靠地传输。 TCP 是数据流传输。
+TCP 被设计为确保互联网上的数据尽可能可靠地传输。 TCP 是数据流传输。虽然流在传输时会被操作系统拆散为一个个单独的包，但是应用程序并不需要关心包的边界。TCP 保证如果流被传送到应用程序，它就是完整的到达、无改动、仅传输一次且保证顺序。显然，如果线缆被破坏会导致流量无法送达，任何协议都无法克服这类限制。
 
-This brings with it some tradeoffs compared with UDP. First of all, there are a few packets that must be sent at the start of the TCP conversation to establish the link. For very short conversations, then, UDP would have a performance advantage. Also, TCP tries very hard to get data through. If one end of a conversation tries to send data to the remote, but doesn't receive an acknowledgment back, it will periodically re-transmit the data for some time before giving up. This makes TCP robust in the face of dropped packets. However, it also means that TCP is not the best choice for real-time protocols that involve things such as live audio or video. 1 comment
+与 UDP 相比，这带来一些折衷。首先，在 TCP 会话开始必须传递一些包以建立连接。其次，对于每个短会话，UDP 将有性能有时。另外，TCP 会努力确保数据到达。如果会话的一端尝试向远端发送数据，但是没有收到响应，它将周期性的尝试重新传输数据直至放弃。这使得 TCP 面对丢包时比较健壮可靠。可是，它同样意味着 TCP 不是实时传输协议（如实况音频或视频传输）的最佳选择。
 
 Handling Multiple TCP Streams
 ^^^^^^^^^^^^^^^^^
