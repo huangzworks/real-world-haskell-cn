@@ -239,10 +239,10 @@ TCP 被设计为确保互联网上的数据尽可能可靠地传输。 TCP 是�
 
 与 UDP 相比，这带来一些折衷。首先，在 TCP 会话开始必须传递一些包以建立连接。其次，对于每个短会话，UDP 将有性能有时。另外，TCP 会努力确保数据到达。如果会话的一端尝试向远端发送数据，但是没有收到响应，它将周期性的尝试重新传输数据直至放弃。这使得 TCP 面对丢包时比较健壮可靠。可是，它同样意味着 TCP 不是实时传输协议（如实况音频或视频传输）的最佳选择。
 
-Handling Multiple TCP Streams
+处理多个 TCP 流
 ^^^^^^^^^^^^^^^^^
 
-With TCP, connections are stateful. That means that there is a dedicated logical "channel" between a client and server, rather than just one-off packets as with UDP. This makes things easy for client developers. Server applications almost always will want to be able to handle more than one TCP connection at once. How then to do this? No comments
+TCP 的连接是有状态的。这意味着每个客户机和服务器之间都有一条专用的逻辑“频道”，而不是像 UDP 一样只是处理一次性的数据包。这简化了客户端开发者的工作。服务器端程序几乎总是需要同时处理多条 TCP 连接。如何做到这一点呢？
 
 On the server side, you will first create a socket and bind to a port, just like UDP. Instead of repeatedly listening for data from any location, your main loop will be around the accept call. Each time a client connects, the server's operating system allocates a new socket for it. So we have the master socket, used only to listen for incoming connections, and never to transmit data. We also have the potential for multiple child sockets to be used at once, each corresponding to a logical TCP conversation. No comments
 
