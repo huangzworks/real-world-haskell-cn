@@ -244,8 +244,85 @@ TCP 被设计为确保互联网上的数据尽可能可靠地传输。 TCP 是�
 
 TCP 的连接是有状态的。这意味着每个客户机和服务器之间都有一条专用的逻辑“频道”，而不是像 UDP 一样只是处理一次性的数据包。这简化了客户端开发者的工作。服务器端程序几乎总是需要同时处理多条 TCP 连接。如何做到这一点呢？
 
-On the server side, you will first create a socket and bind to a port, just like UDP. Instead of repeatedly listening for data from any location, your main loop will be around the accept call. Each time a client connects, the server's operating system allocates a new socket for it. So we have the master socket, used only to listen for incoming connections, and never to transmit data. We also have the potential for multiple child sockets to be used at once, each corresponding to a logical TCP conversation. No comments
+在服务器端，首先需要创建一个 socket 并绑定到某个端口，就像 UDP 一样。但这回不是重复监听从任意地址发来的数据，取而代之，你的主循环将围绕 ``accept`` 调用编写。每当有一个客户机连接，服务器操作系统为其分配一个新的 socket 。所以我们的主 socket 只用来监听进来的连接，但从不发送数据。我们也获得了多个子 socket 可以同时使用，每个子 socket 从属于一个逻辑上的 TCP 会话。
 
-In Haskell, you will usually use forkIO to create a separate lightweight thread to handle each conversation with a child. Haskell has an efficient internal implementation of this that performs quite well. No comments
+在 Haskell 中，通常使用 ``forkIO`` 创建一个单独的轻量级线程以处理与子 socket 的通信。对此， Haskell 拥有一个高效的内部实现，执行得非常好。
 
+TCP Syslog 服务器
+^^^^^^^^^^^^^^^^^
 
+让我们使用 TCP 的实现来替换 UDP 的 syslog 服务器。假设一条消息并不是定义为单独的包，而是以一个尾部的字符 '\n' 结束。任意客户端可以使用 TCP 连接向服务器发送 0 或多条消息。我们可以像下面这样实现：
+
+::
+
+   -- file: ch27/syslogtcpserver.hs
+   import Data.Bits
+   import Network.Socket
+   import Network.BSD
+   import Data.List
+   import Control.Concurrent
+   import Control.Concurrent.MVar
+   import System.IO
+   
+   type HandlerFunc = SockAddr -> String -> IO ()
+   
+   serveLog :: String              -- ^ Port number or name; 514 is default
+            -> HandlerFunc         -- ^ Function to handle incoming messages
+            -> IO ()
+   serveLog port handlerfunc = withSocketsDo $
+       do -- Look up the port.  Either raises an exception or returns
+          -- a nonempty list.  
+          addrinfos <- getAddrInfo 
+                       (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
+                       Nothing (Just port)
+          let serveraddr = head addrinfos
+   
+          -- Create a socket
+          sock <- socket (addrFamily serveraddr) Stream defaultProtocol
+   
+          -- Bind it to the address we're listening to
+          bindSocket sock (addrAddress serveraddr)
+   
+          -- Start listening for connection requests.  Maximum queue size
+          -- of 5 connection requests waiting to be accepted.
+          listen sock 5
+   
+          -- Create a lock to use for synchronizing access to the handler
+          lock <- newMVar ()
+   
+          -- Loop forever waiting for connections.  Ctrl-C to abort.
+          procRequests lock sock
+   
+       where
+             -- | Process incoming connection requests
+             procRequests :: MVar () -> Socket -> IO ()
+             procRequests lock mastersock = 
+                 do (connsock, clientaddr) <- accept mastersock
+                    handle lock clientaddr
+                       "syslogtcpserver.hs: client connnected"
+                    forkIO $ procMessages lock connsock clientaddr
+                    procRequests lock mastersock
+   
+             -- | Process incoming messages
+             procMessages :: MVar () -> Socket -> SockAddr -> IO ()
+             procMessages lock connsock clientaddr =
+                 do connhdl <- socketToHandle connsock ReadMode
+                    hSetBuffering connhdl LineBuffering
+                    messages <- hGetContents connhdl
+                    mapM_ (handle lock clientaddr) (lines messages)
+                    hClose connhdl
+                    handle lock clientaddr 
+                       "syslogtcpserver.hs: client disconnected"
+   
+             -- Lock the handler before passing data to it.
+             handle :: MVar () -> HandlerFunc
+             -- This type is the same as
+             -- handle :: MVar () -> SockAddr -> String -> IO ()
+             handle lock clientaddr msg =
+                 withMVar lock 
+                    (\a -> handlerfunc clientaddr msg >> return a)
+   
+   -- A simple handler that prints incoming packets
+   plainHandler :: HandlerFunc
+   plainHandler addr msg = 
+       putStrLn $ "From " ++ show addr ++ ": " ++ msg
