@@ -331,9 +331,142 @@ TCP Syslog 服务器
 
 ``SyslogTypes`` 的实现，见 :ref:`UDP 客户端例子：syslog` 。
 
-让我们读一下源码。主循环是 ``procRequests`` ，这是一个死循环，用于等待来自客户端的新连接。 ``accept`` 调用将一直阻塞，直到一个客户端来连接。当有客户端连接，我们获得一个新 socket 和客户机地址。我们向处理函数发送一条消息，接着使用 ``forkIO`` 建立一个线程处理来自客户机的数据。这条线程执行 ``procMessages`` 。
+让我们读一下源码。主循环是 ``procRequests`` ，这是一个死循环，用于等待来自客户端的新连接。 ``accept`` 调用将一直阻塞，直到一个客户端来连接。当有客户端连接，我们获得一个新 socket 和客户机地址。我们向处理函数发送一条关于新连接的消息，接着使用 ``forkIO`` 建立一个线程处理来自客户机的数据。这条线程执行 ``procMessages`` 。
 
-When dealing with TCP data, it's often convenient to convert a socket into a Haskell Handle. We do so here, and explicitly set the buffering -- an important point for TCP communication. Next, we set up lazy reading from the socket's Handle. For each incoming line, we pass it to handle. After there is no more data -- because the remote end has closed the socket -- we output a message about that. No comments
+处理 TCP 数据时，为了方便，通常将 socket 转换为 Haskell 句柄。我们也同样处理，并明确设置了缓冲 -- 一个 TCP 通信的要点。接着，设置惰性读取 socket 句柄。对每个传入的行，我们都将其传给 ``handle`` 。当没有更多数据时 -- 远端已经关闭了 socket -- 我们输出一条会话结束的消息。
+
+因为可能同事收到多条消息，我们需要确保没有将多条消息同时写入一个处理函数。那将导致混乱的输出。我们使用了一个简单的锁以序列化对处理函数的访问，并且编写了一个简单的 ``handle`` 函数处理它。
+
+你可以使用下面我们将展示的客户机代码测试，或者直接使用 ``telnet`` 程序来连接这个服务器。你向其发送的每一行输入都将被服务器原样返回。我们来试一下：
+
+::
+
+   ghci> :load syslogtcpserver.hs
+   [1 of 1] Compiling Main             ( syslogtcpserver.hs, interpreted )
+   Ok, modules loaded: Main.
+   ghci> serveLog "10514" plainHandler
+   Loading package parsec-2.1.0.0 ... linking ... done.
+   Loading package network-2.1.0.0 ... linking ... done.
+      
+
+此处，服务器从 10514 端口监听新连接。在有某个客户机过来连接之前，它什么事儿都不做。我们可以使用 ``telnet`` 来连接这个服务器：
+
+::
+   ~$ telnet localhost 10514
+   Trying 127.0.0.1...
+   Connected to localhost.
+   Escape character is '^]'.
+   Test message
+   ^]
+   telnet> quit
+   Connection closed.
+
+于此同时，在我们运行 TCP 服务器的终端上，你将看到如下输出：
+
+::
+
+   From 127.0.0.1:38790: syslogtcpserver.hs: client connnected
+   From 127.0.0.1:38790: Test message
+   From 127.0.0.1:38790: syslogtcpserver.hs: client disconnected
 
 
+其显示一个客户端从本机 (127.0.0.1) 的 38790 端口连上了主机。连接之后，它发送了一条消息，然后断开。当你扮演一个 TCP 客户端时，操作系统将分配一个未被使用的端口给你。通常这个端口在你每次运行程序时都不一样。
 
+TCP Syslog 客户端
+^^^^^^^^^^^^^^^^^
+
+现在，为我们的 TCP syslog 协议编写一个客户端。这个客户端与 UDP 客户端类似，但是有一些变化。首先，因为 TCP 是流式协议，我们可以使用句柄传输数据而不需要使用底层的 socket 操作。其次，不在需要在 ``SyslogHandle`` 中保存目的地址，因为我们将使用 ``connect`` 建立 TCP 连接。最后，我们需要一个途径，以区分不同的消息。UDP 中，这很容易，因为每条消息都是不相关的逻辑包。TCP 中，我们将仅使用换行符 '\n' 来作为消息结尾的标识，尽管这意味着不能在单条消息中发送多行信息。这是代码：
+
+::
+
+   -- file: ch27/syslogtcpclient.hs
+   import Data.Bits
+   import Network.Socket
+   import Network.BSD
+   import Data.List
+   import SyslogTypes
+   import System.IO
+   
+   data SyslogHandle = 
+       SyslogHandle {slHandle :: Handle,
+                     slProgram :: String}
+   
+   openlog :: HostName             -- ^ Remote hostname, or localhost
+           -> String               -- ^ Port number or name; 514 is default
+           -> String               -- ^ Name to log under
+           -> IO SyslogHandle      -- ^ Handle to use for logging
+   openlog hostname port progname =
+       do -- Look up the hostname and port.  Either raises an exception
+          -- or returns a nonempty list.  First element in that list
+          -- is supposed to be the best option.
+          addrinfos <- getAddrInfo Nothing (Just hostname) (Just port)
+          let serveraddr = head addrinfos
+   
+          -- Establish a socket for communication
+          sock <- socket (addrFamily serveraddr) Stream defaultProtocol
+   
+          -- Mark the socket for keep-alive handling since it may be idle
+          -- for long periods of time
+          setSocketOption sock KeepAlive 1
+   
+          -- Connect to server
+          connect sock (addrAddress serveraddr)
+   
+          -- Make a Handle out of it for convenience
+          h <- socketToHandle sock WriteMode
+   
+          -- We're going to set buffering to BlockBuffering and then
+          -- explicitly call hFlush after each message, below, so that
+          -- messages get logged immediately
+          hSetBuffering h (BlockBuffering Nothing)
+          
+          -- Save off the socket, program name, and server address in a handle
+          return $ SyslogHandle h progname
+   
+   syslog :: SyslogHandle -> Facility -> Priority -> String -> IO ()
+   syslog syslogh fac pri msg =
+       do hPutStrLn (slHandle syslogh) sendmsg
+          -- Make sure that we send data immediately
+          hFlush (slHandle syslogh)
+       where code = makeCode fac pri
+             sendmsg = "<" ++ show code ++ ">" ++ (slProgram syslogh) ++
+                       ": " ++ msg
+   
+   closelog :: SyslogHandle -> IO ()
+   closelog syslogh = hClose (slHandle syslogh)
+   
+   {- | Convert a facility and a priority into a syslog code -}
+   makeCode :: Facility -> Priority -> Int
+   makeCode fac pri =
+       let faccode = codeOfFac fac
+           pricode = fromEnum pri 
+           in
+             (faccode `shiftL` 3) .|. pricode
+
+可以在 ghci 中试着运行它。如果还没有关闭之前的 TCP 服务器，你的会话看上去可能会像是这样：
+
+::
+
+   ghci> :load syslogtcpclient.hs
+   Loading package base ... linking ... done.
+   [1 of 2] Compiling SyslogTypes      ( SyslogTypes.hs, interpreted )
+   [2 of 2] Compiling Main             ( syslogtcpclient.hs, interpreted )
+   Ok, modules loaded: Main, SyslogTypes.
+   ghci> openlog "localhost" "10514" "tcptest"
+   Loading package parsec-2.1.0.0 ... linking ... done.
+   Loading package network-2.1.0.0 ... linking ... done.
+   ghci> sl <- openlog "localhost" "10514" "tcptest"
+   ghci> syslog sl USER INFO "This is my TCP message"
+   ghci> syslog sl USER INFO "This is my TCP message again"
+   ghci> closelog sl
+         
+结束时，服务器上将看到这样的输出：
+
+::
+
+   From 127.0.0.1:46319: syslogtcpserver.hs: client connnected
+   From 127.0.0.1:46319: <9>tcptest: This is my TCP message
+   From 127.0.0.1:46319: <9>tcptest: This is my TCP message again
+   From 127.0.0.1:46319: syslogtcpserver.hs: client disconnected
+      
+``<9>`` 是优先级和设施代码，和之前 UDP 例子中的意思一样。
