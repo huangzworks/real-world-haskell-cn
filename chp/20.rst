@@ -962,7 +962,7 @@ Fortunately, we already have most of the pieces to support this in place. We nee
 
     * 一些工具函数，提供了用 Haskell 实现的类 Unix shell 命令。
 
-现在来试试这些新特性。首先确定一下之前例子种的命令是否还能工作。然后，使用新的类 shell 语法运行一下。
+现在来试试这些新特性。首先确定一下之前例子中的命令是否还能工作。然后，使用新的类 shell 语法运行一下。
 
 .. code-block:: haskell
    ghci> :load RunProcess.hs
@@ -1033,7 +1033,7 @@ That was a lot easier to type. Let's try substituting our native Haskell impleme
 
 我们开发了一个精巧的系统。前面时醒过， POSIX 有时会很复杂。另外要强调一下：要始终注意确保先将这些函数返回的字符串求值，然后再尝试获取子进程的退出状态码。子进程经常要等待写出其所有输出之后才能退出，如果搞错了获取输出和退出状态码的顺序，你的程序会挂住。
 
-本章中，我们从零开始开发了一个精简版的 ``HSH`` 。如果你希望使程序具有这种类 shell 的功能，我们推荐使用 ``HSH`` 而非上面开发的例子，因为 ``HSH`` 的实现更加优化。``HSH`` 还有一个数量庞大的工具函数集和更多功能，但其背后的代码也更加庞大和复杂。其实例子中很多工具函数的代码我们是直接从 ``HSH`` 抄过来的。可以从 http://software.complete.org/hsh访问 ``HSH`` 的源码。
+本章中，我们从零开始开发了一个精简版的 ``HSH`` 。如果你希望使程序具有这样类 shell 的功能，我们推荐使用 ``HSH`` 而非上面开发的例子，因为 ``HSH`` 的实现更加优化。``HSH`` 还有一个数量庞大的工具函数集和更多功能，但其背后的代码也更加庞大和复杂。其实例子中很多工具函数的代码我们是直接从 ``HSH`` 抄过来的。可以从 http://software.complete.org/hsh访问 ``HSH`` 的源码。
 
 .. rubric:: 注
 .. [43] 也有一个 ``system`` 函数，接受单个字符串为参数，并将其传入 shell 解析。我们推荐使用 ``rawSystem`` ，因为某些字符在 shell 中具有特殊含义，可能会导致安全隐患或者意外的行为。
