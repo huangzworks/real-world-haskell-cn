@@ -962,6 +962,16 @@ Fortunately, we already have most of the pieces to support this in place. We nee
 
     * 一些工具函数，提供了用 Haskell 实现的类 Unix shell 命令。
 
+现在来试试这些新特性。首先确定一下之前例子种的命令是否还能工作。然后，使用新的类 shell 语法运行一下。
+
+.. code-block:: haskell
+   ghci> :load RunProcess.hs
+
+   ghci> runIO $ ("ls", ["/etc"]) -|- ("grep", ["m.*ap"]) -|- ("tr", ["a-z", "A-Z"])
+
+   ghci> runIO $ "ls /etc" -|- "grep 'm.*ap'" -|- "tr a-z A-Z"
+
+
 
 
 
