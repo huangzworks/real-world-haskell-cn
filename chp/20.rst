@@ -362,7 +362,7 @@ POSIX 平台不仅维护变更时间 (被称为 mtime)， 还有最后读或写�
 
 注意对 ``getFileStatus`` 的调用。 这个调用直接映射到 C 语言的 ``stat()`` 函数。其返回一个包含了大量不同种类信息的值，包括文件类型、权限、属主、组、和我们感性去的三种时间值。 ``System.Posix.Files`` 提供了 ``accessTime`` 等多个函数，可以将我们感兴趣的时间从 ``getFileStatus`` 返回的 ``FileStatus`` 类型中提取出来。
 
- ``accessTime`` 等函数返回一个POSIX 平台特有的类型，称为 ``EpochTime`` ，  可以通过  ``toct`` 函数转换``ClockTime`` 。 ``System.Posix.Files`` 模块同样提供了 ``setFileTimes`` 函数，以设置文件的 ``atime`` 和 ``mtime`` 。 [45]_ 
+ ``accessTime`` 等函数返回一个POSIX 平台特有的类型，称为 ``EpochTime`` ，  可以通过  ``toct`` 函数转换 ``ClockTime`` 。 ``System.Posix.Files`` 模块同样提供了 ``setFileTimes`` 函数，以设置文件的 ``atime`` 和 ``mtime`` 。 [45]_ 
 
 延伸的例子: 管道
 --------------------
@@ -569,7 +569,8 @@ POSIX 定义了一个函数用于创建管道。这个函数返回两个文件�
                Exited ExitSuccess -> return ()
                x -> fail $ "Exited: " ++ show x
    
-Let's experiment with this in ghci a bit before looking at how it works. 1 comment
+在研究这个函数的运作原理之前，
+让我们先来在 ``ghci`` 里面尝试运行它一下：
    
 ::
  
@@ -627,7 +628,6 @@ Let's experiment with this in ghci a bit before looking at how it works. 1 comme
 
     * 以易于 Haskell 程序利用的方式返回标准输出和退出状态码。
 
-Fortunately, we already have most of the pieces to support this in place. We need only add a few more instances of CommandLike to support this, and a few more functions similar to runIO. Here is a revised example that implements all of these features: No comments
 幸运的是，支持这些功能的代码片段已经差不多就位了。只需要为 ``CommandLike`` 多加入几个实例，以及一些类西 ``runIO`` 的函数。下面是修订后实现了以上功能的例子代码：
 
 ::
@@ -993,7 +993,6 @@ Fortunately, we already have most of the pieces to support this in place. We nee
    ghci> runIO $ "ls /etc" -|- "grep 'm.*ap'" -|- "tr a-z A-Z"
    COM.APPLE.SCREENSHARING.AGENT.LAUNCHD
 
-That was a lot easier to type. Let's try substituting our native Haskell implementation of grep and try out some other new features as well
 输入起来容易多了。试试使用 Haskell 实现的 grep 来试一下其它的新特性：
 
 ::
