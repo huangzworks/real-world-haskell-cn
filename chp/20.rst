@@ -5,7 +5,7 @@
 
 本章中，我们将尝试一些很有野心的东西：编写一种类似 Perl 实际上是合法的 Haskell 的“语言”，完全使用 Haskell 实现，用于简化编写 shell 脚本。我们将实现管道，简单命令调用，和一些简单的工具用于执行由 ``grep`` 和 ``sed`` 处理的任务。
 
-有一些模块依赖操作系统的。本章中，我们将尽可能使用不依赖特殊操作系统的通用模块。不过，本章将有很多内容着眼于 POSIX 环境。 POSIX 是一种类 Unix 标准， 如 Linux ，FreeBSD ，MacOS X ，或 Solaris 。Windows 默认情况下不支持 POSIX ，但是 Cygwin 环境为 Windows 提供了 POSIX 兼容层。
+有些模块是依赖操作系统的。本章中，我们将尽可能使用不依赖特殊操作系统的通用模块。不过，本章将有很多内容着眼于 POSIX 环境。 POSIX 是一种类 Unix 标准， 如 Linux ，FreeBSD ，MacOS X ，或 Solaris 。Windows 默认情况下不支持 POSIX ，但是 Cygwin 环境为 Windows 提供了 POSIX 兼容层。
 
 调用外部程序
 -----------------
@@ -626,8 +626,7 @@ Let's experiment with this in ghci a bit before looking at how it works. 1 comme
 
     * 以易于 Haskell 程序利用的方式返回标准输出和退出状态码。
 
-Fortunately, we already have most of the pieces to support this in place. We need only add a few more instances of CommandLike to support this, and a few more functions similar to runIO. Here is a revised example that implements all of these features: No comments
-幸运的是，支持这些功能的代码片段已经差不多就位了。只需要为 ``CommandLike`` 多加入几个实例，以及一些类西 ``runIO`` 的函数。下面是修订后实现了以上功能的例子代码：
+幸运的是，支持这些功能的代码片段已经差不多就位了。只需要为加入几个 ``CommandLike`` 的实例，以及一些类似 ``runIO`` 的函数。下面是修订后实现了以上功能的例子代码：
 
 .. code-block:: haskell
    -- file: ch20/RunProcess.hs
@@ -990,7 +989,6 @@ Fortunately, we already have most of the pieces to support this in place. We nee
    ghci> runIO $ "ls /etc" -|- "grep 'm.*ap'" -|- "tr a-z A-Z"
    COM.APPLE.SCREENSHARING.AGENT.LAUNCHD
 
-That was a lot easier to type. Let's try substituting our native Haskell implementation of grep and try out some other new features as well
 输入起来容易多了。试试使用 Haskell 实现的 grep 来试一下其它的新特性：
 
 .. code-block:: haskell
