@@ -158,4 +158,91 @@ UDP 客户端例子：syslog
                    Just x -> x
                    _ -> error $ "Invalid code in facOfCode"
 
+可以用 ghci 向本地的 syslog 服务器发送消息。服务器可以使用本章实现的例子，也可以使用其它的在 Linux 或者 POSIX 系统中的 syslog 服务器。注意，这些服务器默认禁用了 UDP 端口，你需要启用 UDP 以使 syslog 接收 UDP 消息。
+
+你可以使用下面这样的命令向本地 syslog 服务器发送一条消息：
+.. code-block:: haskell
+   ghci> :load syslogclient.hs
+   [1 of 2] Compiling SyslogTypes      ( SyslogTypes.hs, interpreted )
+   [2 of 2] Compiling Main             ( syslogclient.hs, interpreted )
+   Ok, modules loaded: SyslogTypes, Main.
+   ghci> h <- openlog "localhost" "514" "testprog"
+   Loading package parsec-2.1.0.0 ... linking ... done.
+   Loading package network-2.1.0.0 ... linking ... done.
+   ghci> syslog h USER INFO "This is my message"
+   ghci> closelog h
+
+
+UDP Syslog 服务器
+^^^^^^^^^^^^^^^^^
+
+UDP 服务器会在服务器上绑定某个端口。其接收直接发到这个端口的包，并处理它们。UDP 是武装抬的，面向包的协议，程序员通常使用 ``recvFrom`` 这个调用接收消息和发送机信息，在发送响应时会用到发送机信息。
+
+.. code-block:: haskell
+   -- file: ch27/syslogserver.hs
+   import Data.Bits
+   import Network.Socket
+   import Network.BSD
+   import Data.List
+   
+   type HandlerFunc = SockAddr -> String -> IO ()
+   
+   serveLog :: String              -- ^ Port number or name; 514 is default
+            -> HandlerFunc         -- ^ Function to handle incoming messages
+            -> IO ()
+   serveLog port handlerfunc = withSocketsDo $
+       do -- Look up the port.  Either raises an exception or returns
+          -- a nonempty list.  
+          addrinfos <- getAddrInfo 
+                       (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
+                       Nothing (Just port)
+          let serveraddr = head addrinfos
+   
+          -- Create a socket
+          sock <- socket (addrFamily serveraddr) Datagram defaultProtocol
+   
+          -- Bind it to the address we're listening to
+          bindSocket sock (addrAddress serveraddr)
+   
+          -- Loop forever processing incoming data.  Ctrl-C to abort.
+          procMessages sock
+       where procMessages sock =
+                 do -- Receive one UDP packet, maximum length 1024 bytes,
+                    -- and save its content into msg and its source
+                    -- IP and port into addr
+                    (msg, _, addr) <- recvFrom sock 1024
+                    -- Handle it
+                    handlerfunc addr msg
+                    -- And process more messages
+                    procMessages sock
+   
+   -- A simple handler that prints incoming packets
+   plainHandler :: HandlerFunc
+   plainHandler addr msg = 
+       putStrLn $ "From " ++ show addr ++ ": " ++ msg
+
+You can run this in ghci. A call to serveLog "1514" plainHandler will set up a UDP server on port 1514 that will use plainHandler to print out every incoming UDP packet on that port. Ctrl-C will terminate the program. 
+这段程序可以在 ghci 中执行。执行 ``serveLog "1514" plainHandler`` 将建立一个监听 1514 端口的 UDP 服务器。其使用 ``plainHandler`` 将每条收到的 UDP 包打印出来。按下 ``Ctrl-C`` 可以终止这个程序。
+
+.. note::
+   处理错误
+   执行时收到了 ``bind: permission denied`` 消息？确定端口值比 1024 大。某些操作系统不允许 root 之外的用于使用小于 1024 的端口。
+   
+
+Communicating with TCP
+-----------------
+
+TCP is designed to make data transfer over the Internet as reliable as possible. TCP traffic is a stream of data. While this stream gets broken up into individual packets by the operating system, the packet boundaries are neither known nor relevant to applications. TCP guarantees that, if traffic is delivered to the application at all, that it has arrived intact, unmodified, exactly once, and in order. Obviously, things such as a broken wire can cause traffic to not be delivered, and no protocol can overcome those limitations. No comments
+
+This brings with it some tradeoffs compared with UDP. First of all, there are a few packets that must be sent at the start of the TCP conversation to establish the link. For very short conversations, then, UDP would have a performance advantage. Also, TCP tries very hard to get data through. If one end of a conversation tries to send data to the remote, but doesn't receive an acknowledgment back, it will periodically re-transmit the data for some time before giving up. This makes TCP robust in the face of dropped packets. However, it also means that TCP is not the best choice for real-time protocols that involve things such as live audio or video. 1 comment
+
+Handling Multiple TCP Streams
+^^^^^^^^^^^^^^^^^
+
+With TCP, connections are stateful. That means that there is a dedicated logical "channel" between a client and server, rather than just one-off packets as with UDP. This makes things easy for client developers. Server applications almost always will want to be able to handle more than one TCP connection at once. How then to do this? No comments
+
+On the server side, you will first create a socket and bind to a port, just like UDP. Instead of repeatedly listening for data from any location, your main loop will be around the accept call. Each time a client connects, the server's operating system allocates a new socket for it. So we have the master socket, used only to listen for incoming connections, and never to transmit data. We also have the potential for multiple child sockets to be used at once, each corresponding to a logical TCP conversation. No comments
+
+In Haskell, you will usually use forkIO to create a separate lightweight thread to handle each conversation with a child. Haskell has an efficient internal implementation of this that performs quite well. No comments
+
 
