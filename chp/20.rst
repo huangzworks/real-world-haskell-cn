@@ -966,10 +966,29 @@ Fortunately, we already have most of the pieces to support this in place. We nee
 
 .. code-block:: haskell
    ghci> :load RunProcess.hs
+   [1 of 1] Compiling RunProcess       ( RunProcess.hs, interpreted )
+   Ok, modules loaded: RunProcess.
 
    ghci> runIO $ ("ls", ["/etc"]) -|- ("grep", ["m.*ap"]) -|- ("tr", ["a-z", "A-Z"])
+   Loading package array-0.5.0.0 ... linking ... done.
+   Loading package deepseq-1.3.0.2 ... linking ... done.
+   Loading package bytestring-0.10.4.0 ... linking ... done.
+   Loading package containers-0.5.5.1 ... linking ... done.
+   Loading package filepath-1.3.0.2 ... linking ... done.
+   Loading package old-locale-1.0.0.6 ... linking ... done.
+   Loading package time-1.4.2 ... linking ... done.
+   Loading package unix-2.7.0.1 ... linking ... done.
+   Loading package directory-1.2.1.0 ... linking ... done.
+   Loading package process-1.2.0.0 ... linking ... done.
+   Loading package transformers-0.3.0.0 ... linking ... done.
+   Loading package mtl-2.1.3.1 ... linking ... done.
+   Loading package regex-base-0.93.2 ... linking ... done.
+   Loading package regex-posix-0.95.2 ... linking ... done.
+   Loading package regex-compat-0.95.1 ... linking ... done.
+   COM.APPLE.SCREENSHARING.AGENT.LAUNCHD
 
    ghci> runIO $ "ls /etc" -|- "grep 'm.*ap'" -|- "tr a-z A-Z"
+   COM.APPLE.SCREENSHARING.AGENT.LAUNCHD
 
 
 
