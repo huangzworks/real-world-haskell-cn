@@ -34,6 +34,7 @@ Real World Haskell 中文版
    chp/13
    chp/18
    chp/20
+   chp/27
    chp/28
 
 
