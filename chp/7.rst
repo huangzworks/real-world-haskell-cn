@@ -88,12 +88,12 @@ Haskell经典I/O
        "Your name contains " ++ charcount ++ " characters."
        where charcount = show (length name)
 
-       main :: IO ()
-       main = do
-           putStrLn "Greetings once again.  What is your name?"
-           inpStr <- getLine
-           let outStr = name2reply inpStr
-           putStrLn outStr
+   main :: IO ()
+   main = do
+          putStrLn "Greetings once again.  What is your name?"
+          inpStr <- getLine
+          let outStr = name2reply inpStr
+          putStrLn outStr
 
 注意例子中的 ``name2replay`` 函数。这是一个Haskell的一个常规函数，它遵守所有我们告诉过你的规则：给它相同的输入，它总是返回相同的结果，没有副作用，并且以惰性方式运行。它用了其他Haskell函数： ``(++)`` ， ``show`` 和 ``length`` 。
 
