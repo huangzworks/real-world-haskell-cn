@@ -66,6 +66,8 @@ Real World Haskell 中文版
 
 - `spectator <https://github.com/spectatorwatcher>`_
 
+- `tiancaiamao <https://github.com/tiancaiamao>`_
+
 除了进行翻译之外，本文档还在原书的基础上做了以下改进：
 
 * 修正原文正文和代码中的错误
