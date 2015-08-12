@@ -146,4 +146,65 @@ Haskell程序性能分析
     The complete set of flags the Haskell runtime accepts is documented in the
     GHC User's Guide:
 
+特别地，我们可以用 ``-s`` 选项来让运行时系统收集内存和垃圾收集性能参数（并可以用 ``-N`` 
+来控制系统线程的数量，或调整栈和堆的大小）。我们将用运行时选项来打开性能分析的
+几种不同变量。Haskell 运行时所能接受的所有选项列表可以参见GHC用户手册。
+
+..
+    So let's run the program with statistic reporting enabled,
+    via +RTS -sstderr, yielding this result.
+
+那么让我们用 ``+RTS -sstderr`` 来运行程序收集我们所需要的结果吧。
+
+::
+    $ ./A 1e7 +RTS -sstderr
+    ./A 1e7 +RTS -sstderr
+    5000000.5
+    1,689,133,824 bytes allocated in the heap
+    697,882,192 bytes copied during GC (scavenged)
+    465,051,008 bytes copied during GC (not scavenged)
+    382,705,664 bytes maximum residency (10 sample(s))
+
+           3222 collections in generation 0 (  0.91s)
+             10 collections in generation 1 ( 18.69s)
+
+            742 Mb total memory in use
+
+      INIT  time    0.00s  (  0.00s elapsed)
+      MUT   time    0.63s  (  0.71s elapsed)
+      GC    time   19.60s  ( 20.73s elapsed)
+      EXIT  time    0.00s  (  0.00s elapsed)
+      Total time   20.23s  ( 21.44s elapsed)
+
+      %GC time      96.9%  (96.7% elapsed)
+
+      Alloc rate    2,681,318,018 bytes per MUT second
+
+      Productivity   3.1% of total user, 2.9% of total elapsed
+
+
+..
+    When using -sstderr, our program's performance numbers are printed to the standard
+    error stream, giving us a lot of information about what our program was doing.
+    In particular, it tells us how much time was spent in garbage collection,
+    and what the maximum live memory usage was.
+    It turns out that to compute the mean of a list of 10 million elements
+    our program used a maximum of 742 megabytes on the heap,
+    and spent 96.9% of its time doing garbage collection! In total,
+    only 3.1% of the program's running time was spent doing productive work.
+
+
+..
+    So why is our program behaving so badly, and what can we do to improve it?
+    After all, Haskell is a lazy language: shouldn't it be able to process the list
+    in constant space?
+
+
+..
+    Time profiling
+    ++++++++++++++
+
+时间消耗分析
+++++++++++++
+
 
