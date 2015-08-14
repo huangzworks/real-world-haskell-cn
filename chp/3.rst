@@ -1172,9 +1172,119 @@ where 从句
     -- file: ch03/GlobalVariable.hs
     itemName = "Weighted Companion Cube"
 
+表达式里的缩进规则和空白字符
+----------------------------
 
-The Offside Rule and Whitespace in an Expression
----------------------------------------------------------
+请看 ``lend`` 和 ``lend2`` 的定义表达式，左侧空出了一大块。这并不是随随便便写的，这些空白字符是有意义的。
+
+Haskell 依据缩进来解析代码块。这种用排版来表达逻辑结构的方式通常被称作*缩进规则*。一份源代码文件的首行即顶级的声明或定义可以从任一列开始，Haskell 编译器或解释器将记住这个缩进级别。所有后续顶级声明也必须使用相同的缩进。
+
+以下是一个顶级缩进规则的例子。第一个文件 ``GoodIndent.hs`` 执行正常。
+
+::
+
+    -- file: ch03/GoodIndent.hs
+    -- 这里是最左侧一列
+
+        -- 顶级声明可以从任一列开始
+        firstGoodIndentation = 1
+
+        -- 只要所有后续声明也这么做！
+        secondGoodIndentation = 2
+
+第二个文件 ``BadIndent.hs`` 没有遵守规则，因此也不能正常执行。
+
+::
+
+    -- file: ch03/BadIndent.hs
+    -- 这里是最左侧一列
+
+        -- 第一个声明从第 4 列开始
+        firstBadIndentation = 1
+
+    -- 第二个声明从第 1 列开始，这样是非法的！
+    secondBadIndentation = 2
+
+如果我们尝试在 **ghci** 里加载这两个文件，结果如下。
+
+::
+
+    ghci> :load GoodIndent.hs
+    [1 of 1] Compiling Main             ( GoodIndent.hs, interpreted )
+    Ok, modules loaded: Main.
+    ghci> :load BadIndent.hs
+    [1 of 1] Compiling Main             ( BadIndent.hs, interpreted )
+
+    BadIndent.hs:8:2: parse error on input `secondBadIndentation'
+    Failed, modules loaded: none.
+
+紧跟着的（译注：一个或多个）空白行将被视作当前行的延续，比当前行缩进更深的紧跟着的行也是如此。
+
+``let`` 表达式和 ``where`` 从句的规则与此类似。一旦 Haskell 编译器或解释器遇到一个 ``let`` 或 ``where`` 关键字，就会记住接下来第一个标记（token）的缩进位置。然后如果紧跟着的行是空白行或向右缩进更深，则被视作是前一行的延续。而如果其缩进和前一行相同，则被视作是同一区块内的新的一行。
+
+::
+
+    -- file: ch03/Indentation.hs
+    foo = let firstDefinition = blah blah
+              -- 只有注释的行被视作空白行
+                      continuation blah
+
+              -- 减少缩进，于是下面这行就变成了一行新定义
+              secondDefinition = yada yada
+
+                      continuation yada
+          in whatever
+
+下面的例子演示了如何嵌套使用 ``let`` 和 ``where``。
+
+::
+
+    -- file: ch03/letwhere.hs
+    bar = let b = 2
+              c = True
+          in let a = b
+             in (a, c)
+
+变量 ``a`` 只在内部那个 ``let`` 表达式中可见。它对外部那个 ``let`` 是不可见的。如果我们在外部使用变量 ``a`` 就会得到一个编译错误。缩进为我们和编译器提供了视觉上的标识，让我们可以一眼就看出来作用域中包含哪些东西。
+
+::
+
+    -- file: ch03/letwhere.hs
+    foo = x
+        where x = y
+                where y = 2
+
+于此类似，第一个 ``where`` 从句的作用域即是定义 ``foo`` 的表达式，而第二个 ``where`` 从句的作用域则是第一个 ``where`` 从句。
+
+在 ``let`` 和 ``where`` 从句中妥善使用缩进使得我们想表达的意图展示的十分明确。
+
+对制表符和空格说两句
+^^^^^^^^^^^^^^^^^^^^
+
+如果你用的是一个能识别 Haskell 的编辑器（例如 Emacs）编辑源代码时，通常的默认配置是使用空格来表示缩进。如果你的编辑器不能识别 Haskell，建议您手工设置使用空格来表示缩进。
+
+这么做的好处是可移植性。在一个使用等宽字体的编辑器里，类 Unix 系统和 Windows 系统对制表符的默认显示宽度并不一样，前者相当于 8 个字符宽度，而后者则相当于 4 个。这就意味着无论你自己认为制表符应该显示为多宽，你并不能保证别人的编辑器设置会尊重你的看法。使用制表符来表示缩进一定会在某些人的设置那里看起来一团糟。甚至还有可能导致编译错误，因为 Haskell 语言标准的实现是按照 Unix 风格制表符宽度来的。而使用空格则完全不用担心这个问题。
+
+缩进规则并不是必需
+^^^^^^^^^^^^^^^^^^
+
+我们也可以使用显式的语法结构来代替排版，从而表达代码的意图。例如，我们先写一个左大括号，然后写几个赋值等式，每个等式之间用分号分隔，最后加上一个右大括号。下面这个两个例子所表达的意图是一模一样的。
+
+::
+
+    -- file: ch03/Braces.hs
+    bar = let a = 1
+              b = 2
+              c = 3
+          in a + b + c
+
+    foo = let { a = 1;  b = 2;
+            c = 3 }
+          in a + b + c
+
+当我们使用显式语法结构时，普通的排版不再起作用。就像在第二个例子中那样，我们可以随意的使用缩进而仍然保持正确。
+
+显式语法结构可以用在任何地方替换普通排版。它对 ``where`` 从句乃至顶级声明也是有效的。但是请记住，尽管你可以这样用，但在 Hasekll 编程中几乎没有人会使用显式语法结构。
 
 The Case Expression
 ---------------------------------------------------------
