@@ -44,3 +44,44 @@
 另外，我们将创建一些不作为部分公开API中提供的辅助模块，让内部代码保持清晰。
 
 最后，我们让API的使用者提供用来产生多个哈希的函数。这个函数的类型是<code>a -> [Word32]</code>。我们将使用这个函数返回的全部哈希值，所以这个函数返回的列表不能为无穷的。
+
+基本设计
+------------------
+
+我们为Haskell的布隆过滤器使用的数据结构是之前我们给出的简单介绍中的直接翻译：一个位数组和一个计算多个哈希值的函数
+-- file: BloomFilter/Internal.hs
+module BloomFilter.Internal
+    (
+      Bloom(..)
+    , MutBloom(..)
+    ) where
+
+import Data.Array.ST (STUArray)
+import Data.Array.Unboxed (UArray)
+import Data.Word (Word32)
+
+data Bloom a = B {
+      blmHash  :: (a -> [Word32])
+    , blmArray :: UArray Word32 Bool
+    }
+
+当我们创建我们的Cabal包时，我们不会导出这个<code>BloomFilter.Internal</code>模块。这个模块的存在纯粹是为了让我们控制名称的可见性。我们把<code>BloomFilter.Internal</code>导入可变和不可变的模块中，但是我们会从各个模块中重新导出和模块API相关的类型。
+
+拆箱，提升和bottom
+---------------------------
+
+与其他Haskell的数组不同，<code>UArray</code>包含未装箱的值。
+
+对一个常规的Haskell类型，一个值可以为完全求值的，一个未求值的形式程序（thunk），或者特殊值⊥，发音（有时候也写作）为“bottom"。值⊥是一个用来表示计算未成功的占位符。这里的计算可以有多钟形式。它可能是一个无限循环，一个<code>error</code>应用，或者特殊值<code>undefined</code>。
+
+一个可以包含bottom的类型被称为已提升的。所有常规Haskell类型都是已提升的。实际中，这意味着我们可以写<code>error "eek!"</code>或者<code>undefined</code>来代替常规表达式。
+
+能存储形式程序和bottom会带来性能上的损耗：这种能力增加了额外的间接的层。为了理解为什么我们需要这种间接，考虑<code>Word32</code>类型。这是类型的值是全32位宽的，所以在32位系统上，没有办法直接用32位来编码bottom。运行时系统不得不维护，并且检查一些额外的数据来跟踪这个值是不是bottom。
+
+一个未装箱的值没有这种间接性。通过未装箱，获得了性能，但是牺牲了表示形式程序或者bottom的能力。因为未装箱的数组可以比常规Haskell的数组更加紧凑，所以这对于大量数据和位来说是一个非常好的选择。
+
+装箱和提升
+
+对应未装箱的类型的是使用了间接层的装箱类型。所有提升的值都是装箱的，但是一些底层的装箱类型没有被提升。比如，GHC的运行时系统有一个底层数组类型用于装箱（比如，它维护了一个数组的指针）。如果它是一个数组的引用，那么它知道数组肯定是存在的，所以它不需要关心bottom是否存在。所以这个数组类型是装箱的，但是未提升的。装箱但是未提升的类型仅展示了底层运行时的特殊实现（hacking）。在常规使用中我们不会遇到它们。
+
+GHC实现了一个<code>Bool</code>的<code>UArray</code>，内部把8个数组元素组装为1个byte，所以这个类型非常适合我们的需求。
