@@ -18,3 +18,30 @@
 许多传统编程语言进一步模糊了并发和并行之间已经难以辨认的边界，这些语言强制程序员使用相同的基础设施投监这两种程序。
 
 本章将涉及在单个操作系统进程内进行并发和并行编程。
+
+用线程进行并发编程
+-----------------
+作为并发编程的基础，大多数语言提供了创建多个多线程的方法。 ``Haskell`` 也不例外，尽管使用 ``Haskell`` 进行线程编程看起来和其他语言有些不同。
+
+In Haskell, a thread is an IO action that executes independently from other threads. To create a thread, we import the Control.Concurrent module and use the forkIO function
+``Haskell`` 中，线程是互相独立的 ``IO`` 动作。为创建线程，需要导入 ``Control.Concurrent`` 模块并使用其中的 ``forkIO`` 函数
+
+::
+
+   ghci> :m +Control.Concurrent
+   ghci> :t forkIO
+   forkIO :: IO () -> IO ThreadId
+   ghci> :m +System.Directory
+   ghci> forkIO (writeFile "xyzzy" "seo craic nua!") >> doesFileExist "xyzzy"
+   True
+
+新线程几乎立即开始执行，创建它的线程同时继续向下执行。新线程将在它的 ``IO`` 动作结束后停止执行。
+
+线程的不确定性
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+GHC 的运行时组件并不按特定顺序执行多个线程。所以，上面的例子中，文件 xyzzy 的创建时间在初始线程检查其是否存在之前或之后都有可能。如果删除 xyzzy 并且再执行一次，我们可能得到完全相反的结果。
+
+隐藏延迟
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
