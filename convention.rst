@@ -150,6 +150,13 @@ monad栈      monad transformer stack / monad stack
 
 多态    polymorphism
 
+第十九章
+-------------
+
+错误处理 error handling
+
+惰性求值 lazy evaluation
+
 
 第八章
 ------------------

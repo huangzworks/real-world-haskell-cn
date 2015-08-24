@@ -33,7 +33,10 @@ Real World Haskell 中文版
    chp/11
    chp/13
    chp/18
+   chp/19
    chp/20
+   chp/21
+   chp/22
    chp/27
    chp/28
 
@@ -65,6 +68,8 @@ Real World Haskell 中文版
 - `bladewang <https://github.com/bladewang>`_
 
 - `spectator <https://github.com/spectatorwatcher>`_
+
+- `tiancaiamao <https://github.com/tiancaiamao>`_
 
 除了进行翻译之外，本文档还在原书的基础上做了以下改进：
 

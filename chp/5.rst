@@ -183,7 +183,7 @@ Haskell 模块
 编译 Haskell 代码
 ------------------
 
-除了 ghci 之外， GHC 还包括一个生成本地码（navie code）的编译器： ghc 。如果你熟悉 gcc 或者 cl （微软 Visual Studio 使用的 C++ 编译器组件）之类的编译器，那么你对 ghc 应该不会感到陌生。
+除了 ghci 之外， GHC 还包括一个生成本地码（native code）的编译器： ghc 。如果你熟悉 gcc 或者 cl （微软 Visual Studio 使用的 C++ 编译器组件）之类的编译器，那么你对 ghc 应该不会感到陌生。
 
 编译一个 Haskell 源码文件可以通过 ``ghc`` 命令来完成：
 
