@@ -220,8 +220,8 @@ Haskell程序性能分析
     Profiling proceeds in three steps: compiling the program for profiling;
     running it with particular profiling modes enabled; and inspecting the resulting statistics.
 
-庆幸的是，GHC有几个工具可以用来分析程序的时间和空间使用情况。尤其是，我们可以在编程程序时
-打开profiling选项，这样程序在执行时会知道每个函数所使用的资源使用的信息。Profiling过程分为
+庆幸的是，GHC提供了几个工具可以分析程序的时间和空间使用情况。尤其是，我们可以在编写程序时
+打开profiling选项，这样程序在执行时会得到每个函数所使用的资源使用的信息。Profiling过程分为
 三步：以Profiling方式编译程序；用profiling模式执行程序；最后是分析收集到的结果数据。
 
 ..
@@ -232,7 +232,9 @@ Haskell程序性能分析
     and GHC will generate code to compute the cost of evaluating the expression at each location.
     Cost centres can be added manually to instrument any expression, using the SCC pragma:
 
-
+编译程序时，我们可以打开 ``-prof`` 选项来记录基本时间和空间性能信息。我们也需要给感兴趣的
+函数标记为 "cost centres" 以便让性能分析程序知晓。一个 cost centre 即是一个信息收集点。GHC
+会生成代码来计算这些地方的资源消耗。我们可以用 ``SCC`` 语法使得任何语句成为 cost centre。
 
 ::
     -- file: ch25/SCC.hs
@@ -246,6 +248,9 @@ Haskell程序性能分析
     as once a hot spot has been identified, we can precisely pin down the
     expensive sub-expressions of a function.
 
+另外我们也可以用 ``-auto-all`` 选项来让编译器将所有顶级函数设为 cost centre。手动
+添加做为一个额外的能力对我们，尤其是我们已经知道哪个特别的地方有问题时，非常有用，
+使得我们有针对性地精确分析一个函数的资源消耗。
 
 ..
     One complication to be aware of: in a lazy, pure language like Haskell,
@@ -258,9 +263,17 @@ Haskell程序性能分析
     To get accurate numbers for these values, known as "constant applicative forms",
     or CAFs, we use the -caf-all flag.
 
+另一难点值得注意：在像 Haskell 这样的惰性、纯函数编程语言里，没有参数的值只会被计算
+一次（比如我们上面程序中的庞大列表），结果会被以后所有地方共享。这些值不是程序调用
+中的一部分，因为不是每次它们都被计算。当然我们仍然需要评估它们的唯一的那次计算所用
+的资源情况。这些值，也被称为CAF （Constant Applicative Forms），的确切数量可以用
+``-caf-all`` 选项来得到。
+
 ..
     Compiling our example program for profiling then (using the -fforce-recomp flag
     to to force full recompilation):
+
+那么以分析性能的方式来编译我们的程序吧（用 ``-fforce-recomp`` 选项来强制重新编译所有部分）：
 
 ::
     $ ghc -O2 --make A.hs -prof -auto-all -caf-all -fforce-recomp
@@ -273,13 +286,14 @@ Haskell程序性能分析
     (and we'll use a smaller input size for the time being,
     as the program now has additional profiling overhead):
 
+现在我们可以执行这个标记了性能分析点的程序了 （标记了性能分析的程序会
+变慢，所以我们用一个较小的输入来执行）：
 
 ::
     $ time ./A  1e6 +RTS -p
     Stack space overflow: current size 8388608 bytes.
     Use `+RTS -Ksize' to increase it.
     ./A 1e6 +RTS -p  1.11s user 0.15s system 95% cpu 1.319 total
-
 
 ..
     The program ran out of stack space! This is the main complication to
@@ -289,6 +303,8 @@ Haskell程序性能分析
     In a sense, observing the program executing modifies how it executes. In this case,
     it is simple to proceed -- we use the GHC runtime flag, -K, to set
     a larger stack limit for our program (with the usual suffixes to indicate magnitude):
+
+
 
 ::
     $ time ./A 1e6 +RTS -p -K100M
