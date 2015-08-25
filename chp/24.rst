@@ -80,9 +80,66 @@ GHC 的运行时组件并不按特定顺序执行多个线程。所以，上面�
 
 当用户输入的文件名并不存在时将发生异常， ``handle (print :: (SomeException-> IO ()))`` 是一个低成本的打印错误信息的方式。
 
-线程间通信
+线程间的简单通信
 -----------------
 
-The simplest way to share information between two threads is to let them both use a variable. In our file compression example, the main thread shares both the name of a file and its contents with the other thread. Because Haskell data is immutable by default, this poses no risks: neither thread can modify the other's view of the file's name or contents. No comments
+在两个线程之间共享信息最简单的方法是，让它们使用同一个变量。上面文件压缩的例子中， ``main`` 线程与子线程共享了文件名和文件内容。 ``Haskell`` 的数据默认是不可变的，所以这样共享不会有问题，两个线程都无法修改另一个线程中的文件名和文件内容。
+
+线程经常需要和其他线程进行活跃的通信。例如， ``GHC``  没有提供查看其他线程是否还在执行、执行完毕、或者崩溃的方法。可是，其提供了同步变量类型， ``MVar`` ，我们可以通过它自己实现上述功能。
+
+``MVar`` 的行为类似一个单元素的箱子：其可以为满或空。将一些东西扔进箱子，使其填满，或者从中拿出一些东西，使其变空。
+
+::
+ 
+   ghci> :t putMVar
+   putMVar :: MVar a -> a -> IO ()
+   ghci> :t takeMVar
+   takeMVar :: MVar a -> IO a
+
+尝试将一个值放入非空的 ``MVar`` ，将会导致线程休眠直到其他线程从其中拿走一个值使其变空。类似的，如果尝试从一个空的 ``MVar`` 取出一个值，线程也将休眠，直到其他线程向其中放入一个值。
+
+::
+
+   -- file: ch24/MVarExample.hs
+   import Control.Concurrent
+   
+   communicate = do
+     m <- newEmptyMVar
+     forkIO $ do
+       v <- takeMVar m
+       putStrLn ("received " ++ show v)
+     putStrLn "sending"
+     putMVar m "wake up!"
+
+``newEmptyMVar`` 函数的作用从其名字一目了然。要创建一个初始状态非空的 ``MVar`` ，需要使用 ``newMVar`` 。
+
+::
+
+   ghci> :t newEmptyMVar
+   newEmptyMVar :: IO (MVar a)
+   ghci> :t newMVar
+   newMVar :: a -> IO (MVar a)
+
+在 ``ghci`` 运行一下上面例子。
+
+::
+
+   ghci> :load MVarExample
+   [1 of 1] Compiling Main             ( MVarExample.hs, interpreted )
+   Ok, modules loaded: Main.
+   ghci> communicate
+   sending
+   rece
+
+If you're coming from a background of concurrent programming in a traditional language, you can think of an MVar as being useful for two familiar purposes. No comments
+如果有使用传统编程语言编写并发程序的经验，你会想到 ``MVar`` 有助于实现两个熟悉的效果。
+
+    * 从一个线程向另一个线程发送消息，例如：一个提醒。
+
+    * 对线程间共享的可变数据提供互斥。在数据没有被任何线程使用时，将其放入 ``MVar`` ，某线程需要读取或改变它时，将其临时从中取出。
+
+
+The main thread and waiting for other threads
+-----------------
 
 
