@@ -21,6 +21,7 @@
 
 用线程进行并发编程
 -----------------
+
 作为并发编程的基础，大多数语言提供了创建多个多线程的方法。 ``Haskell`` 也不例外，尽管使用 ``Haskell`` 进行线程编程看起来和其他语言有些不同。
 
 In Haskell, a thread is an IO action that executes independently from other threads. To create a thread, we import the Control.Concurrent module and use the forkIO function
@@ -44,4 +45,44 @@ GHC 的运行时组件并不按特定顺序执行多个线程。所以，上面�
 
 隐藏延迟
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+假设我们要将一个大文件压缩并写入磁盘，但是希望快速处理用户输入以使他们感觉程序是立即响应的。如果使用 ``forkIO`` 来开启一个单独的线程去写文件，这样就可以同时做这两件事。
+
+::
+   
+   -- file: ch24/Compressor.hs
+   import Control.Concurrent (forkIO)
+   import Control.Exception (handle)
+   import Control.Monad (forever)
+   import qualified Data.ByteString.Lazy as L
+   import System.Console.Readline (readline)
+   
+   -- Provided by the 'zlib' package on http://hackage.haskell.org/
+   import Codec.Compression.GZip (compress)
+   
+   main = do
+       maybeLine <- readline "Enter a file to compress> "
+       case maybeLine of
+         Nothing -> return ()      -- user entered EOF
+         Just "" -> return ()      -- treat no name as "want to quit"
+         Just name -> do
+              handle
+                (print :: (SomeException->IO ()))
+                $ do
+                    content <- L.readFile name
+                    forkIO (compressFile name content)
+                    return ()
+              main
+     where compressFile path = L.writeFile (path ++ ".gz") . compress
+
+
+因为使用了惰性的 ``ByteString``  I/O ，主线程中做仅仅是打开文件。真正读取文件内容发生在子线程中。
+
+当用户输入的文件名并不存在时将发生异常， ``handle (print :: (SomeException-> IO ()))`` 是一个低成本的打印错误信息的方式。
+
+线程间通信
+-----------------
+
+The simplest way to share information between two threads is to let them both use a variable. In our file compression example, the main thread shares both the name of a file and its contents with the other thread. Because Haskell data is immutable by default, this poses no risks: neither thread can modify the other's view of the file's name or contents. No comments
+
 
