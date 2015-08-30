@@ -1,0 +1,846 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>第十章：代码案例学习：解析二进制数据格式 &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
+    <link rel="next" title="第十一章：测试和质量保障" href="11.html" />
+    <link rel="prev" title="第九章：I/O学习 —— 构建一个用于搜索文件系统的库" href="9.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="9.html">第九章：I/O学习 —— 构建一个用于搜索文件系统的库</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="11.html">第十一章：测试和质量保障</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="id1">
+<h1>第十章：代码案例学习：解析二进制数据格式<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h1>
+<p>本章将会讨论一个常见任务：解析（parsing）二进制文件。选这个任务有两个目的。
+第一个确实是想谈谈解析过程，但更重要的目标是谈谈程序组织、重构和消除样板代码
+（boilerplate code：通常指不重要，但没它又不行的代码）。
+我们将会展示如何清理冗余代码，并为第十四章讨论 Monad 做点准备。</p>
+<p>我们将要用到的文件格式来自于 netpbm 库，它包含一组用来处理位图图像的程序及文件格式，它古老而令人尊敬。
+这种文件格式不但被广泛使用，而且还非常简单，虽然解析过程也不是完全没有挑战。
+对我们而言最重要的是，netpbm 文件没有经过压缩。</p>
+<div class="section" id="greyscale-files">
+<span id="id2"></span><h2>灰度文件<a class="headerlink" href="#greyscale-files" title="Permalink to this headline">¶</a></h2>
+<p>netpbm 的灰度文件格式名为 PGM（&#8221;portable grey map&#8221;）。事实上它不是一个格式，而是两个：
+纯文本（又名P2）格式使用 ASCII 编码，而更常用的原始（P5）格式则采用二进制表示。</p>
+<p>每种文件格式都包含头信息，头信息以一个“魔法”字符串开始，指出文件格式。纯文本格式是 <code class="docutils literal"><span class="pre">P2</span></code>，原始格式是 <code class="docutils literal"><span class="pre">P5</span></code>。
+魔法字符串之后是空格，然后是三个数字：宽度、高度、图像的最大灰度值。
+这些数字用十进制 ASCII 数字表示，并用空格隔开。</p>
+<p>最大灰度值之后便是图像数据了。在原始文件中，这是一串二进制值。纯文本文件中，这些值是用空格隔开的十进制 ASCII 数字。</p>
+<p>原始文件可包含多个图像，一个接一个，每个都有自己的头信息。纯文本文件只包含一个图像。</p>
+</div>
+<div class="section" id="pgm">
+<span id="parsing-a-raw-pgm-file"></span><h2>解析原始 PGM 文件<a class="headerlink" href="#pgm" title="Permalink to this headline">¶</a></h2>
+<p>首先我们来给原始 PGM 文件写解析函数。PGM 解析函数是一个纯函数。它不管获取数据，只管解析。
+这是一种常见的 Haskell 编程方法。通过把数据的获取和处理分开，我们可以很方便地控制从哪里获取数据。</p>
+<p>我们用 <code class="docutils literal"><span class="pre">ByteString</span></code> 类型来存储灰度数据，因为它比较节省空间。
+由于 PGM 文件以 ASCII 字符串开头，文件内容又是二进制数据，我们同时载入两种形式的 <code class="docutils literal"><span class="pre">ByteString</span></code> 模块。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/PNM.hs</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.ByteString.Lazy.Char8</span> <span class="k">as</span> <span class="n">L8</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.ByteString.Lazy</span> <span class="k">as</span> <span class="n">L</span>
+<span class="kr">import</span> <span class="nn">Data.Char</span> <span class="p">(</span><span class="nf">isSpace</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>我们并不关心 <code class="docutils literal"><span class="pre">ByteString</span></code> 类型是惰性的还是严格的，因此我们随便选了惰性的版本。</p>
+<p>我们用一个直白的数据类型来表示 PGM 图像。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/PNM.hs</span>
+<span class="kr">data</span> <span class="kt">Greymap</span> <span class="ow">=</span> <span class="kt">Greymap</span> <span class="p">{</span>
+      <span class="n">greyWidth</span> <span class="ow">::</span> <span class="kt">Int</span>
+    <span class="p">,</span> <span class="n">greyHeight</span> <span class="ow">::</span> <span class="kt">Int</span>
+    <span class="p">,</span> <span class="n">greyMax</span> <span class="ow">::</span> <span class="kt">Int</span>
+    <span class="p">,</span> <span class="n">greyData</span> <span class="ow">::</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span>
+    <span class="p">}</span> <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>通常来说，Haskell 的 Show 实例会生成数据的字符串表示，我们还可以用 <code class="docutils literal"><span class="pre">read</span></code> 读回来。
+然而，对于一个位图图像文件来说，这可能会生成一个非常大的字符串，比如当你对一张照片调用 <code class="docutils literal"><span class="pre">show</span></code> 的时候。
+基于这个原因，我们不准备让编译器自动为我们派生 <code class="docutils literal"><span class="pre">Show</span></code> 实例；我们会自己实现，并刻意简化它。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/PNM.hs</span>
+<span class="kr">instance</span> <span class="kt">Show</span> <span class="kt">Greymap</span> <span class="kr">where</span>
+    <span class="n">show</span> <span class="p">(</span><span class="kt">Greymap</span> <span class="n">w</span> <span class="n">h</span> <span class="n">m</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">=</span> <span class="s">&quot;Greymap &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">w</span> <span class="o">++</span> <span class="s">&quot;x&quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">h</span> <span class="o">+</span> <span class="s">&quot; &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">m</span>
+</pre></div>
+</div>
+<p>我们的 <code class="docutils literal"><span class="pre">Show</span></code> 实例故意没打印位图数据，也就没必要写 <code class="docutils literal"><span class="pre">Read</span></code> 实例了，因为我们无法从 <code class="docutils literal"><span class="pre">show</span></code> 的结果重构 <code class="docutils literal"><span class="pre">Greymap</span></code>。</p>
+<p>解析函数的类型显而易见。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/PNM.hs</span>
+<span class="nf">parseP5</span> <span class="ow">::</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="p">(</span><span class="kt">Greymap</span><span class="p">,</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>这个函数以一个 <code class="docutils literal"><span class="pre">ByteString</span></code> 为参数，如果解析成功的话，它返回一个被解析的 Greymap 值以及解析之后剩下的字符串，剩下的字符串以后会用到。</p>
+<p>解析函数必须一点一点处理输入数据。首先，我们必须确认我们正在处理的是原始 PGM 文件；
+然后，我们处理头信息中的数字；最后我们处理位图数据。下面是是一种比较初级的实现方法，我们会在它的基础上不断改进。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/PNM.hs</span>
+<span class="nf">matchHeader</span> <span class="ow">::</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span> <span class="ow">-&gt;</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span>
+
+<span class="c1">-- &quot;nat&quot; here is short for &quot;natural number&quot;</span>
+<span class="nf">getNat</span> <span class="ow">::</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="p">(</span><span class="kt">Int</span><span class="p">,</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span><span class="p">)</span>
+
+<span class="nf">getBytes</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span>
+         <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="p">(</span><span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span><span class="p">,</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span><span class="p">)</span>
+
+<span class="nf">parseP5</span> <span class="n">s</span> <span class="ow">=</span>
+  <span class="kr">case</span> <span class="n">matchHeader</span> <span class="p">(</span><span class="kt">L8</span><span class="o">.</span><span class="n">pack</span> <span class="s">&quot;P5&quot;</span><span class="p">)</span> <span class="n">s</span> <span class="kr">of</span>
+    <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+    <span class="kt">Just</span> <span class="n">s1</span> <span class="ow">-&gt;</span>
+      <span class="kr">case</span> <span class="n">getNat</span> <span class="n">s1</span> <span class="kr">of</span>
+        <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+        <span class="kt">Just</span> <span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">s2</span><span class="p">)</span> <span class="ow">-&gt;</span>
+          <span class="kr">case</span> <span class="n">getNat</span> <span class="p">(</span><span class="kt">L8</span><span class="o">.</span><span class="n">dropWhile</span> <span class="n">isSpace</span> <span class="n">s2</span><span class="p">)</span> <span class="kr">of</span>
+            <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+            <span class="kt">Just</span> <span class="p">(</span><span class="n">height</span><span class="p">,</span> <span class="n">s3</span><span class="p">)</span> <span class="ow">-&gt;</span>
+              <span class="kr">case</span> <span class="n">getNat</span> <span class="p">(</span><span class="kt">L8</span><span class="o">.</span><span class="n">dropWhile</span> <span class="n">isSpace</span> <span class="n">s3</span><span class="p">)</span> <span class="kr">of</span>
+                <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+                <span class="kt">Just</span> <span class="p">(</span><span class="n">maxGrey</span><span class="p">,</span> <span class="n">s4</span><span class="p">)</span>
+                  <span class="o">|</span> <span class="n">maxGrey</span> <span class="o">&gt;</span> <span class="mi">255</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+                  <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">-&gt;</span>
+                      <span class="kr">case</span> <span class="n">getBytes</span> <span class="mi">1</span> <span class="n">s4</span> <span class="kr">of</span>
+                        <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+                        <span class="kt">Just</span> <span class="p">(</span><span class="kr">_</span><span class="p">,</span> <span class="n">s5</span><span class="p">)</span> <span class="ow">-&gt;</span>
+                          <span class="kr">case</span> <span class="n">getBytes</span> <span class="p">(</span><span class="n">width</span> <span class="o">*</span> <span class="n">height</span><span class="p">)</span> <span class="n">s5</span> <span class="kr">of</span>
+                            <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+                            <span class="kt">Just</span> <span class="p">(</span><span class="n">bitmap</span><span class="p">,</span> <span class="n">s6</span><span class="p">)</span> <span class="ow">-&gt;</span>
+                              <span class="kt">Just</span> <span class="p">(</span><span class="kt">Greymap</span> <span class="n">width</span> <span class="n">height</span> <span class="n">maxGrey</span> <span class="n">bitmap</span><span class="p">,</span> <span class="n">s6</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>这段代码非常直白，它把所有的解析放在了一个长长的梯形 <code class="docutils literal"><span class="pre">case</span></code> 表达式中。每个函数在处理完它所需要的部分后会把剩余的 <code class="docutils literal"><span class="pre">ByteString</span></code> 返回。
+我们再把这部分传给下个函数。像这样我们将结果依次解构，如果解析失败就返回 <code class="docutils literal"><span class="pre">Nothing</span></code>，否则便又向最终结迈近了一步。
+下面是我们在解析过程中用到的函数的定义。它们的类型被注释掉了因为已经写过了。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/PNM.hs</span>
+<span class="c1">-- L.ByteString -&gt; L.ByteString -&gt; Maybe L.ByteString</span>
+<span class="nf">matchHeader</span> <span class="n">prefix</span> <span class="n">str</span>
+    <span class="o">|</span> <span class="n">prefix</span> <span class="p">`</span><span class="kt">L8</span><span class="o">.</span><span class="n">isPrefixOf</span><span class="p">`</span> <span class="n">str</span>
+        <span class="ow">=</span> <span class="kt">Just</span> <span class="p">(</span><span class="kt">L8</span><span class="o">.</span><span class="n">dropWhile</span> <span class="n">isSpace</span> <span class="p">(</span><span class="kt">L</span><span class="o">.</span><span class="n">drop</span> <span class="p">(</span><span class="kt">L</span><span class="o">.</span><span class="n">length</span> <span class="n">prefix</span><span class="p">)</span> <span class="n">str</span><span class="p">))</span>
+    <span class="o">|</span> <span class="n">otherwise</span>
+        <span class="ow">=</span> <span class="kt">Nothing</span>
+
+<span class="c1">-- L.ByteString -&gt; Maybe (Int, L.ByteString)</span>
+<span class="nf">getNat</span> <span class="n">s</span> <span class="ow">=</span> <span class="kr">case</span> <span class="kt">L8</span><span class="o">.</span><span class="n">readInt</span> <span class="n">s</span> <span class="kr">of</span>
+             <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+             <span class="kt">Just</span> <span class="p">(</span><span class="n">num</span><span class="p">,</span><span class="n">rest</span><span class="p">)</span>
+                 <span class="o">|</span> <span class="n">num</span> <span class="o">&lt;=</span> <span class="mi">0</span>    <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+                 <span class="o">|</span> <span class="n">otherwise</span>   <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span><span class="n">num</span><span class="p">,</span> <span class="kt">L8</span><span class="o">.</span><span class="n">dropWhile</span> <span class="n">isSpace</span> <span class="n">rest</span><span class="p">)</span>
+
+<span class="c1">-- Int -&gt; L.ByteString -&gt; Maybe (L.ByteString, L.ByteString)</span>
+<span class="nf">getBytes</span> <span class="n">n</span> <span class="n">str</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">count</span>           <span class="ow">=</span> <span class="n">fromIntegral</span> <span class="n">n</span>
+                     <span class="n">both</span><span class="o">@</span><span class="p">(</span><span class="n">prefix</span><span class="p">,</span><span class="kr">_</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">L</span><span class="o">.</span><span class="n">splitAt</span> <span class="n">count</span> <span class="n">str</span>
+                 <span class="kr">in</span> <span class="kr">if</span> <span class="kt">L</span><span class="o">.</span><span class="n">length</span> <span class="n">prefix</span> <span class="o">&lt;</span> <span class="n">count</span>
+                    <span class="kr">then</span> <span class="kt">Nothing</span>
+                    <span class="kr">else</span> <span class="kt">Just</span> <span class="n">both</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="getting-rid-of-boilerplate-code">
+<span id="id3"></span><h2>消除样板代码<a class="headerlink" href="#getting-rid-of-boilerplate-code" title="Permalink to this headline">¶</a></h2>
+<p><code class="docutils literal"><span class="pre">parseP5</span></code> 函数虽然能用，但它的代码风格却并不令人满意。它不断挪向屏幕右侧，非常明显，再来个稍微复杂点的函数它就要横跨屏幕了。
+我们不断构建和解构 <code class="docutils literal"><span class="pre">Maybe</span></code> 值，只在 <code class="docutils literal"><span class="pre">Just</span></code> 匹配特定值的时候才继续。所有这些相似的 <code class="docutils literal"><span class="pre">case</span></code> 表达式就是“样板代码”，它掩盖了我们真正要做的事情。
+总而言之，这段代码需要抽象重构。</p>
+<p>退一步看，我们能观察到两种模式。第一，很多我们用到的函数都有相似的类型，它们最后一个参数都是 <code class="docutils literal"><span class="pre">ByteString</span></code>，返回值类型都是 <code class="docutils literal"><span class="pre">Maybe</span></code>。
+第二，<code class="docutils literal"><span class="pre">parseP5</span></code> 函数不断解构 <code class="docutils literal"><span class="pre">Maybe</span></code> 值，然后要么失败退出，要么把展开之后的值传给下个函数。</p>
+<p>我们很容易就能写个函数来体现第二种模式。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/PNM.hs</span>
+<span class="p">(</span><span class="o">&gt;&gt;?</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">b</span>
+<span class="kt">Nothing</span> <span class="o">&gt;&gt;?</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">Nothing</span>
+<span class="kt">Just</span> <span class="n">v</span>  <span class="o">&gt;&gt;?</span> <span class="n">f</span> <span class="ow">=</span> <span class="n">f</span> <span class="n">v</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">(&gt;&gt;?)</span></code> 函数非常简单：它接受一个值作为左侧参数，一个函数 <code class="docutils literal"><span class="pre">f</span></code> 作为右侧参数。如果值不为 <code class="docutils literal"><span class="pre">Nothing</span></code>，它就把函数 <code class="docutils literal"><span class="pre">f</span></code> 应用在 <code class="docutils literal"><span class="pre">Just</span></code> 构造器中的值上。
+我们把这个函数定义为操作符这样它就能把别的函数串联在一起了。最后，我们没给 <code class="docutils literal"><span class="pre">(&gt;&gt;?)</span></code> 定义结合度，因此它默认为 <code class="docutils literal"><span class="pre">infixl</span> <span class="pre">9</span></code> （左结合，优先级最高的操作符）。
+换言之，<code class="docutils literal"><span class="pre">a</span> <span class="pre">&gt;&gt;?</span> <span class="pre">b</span> <span class="pre">&gt;&gt;?</span> <span class="pre">c</span></code> 会从左向右求值，就像 <code class="docutils literal"><span class="pre">(a</span> <span class="pre">&gt;&gt;?</span> <span class="pre">b)</span> <span class="pre">&gt;&gt;?</span> <span class="pre">c)</span></code> 一样。</p>
+<p>有了这个串联函数，我们来重写一下解析函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/PNM.hs</span>
+<span class="nf">parseP5_take2</span> <span class="ow">::</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="p">(</span><span class="kt">Greymap</span><span class="p">,</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span><span class="p">)</span>
+<span class="nf">parseP5_take2</span> <span class="n">s</span> <span class="ow">=</span>
+    <span class="n">matchHeader</span> <span class="p">(</span><span class="kt">L8</span><span class="o">.</span><span class="n">pack</span> <span class="s">&quot;P5&quot;</span><span class="p">)</span> <span class="n">s</span>      <span class="o">&gt;&gt;?</span>
+    <span class="nf">\</span><span class="n">s</span> <span class="ow">-&gt;</span> <span class="n">skipSpace</span> <span class="p">(</span><span class="nb">()</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>           <span class="o">&gt;&gt;?</span>
+    <span class="p">(</span><span class="n">getNat</span> <span class="o">.</span> <span class="n">snd</span><span class="p">)</span>                    <span class="o">&gt;&gt;?</span>
+    <span class="n">skipSpace</span>                         <span class="o">&gt;&gt;?</span>
+    <span class="nf">\</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="ow">-&gt;</span>   <span class="n">getNat</span> <span class="n">s</span>         <span class="o">&gt;&gt;?</span>
+    <span class="n">skipSpace</span>                         <span class="o">&gt;&gt;?</span>
+    <span class="nf">\</span><span class="p">(</span><span class="n">height</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="ow">-&gt;</span>  <span class="n">getNat</span> <span class="n">s</span>         <span class="o">&gt;&gt;?</span>
+    <span class="nf">\</span><span class="p">(</span><span class="n">maxGrey</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">getBytes</span> <span class="mi">1</span> <span class="n">s</span>     <span class="o">&gt;&gt;?</span>
+    <span class="p">(</span><span class="n">getBytes</span> <span class="p">(</span><span class="n">width</span> <span class="o">*</span> <span class="n">height</span><span class="p">)</span> <span class="o">.</span> <span class="n">snd</span><span class="p">)</span> <span class="o">&gt;&gt;?</span>
+    <span class="nf">\</span><span class="p">(</span><span class="n">bitmap</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span><span class="kt">Greymap</span> <span class="n">width</span> <span class="n">height</span> <span class="n">maxGrey</span> <span class="n">bitmap</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+
+<span class="nf">skipSpace</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span><span class="p">)</span>
+<span class="nf">skipSpace</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="kt">L8</span><span class="o">.</span><span class="n">dropWhile</span> <span class="n">isSpace</span> <span class="n">s</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>理解这个函数的关键在于理解其中的链。每个 <code class="docutils literal"><span class="pre">(&gt;&gt;?)</span></code> 的左侧都是一个 <code class="docutils literal"><span class="pre">Maybe</span></code> 值，右侧都是一个返回 <code class="docutils literal"><span class="pre">Maybe</span></code> 值的函数。
+这样，<code class="docutils literal"><span class="pre">Maybe</span></code> 值就可以不断传给后续 <code class="docutils literal"><span class="pre">(&gt;&gt;?)</span></code> 表达式。</p>
+<p>我们新增了 <code class="docutils literal"><span class="pre">skipSpace</span></code> 函数用来提高可读性。通过这些改进，我们已将代码长度减半。通过移除样板 <code class="docutils literal"><span class="pre">case</span></code> 代码，代码变得更容易理解。</p>
+<p>尽管在<a class="reference internal" href="4.html#anonymous-lambda-functions"><span>匿名（lambda）函数</span></a>中我们已经警告过不要过度使用匿名函数，在上面的函数链中我们还是用了一些。因为这些函数太小了，给它们命名并不能提高可读性。</p>
+</div>
+<div class="section" id="implicit-state">
+<span id="id4"></span><h2>隐式状态<a class="headerlink" href="#implicit-state" title="Permalink to this headline">¶</a></h2>
+<p>到这里还没完。我们的代码显式地用序对传递结果，其中一个元素代表解析结果的中间值，另一个代表剩余的 <code class="docutils literal"><span class="pre">ByteString</span></code> 值。
+如果我们想扩展代码，比方说记录已经处理过的字节数，以便在解析失败时报告出错位置，那我们已经有8个地方要改了，就为了把序对改成三元组。</p>
+<p>这使得本来就没多少的代码还很难修改。问题在于用模式匹配从序对中取值：我们假设了我们总是会用序对，并且把这种假设编进了代码。
+尽管模式匹配非常好用，但如果不慎重，我们还是会误入歧途。</p>
+<p>让我们解决新代码带来的不便。首先，我们来修改解析状态的类型。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="kr">data</span> <span class="kt">ParseState</span> <span class="ow">=</span> <span class="kt">ParseState</span> <span class="p">{</span>
+      <span class="n">string</span> <span class="ow">::</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span>
+    <span class="p">,</span> <span class="n">offset</span> <span class="ow">::</span> <span class="kt">Int64</span>           <span class="c1">-- imported from Data.Int</span>
+    <span class="p">}</span> <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>我们转向了代数数据类型，现在我们既可以记录当前剩余的字符串，也可以记录相对于原字符串的偏移值了。
+更重要的改变是用了记录语法：现在可以避免使用模式匹配来获取状态信息了，可以用 <code class="docutils literal"><span class="pre">string</span></code> 和 <code class="docutils literal"><span class="pre">offset</span></code> 访问函数。</p>
+<p>我们给解析状态起了名字。给东西起名字方便我们推理。例如，我们现在可以这么看解析函数：它处理一个解析状态，产生新解析状态和一些别的信息。
+我们可以用 Haskell 类型直接表示。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">simpleParse</span> <span class="ow">::</span> <span class="kt">ParseState</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="kt">ParseState</span><span class="p">)</span>
+<span class="nf">simpleParse</span> <span class="ow">=</span> <span class="n">undefined</span>
+</pre></div>
+</div>
+<p>为了给用户更多帮助，我们可以在解析失败时报告一条错误信息。只需对解析器的类型稍作修改即可。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">betterParse</span> <span class="ow">::</span> <span class="kt">ParseState</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="kt">ParseState</span><span class="p">)</span>
+<span class="nf">betterParse</span> <span class="ow">=</span> <span class="n">undefined</span>
+</pre></div>
+</div>
+<p>为了防患于未然，我们最好不要将解析器的实现暴露给用户。早些时候我们显式地用序对来表示状态，当我们想扩展解析器的功能时，我们马上就遇到了麻烦。
+为了防止这种现象再次发生，我们用一个 <code class="docutils literal"><span class="pre">newtype</span></code> 声明来隐藏解析器的细节。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">--file: ch10/Parse.hs</span>
+<span class="kr">newtype</span> <span class="kt">Parse</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Parse</span> <span class="p">{</span>
+    <span class="n">runParse</span> <span class="ow">::</span> <span class="kt">ParseState</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="kt">ParseState</span><span class="p">)</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<p>别忘了 <code class="docutils literal"><span class="pre">newtype</span></code> 只是函数在编译时的一层包装，它没有运行时开销。我们想用这个函数时，我们用 <code class="docutils literal"><span class="pre">runParser</span></code> 访问器。</p>
+<p>如果我们的模块不导出 <code class="docutils literal"><span class="pre">Parse</span></code> 值构造器，我们就能确保没人会不小心创建一个解析器，或者通过模式匹配来观察其内部构造。</p>
+<div class="section" id="the-identity-parser">
+<span id="identity"></span><h3>identity 解析器<a class="headerlink" href="#the-identity-parser" title="Permalink to this headline">¶</a></h3>
+<p>我们来定义一个简单的 <em>identity</em> 解析器。它把输入值转为解析结果。从这个意义上讲，它有点像 <code class="docutils literal"><span class="pre">id</span></code> 函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">identity</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Parse</span> <span class="n">a</span>
+<span class="nf">identity</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Parse</span> <span class="p">(</span><span class="nf">\</span><span class="n">s</span> <span class="ow">-&gt;</span> <span class="kt">Right</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">s</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>这个函数没动解析状态，只把它的参数当成了解析结果。我们把函数体包装成 <code class="docutils literal"><span class="pre">Parse</span></code> 类型以通过类型检查。
+我们该怎么用它去解析呢？</p>
+<p>首先我们得把 <code class="docutils literal"><span class="pre">Parse</span></code> 包装去掉从而得到里面的函数。这通过 <code class="docutils literal"><span class="pre">runParse</span></code> 函数实现。
+然后得创建一个 <code class="docutils literal"><span class="pre">ParseState</span></code>，然后对其调用解析函数。最后，我们把解析结果和最终的 <code class="docutils literal"><span class="pre">ParseState</span></code> 分开。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">parse</span> <span class="ow">::</span> <span class="kt">Parse</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">L</span><span class="o">.</span><span class="kt">ByteString</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="n">a</span>
+<span class="nf">parse</span> <span class="n">parser</span> <span class="n">initState</span>
+    <span class="ow">=</span> <span class="kr">case</span> <span class="n">runParse</span> <span class="n">parser</span> <span class="p">(</span><span class="kt">ParseState</span> <span class="n">initState</span> <span class="mi">0</span><span class="p">)</span> <span class="kr">of</span>
+        <span class="kt">Left</span> <span class="n">err</span>          <span class="ow">-&gt;</span> <span class="kt">Left</span> <span class="n">err</span>
+        <span class="kt">Right</span> <span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Right</span> <span class="n">result</span>
+</pre></div>
+</div>
+<p>由于 <code class="docutils literal"><span class="pre">identity</span></code> 解析器和 <code class="docutils literal"><span class="pre">parse</span></code> 函数都没有检查解析状态，我们都不用传入字符串就可以试验我们的代码。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">r</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">Parse</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">parse</span> <span class="p">(</span><span class="n">identity</span> <span class="mi">1</span><span class="p">)</span> <span class="n">undefined</span>
+<span class="nf">parse</span> <span class="p">(</span><span class="n">identity</span> <span class="mi">1</span><span class="p">)</span> <span class="n">undefined</span> <span class="ow">::</span> <span class="kt">Num</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="n">a</span>
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">identity</span> <span class="mi">1</span><span class="p">)</span> <span class="n">undefined</span>
+<span class="kt">Right</span> <span class="mi">1</span>
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">identity</span> <span class="s">&quot;foo&quot;</span><span class="p">)</span> <span class="n">undefined</span>
+<span class="kt">Right</span> <span class="s">&quot;foo&quot;</span>
+</pre></div>
+</div>
+<p>一个不检查输入的解析器可能有点奇怪，但很快我们就可以看到它的用处。
+同时，我们更加确信我们的类型是正确的，基本了解了代码是如何工作的。</p>
+</div>
+<div class="section" id="record-syntax-updates-and-pattern-matching">
+<span id="id5"></span><h3>记录语法、更新以及模式匹配<a class="headerlink" href="#record-syntax-updates-and-pattern-matching" title="Permalink to this headline">¶</a></h3>
+<p>记录语法的用处不仅仅在于访问函数：我们可以用它来复制或部分改变已有值。就像下面这样：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">modifyOffset</span> <span class="ow">::</span> <span class="kt">ParseState</span> <span class="ow">-&gt;</span> <span class="kt">Int64</span> <span class="ow">-&gt;</span> <span class="kt">ParseState</span>
+<span class="nf">modifyOffset</span> <span class="n">initState</span> <span class="n">newOffset</span> <span class="ow">=</span>
+    <span class="n">initState</span> <span class="p">{</span> <span class="n">offset</span> <span class="ow">=</span> <span class="n">newOffset</span> <span class="p">}</span>
+</pre></div>
+</div>
+<p>这会创建一个跟 <code class="docutils literal"><span class="pre">initState</span></code> 完全一样的 <code class="docutils literal"><span class="pre">ParseState</span></code> 值，除了 <code class="docutils literal"><span class="pre">offset</span></code> 字段会替换成 <code class="docutils literal"><span class="pre">newOffset</span></code> 指定的值。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">before</span> <span class="ow">=</span> <span class="kt">ParseState</span> <span class="p">(</span><span class="kt">L8</span><span class="o">.</span><span class="n">pack</span> <span class="s">&quot;foo&quot;</span><span class="p">)</span> <span class="mi">0</span>
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">after</span> <span class="ow">=</span> <span class="n">modifyOffset</span> <span class="n">before</span> <span class="mi">3</span>
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">before</span>
+<span class="kt">ParseState</span> <span class="p">{</span><span class="n">string</span> <span class="ow">=</span> <span class="s">&quot;foo&quot;</span><span class="p">,</span> <span class="n">offset</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">}</span>
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">after</span>
+<span class="kt">ParseState</span> <span class="p">{</span><span class="n">string</span> <span class="ow">=</span> <span class="s">&quot;foo&quot;</span><span class="p">,</span> <span class="n">offset</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>在大括号里我们可以给任意多的字段赋值，用逗号分开即可。</p>
+</div>
+<div class="section" id="a-more-interesting-parser">
+<span id="id6"></span><h3>一个更有趣的解析器<a class="headerlink" href="#a-more-interesting-parser" title="Permalink to this headline">¶</a></h3>
+<p>现在来写个解析器做一些有意义的事情。我们并不好高骛远：我们只想解析单个字节而已。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="c1">-- import the Word8 type from Data.Word</span>
+<span class="nf">parseByte</span> <span class="ow">::</span> <span class="kt">Parse</span> <span class="kt">Word8</span>
+<span class="nf">parseByte</span> <span class="ow">=</span>
+    <span class="n">getState</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="n">initState</span> <span class="ow">-&gt;</span>
+    <span class="kr">case</span> <span class="kt">L</span><span class="o">.</span><span class="n">uncons</span> <span class="p">(</span><span class="n">string</span> <span class="n">initState</span><span class="p">)</span> <span class="kr">of</span>
+      <span class="kt">Nothing</span> <span class="ow">-&gt;</span>
+          <span class="n">bail</span> <span class="s">&quot;no more input&quot;</span>
+      <span class="kt">Just</span> <span class="p">(</span><span class="n">byte</span><span class="p">,</span><span class="n">remainder</span><span class="p">)</span> <span class="ow">-&gt;</span>
+          <span class="n">putState</span> <span class="n">newState</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="kr">_</span> <span class="ow">-&gt;</span>
+          <span class="n">identity</span> <span class="n">byte</span>
+        <span class="kr">where</span> <span class="n">newState</span> <span class="ow">=</span> <span class="n">initState</span> <span class="p">{</span> <span class="n">string</span> <span class="ow">=</span> <span class="n">remainder</span><span class="p">,</span>
+                                     <span class="n">offset</span> <span class="ow">=</span> <span class="n">newOffset</span> <span class="p">}</span>
+              <span class="n">newOffset</span> <span class="ow">=</span> <span class="n">offset</span> <span class="n">initState</span> <span class="o">+</span> <span class="mi">1</span>
+</pre></div>
+</div>
+<p>定义中有几个新函数。</p>
+<p><code class="docutils literal"><span class="pre">L8.uncons</span></code> 函数取出 <code class="docutils literal"><span class="pre">ByteString</span></code> 中的第一个元素。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">L8</span><span class="o">.</span><span class="n">uncons</span> <span class="p">(</span><span class="kt">L8</span><span class="o">.</span><span class="n">pack</span> <span class="s">&quot;foo&quot;</span><span class="p">)</span>
+<span class="kt">Just</span> <span class="p">(</span><span class="sc">&#39;f&#39;</span><span class="p">,</span><span class="kt">Chunk</span> <span class="s">&quot;oo&quot;</span> <span class="kt">Empty</span><span class="p">)</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">L8</span><span class="o">.</span><span class="n">uncons</span> <span class="kt">L8</span><span class="o">.</span><span class="n">empty</span>
+<span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">getState</span></code> 函数得到当前解析状态，<code class="docutils literal"><span class="pre">putState</span></code> 函数更新解析状态。<code class="docutils literal"><span class="pre">bail</span></code> 函数终止解析并报告错误。
+<code class="docutils literal"><span class="pre">(==&gt;)</span></code> 函数把解析器串联起来。我们马上就会详细介绍这些函数。</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Hanging lambdas</p>
+</div>
+</div>
+<div class="section" id="obtaining-and-modifying-the-parse-state">
+<span id="id7"></span><h3>获取和修改解析状态<a class="headerlink" href="#obtaining-and-modifying-the-parse-state" title="Permalink to this headline">¶</a></h3>
+<p><code class="docutils literal"><span class="pre">parseByte</span></code> 函数并不接受解析状态作为参数。相反，它必须调用 <code class="docutils literal"><span class="pre">getState</span></code> 来得到解析状态的副本，然后调用 <code class="docutils literal"><span class="pre">putState</span></code> 将当前状态更新为新状态。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">getState</span> <span class="ow">::</span> <span class="kt">Parse</span> <span class="kt">ParseState</span>
+<span class="nf">getState</span> <span class="ow">=</span> <span class="kt">Parse</span> <span class="p">(</span><span class="nf">\</span><span class="n">s</span> <span class="ow">-&gt;</span> <span class="kt">Right</span> <span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">s</span><span class="p">))</span>
+
+<span class="nf">putState</span> <span class="ow">::</span> <span class="kt">ParseState</span> <span class="ow">-&gt;</span> <span class="kt">Parse</span> <span class="nb">()</span>
+<span class="nf">putState</span> <span class="n">s</span> <span class="ow">=</span> <span class="kt">Parse</span> <span class="p">(</span><span class="nf">\</span><span class="kr">_</span> <span class="ow">-&gt;</span> <span class="kt">Right</span> <span class="p">(</span><span class="nb">()</span><span class="p">,</span> <span class="n">s</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>阅读这些函数的时候，记得序对左元素为 <code class="docutils literal"><span class="pre">Parse</span></code> 结果，右元素为当前 <code class="docutils literal"><span class="pre">ParseState</span></code>。这样理解起来会比较容易。</p>
+<p><code class="docutils literal"><span class="pre">getState</span></code> 将当前解析状态展开，这样调用者就能访问里面的字符串。
+<code class="docutils literal"><span class="pre">putState</span></code> 将当前解析状态替换为一个新状态。<code class="docutils literal"><span class="pre">(==&gt;)</span></code> 链中的下一个函数将会使用这个状态。</p>
+<p>这些函数将显式的状态处理移到了需要它们的函数的函数体内。很多函数并不关心当前状态是什么，因而它们也不会调用 <code class="docutils literal"><span class="pre">getState</span></code> 或 <code class="docutils literal"><span class="pre">putState</span></code>。
+跟之前需要手动传递元组的解析器相比，现在的代码更加紧凑。在之后的代码中就能看到效果。</p>
+<p>我们将解析状态的细节打包放入 <code class="docutils literal"><span class="pre">ParseState</span></code> 类型中，然后我们通过访问器而不是模式匹配来访问它。
+隐式地传递解析状态给我们带来另外的好处。如果想增加解析状态的信息，我们只需修改 <code class="docutils literal"><span class="pre">ParseState</span></code> 定义，以及需要新信息的函数体即可。
+跟之前通过模式匹配暴露状态的解析器相比，现在的代码更加模块化：只有需要新信息的代码会受到影响。</p>
+</div>
+<div class="section" id="reporting-parse-errors">
+<span id="id8"></span><h3>报告解析错误<a class="headerlink" href="#reporting-parse-errors" title="Permalink to this headline">¶</a></h3>
+<p>在定义 <code class="docutils literal"><span class="pre">Parse</span></code> 的时候我们已经考虑了出错的情况。<code class="docutils literal"><span class="pre">(==&gt;)</span></code> 组合子不断检查解析错误并在错误发生时终止解析。
+但我们还没来得及介绍用来报告解析错误的 <code class="docutils literal"><span class="pre">bail</span></code> 函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">bail</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Parse</span> <span class="n">a</span>
+<span class="nf">bail</span> <span class="n">err</span> <span class="ow">=</span> <span class="kt">Parse</span> <span class="o">$</span> <span class="nf">\</span><span class="n">s</span> <span class="ow">-&gt;</span> <span class="kt">Left</span> <span class="o">$</span>
+           <span class="s">&quot;byte offset &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="p">(</span><span class="n">offset</span> <span class="n">s</span><span class="p">)</span> <span class="o">++</span> <span class="s">&quot;: &quot;</span> <span class="o">++</span> <span class="n">err</span>
+</pre></div>
+</div>
+<p>调用 <code class="docutils literal"><span class="pre">bail</span></code> 之后，<code class="docutils literal"><span class="pre">(==&gt;)</span></code> 会模式匹配包装了错误信息的 <code class="docutils literal"><span class="pre">Left</span></code> 构造器，并且不会调用下一个解析器。
+这使得错误信息可以沿着调用链返回。</p>
+</div>
+<div class="section" id="chaining-parsers-together">
+<span id="id9"></span><h3>把解析器串联起来<a class="headerlink" href="#chaining-parsers-together" title="Permalink to this headline">¶</a></h3>
+<p><code class="docutils literal"><span class="pre">(==&gt;)</span></code> 函数的功能和之前介绍的 <code class="docutils literal"><span class="pre">(&gt;&gt;?)</span></code> 函数功能类似：它可以作为“胶水”把函数串联起来。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="p">(</span><span class="o">==&gt;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Parse</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Parse</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Parse</span> <span class="n">b</span>
+
+<span class="nf">firstParser</span> <span class="o">==&gt;</span> <span class="n">secondParser</span>  <span class="ow">=</span>  <span class="kt">Parse</span> <span class="n">chainedParser</span>
+  <span class="kr">where</span> <span class="n">chainedParser</span> <span class="n">initState</span>   <span class="ow">=</span>
+          <span class="kr">case</span> <span class="n">runParse</span> <span class="n">firstParser</span> <span class="n">initState</span> <span class="kr">of</span>
+            <span class="kt">Left</span> <span class="n">errMessage</span> <span class="ow">-&gt;</span>
+                <span class="kt">Left</span> <span class="n">errMessage</span>
+            <span class="kt">Right</span> <span class="p">(</span><span class="n">firstResult</span><span class="p">,</span> <span class="n">newState</span><span class="p">)</span> <span class="ow">-&gt;</span>
+                <span class="n">runParse</span> <span class="p">(</span><span class="n">secondParser</span> <span class="n">firstResult</span><span class="p">)</span> <span class="n">newState</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">(==&gt;)</span></code> 函数体很有趣，还稍微有点复杂。回想一下，<code class="docutils literal"><span class="pre">Parse</span></code> 类型表示一个被包装的函数。
+既然 <code class="docutils literal"><span class="pre">(==&gt;)</span></code> 函数把两个 <code class="docutils literal"><span class="pre">Parse</span></code> 串联起来并产生第三个，它也必须返回一个被包装的函数。</p>
+<p>这个函数做的并不多：它仅仅创建了一个<em>闭包</em>（closure）用来记忆 <code class="docutils literal"><span class="pre">firstParser</span></code> 和 <code class="docutils literal"><span class="pre">secondParser</span></code> 的值。</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">闭包是一个函数和它所在的<em>环境</em>，也就是它可以访问的变量。闭包在 Haskell 中很常见。
+例如，<code class="docutils literal"><span class="pre">(+5)</span></code> 就是一个闭包。实现的时候必须将 <code class="docutils literal"><span class="pre">5</span></code> 记录为 <code class="docutils literal"><span class="pre">(+)</span></code> 操作符的第二个参数，这样得到的函数才能把 <code class="docutils literal"><span class="pre">5</span></code> 加给它的参数。</p>
+</div>
+<p>在应用 <code class="docutils literal"><span class="pre">parse</span></code> 之前，这个闭包不会被展开应用。
+应用的时候，它会求值 <code class="docutils literal"><span class="pre">firstParser</span></code> 并检查它的结果。如果解析失败，闭包也会失败。
+否则，它会把解析结果及 <code class="docutils literal"><span class="pre">newState</span></code> 传给 <code class="docutils literal"><span class="pre">secondParser</span></code>。</p>
+<p>这是非常具有想象力、非常微妙的想法：我们实际上用了一个隐藏的参数将 <code class="docutils literal"><span class="pre">ParseState</span></code> 在 <code class="docutils literal"><span class="pre">Parse</span></code> 链之间传递。
+（我们在之后几章还会碰到这样的代码，所以现在不懂也没有关系。）</p>
+</div>
+</div>
+<div class="section" id="functor">
+<span id="introducing-functors"></span><h2>Functor 简介<a class="headerlink" href="#functor" title="Permalink to this headline">¶</a></h2>
+<p>现在我们对 <code class="docutils literal"><span class="pre">map</span></code> 函数已经有了一个比较详细的了解，它把函数应用在列表的每一个元素上，并返回一个可能包含另一种类型元素的列表。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">map</span> <span class="p">(</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">map</span> <span class="n">show</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+<span class="p">[</span><span class="s">&quot;1&quot;</span><span class="p">,</span><span class="s">&quot;2&quot;</span><span class="p">,</span><span class="s">&quot;3&quot;</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">map</span> <span class="n">show</span>
+<span class="nf">map</span> <span class="n">show</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Show</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">map</span></code> 函数这种行为在别的实例中可能有用。例如，考虑一棵二叉树。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/TreeMap.hs</span>
+<span class="kr">data</span> <span class="kt">Tree</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Node</span> <span class="p">(</span><span class="kt">Tree</span> <span class="n">a</span><span class="p">)</span> <span class="p">(</span><span class="kt">Tree</span> <span class="n">a</span><span class="p">)</span>
+            <span class="o">|</span> <span class="kt">Leaf</span> <span class="n">a</span>
+              <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>如果想把一个字符串树转成一个包含这些字符串长度的树，我们可以写个函数来实现：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/TreeMap.hs</span>
+<span class="nf">treeLengths</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="n">s</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Leaf</span> <span class="p">(</span><span class="n">length</span> <span class="n">s</span><span class="p">)</span>
+<span class="nf">treeLengths</span> <span class="p">(</span><span class="kt">Node</span> <span class="n">l</span> <span class="n">r</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Node</span> <span class="p">(</span><span class="n">treeLengths</span> <span class="n">l</span><span class="p">)</span> <span class="p">(</span><span class="n">treeLengths</span> <span class="n">r</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>我们试着寻找一些可能转成通用函数的模式，下面就是一个可能的模式。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/TreeMap.hs</span>
+<span class="nf">treeMap</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Tree</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Tree</span> <span class="n">b</span>
+<span class="nf">treeMap</span> <span class="n">f</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="n">a</span><span class="p">)</span>   <span class="ow">=</span> <span class="kt">Leaf</span> <span class="p">(</span><span class="n">f</span> <span class="n">a</span><span class="p">)</span>
+<span class="nf">treeMap</span> <span class="n">f</span> <span class="p">(</span><span class="kt">Node</span> <span class="n">l</span> <span class="n">r</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Node</span> <span class="p">(</span><span class="n">treeMap</span> <span class="n">f</span> <span class="n">l</span><span class="p">)</span> <span class="p">(</span><span class="n">treeMap</span> <span class="n">f</span> <span class="n">r</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>正如我们希望的那样，<code class="docutils literal"><span class="pre">treeLengths</span></code> 和 <code class="docutils literal"><span class="pre">treeMap</span> <span class="pre">length</span></code> 返回相同的结果。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">tree</span> <span class="ow">=</span> <span class="kt">Node</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="s">&quot;foo&quot;</span><span class="p">)</span> <span class="p">(</span><span class="kt">Node</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="s">&quot;x&quot;</span><span class="p">)</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="s">&quot;quux&quot;</span><span class="p">))</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">treeLengths</span> <span class="n">tree</span>
+<span class="kt">Node</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="mi">3</span><span class="p">)</span> <span class="p">(</span><span class="kt">Node</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="mi">4</span><span class="p">))</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">treeMap</span> <span class="n">length</span> <span class="n">tree</span>
+<span class="kt">Node</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="mi">3</span><span class="p">)</span> <span class="p">(</span><span class="kt">Node</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="mi">4</span><span class="p">))</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">treeMap</span> <span class="p">(</span><span class="n">odd</span> <span class="o">.</span> <span class="n">length</span><span class="p">)</span> <span class="n">tree</span>
+<span class="kt">Node</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="kt">True</span><span class="p">)</span> <span class="p">(</span><span class="kt">Node</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="kt">True</span><span class="p">)</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="kt">False</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Haskell 提供了一个众所周知的类型类来进一步一般化 <code class="docutils literal"><span class="pre">treeMap</span></code>。这个类型类叫做 <code class="docutils literal"><span class="pre">Functor</span></code>，它只定义了一个函数 <code class="docutils literal"><span class="pre">fmap</span></code>。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/TreeMap.hs</span>
+<span class="kr">class</span> <span class="kt">Functor</span> <span class="n">f</span> <span class="kr">where</span>
+    <span class="n">fmap</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>我们可以把 <code class="docutils literal"><span class="pre">fmap</span></code> 当做某种提升函数，就像我们在 Avoiding boilerplate with lifting(fix link) 一节中介绍的那样。
+它接受一个参数为普通值 <code class="docutils literal"><span class="pre">a</span> <span class="pre">-&gt;</span> <span class="pre">b</span></code> 的函数并把它提升为一个参数为容器 <code class="docutils literal"><span class="pre">f</span> <span class="pre">a</span> <span class="pre">-&gt;</span> <span class="pre">f</span> <span class="pre">b</span></code> 的函数。
+其中 <code class="docutils literal"><span class="pre">f</span></code> 是容器的类型。</p>
+<p>举个例子，如果我们用 <code class="docutils literal"><span class="pre">Tree</span></code> 替换类型变量 <code class="docutils literal"><span class="pre">f</span></code>，<code class="docutils literal"><span class="pre">fmap</span></code> 的类型就会跟 <code class="docutils literal"><span class="pre">treeMap</span></code> 的类型相同。
+事实上我们可以用 <code class="docutils literal"><span class="pre">treeMap</span></code> 作为 <code class="docutils literal"><span class="pre">fmap</span></code> 对 <code class="docutils literal"><span class="pre">Tree</span></code> 的实现。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/TreeMap.hs</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">Tree</span> <span class="kr">where</span>
+    <span class="n">fmap</span> <span class="ow">=</span> <span class="n">treeMap</span>
+</pre></div>
+</div>
+<p>我们可以用 <code class="docutils literal"><span class="pre">map</span></code> 作为 <code class="docutils literal"><span class="pre">fmap</span></code> 对列表的实现。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/TreeMap.hs</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">[]</span> <span class="kr">where</span>
+    <span class="n">fmap</span> <span class="ow">=</span> <span class="n">map</span>
+</pre></div>
+</div>
+<p>现在我们可以把 <code class="docutils literal"><span class="pre">fmap</span></code> 用于不同类型的容器上了。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">fmap</span> <span class="n">length</span> <span class="p">[</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;quux&quot;</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">fmap</span> <span class="n">length</span> <span class="p">(</span><span class="kt">Node</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="s">&quot;Livingstone&quot;</span><span class="p">)</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="s">&quot;I presume&quot;</span><span class="p">))</span>
+<span class="kt">Node</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="mi">11</span><span class="p">)</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="mi">9</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Prelude 定义了一些常见类型的 <code class="docutils literal"><span class="pre">Functor</span></code> 实例，如列表和 <code class="docutils literal"><span class="pre">Maybe</span></code>。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/TreeMap.hs</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">Maybe</span> <span class="kr">where</span>
+    <span class="n">fmap</span> <span class="kr">_</span> <span class="kt">Nothing</span>  <span class="ow">=</span> <span class="kt">Nothing</span>
+    <span class="n">fmap</span> <span class="n">f</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">x</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="p">(</span><span class="n">f</span> <span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">Maybe</span></code> 的这个实例很清楚地表明了 <code class="docutils literal"><span class="pre">fmap</span></code> 要做什么。对于类型的每一个构造器，它都必须给出对应的行为。
+例如，如果值被包装在 <code class="docutils literal"><span class="pre">Just</span></code> 里，<code class="docutils literal"><span class="pre">fmap</span></code> 实现把函数应用在展开之后的值上，然后再用 <code class="docutils literal"><span class="pre">Just</span></code> 重新包装起来。</p>
+<p><code class="docutils literal"><span class="pre">Functor</span></code> 的定义限制了我们能用 <code class="docutils literal"><span class="pre">fmap</span></code> 做什么。例如，如果一个类型有且仅有一个类型参数，我们才能给它实现 <code class="docutils literal"><span class="pre">Functor</span></code> 实例。</p>
+<p>举个例子，我们不能给 <code class="docutils literal"><span class="pre">Either</span> <span class="pre">a</span> <span class="pre">b</span></code> 或者 <code class="docutils literal"><span class="pre">(a,</span> <span class="pre">b)</span></code> 写 <code class="docutils literal"><span class="pre">fmap</span></code> 实现，因为它们有两个类型参数。
+我们也不能给 <code class="docutils literal"><span class="pre">Bool</span></code> 或者 <code class="docutils literal"><span class="pre">Int</span></code> 写，因为它们没有类型参数。</p>
+<p>另外，我们不能给类型定义添加任何约束。这是什么意思呢？为了搞清楚，我们来看一个正常的 <code class="docutils literal"><span class="pre">data</span></code> 定义和它的 <code class="docutils literal"><span class="pre">Functor</span></code> 实例。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/ValidFunctor.hs</span>
+<span class="kr">data</span> <span class="kt">Foo</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Foo</span> <span class="n">a</span>
+
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">Foo</span> <span class="kr">where</span>
+    <span class="n">fmap</span> <span class="n">f</span> <span class="p">(</span><span class="kt">Foo</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Foo</span> <span class="p">(</span><span class="n">f</span> <span class="n">a</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>当我们定义新类型时，我们可以在 <code class="docutils literal"><span class="pre">data</span></code> 关键字之后加一个类型约束。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/ValidFunctor.hs</span>
+<span class="kr">data</span> <span class="kt">Eq</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Bar</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Bar</span> <span class="n">a</span>
+
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">Bar</span> <span class="kr">where</span>
+    <span class="n">fmap</span> <span class="n">f</span> <span class="p">(</span><span class="kt">Bar</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Bar</span> <span class="p">(</span><span class="n">f</span> <span class="n">a</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>这意味着只有当 <code class="docutils literal"><span class="pre">a</span></code> 是 <code class="docutils literal"><span class="pre">Eq</span></code> 类型类的成员时，它才能被放进 <code class="docutils literal"><span class="pre">Foo</span></code>。
+然而，这个约束却让我们无法给 <code class="docutils literal"><span class="pre">Bar</span></code> 写 <code class="docutils literal"><span class="pre">Functor</span></code> 实例。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="kt">ValidFunctor</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">ValidFunctor</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+
+<span class="kt">ValidFunctor</span><span class="o">.</span><span class="n">hs</span><span class="kt">:</span><span class="mi">8</span><span class="kt">:</span><span class="mi">6</span><span class="kt">:</span>
+    <span class="kt">Illegal</span> <span class="n">datatype</span> <span class="n">context</span> <span class="p">(</span><span class="n">use</span> <span class="kt">DatatypeContexts</span><span class="p">)</span><span class="kt">:</span> <span class="kt">Eq</span> <span class="n">a</span> <span class="ow">=&gt;</span>
+<span class="kt">Failed</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="n">none</span><span class="o">.</span>
+</pre></div>
+</div>
+<div class="section" id="constraints-on-type-definitions-are-bad">
+<span id="id10"></span><h3>给类型定义加约束不好<a class="headerlink" href="#constraints-on-type-definitions-are-bad" title="Permalink to this headline">¶</a></h3>
+<p>给类型定义加约束从来就不是什么好主意。它的实质效果是强迫你给每一个用到这种类型值的函数加类型约束。
+假设我们现在有一个栈数据结构，我们想通过访问它来看看它的元素是否按顺序排列。下面是数据类型的一个简单实现。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/TypeConstraint.hs</span>
+<span class="kr">data</span> <span class="p">(</span><span class="kt">Ord</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">OrdStack</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Bottom</span>
+                           <span class="o">|</span> <span class="kt">Item</span> <span class="n">a</span> <span class="p">(</span><span class="kt">OrdStack</span> <span class="n">a</span><span class="p">)</span>
+                             <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>如果我们想写一个函数来看看它是不是升序的（即每个元素都比它下面的元素大），很显然，我们需要 <code class="docutils literal"><span class="pre">Ord</span></code> 约束来进行两两比较。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/TypeConstraint.hs</span>
+<span class="nf">isIncreasing</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Ord</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">OrdStack</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">isIncreasing</span> <span class="p">(</span><span class="kt">Item</span> <span class="n">a</span> <span class="n">rest</span><span class="o">@</span><span class="p">(</span><span class="kt">Item</span> <span class="n">b</span> <span class="kr">_</span><span class="p">))</span>
+    <span class="o">|</span> <span class="n">a</span> <span class="o">&lt;</span> <span class="n">b</span>     <span class="ow">=</span> <span class="n">isIncreasing</span> <span class="n">rest</span>
+    <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="kt">False</span>
+<span class="nf">isIncreasing</span> <span class="kr">_</span>  <span class="ow">=</span> <span class="kt">True</span>
+</pre></div>
+</div>
+<p>然而，由于我们在类型声明上加了类型约束，它最后也影响到了某些不需要它的地方：我们需要给 <code class="docutils literal"><span class="pre">push</span></code> 加上 <code class="docutils literal"><span class="pre">Ord</span></code> 约束，但事实上它并不关心栈里元素的顺序。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/TypeConstraint.hs</span>
+<span class="nf">push</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Ord</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">OrdStack</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">OrdStack</span> <span class="n">a</span>
+<span class="nf">push</span> <span class="n">a</span> <span class="n">s</span> <span class="ow">=</span> <span class="kt">Item</span> <span class="n">a</span> <span class="n">s</span>
+</pre></div>
+</div>
+<p>如果你把 <code class="docutils literal"><span class="pre">Ord</span></code> 约束删掉，<code class="docutils literal"><span class="pre">push</span></code> 定义便无法通过类型检查。</p>
+<p>正是由于这个原因，我们之前给 <code class="docutils literal"><span class="pre">Bar</span></code> 写 <code class="docutils literal"><span class="pre">Functor</span></code> 实例没有成功：它要求 <code class="docutils literal"><span class="pre">fmap</span></code> 的类型签名加上 <code class="docutils literal"><span class="pre">Eq</span></code> 约束。</p>
+<p>我们现在已经尝试性地确定了 Haskell 里给类型签名加类型约束并不是一个好的特性，那有什么好的替代吗？
+答案很简单：不要在类型定义上加类型约束，在需要它们的函数上加。</p>
+<p>在这个例子中，我们可以删掉 <code class="docutils literal"><span class="pre">OrdStack</span></code> 和 <code class="docutils literal"><span class="pre">push</span></code> 上的 <code class="docutils literal"><span class="pre">Ord</span></code>。
+<code class="docutils literal"><span class="pre">isIncreasing</span></code> 还需要，否则便无法调用 <code class="docutils literal"><span class="pre">(&lt;)</span></code>。现在我们只在需要的地方加类型约束了。
+这还有一个更深远的好处：类型签名更准确地表示了每个函数的真正需求。</p>
+<p>大多数 Haskell 容器遵循这个模式。<code class="docutils literal"><span class="pre">Data.Map</span></code> 模块里的 <code class="docutils literal"><span class="pre">Map</span></code> 类型要求它的键是排序的，但类型本身却没有这个约束。
+这个约束是通过 <code class="docutils literal"><span class="pre">insert</span></code> 这样的函数来表达的，因为这里需要它，在 <code class="docutils literal"><span class="pre">size</span></code> 上却没有，因为在这里顺序无关紧要。</p>
+</div>
+<div class="section" id="fmap">
+<span id="infix-use-of-fmap"></span><h3>fmap 的中缀使用<a class="headerlink" href="#fmap" title="Permalink to this headline">¶</a></h3>
+<p>你经常会看到 <code class="docutils literal"><span class="pre">fmap</span></code> 作为操作符使用：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="mi">1</span><span class="o">+</span><span class="p">)</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span> <span class="o">++</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>也许你感到奇怪，原始的 <code class="docutils literal"><span class="pre">map</span></code> 却几乎从不这样使用。</p>
+<p>我们这样使用 <code class="docutils literal"><span class="pre">fmap</span></code> 一个可能的原因是可以省略第二个参数的括号。括号越少读代码也就越容易。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">fmap</span> <span class="p">(</span><span class="mi">1</span><span class="o">+</span><span class="p">)</span> <span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span> <span class="o">++</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">])</span>
+<span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">7</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>如果你真的想把 <code class="docutils literal"><span class="pre">fmap</span></code> 当做操作符用，<code class="docutils literal"><span class="pre">Control.Applicative</span></code> 模块包含了作为 <code class="docutils literal"><span class="pre">fmap</span></code> 别名的 <code class="docutils literal"><span class="pre">(&lt;$&gt;)</span></code> 操作符。</p>
+<p>当我们返回之前写的代码时，我们会发现这对解析很有用。</p>
+</div>
+<div class="section" id="flexible-instances">
+<span id="id11"></span><h3>灵活实例<a class="headerlink" href="#flexible-instances" title="Permalink to this headline">¶</a></h3>
+<p>你可能想给 <code class="docutils literal"><span class="pre">Either</span> <span class="pre">Int</span> <span class="pre">b</span></code> 类型实现 <code class="docutils literal"><span class="pre">Functor</span></code> 实例，因为它只有一个类型参数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/EitherInt.hs</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="p">(</span><span class="kt">Either</span> <span class="kt">Int</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">fmap</span> <span class="kr">_</span> <span class="p">(</span><span class="kt">Left</span> <span class="n">n</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Left</span> <span class="n">n</span>
+    <span class="n">fmap</span> <span class="n">f</span> <span class="p">(</span><span class="kt">Right</span> <span class="n">r</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Right</span> <span class="p">(</span><span class="n">f</span> <span class="n">r</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>然而，Haskell 98 类型系统不能保证检查这种实例的约束会终结。非终结的约束检查会导致编译器进入死循环，所以这种形式的实例是被禁止的。</p>
+<div class="highlight-haskell"><div class="highlight"><pre>Prelude&gt; :l EitherInt.hs
+[1 of 1] Compiling Main             ( EitherInt.hs, interpreted )
+
+EitherInt.hs:2:10:
+    Illegal instance declaration for ‘Functor (Either Int)’
+      (All instance types must be of the form (T a1 ... an)
+       where a1 ... an are *distinct type variables*,
+       and each type variable appears at most once in the instance head.
+       Use FlexibleInstances if you want to disable this.)
+    In the instance declaration for ‘Functor (Either Int)’
+Failed, modules loaded: none.
+</pre></div>
+</div>
+<p>GHC 的类型系统比 Haskell 98 标准更强大。出于可移植性的考虑，默认情况下，它是运行在兼容 Haskell 98 的模式下的。
+我们可以通过一个编译命令允许更灵活的实例。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/EitherIntFlexible.hs</span>
+<span class="cm">{-# LANGUAGE FlexibleInstances #-}</span>
+
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="p">(</span><span class="kt">Either</span> <span class="kt">Int</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">fmap</span> <span class="kr">_</span> <span class="p">(</span><span class="kt">Left</span> <span class="n">n</span><span class="p">)</span>  <span class="ow">=</span> <span class="kt">Left</span> <span class="n">n</span>
+    <span class="n">fmap</span> <span class="n">f</span> <span class="p">(</span><span class="kt">Right</span> <span class="n">r</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Right</span> <span class="p">(</span><span class="n">f</span> <span class="n">r</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>这个命令内嵌于 <code class="docutils literal"><span class="pre">LANGUAGE</span></code> 编译选项。</p>
+<p>有了 <code class="docutils literal"><span class="pre">Functor</span></code> 实例，我们来试试 <code class="docutils literal"><span class="pre">Either</span> <span class="pre">Int</span></code> 的 <code class="docutils literal"><span class="pre">fmap</span></code> 函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">EitherIntFlexible</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">EitherIntFlexible</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">fmap</span> <span class="p">(</span><span class="o">==</span> <span class="s">&quot;cheeseburger&quot;</span><span class="p">)</span> <span class="p">(</span><span class="kt">Left</span> <span class="mi">1</span> <span class="ow">::</span> <span class="kt">Either</span> <span class="kt">Int</span> <span class="kt">String</span><span class="p">)</span>
+<span class="kt">Left</span> <span class="mi">1</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">fmap</span> <span class="p">(</span><span class="o">==</span> <span class="s">&quot;cheeseburger&quot;</span><span class="p">)</span> <span class="p">(</span><span class="kt">Right</span> <span class="s">&quot;fries&quot;</span> <span class="ow">::</span> <span class="kt">Either</span> <span class="kt">Int</span> <span class="kt">String</span><span class="p">)</span>
+<span class="kt">Right</span> <span class="kt">False</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="thinking-more-about-functors">
+<span id="id12"></span><h3>更多关于 Functor 的思考<a class="headerlink" href="#thinking-more-about-functors" title="Permalink to this headline">¶</a></h3>
+<p>对于 Functor 如何工作，我们做了一些隐式的假设。
+把它们说清楚并当成规则去遵守非常有用，因为这会让我们把 Functor 当成统一的、行为规范的对象。
+规则只有两个，并且非常简单。</p>
+<p>第一条规则是 Functor 必须保持<em>身份</em>（preserve identity）。也就是说，应用 <code class="docutils literal"><span class="pre">fmap</span> <span class="pre">id</span></code> 应该返回相同的值。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">fmap</span> <span class="n">id</span> <span class="p">(</span><span class="kt">Node</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="s">&quot;a&quot;</span><span class="p">)</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="s">&quot;b&quot;</span><span class="p">))</span>
+<span class="kt">Node</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="s">&quot;a&quot;</span><span class="p">)</span> <span class="p">(</span><span class="kt">Leaf</span> <span class="s">&quot;b&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>第二条规则是 Functor 必须是<em>可组合的</em>。
+也就是说，把两个 <code class="docutils literal"><span class="pre">fmap</span></code> 组合使用效果应该和把函数组合起来再用 <code class="docutils literal"><span class="pre">fmap</span></code> 相同。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">fmap</span> <span class="n">even</span> <span class="o">.</span> <span class="n">fmap</span> <span class="n">length</span><span class="p">)</span> <span class="p">(</span><span class="kt">Just</span> <span class="s">&quot;twelve&quot;</span><span class="p">)</span>
+<span class="kt">Just</span> <span class="kt">True</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">fmap</span> <span class="p">(</span><span class="n">even</span> <span class="o">.</span> <span class="n">length</span><span class="p">)</span> <span class="p">(</span><span class="kt">Just</span> <span class="s">&quot;twelve&quot;</span><span class="p">)</span>
+<span class="kt">Just</span> <span class="kt">True</span>
+</pre></div>
+</div>
+<p>另一种看待这两条规则的方式是 Functor 必须保持<em>结构</em>（shape）。集合的结构不应该受到 Functor 的影响，只有对应的值会改变。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">fmap</span> <span class="n">odd</span> <span class="p">(</span><span class="kt">Just</span> <span class="mi">1</span><span class="p">)</span>
+<span class="kt">Just</span> <span class="kt">True</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">fmap</span> <span class="n">odd</span> <span class="kt">Nothing</span>
+<span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>如果你要写 <code class="docutils literal"><span class="pre">Functor</span></code> 实例，最好把这些规则记在脑子里，并且最好测试一下，因为编译器不会检查我们提到的规则。
+另一方面，如果你只是用 Functor，这些规则又如此自然，根本没必要记住。
+它们只是把一些“照我说的做”的直觉概念形式化了。下面是期望行为的伪代码表示。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/FunctorLaws.hs</span>
+<span class="nf">fmap</span> <span class="n">id</span>       <span class="o">==</span>  <span class="n">id</span>
+<span class="nf">fmap</span> <span class="p">(</span><span class="n">f</span> <span class="o">.</span> <span class="n">g</span><span class="p">)</span>  <span class="o">==</span>  <span class="n">fmap</span> <span class="n">f</span> <span class="o">.</span> <span class="n">fmap</span> <span class="n">g</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="parse-functor">
+<span id="writing-a-functor-instance-for-parse"></span><h2>给 Parse 写一个 Functor 实例<a class="headerlink" href="#parse-functor" title="Permalink to this headline">¶</a></h2>
+<p>对于到目前为止我们研究过的类型而言，<code class="docutils literal"><span class="pre">fmap</span></code> 的期望行为非常明显。然而由于 <code class="docutils literal"><span class="pre">Parse</span></code> 的复杂度，对于它而言 <code class="docutils literal"><span class="pre">fmap</span></code> 的期望行为并没有这么明显。
+一个合理的猜测是我们要 <code class="docutils literal"><span class="pre">fmap</span></code> 的函数应该应用到当前解析的结果上，并保持解析状态不变。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">Parse</span> <span class="kr">where</span>
+    <span class="n">fmap</span> <span class="n">f</span> <span class="n">parser</span> <span class="ow">=</span> <span class="n">parser</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="n">result</span> <span class="ow">-&gt;</span>
+                    <span class="n">identity</span> <span class="p">(</span><span class="n">f</span> <span class="n">result</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>定义很容易理解，我们来快速做几个实验看看我们是否遵守了 Functor 规则。</p>
+<p>首先我们检查身份是否被保持。我们在一次应该失败的解析上试试：从空字符串中解析字节（别忘了 <code class="docutils literal"><span class="pre">(&lt;$&gt;)</span></code> 就是 <code class="docutils literal"><span class="pre">fmap</span></code>）。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="n">parseByte</span> <span class="kt">L</span><span class="o">.</span><span class="n">empty</span>
+<span class="kt">Left</span> <span class="s">&quot;byte offset 0: no more input&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">id</span> <span class="o">&lt;$&gt;</span> <span class="n">parseByte</span><span class="p">)</span> <span class="kt">L</span><span class="o">.</span><span class="n">empty</span>
+<span class="kt">Left</span> <span class="s">&quot;byte offset 0: no more input&quot;</span>
+</pre></div>
+</div>
+<p>不错。再来试试应该成功的解析。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">input</span> <span class="ow">=</span> <span class="kt">L8</span><span class="o">.</span><span class="n">pack</span> <span class="s">&quot;foo&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">L</span><span class="o">.</span><span class="n">head</span> <span class="n">input</span>
+<span class="mi">102</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="n">parseByte</span> <span class="n">input</span>
+<span class="kt">Right</span> <span class="mi">102</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">id</span> <span class="o">&lt;$&gt;</span> <span class="n">parseByte</span><span class="p">)</span> <span class="n">input</span>
+<span class="kt">Right</span> <span class="mi">102</span>
+</pre></div>
+</div>
+<p>通过观察上面的结果，可以看到我们的 Functor 实例同样遵守了第二条规则，也就是保持结构。
+失败被保持为失败，成功被保持为成功。</p>
+<p>最后，我们确保可组合性被保持了。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">((</span><span class="n">chr</span> <span class="o">.</span> <span class="n">fromIntegral</span><span class="p">)</span> <span class="o">&lt;$&gt;</span> <span class="n">parseByte</span><span class="p">)</span> <span class="n">input</span>
+<span class="kt">Right</span> <span class="sc">&#39;f&#39;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">chr</span> <span class="o">&lt;$&gt;</span> <span class="n">fromIntegral</span> <span class="o">&lt;$&gt;</span> <span class="n">parseByte</span><span class="p">)</span> <span class="n">input</span>
+<span class="kt">Right</span> <span class="sc">&#39;f&#39;</span>
+</pre></div>
+</div>
+<p>通过这个简单的观察，我们的 Functor 实例看起来行为规范。</p>
+</div>
+<div class="section" id="using-functors-for-parsing">
+<span id="id13"></span><h2>利用 Functor 解析<a class="headerlink" href="#using-functors-for-parsing" title="Permalink to this headline">¶</a></h2>
+<p>我们讨论 Functor 是有目的的：它让我们写出简洁、表达能力强的代码。回想早先引入的 <code class="docutils literal"><span class="pre">parseByte</span></code> 函数。
+在重构 PGM 解析器使之使用新的解析架构的过程中，我们经常想用 ASCII 字符而不是 <code class="docutils literal"><span class="pre">Word8</span></code> 值。</p>
+<p>尽管可以写一个类似于 <code class="docutils literal"><span class="pre">parseByte</span></code> 的 <code class="docutils literal"><span class="pre">parseChar</span></code> 函数，我们现在可以利用 <code class="docutils literal"><span class="pre">Parse</span></code> 的 Functor 属性来避免重复代码。
+我们的 functor 接受一个解析结果并将一个函数应用于它，因此我们需要的是一个把 <code class="docutils literal"><span class="pre">Word8</span></code> 转成 <code class="docutils literal"><span class="pre">Char</span></code> 的函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">w2c</span> <span class="ow">::</span> <span class="kt">Word8</span> <span class="ow">-&gt;</span> <span class="kt">Char</span>
+<span class="nf">w2c</span> <span class="ow">=</span> <span class="n">chr</span> <span class="o">.</span> <span class="n">fromIntegral</span>
+
+<span class="c1">-- import Control.Applicative</span>
+<span class="nf">parseChar</span> <span class="ow">::</span> <span class="kt">Parse</span> <span class="kt">Char</span>
+<span class="nf">parseChar</span> <span class="ow">=</span> <span class="n">w2c</span> <span class="o">&lt;$&gt;</span> <span class="n">parseByte</span>
+</pre></div>
+</div>
+<p>我们也可以利用 Functor 来写一个短小的“窥视”函数。如果我们在输入字符串的末尾，它会返回 <code class="docutils literal"><span class="pre">Nothing</span></code>。
+否则，它返回下一个字符，但不作处理（也就是说，它观察但不打扰当前的解析状态）。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">peekByte</span> <span class="ow">::</span> <span class="kt">Parse</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="kt">Word8</span><span class="p">)</span>
+<span class="nf">peekByte</span> <span class="ow">=</span> <span class="p">(</span><span class="n">fmap</span> <span class="n">fst</span> <span class="o">.</span> <span class="kt">L</span><span class="o">.</span><span class="n">uncons</span> <span class="o">.</span> <span class="n">string</span><span class="p">)</span> <span class="o">&lt;$&gt;</span> <span class="n">getState</span>
+</pre></div>
+</div>
+<p>定义 <code class="docutils literal"><span class="pre">parseChar</span></code> 时用到的提升把戏同样也可以用于定义 <code class="docutils literal"><span class="pre">peekChar</span></code>。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">peekChar</span> <span class="ow">::</span> <span class="kt">Parse</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="kt">Char</span><span class="p">)</span>
+<span class="nf">peekChar</span> <span class="ow">=</span> <span class="n">fmap</span> <span class="n">w2c</span> <span class="o">&lt;$&gt;</span> <span class="n">peekByte</span>
+</pre></div>
+</div>
+<p>注意到 <code class="docutils literal"><span class="pre">peekByte</span></code> 和 <code class="docutils literal"><span class="pre">peekChar</span></code> 分别两次调用了 <code class="docutils literal"><span class="pre">fmap</span></code>，其中一次还是 <code class="docutils literal"><span class="pre">(&lt;$&gt;)</span></code>。
+这么做的原因是 <code class="docutils literal"><span class="pre">Parse</span> <span class="pre">(Maybe</span> <span class="pre">a)</span></code> 类型是嵌在 Functor 中的 Functor。
+我们必须提升函数两次使它能进入内部 Functor。</p>
+<p>最后，我们会写一个通用组合子，它是 <code class="docutils literal"><span class="pre">Parse</span></code> 中的 <code class="docutils literal"><span class="pre">takeWhile</span></code>：它在谓词为 <code class="docutils literal"><span class="pre">True</span></code> 是处理输入。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">parseWhile</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Word8</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Parse</span> <span class="p">[</span><span class="kt">Word8</span><span class="p">]</span>
+<span class="nf">parseWhile</span> <span class="n">p</span> <span class="ow">=</span> <span class="p">(</span><span class="n">fmap</span> <span class="n">p</span> <span class="o">&lt;$&gt;</span> <span class="n">peekByte</span><span class="p">)</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="n">mp</span> <span class="ow">-&gt;</span>
+               <span class="kr">if</span> <span class="n">mp</span> <span class="o">==</span> <span class="kt">Just</span> <span class="kt">True</span>
+               <span class="kr">then</span> <span class="n">parseByte</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="n">b</span> <span class="ow">-&gt;</span>
+                    <span class="p">(</span><span class="n">b</span><span class="kt">:</span><span class="p">)</span> <span class="o">&lt;$&gt;</span> <span class="n">parseWhile</span> <span class="n">p</span>
+               <span class="kr">else</span> <span class="n">identity</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+<p>再次说明，我们在好几个地方都用到了 Functor（doubled up, when necessary）用以化简函数。
+下面是相同函数不用 Functor 的版本。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">parseWhileVerbose</span> <span class="n">p</span> <span class="ow">=</span>
+    <span class="n">peekByte</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="n">mc</span> <span class="ow">-&gt;</span>
+    <span class="kr">case</span> <span class="n">mc</span> <span class="kr">of</span>
+      <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">identity</span> <span class="kt">[]</span>
+      <span class="kt">Just</span> <span class="n">c</span> <span class="o">|</span> <span class="n">p</span> <span class="n">c</span> <span class="ow">-&gt;</span>
+                 <span class="n">parseByte</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="n">b</span> <span class="ow">-&gt;</span>
+                 <span class="n">parseWhileVerbose</span> <span class="n">p</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="n">bs</span> <span class="ow">-&gt;</span>
+                 <span class="n">identity</span> <span class="p">(</span><span class="n">b</span><span class="kt">:</span><span class="n">bs</span><span class="p">)</span>
+             <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">-&gt;</span>
+                 <span class="n">identity</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+<p>当你对 Functor 不熟悉的时候，冗余的定义应该会更好读。
+但是，由于 Haskell 中 Functor 非常常见，你很快就会更习惯（包括读和写）简洁的表达。</p>
+</div>
+<div class="section" id="rewriting-our-pgm-parser">
+<span id="id14"></span><h2>重构 PGM 解析器<a class="headerlink" href="#rewriting-our-pgm-parser" title="Permalink to this headline">¶</a></h2>
+<p>有了新的解析代码，原始 PGM 解析函数现在变成了这个样子：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">parseRawPGM</span> <span class="ow">=</span>
+    <span class="n">parseWhileWith</span> <span class="n">w2c</span> <span class="n">notWhite</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="n">header</span> <span class="ow">-&gt;</span> <span class="n">skipSpaces</span> <span class="o">==&gt;&amp;</span>
+    <span class="n">assert</span> <span class="p">(</span><span class="n">header</span> <span class="o">==</span> <span class="s">&quot;P5&quot;</span><span class="p">)</span> <span class="s">&quot;invalid raw header&quot;</span> <span class="o">==&gt;&amp;</span>
+    <span class="n">parseNat</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="n">width</span> <span class="ow">-&gt;</span> <span class="n">skipSpaces</span> <span class="o">==&gt;&amp;</span>
+    <span class="n">parseNat</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="n">height</span> <span class="ow">-&gt;</span> <span class="n">skipSpaces</span> <span class="o">==&gt;&amp;</span>
+    <span class="n">parseNat</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="n">maxGrey</span> <span class="ow">-&gt;</span>
+    <span class="n">parseByte</span> <span class="o">==&gt;&amp;</span>
+    <span class="n">parseBytes</span> <span class="p">(</span><span class="n">width</span> <span class="o">*</span> <span class="n">height</span><span class="p">)</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="n">bitmap</span> <span class="ow">-&gt;</span>
+    <span class="n">identity</span> <span class="p">(</span><span class="kt">Greymap</span> <span class="n">width</span> <span class="n">height</span> <span class="n">maxGrey</span> <span class="n">bitmap</span><span class="p">)</span>
+  <span class="kr">where</span> <span class="n">notWhite</span> <span class="ow">=</span> <span class="p">(`</span><span class="n">notElem</span><span class="p">`</span> <span class="s">&quot; </span><span class="se">\r\n\t</span><span class="s">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>下面是定义中用到的辅助函数，其中一些模式现在应该已经非常熟悉了：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch10/Parse.hs</span>
+<span class="nf">parseWhileWith</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Word8</span> <span class="ow">-&gt;</span> <span class="n">a</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Parse</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">parseWhileWith</span> <span class="n">f</span> <span class="n">p</span> <span class="ow">=</span> <span class="n">fmap</span> <span class="n">f</span> <span class="o">&lt;$&gt;</span> <span class="n">parseWhile</span> <span class="p">(</span><span class="n">p</span> <span class="o">.</span> <span class="n">f</span><span class="p">)</span>
+
+<span class="nf">parseNat</span> <span class="ow">::</span> <span class="kt">Parse</span> <span class="kt">Int</span>
+<span class="nf">parseNat</span> <span class="ow">=</span> <span class="n">parseWhileWith</span> <span class="n">w2c</span> <span class="n">isDigit</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="n">digits</span> <span class="ow">-&gt;</span>
+           <span class="kr">if</span> <span class="n">null</span> <span class="n">digits</span>
+           <span class="kr">then</span> <span class="n">bail</span> <span class="s">&quot;no more input&quot;</span>
+           <span class="kr">else</span> <span class="kr">let</span> <span class="n">n</span> <span class="ow">=</span> <span class="n">read</span> <span class="n">digits</span>
+                <span class="kr">in</span> <span class="kr">if</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">0</span>
+                   <span class="kr">then</span> <span class="n">bail</span> <span class="s">&quot;integer overflow&quot;</span>
+                   <span class="kr">else</span> <span class="n">identity</span> <span class="n">n</span>
+
+<span class="p">(</span><span class="o">==&gt;&amp;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Parse</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Parse</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="kt">Parse</span> <span class="n">b</span>
+<span class="nf">p</span> <span class="o">==&gt;&amp;</span> <span class="n">f</span> <span class="ow">=</span> <span class="n">p</span> <span class="o">==&gt;</span> <span class="nf">\</span><span class="kr">_</span> <span class="ow">-&gt;</span> <span class="n">f</span>
+
+<span class="nf">skipSpaces</span> <span class="ow">::</span> <span class="kt">Parse</span> <span class="nb">()</span>
+<span class="nf">skipSpaces</span> <span class="ow">=</span> <span class="n">parseWhileWith</span> <span class="n">w2c</span> <span class="n">isSpace</span> <span class="o">==&gt;&amp;</span> <span class="n">identity</span> <span class="nb">()</span>
+
+<span class="nf">assert</span> <span class="ow">::</span> <span class="kt">Bool</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Parse</span> <span class="nb">()</span>
+<span class="nf">assert</span> <span class="kt">True</span>  <span class="kr">_</span>   <span class="ow">=</span> <span class="n">identity</span> <span class="nb">()</span>
+<span class="nf">assert</span> <span class="kt">False</span> <span class="n">err</span> <span class="ow">=</span> <span class="n">bail</span> <span class="n">err</span>
+</pre></div>
+</div>
+<p>类似于 <code class="docutils literal"><span class="pre">(==&gt;)</span></code>，<code class="docutils literal"><span class="pre">(==&gt;&amp;)</span></code> 组合子将解析器串联起来。但右侧忽略左侧的结果。
+<code class="docutils literal"><span class="pre">assert</span></code> 使得我们可以检查性质，然后当性质为 <code class="docutils literal"><span class="pre">False</span></code> 时终止解析并报告错误信息。</p>
+</div>
+<div class="section" id="future-directions">
+<span id="id15"></span><h2>未来方向<a class="headerlink" href="#future-directions" title="Permalink to this headline">¶</a></h2>
+<p>本章的主题是抽象。我们发现在函数链中传递显式状态并不理想，因此我们把这个细节抽象出来。
+在写解析器的时候发现要重复用到一些代码，我们把它们抽象成函数。
+我们引入了 Functor，它提供了一种映射到参数化类型的通用方法。</p>
+<p>关于解析，我们在第16章会讨论一个使用广泛并且灵活的解析库 Parsec。
+在第14章中，我们会再次讨论抽象，我们会发现用 Monad 可以进一步化简这章的代码。</p>
+<p>Hackage 数据库中存在不少包可以用来高效解析以 <code class="docutils literal"><span class="pre">ByteString</span></code> 表示的二进制数据。在写作时，最流行的是 <code class="docutils literal"><span class="pre">binary</span></code>，它易用且高效。</p>
+</div>
+<div class="section" id="id16">
+<h2>练习<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h2>
+<ol class="arabic">
+<li><p class="first">给“纯文本” PGM 文件写解析器。</p>
+</li>
+<li><p class="first">在对“原始” PGM 文件的描述中，我们省略了一个细节。如果头信息中的“最大灰度”值小于256，那每个像素都会用单个字节表示。
+然而，它的最大范围可达65535，这种情况下每个像素会以大端序的形式（最高有效位字节在前）用两个字节来表示。</p>
+<p>重写原始 PGM 解析器使它能够处理单字节和双字节形式。</p>
+</li>
+<li><p class="first">重写解析器使得它能够区分“原始”和“纯文本” PGM 文件，并解析对应的文件类型。</p>
+</li>
+</ol>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="9.html">第九章：I/O学习 —— 构建一个用于搜索文件系统的库</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="11.html">第十一章：测试和质量保障</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.1.
+    </div>
+  </body>
+</html>

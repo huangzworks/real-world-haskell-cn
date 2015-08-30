@@ -1,0 +1,795 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>第九章：I/O学习 —— 构建一个用于搜索文件系统的库 &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
+    <link rel="next" title="第十章：代码案例学习：解析二进制数据格式" href="10.html" />
+    <link rel="prev" title="第八章：高效文件处理、正则表达式、文件名匹配" href="8.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="8.html">第八章：高效文件处理、正则表达式、文件名匹配</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="10.html">第十章：代码案例学习：解析二进制数据格式</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="i-o">
+<h1>第九章：I/O学习 —— 构建一个用于搜索文件系统的库<a class="headerlink" href="#i-o" title="Permalink to this headline">¶</a></h1>
+<p>自从电脑有了分层文件系统以来，“我知道有这个文件，但不知道它放在哪”这个问题就一直困扰着人们。1974年发布的Unix第五个版本引入的 <code class="docutils literal"><span class="pre">find</span></code> 命令，到今天仍在使用。查找文件的艺术已经走过了很长一段路：伴随现代操作系统一起不断发展的文件索引和搜索功能。</p>
+<p>给程序员的工具箱里添加类似 <code class="docutils literal"><span class="pre">find</span></code> 这样的功能依旧非常有价值，在本章，我们将通过编写一个Haskell库给我们的 <code class="docutils literal"><span class="pre">find</span></code> 命令添加更多功能，我们将通过一些有着不同的健壮度的方法来完成这个库。</p>
+<div class="section" id="find">
+<h2>find命令<a class="headerlink" href="#find" title="Permalink to this headline">¶</a></h2>
+<p>如果你不曾用过类Unix的系统，或者你不是个重度shell用户，那么你很可能从未听说过 <code class="docutils literal"><span class="pre">find</span></code> ，通过给定的一组目录，它递归搜索每个目录并且打印出每个匹配表达式的实体名称。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/RecursiveContents.hs</span>
+<span class="kr">module</span> <span class="nn">RecursiveContents</span> <span class="p">(</span><span class="nf">getRecursiveContents</span><span class="p">)</span> <span class="kr">where</span>
+<span class="kr">import</span> <span class="nn">Control.Monad</span> <span class="p">(</span><span class="nf">forM</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Directory</span> <span class="p">(</span><span class="nf">doesDirectoryExist</span><span class="p">,</span> <span class="nf">getDirectoryContents</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.FilePath</span> <span class="p">((</span><span class="o">&lt;/&gt;</span><span class="p">))</span>
+<span class="nf">getRecursiveContents</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">FilePath</span><span class="p">]</span>
+<span class="nf">getRecursiveContents</span> <span class="n">topdir</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">names</span> <span class="ow">&lt;-</span> <span class="n">getDirectoryContents</span> <span class="n">topdir</span>
+<span class="kr">let</span> <span class="n">properNames</span> <span class="ow">=</span> <span class="n">filter</span> <span class="p">(`</span><span class="n">notElem</span><span class="p">`</span> <span class="p">[</span><span class="s">&quot;.&quot;</span><span class="p">,</span> <span class="s">&quot;..&quot;</span><span class="p">])</span> <span class="n">names</span>
+    <span class="n">paths</span> <span class="ow">&lt;-</span> <span class="n">forM</span> <span class="n">properNames</span> <span class="o">$</span> <span class="nf">\</span><span class="n">name</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+<span class="kr">let</span> <span class="n">path</span> <span class="ow">=</span> <span class="n">topdir</span> <span class="o">&lt;/&gt;</span> <span class="n">name</span>
+    <span class="n">isDirectory</span> <span class="ow">&lt;-</span> <span class="n">doesDirectoryExist</span> <span class="n">path</span>
+    <span class="kr">if</span> <span class="n">isDirectory</span>
+        <span class="kr">then</span> <span class="n">getRecursiveContents</span> <span class="n">path</span>
+    <span class="kr">else</span> <span class="n">return</span> <span class="p">[</span><span class="n">path</span><span class="p">]</span>
+<span class="nf">return</span> <span class="p">(</span><span class="n">concat</span> <span class="n">paths</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>单个表达式可以识别像“符合这个全局模式的名称”，“实体是一个文件”，“当前最后一个被修改的文件”以及其他诸如此类的表达式，通过and或or算子就可以把他们装配起来构成更加复杂的表达式</p>
+</div>
+<div class="section" id="id1">
+<h2>简单的开始：递归遍历目录<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>在投入设计我们的库之前，先解决一些规模稍小的问题，我们第一个问题就是递归地列出一个目录下面的所有内容和它的子目录</p>
+<p><code class="docutils literal"><span class="pre">filter</span></code> 表达式确保一个目录的列表不含特定的目录名（比如代表当前目录的 <code class="docutils literal"><span class="pre">.</span></code> 和上一级目录的 <code class="docutils literal"><span class="pre">..</span></code> ），如果忘记过滤这些，随后的查找将陷入无限循环。</p>
+<p>我们在之前的章节里完成了 <code class="docutils literal"><span class="pre">forM</span></code> 函数，它是参数颠倒后的 <code class="docutils literal"><span class="pre">mapM</span></code> 函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="o">+</span><span class="kt">Control</span><span class="o">.</span><span class="kt">Monad</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">mapM</span>
+<span class="nf">mapM</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Monad</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="p">[</span><span class="n">b</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">forM</span>
+<span class="nf">forM</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Monad</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="p">[</span><span class="n">b</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>循环体将检查当前实体是否为目录，如果是，则递归调用 <code class="docutils literal"><span class="pre">getrecuresivacontents</span></code> 函数列出这个目录（的内容），如果否，则返回只含有当前实体名称一个元素的列表，不要忘记 <code class="docutils literal"><span class="pre">return</span></code> 函数在 Haskell 中有特殊的含义，他通过monad的类型构造器包装了一个值。</p>
+<p>另一个值得注意的地方是变量 <code class="docutils literal"><span class="pre">isDirectory</span></code> 的使用，在命令式语言如 Python 中，我们通常用 <code class="docutils literal"><span class="pre">if</span> <span class="pre">os.path.isdir(path)</span></code> 来表示，然而， <code class="docutils literal"><span class="pre">doesDirectoryExist</span></code> 函数是一个动作，它的返回类型是 <code class="docutils literal"><span class="pre">IO</span> <span class="pre">Bool</span></code> 而非 <code class="docutils literal"><span class="pre">Bool</span></code> ，由于 <code class="docutils literal"><span class="pre">if</span></code> 表达式需要一个操作值为 <code class="docutils literal"><span class="pre">bool</span></code> 的表达式作为条件，我们使用 <code class="docutils literal"><span class="pre">&lt;-</span></code> 来从io包装器上得到这个动作的的 <code class="docutils literal"><span class="pre">bool</span></code> 返回值，这样我们就能在 <code class="docutils literal"><span class="pre">if</span></code> 中使用这个干净的无包装的 <code class="docutils literal"><span class="pre">bool</span></code> 。</p>
+<p>循环体中每一次迭代生成的结果都是名称列表，因此 <code class="docutils literal"><span class="pre">forM</span></code> 的结果是 <code class="docutils literal"><span class="pre">IO</span> <span class="pre">[[FilePath]]</span></code> ，我们通过 <code class="docutils literal"><span class="pre">concat</span></code> 将它转换为一个元素列表(从以列表为元素的列表转换为不含列表元素的列表)</p>
+<div class="section" id="id2">
+<h3>再次认识匿名和命名函数<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<p>在 <a class="reference external" href="http://book.realworldhaskell.org/read/functional-programming.html#fp.anonymous">Anonymous (lambda) functions</a> 这部分，我们列举了一系列不使用匿名函数的原因，然而在这里，我们将使用它作为函数体，这是匿名函数在 Haskell 中最常见的用途之一。</p>
+<p>我们已经在 <code class="docutils literal"><span class="pre">froM</span></code> 和 <code class="docutils literal"><span class="pre">mapM</span></code> 上看到使用函数作为参数的方式，许多循环体是程序中只出现一次的代码块。既然我们喜欢在循环中使用一个再也不会出现的循环体，那么为什么要给他们命名？</p>
+<p>显而易见，有时候我们需要在不同的循环中嵌入相同的代码，这时候我们不应该使用匿名函数，把他们剪贴和复制进去，而是给这些匿名函数命名来调用，这样显得有意义一点</p>
+</div>
+<div class="section" id="mapm-form">
+<h3>为什么提供 <code class="docutils literal"><span class="pre">mapM</span></code> 和 <code class="docutils literal"><span class="pre">forM</span></code><a class="headerlink" href="#mapm-form" title="Permalink to this headline">¶</a></h3>
+<p>存在两个相同的函数看起来是有点奇怪，但接受参数的顺序之间的差异使他们适用于不同的情况。</p>
+<p>我们来考察下之前的例子，使用匿名函数作为循环体，如果我们使用 <code class="docutils literal"><span class="pre">mapM</span></code> 而非 <code class="docutils literal"><span class="pre">forM</span></code> ，我们将不得不把变量 <code class="docutils literal"><span class="pre">properNames</span></code> 放置到函数体的后边，而为了让代码正确解析，我们就必须将整个匿名函数用括号包起来，或者用一个不必要的命名函数将它取代，自己尝试下，拷贝上边的代码，用 <code class="docutils literal"><span class="pre">mapM</span></code> 代替 <code class="docutils literal"><span class="pre">forM</span></code> ，观察代码可读性上有什么变化</p>
+<p>相反，如果循环体是一个命名函数，而且我们要循环的列表是通过一个复杂表达式计算的，我们就找到了 <code class="docutils literal"><span class="pre">mapM</span></code> 的应用场景</p>
+<p>这里需要遵守的代码风格是无论通过 <code class="docutils literal"><span class="pre">mapM</span></code> 和 <code class="docutils literal"><span class="pre">forM</span></code> 都让你写出干净的代码，如果循环体或者循环中的表达式都很短，那么用哪个都无所谓，如果循环体很短，但数据很长，使用 <code class="docutils literal"><span class="pre">mapM</span></code> ，如果相反，则用 <code class="docutils literal"><span class="pre">forM</span></code> ，如果都很长，使用 <code class="docutils literal"><span class="pre">let</span></code> 或者 <code class="docutils literal"><span class="pre">where</span></code> 让其中一个变短，通过这样一些实践，不同情况下那个实现最好就变得显而易见</p>
+</div>
+</div>
+<div class="section" id="id3">
+<h2>一个本地查找函数<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<p>我们可以使用 <code class="docutils literal"><span class="pre">getRecursiveContents</span></code> 函数作为一个内置的简单文件查找器的基础</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/SimpleFinder.hs</span>
+<span class="kr">import</span> <span class="nn">RecursiveContents</span> <span class="p">(</span><span class="nf">getRecursiveContents</span><span class="p">)</span>
+<span class="nf">simpleFind</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">FilePath</span><span class="p">]</span>
+<span class="nf">simpleFind</span> <span class="n">p</span> <span class="n">path</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">names</span> <span class="ow">&lt;-</span> <span class="n">getRecursiveContents</span> <span class="n">path</span>
+    <span class="n">return</span> <span class="p">(</span><span class="n">filter</span> <span class="n">p</span> <span class="n">names</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>上文的函数通过我们在过滤器中的谓词来匹配 <code class="docutils literal"><span class="pre">getRecursiveContents</span></code> 函数返回的名字，每个通过谓词判断的名称都是文件全路径，因此如何完成一个像“查找所有扩展名以 <code class="docutils literal"><span class="pre">.c</span></code> 结尾的文件”的功能？</p>
+<p><code class="docutils literal"><span class="pre">System.FilePath</span></code> 模块包含了许多有价值的函数来帮助我们操作文件名，在这个例子中，我们使用 <code class="docutils literal"><span class="pre">takeExtension</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="o">+</span><span class="kt">System</span><span class="o">.</span><span class="kt">FilePath</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">takeExtension</span>
+<span class="nf">takeExtension</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">takeExtension</span> <span class="s">&quot;foo/bar.c&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">filepath</span><span class="o">-</span><span class="mf">1.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="s">&quot;.c&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">takeExtension</span> <span class="s">&quot;quux&quot;</span>
+<span class="s">&quot;&quot;</span>
+</pre></div>
+</div>
+<p>下面的代码给我们一个包括获得路径，获得扩展名，然后和.c进行比较的
+简单功能的函数实现，</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">SimpleFinder</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">RecursiveContents</span> <span class="p">(</span> <span class="kt">RecursiveContents</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="p">[</span><span class="mi">2</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">SimpleFinder</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">RecursiveContents</span><span class="p">,</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">simpleFind</span> <span class="p">(</span><span class="nf">\</span><span class="n">p</span> <span class="ow">-&gt;</span> <span class="n">takeExtension</span> <span class="n">p</span> <span class="o">==</span> <span class="s">&quot;.c&quot;</span><span class="p">)</span>
+<span class="nf">simpleFind</span> <span class="p">(</span><span class="nf">\</span><span class="n">p</span> <span class="ow">-&gt;</span> <span class="n">takeExtension</span> <span class="n">p</span> <span class="o">==</span> <span class="s">&quot;.c&quot;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">FilePath</span><span class="p">]</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">simpleFind</span></code> 在工作中有一些非常刺眼的问题，第一个就是谓词并不能准确而完全的表达，他只关注文件夹中的实体名称，而无法做到辨认这是个文件还是个目录此类的事情，——而我们使用 <code class="docutils literal"><span class="pre">simpleFind</span></code> 的尝试就是想列举所文件和有和文件一样拥有 <code class="docutils literal"><span class="pre">.c</span></code> 扩展名的文件夹</p>
+<p>第二个问题是在 <code class="docutils literal"><span class="pre">simpleFind</span></code> 中我们无法控制它遍历文件系统的方式，这是显而易见的，想想在分布式版本控制系统中控制下的树状结构中查找一个源文件的问题吧，所有被控制的目录都含有一个 <code class="docutils literal"><span class="pre">.svn</span></code> 的私有文件夹，每一个包含了许多我们毫不感兴趣的子文件夹和文件，简单的过滤所有包含 <code class="docutils literal"><span class="pre">.svn</span></code> 的路径远比仅仅在读取时避免遍历这些文件夹更加有效。例如，一个分布式源码树包含了45000个文件，30000个分布在1200个不同的.svn文件夹中，避免遍历这1200个文件夹比过滤他们包含的30000个文件代价更低。</p>
+<p>最后。 <code class="docutils literal"><span class="pre">simpleFind</span></code> 是严格的，因为它包含一系列IO元操作执行构成的动作，如果我们有一百万个文件要遍历，我们需要等待很长一段时间才能得到一个包含一百万个名字的巨大的返回值，这对用户体验和资源消耗都是噩梦，我们更需要一个只有当他们获得结果的时才展示的结果流。</p>
+<p>在接下来的环节里，我们将解决每个遇到的问题</p>
+</div>
+<div class="section" id="id4">
+<h2>谓词在保持纯粹的同时支持从贫类型到富类型<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
+<p>我们的谓词只关注文件名，这将一系列有趣的操作排除在外，试想下，假如我们希望列出比某个给定值更大的文件呢？</p>
+<p>面对这个问题的第一反应是查找 <code class="docutils literal"><span class="pre">IO</span></code> :我们的谓词是 <code class="docutils literal"><span class="pre">FilePath</span> <span class="pre">-&gt;</span> <span class="pre">Bool</span></code> 类型，为什么不把它变成 <code class="docutils literal"><span class="pre">FilePath</span> <span class="pre">-&gt;</span> <span class="pre">IO</span> <span class="pre">Bool</span></code> 类型？这将使我们所有的IO操作都成为谓词的一部分，但这在显而易见的好处之外引入一个潜在的问题，使用这样一个谓词存在各种可能的后果，比如一个有 <code class="docutils literal"><span class="pre">IO</span> <span class="pre">a</span></code> 类型返回的函数将有能力生成任何它想产生的结果。</p>
+<p>让我们在类型系统中寻找以写出拥有更多谓词，更少bug的代码，我们通过避免污染IO来坚持断言的纯粹，这将确保他们不会产生任何不纯的结果，同时我们给他们提供更多信息，这样他们就可以在不必诱发潜在的危险的情况下获得需要的表达式</p>
+<p>Haskell 的 <code class="docutils literal"><span class="pre">System.Directory</span></code> 模块提供了一个尽管受限但仍然有用的关于文件元数据的集合</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="o">+</span><span class="kt">System</span><span class="o">.</span><span class="kt">Directory</span>
+</pre></div>
+</div>
+<p>我们可以通过 <code class="docutils literal"><span class="pre">doesFileExist</span></code> 和 <code class="docutils literal"><span class="pre">doesDirectoryExist</span></code> 来判断目录实体是目录还是文件，但暂时还没有更多方式来查找这些年里出现的纷繁复杂的其他文件类型，比如管道，硬链接和软连接。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">doesFileExist</span>
+<span class="nf">doesFileExist</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">Bool</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">doesFileExist</span> <span class="s">&quot;.&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">locale</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">time</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">directory</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">False</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">doesDirectoryExist</span>
+<span class="nf">doesDirectoryExist</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">Bool</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">doesDirectoryExist</span> <span class="s">&quot;.&quot;</span>
+<span class="kt">True</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">getPermissions</span></code> 函数让我们确定当前对于文件或目录的操作是否是合法：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">getPermissions</span>
+<span class="nf">getPermissions</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">Permissions</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">info</span> <span class="kt">Permissions</span>
+<span class="kr">data</span> <span class="kt">Permissions</span>
+  <span class="ow">=</span> <span class="kt">Permissions</span> <span class="p">{</span><span class="n">readable</span> <span class="ow">::</span> <span class="kt">Bool</span><span class="p">,</span>
+                 <span class="n">writable</span> <span class="ow">::</span> <span class="kt">Bool</span><span class="p">,</span>
+                 <span class="n">executable</span> <span class="ow">::</span> <span class="kt">Bool</span><span class="p">,</span>
+                 <span class="n">searchable</span> <span class="ow">::</span> <span class="kt">Bool</span><span class="p">}</span>
+      <span class="c1">-- Defined in System.Directory</span>
+<span class="kr">instance</span> <span class="kt">Eq</span> <span class="kt">Permissions</span> <span class="c1">-- Defined in System.Directory</span>
+<span class="kr">instance</span> <span class="kt">Ord</span> <span class="kt">Permissions</span> <span class="c1">-- Defined in System.Directory</span>
+<span class="kr">instance</span> <span class="kt">Read</span> <span class="kt">Permissions</span> <span class="c1">-- Defined in System.Directory</span>
+<span class="kr">instance</span> <span class="kt">Show</span> <span class="kt">Permissions</span> <span class="c1">-- Defined in System.Directory</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getPermissions</span> <span class="s">&quot;.&quot;</span>
+<span class="kt">Permissions</span> <span class="p">{</span><span class="n">readable</span> <span class="ow">=</span> <span class="kt">True</span><span class="p">,</span> <span class="n">writable</span> <span class="ow">=</span> <span class="kt">True</span><span class="p">,</span> <span class="n">executable</span> <span class="ow">=</span> <span class="kt">False</span><span class="p">,</span> <span class="n">searchable</span> <span class="ow">=</span> <span class="kt">True</span><span class="p">}</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">searchable</span>
+<span class="nf">searchable</span> <span class="ow">::</span> <span class="kt">Permissions</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">searchable</span> <span class="n">it</span>
+<span class="kt">True</span>
+</pre></div>
+</div>
+<p>如果你无法回忆起 <code class="docutils literal"><span class="pre">ghci</span></code> 中变量 <code class="docutils literal"><span class="pre">it</span></code> 的特殊用法，回到第一章复习一下，如果我们的权限能够列出它的内容，那么这个目录就应该是可被搜索的，而文件则永远是不可搜索的</p>
+<p>最后， <code class="docutils literal"><span class="pre">getModificationTime</span></code> 告诉我们实体上次被修改的时间：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">getModificationTime</span>
+<span class="nf">getModificationTime</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">System</span><span class="o">.</span><span class="kt">Time</span><span class="o">.</span><span class="kt">ClockTime</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getModificationTime</span> <span class="s">&quot;.&quot;</span>
+<span class="kt">Mon</span> <span class="kt">Aug</span> <span class="mi">18</span> <span class="mi">12</span><span class="kt">:</span><span class="mi">08</span><span class="kt">:</span><span class="mi">24</span> <span class="kt">CDT</span> <span class="mi">2008</span>
+</pre></div>
+</div>
+<p>如果我们像标准的Haskell代码一样对可移植性要求严格，这些函数就是我们手头所有的一切(我们同样可以通过黑客手段来获得文件大小)，这些已经足够让我们明白所感兴趣领域中的原则，而非让我们浪费宝贵的时间对着一个例子冥思苦想，如果你需要写满足更多需求的代码， <code class="docutils literal"><span class="pre">System.Posix</span></code> 和 <code class="docutils literal"><span class="pre">System.Win32</span></code> 模块提供关于当代两种计算平台的更多文件元数据的细节。 <code class="docutils literal"><span class="pre">Hackage</span></code> 中同样有一个 <code class="docutils literal"><span class="pre">unix-compat</span></code> 包，提供windows下的类unix的api 。</p>
+<p>新的富类型谓词需要关注的数据段到底有几个？自从我们可以通过 <code class="docutils literal"><span class="pre">Permissions</span></code> 来判断实体是文件还是目录之后，我们就不再需要获得 <code class="docutils literal"><span class="pre">doesFileExist</span></code> 和 <code class="docutils literal"><span class="pre">doesDirectoryExist</span></code> 的结果，因此一个谓词需要关注的输入有四个。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="kr">import</span> <span class="nn">Control.Monad</span> <span class="p">(</span><span class="nf">filterM</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Directory</span> <span class="p">(</span><span class="kt">Permissions</span><span class="p">(</span><span class="o">..</span><span class="p">),</span> <span class="nf">getModificationTime</span><span class="p">,</span> <span class="nf">getPermissions</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Time</span> <span class="p">(</span><span class="kt">ClockTime</span><span class="p">(</span><span class="o">..</span><span class="p">))</span>
+<span class="kr">import</span> <span class="nn">System.FilePath</span> <span class="p">(</span><span class="nf">takeExtension</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Control.Exception</span> <span class="p">(</span><span class="nf">bracket</span><span class="p">,</span> <span class="nf">handle</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.IO</span> <span class="p">(</span><span class="kt">IOMode</span><span class="p">(</span><span class="o">..</span><span class="p">),</span> <span class="nf">hClose</span><span class="p">,</span> <span class="nf">hFileSize</span><span class="p">,</span> <span class="nf">openFile</span><span class="p">)</span>
+
+<span class="c1">-- the function we wrote earlier</span>
+<span class="kr">import</span> <span class="nn">RecursiveContents</span> <span class="p">(</span><span class="nf">getRecursiveContents</span><span class="p">)</span>
+
+<span class="kr">type</span> <span class="kt">Predicate</span> <span class="ow">=</span>  <span class="kt">FilePath</span>      <span class="c1">-- path to directory entry</span>
+               <span class="ow">-&gt;</span> <span class="kt">Permissions</span>   <span class="c1">-- permissions</span>
+               <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">Integer</span> <span class="c1">-- file size (Nothing if not file)</span>
+               <span class="ow">-&gt;</span> <span class="kt">ClockTime</span>     <span class="c1">-- last modified</span>
+               <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+</pre></div>
+</div>
+<p>这一谓词类型只是一个有四个参数的函数的同义词，他将给我们节省一些键盘工作和屏幕空间。</p>
+<p>注意这一返回值是 <code class="docutils literal"><span class="pre">Bool</span></code> 而非 <code class="docutils literal"><span class="pre">IO</span> <span class="pre">Bool</span></code> ，谓词需要保证纯粹，而且不能表现IO，在拥有这种类型以后，我们的查找函数仍然显得非常空白。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="c1">-- soon to be defined</span>
+<span class="nf">getFileSize</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="kt">Integer</span><span class="p">)</span>
+
+<span class="nf">betterFind</span> <span class="ow">::</span> <span class="kt">Predicate</span> <span class="ow">-&gt;</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">FilePath</span><span class="p">]</span>
+
+<span class="nf">betterFind</span> <span class="n">p</span> <span class="n">path</span> <span class="ow">=</span> <span class="n">getRecursiveContents</span> <span class="n">path</span> <span class="o">&gt;&gt;=</span> <span class="n">filterM</span> <span class="n">check</span>
+    <span class="kr">where</span> <span class="n">check</span> <span class="n">name</span> <span class="ow">=</span> <span class="kr">do</span>
+            <span class="n">perms</span> <span class="ow">&lt;-</span> <span class="n">getPermissions</span> <span class="n">name</span>
+            <span class="n">size</span> <span class="ow">&lt;-</span> <span class="n">getFileSize</span> <span class="n">name</span>
+            <span class="n">modified</span> <span class="ow">&lt;-</span> <span class="n">getModificationTime</span> <span class="n">name</span>
+            <span class="n">return</span> <span class="p">(</span><span class="n">p</span> <span class="n">name</span> <span class="n">perms</span> <span class="n">size</span> <span class="n">modified</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>先来阅读代码，由于随后将讨论 <code class="docutils literal"><span class="pre">getFileSize</span></code> 的某些细节，因此现在暂时先跳过它。</p>
+<p>我们无法使用 <code class="docutils literal"><span class="pre">filter</span></code> 来调用我们的谓词，因为 <code class="docutils literal"><span class="pre">p</span></code> 的纯粹代表他不能作为IO收集元数据的方式</p>
+<p>这让我们将目光转移到一个并不熟悉的函数 <code class="docutils literal"><span class="pre">filterM</span></code> 上，它的动作就像普通的 <code class="docutils literal"><span class="pre">filter</span></code> 函数，但在这种情况下，它在 <code class="docutils literal"><span class="pre">IO</span> <span class="pre">monad</span></code> 操作中使用它的谓词，进而通过谓词表现IO：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="o">+</span><span class="kt">Control</span><span class="o">.</span><span class="kt">Monad</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">filterM</span>
+<span class="nf">filterM</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Monad</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">check</span></code> 谓词是纯谓词 <code class="docutils literal"><span class="pre">p</span></code> 的IO功能包装器，他执行了所有IO发生在 <code class="docutils literal"><span class="pre">p</span></code> 上的可能引起负面效果的任务，因此我们可以使 <code class="docutils literal"><span class="pre">p</span></code> 对负面效果免疫，在收集完元数据后， <code class="docutils literal"><span class="pre">check</span></code> 调用 <code class="docutils literal"><span class="pre">p</span></code> ，通过 <code class="docutils literal"><span class="pre">return</span></code> 语句包装 <code class="docutils literal"><span class="pre">p</span></code> 的IO返回结果</p>
+</div>
+<div class="section" id="id5">
+<h2>安全的获得一个文件的大小<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h2>
+<p>即使 <code class="docutils literal"><span class="pre">System.Directory</span></code> 不允许我们获得一个文件的大小，我们仍可以使用 <code class="docutils literal"><span class="pre">System.IO</span></code> 的类似接口完成这项任务，它包含了一个名为 <code class="docutils literal"><span class="pre">hFileSize</span></code> 的函数，这一函数返回打开文件的字节数，下面是他的简单调用实例：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">simpleFileSize</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">Integer</span>
+
+<span class="nf">simpleFileSize</span> <span class="n">path</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">h</span> <span class="ow">&lt;-</span> <span class="n">openFile</span> <span class="n">path</span> <span class="kt">ReadMode</span>
+  <span class="n">size</span> <span class="ow">&lt;-</span> <span class="n">hFileSize</span> <span class="n">h</span>
+  <span class="n">hClose</span> <span class="n">h</span>
+  <span class="n">return</span> <span class="n">size</span>
+</pre></div>
+</div>
+<p>当这个函数工作时，他还不能完全为我们所用，在 <code class="docutils literal"><span class="pre">betterFind</span></code> 中，我们在目录下的任何实体上调用 <code class="docutils literal"><span class="pre">getFileSize</span></code> ，如果实体不是一个文件或者大小被 <code class="docutils literal"><span class="pre">Just</span></code> 包装起来，他应当返回一个空值，而当实体不是文件或者没有被打开时（可能是由于权限不够），
+这个函数会抛出一个异常然后返回一个未包装的大小。</p>
+<p>下文是安全的用法：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">saferFileSize</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="kt">Integer</span><span class="p">)</span>
+
+<span class="nf">saferFileSize</span> <span class="n">path</span> <span class="ow">=</span> <span class="n">handle</span> <span class="p">(</span><span class="nf">\</span><span class="kr">_</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="kt">Nothing</span><span class="p">)</span> <span class="o">$</span> <span class="kr">do</span>
+  <span class="n">h</span> <span class="ow">&lt;-</span> <span class="n">openFile</span> <span class="n">path</span> <span class="kt">ReadMode</span>
+  <span class="n">size</span> <span class="ow">&lt;-</span> <span class="n">hFileSize</span> <span class="n">h</span>
+  <span class="n">hClose</span> <span class="n">h</span>
+  <span class="n">return</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">size</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>函数体几乎完全一致，除了 <code class="docutils literal"><span class="pre">handle</span></code> 语句。</p>
+<p>我们的异常捕捉在忽略通过的异常的同时返回一个空值，函数体唯一的变化就是允许通过 <code class="docutils literal"><span class="pre">Just</span></code> 包装文件大小</p>
+<p><code class="docutils literal"><span class="pre">saferFileSize</span></code> 函数现在有正确的类型签名，并且不会抛出任何异常，但他扔未能完全的正常工作，存在 <code class="docutils literal"><span class="pre">openFile</span></code> 会成功的目录实体，但 <code class="docutils literal"><span class="pre">hFileSize</span></code> 会抛出异常，这将和被称作命名管道的状况一起发生，这样的异常会被捕捉，但却从未发起调用 <code class="docutils literal"><span class="pre">hClose</span></code> 。</p>
+<p>当发现不再使用文件句柄，Haskell会自动关闭它，但这只有在运行垃圾回收时才会执行，如果无法断言，则延迟到下一次垃圾回收。</p>
+<p>文件句柄是稀缺资源，稀缺性是通过操作系统强制保证的，在linux中，一个进程只能同时拥有1024个文件句柄。</p>
+<p>不难想象这种场景，程序调用了一个使用 <code class="docutils literal"><span class="pre">saferFileSize</span></code> 的 <code class="docutils literal"><span class="pre">betterFind</span></code> 函数，在足够的垃圾文件句柄被关闭之前，由于 <code class="docutils literal"><span class="pre">betterFind</span></code> 造成文件句柄数耗尽导致了程序崩溃</p>
+<p>这是bug危害性的一方面：通过合并起来的不同的部分使得bug不易被排查，只有在 <code class="docutils literal"><span class="pre">betterFind</span></code> 访问足够多的非文件达到进程打开文件句柄数上限的时候才会被触发，随后在积累的垃圾文件句柄被关闭之前返回一个尝试打开另一个文件的调用。</p>
+<p>任何程序内由无法获得数据造成的后续错误都会让事情变得更糟，直到垃圾回收为止。修正这样一个bug需要程序结构本身支持，文件系统内容，如何关闭当前正在运行的程序以触发垃圾回收</p>
+<p>这种问题在开发中很容易被检查出来，然而当他在上线之后出现（这些恶心的问题一向如此），就变得非常难以发觉</p>
+<p>幸运的是，我们可以很容易避开这种错误，同时又能缩短我们的函数。</p>
+<div class="section" id="id6">
+<h3>请求-使用-释放循环<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h3>
+<p>每当 <code class="docutils literal"><span class="pre">openFile</span></code> 成功之后我们就必须保证调用 <code class="docutils literal"><span class="pre">hClose</span></code> ， <code class="docutils literal"><span class="pre">Control.Exception</span></code> 模块提供了 <code class="docutils literal"><span class="pre">bracket</span></code> 函数来支持这个想法：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">bracket</span>
+<span class="nf">bracket</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">c</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">c</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">bracket</span></code> 函数需要三个动作作为参数，第一个动作需要一个资源，第二个动作释放这个资源，第三个动作在这两个中执行，当资源被请求，我们称他为操作动作，当请求动作成功，释放动作随后总是被调用，这保证了这个资源一直能够被释放，对通过的每个请求资源文件的操作，使用和释放动作都是必要的。</p>
+<p>如果一个异常发生在使用过程中， <code class="docutils literal"><span class="pre">bracket</span></code> 调用释放动作并抛出异常，如果使用动作成功， <code class="docutils literal"><span class="pre">bracket</span></code> 调用释放动作，同时返回使用动作返回的值。</p>
+<p>我们现在可以写一个完全安全的函数了，他将不会抛出异常，也不会积累可能在我们程序其他地方制造失败的垃圾文件句柄数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">getFileSize</span> <span class="n">path</span> <span class="ow">=</span> <span class="n">handle</span> <span class="p">(</span><span class="nf">\</span><span class="kr">_</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="kt">Nothing</span><span class="p">)</span> <span class="o">$</span>
+  <span class="n">bracket</span> <span class="p">(</span><span class="n">openFile</span> <span class="n">path</span> <span class="kt">ReadMode</span><span class="p">)</span> <span class="n">hClose</span> <span class="o">$</span> <span class="nf">\</span><span class="n">h</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+    <span class="n">size</span> <span class="ow">&lt;-</span> <span class="n">hFileSize</span> <span class="n">h</span>
+    <span class="n">return</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">size</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>仔细观察 <code class="docutils literal"><span class="pre">bracket</span></code> 的参数，首先打开文件，并且返回文件句柄，第二步关闭句柄，第三步在句柄上调用 <code class="docutils literal"><span class="pre">hFileSize</span></code> 并用 <code class="docutils literal"><span class="pre">just</span></code> 包装结果返回</p>
+<p>为了这个函数的正常工作，我们需要使用 <code class="docutils literal"><span class="pre">bracket</span></code> 和 <code class="docutils literal"><span class="pre">handle</span></code> ，前者保证我们不会积累垃圾文件句柄数，后者保证我们免于异常。</p>
+<div class="section" id="id7">
+<h4>练习<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h4>
+<ol class="arabic simple">
+<li>调用 <code class="docutils literal"><span class="pre">bracket</span></code> 和 <code class="docutils literal"><span class="pre">handle</span></code> 的顺序重要吗，为什么</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="section" id="id8">
+<h2>为谓词而开发的领域特定语言<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h2>
+<p>深入谓词写作的内部，我们的谓词将检查大于128kb的C++源文件：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">myTest</span> <span class="n">path</span> <span class="kr">_</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">size</span><span class="p">)</span> <span class="kr">_</span> <span class="ow">=</span>
+    <span class="n">takeExtension</span> <span class="n">path</span> <span class="o">==</span> <span class="s">&quot;.cpp&quot;</span> <span class="o">&amp;&amp;</span> <span class="n">size</span> <span class="o">&gt;</span> <span class="mi">131072</span>
+<span class="nf">myTest</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">False</span>
+</pre></div>
+</div>
+<p>这并不是令人感到愉快的工作，断言需要四个参数，并且总是忽略其中的两个，同时需要定义两个等式，写一些更有意义的谓词代码，我们可以做的更好。</p>
+<p>有些时候，这种库被用作嵌入式领域特定语言，我们通过编写代码的过程中通过编程语言的本地特性来优雅的解决一些特定问题</p>
+<p>第一步是写一个返回当前函数的一个参数的函数，这个从参数中抽取路径并传给谓词：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">pathP</span> <span class="n">path</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">path</span>
+</pre></div>
+</div>
+<p>如果我们不能提供类型签名， Haskell 将给这个函数提供一个通用类型，这在随后会导致一个难以理解的错误信息，因此给 <code class="docutils literal"><span class="pre">pathP</span></code> 一个类型：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="kr">type</span> <span class="kt">InfoP</span> <span class="n">a</span> <span class="ow">=</span>  <span class="kt">FilePath</span>        <span class="c1">-- path to directory entry</span>
+             <span class="ow">-&gt;</span> <span class="kt">Permissions</span>     <span class="c1">-- permissions</span>
+             <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">Integer</span>   <span class="c1">-- file size (Nothing if not file)</span>
+             <span class="ow">-&gt;</span> <span class="kt">ClockTime</span>       <span class="c1">-- last modified</span>
+             <span class="ow">-&gt;</span> <span class="n">a</span>
+
+<span class="nf">pathP</span> <span class="ow">::</span> <span class="kt">InfoP</span> <span class="kt">FilePath</span>
+</pre></div>
+</div>
+<p>我们已经创建了一个可以用做缩写的类型，相似的结构函数，我们的类型代词接受一个类型参数，如此我们可以分辨不同的结果类型：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">sizeP</span> <span class="ow">::</span> <span class="kt">InfoP</span> <span class="kt">Integer</span>
+<span class="nf">sizeP</span> <span class="kr">_</span> <span class="kr">_</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">size</span><span class="p">)</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">size</span>
+<span class="nf">sizeP</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kt">Nothing</span>     <span class="kr">_</span> <span class="ow">=</span> <span class="o">-</span><span class="mi">1</span>
+</pre></div>
+</div>
+<p>我们在这里做了些小动作，对那些我们无法打开的文件或者不是文件的东西我们返回的实体大小是 <code class="docutils literal"><span class="pre">-1</span></code> 。</p>
+<p>事实上，浏览中可以看出我们在本章开始处定义谓词类型的和 <code class="docutils literal"><span class="pre">InfoP</span> <span class="pre">Bool</span></code> 一样，因此我们可以合法的放弃谓词类型。</p>
+<p><code class="docutils literal"><span class="pre">pathP</span></code> 和 <code class="docutils literal"><span class="pre">sizeP</span></code> 的用法？通过一些线索，我们发现可以在一个谓词中使用它们（每个名称中的前缀p代表断言），从这开始事情就变得有趣起来：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">equalP</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">InfoP</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="kt">Bool</span>
+<span class="nf">equalP</span> <span class="n">f</span> <span class="n">k</span> <span class="ow">=</span> <span class="nf">\</span><span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="o">==</span> <span class="n">k</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">equalP</span></code> 的类型签名值得注意，他接受一个 <code class="docutils literal"><span class="pre">InfoP</span> <span class="pre">a</span></code> ，同时兼容 <code class="docutils literal"><span class="pre">pathP</span></code> 和 <code class="docutils literal"><span class="pre">sizeP</span></code> ，他接受一个 <code class="docutils literal"><span class="pre">a</span></code> ，并返回一个被认为是谓词同义词的 <code class="docutils literal"><span class="pre">InfoP</span> <span class="pre">Bool</span></code> ，换言之， <code class="docutils literal"><span class="pre">equalP</span></code> 构造了一个谓词。</p>
+<p><code class="docutils literal"><span class="pre">equalP</span></code> 函数通过返回一个匿名函数工作，谓词接受参数之后将他们转成 <code class="docutils literal"><span class="pre">f</span></code> ，并将结果和 <code class="docutils literal"><span class="pre">f</span></code> 进行比对。</p>
+<p><code class="docutils literal"><span class="pre">equalP</span></code> 的相等强调了这一事实，我们认为它需要两个参数，在 Haskell 柯里化处理了所有函数的情况下，通过这种方式写 <code class="docutils literal"><span class="pre">equalP</span></code> 并无必要，我们可以避免匿名函数，同时通过柯里化来写出表现相同的函数：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">equalP&#39;</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">InfoP</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="kt">Bool</span>
+<span class="nf">equalP&#39;</span> <span class="n">f</span> <span class="n">k</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="n">f</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="o">==</span> <span class="n">k</span>
+</pre></div>
+</div>
+<p>在继续我们的探险之前，先把写好的模块加载到 <code class="docutils literal"><span class="pre">ghci</span></code> 里去：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">BetterPredicate</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">RecursiveContents</span> <span class="p">(</span> <span class="kt">RecursiveContents</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="p">[</span><span class="mi">2</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">BetterPredicate</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">RecursiveContents</span><span class="p">,</span> <span class="kt">Main</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>让我们来看看函数中的简单谓词能否正常工作：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">betterFind</span> <span class="p">(</span><span class="n">sizeP</span> <span class="p">`</span><span class="n">equalP</span><span class="p">`</span> <span class="mi">1024</span><span class="p">)</span>
+<span class="nf">betterFind</span> <span class="p">(</span><span class="n">sizeP</span> <span class="p">`</span><span class="n">equalP</span><span class="p">`</span> <span class="mi">1024</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">FilePath</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>注意我们并没有直接调用 <code class="docutils literal"><span class="pre">betterFind</span></code> ，我们只是确定我们的表达式进行了类型检查，现在我们需要更多的方法来列出大小为特定值的所有文件，之前的成功给了我们继续下去的勇气。</p>
+<div class="section" id="lifting">
+<h3>多用提升（lifting）少用模板<a class="headerlink" href="#lifting" title="Permalink to this headline">¶</a></h3>
+<p>除了 <code class="docutils literal"><span class="pre">equalP</span></code> ，我们还将能够编写其他二进制函数，我们更希望不去写他们每个的具体实现，因为这看起来只是重复工作：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">liftP</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">c</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="n">c</span>
+<span class="nf">liftP</span> <span class="n">q</span> <span class="n">f</span> <span class="n">k</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="n">f</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="p">`</span><span class="n">q</span><span class="p">`</span> <span class="n">k</span>
+
+<span class="nf">greaterP</span><span class="p">,</span> <span class="n">lesserP</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Ord</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">InfoP</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="kt">Bool</span>
+<span class="nf">greaterP</span> <span class="ow">=</span> <span class="n">liftP</span> <span class="p">(</span><span class="o">&gt;</span><span class="p">)</span>
+<span class="nf">lesserP</span> <span class="ow">=</span> <span class="n">liftP</span> <span class="p">(</span><span class="o">&lt;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>为了完成这个，让我们使用 Haskell 的抽象功能，定义 <code class="docutils literal"><span class="pre">equalP</span></code> 代替直接调用 <code class="docutils literal"><span class="pre">==</span></code> ，我们就可以把二进制函数作为参数传入我们想调用的函数。</p>
+<p>函数动作，比如 <code class="docutils literal"><span class="pre">&gt;</span></code> ，以及将它转换成另一个函数操作另一种上下文，在这里是 <code class="docutils literal"><span class="pre">greaterP</span></code> ，通过提升（lifting）将它引入到上下文，这解释了当前函数名称中lifting出现的原因，提升让我们复用代码并降低模板的使用，在本书的后半部分的内容中，我们将大量使用这一技术</p>
+<p>当我们提升一个函数，我们通常将它转换到原始类型和一个新版本——提升和未提升两个版本</p>
+<p>在这里，将 <code class="docutils literal"><span class="pre">q</span></code> 作为 <code class="docutils literal"><span class="pre">liftP</span></code> 的第一个参数是经过深思熟虑的，这使得我们可能写一个对 <code class="docutils literal"><span class="pre">greaterP</span></code> 和 <code class="docutils literal"><span class="pre">lesserP</span></code> 都有意义的定义，实践中发现，相较其他语言，Haskell 中参数的最佳适配成为api设计中最重要的一部分。语言内部要求参数转换，在Haskell中放错一个参数的位置就将失去程序的所有意义。</p>
+<p>我们可以通过组合字（combinators）恢复一些意义，比如，直到2007年 <code class="docutils literal"><span class="pre">forM</span></code> 才加入 <code class="docutils literal"><span class="pre">Control.Monad</span></code> 模块，在此之前，人们用的是 <code class="docutils literal"><span class="pre">flip</span> <span class="pre">mapM</span></code> 。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="o">+</span><span class="kt">Control</span><span class="o">.</span><span class="kt">Monad</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">mapM</span>
+<span class="nf">mapM</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Monad</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="p">[</span><span class="n">b</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">forM</span>
+<span class="nf">forM</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Monad</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="p">[</span><span class="n">b</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">flip</span> <span class="n">mapM</span>
+<span class="nf">flip</span> <span class="n">mapM</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Monad</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="p">[</span><span class="n">b</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id9">
+<h3>谓词组合<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h3>
+<p>如果我们希望组合谓词，我们可以循着手边最明显的路径来开始</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">simpleAndP</span> <span class="ow">::</span> <span class="kt">InfoP</span> <span class="kt">Bool</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="kt">Bool</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="kt">Bool</span>
+<span class="nf">simpleAndP</span> <span class="n">f</span> <span class="n">g</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="n">f</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="o">&amp;&amp;</span> <span class="n">g</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span>
+</pre></div>
+</div>
+<p>现在我们知道了提升，他成为通过提升存在的布尔操作来削减代码量的更自然的选择。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">liftP2</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">c</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="n">c</span>
+<span class="nf">liftP2</span> <span class="n">q</span> <span class="n">f</span> <span class="n">g</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="n">f</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="p">`</span><span class="n">q</span><span class="p">`</span> <span class="n">g</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span>
+
+<span class="nf">andP</span> <span class="ow">=</span> <span class="n">liftP2</span> <span class="p">(</span><span class="o">&amp;&amp;</span><span class="p">)</span>
+<span class="nf">orP</span> <span class="ow">=</span> <span class="n">liftP2</span> <span class="p">(</span><span class="o">||</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>注意 <code class="docutils literal"><span class="pre">liftP2</span></code> 非常像我们之前的 <code class="docutils literal"><span class="pre">liftP</span></code> ，事实上，这更加通用，因为我们可以用 <code class="docutils literal"><span class="pre">liftP</span></code> 代替 <code class="docutils literal"><span class="pre">liftP2</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">constP</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="n">a</span>
+<span class="nf">constP</span> <span class="n">k</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">k</span>
+
+<span class="nf">liftP&#39;</span> <span class="n">q</span> <span class="n">f</span> <span class="n">k</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="n">f</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="p">`</span><span class="n">q</span><span class="p">`</span> <span class="n">constP</span> <span class="n">k</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>组合子</p>
+<p class="last">在Haskell中，我们更希望函数的传入参数和返回值都是函数，就像组合子一样</p>
+</div>
+<p>回到之前定义的 <code class="docutils literal"><span class="pre">myTest</span></code> 函数，现在我们可以使用一些帮助函数了。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">myTest</span> <span class="n">path</span> <span class="kr">_</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">size</span><span class="p">)</span> <span class="kr">_</span> <span class="ow">=</span>
+    <span class="n">takeExtension</span> <span class="n">path</span> <span class="o">==</span> <span class="s">&quot;.cpp&quot;</span> <span class="o">&amp;&amp;</span> <span class="n">size</span> <span class="o">&gt;</span> <span class="mi">131072</span>
+<span class="nf">myTest</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">False</span>
+</pre></div>
+</div>
+<p>在加入组合字以后这个函数会变成什么样子：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="nf">liftPath</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="n">a</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="n">a</span>
+<span class="nf">liftPath</span> <span class="n">f</span> <span class="n">w</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">f</span> <span class="n">w</span>
+
+<span class="nf">myTest2</span> <span class="ow">=</span> <span class="p">(</span><span class="n">liftPath</span> <span class="n">takeExtension</span> <span class="p">`</span><span class="n">equalP</span><span class="p">`</span> <span class="s">&quot;.cpp&quot;</span><span class="p">)</span> <span class="p">`</span><span class="n">andP</span><span class="p">`</span>
+          <span class="p">(</span><span class="n">sizeP</span> <span class="p">`</span><span class="n">greaterP</span><span class="p">`</span> <span class="mi">131072</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>由于操作文件名是如此平常的行为，我们加入了最终组合字 <code class="docutils literal"><span class="pre">liftPath</span></code> 。</p>
+</div>
+</div>
+<div class="section" id="id10">
+<h2>定义并使用新算符<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h2>
+<p>可以通过特定领域语言定义新的操作：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="p">(</span><span class="o">==?</span><span class="p">)</span> <span class="ow">=</span> <span class="n">equalP</span>
+<span class="p">(</span><span class="o">&amp;&amp;?</span><span class="p">)</span> <span class="ow">=</span> <span class="n">andP</span>
+<span class="p">(</span><span class="o">&gt;?</span><span class="p">)</span> <span class="ow">=</span> <span class="n">greaterP</span>
+
+<span class="nf">myTest3</span> <span class="ow">=</span> <span class="p">(</span><span class="n">liftPath</span> <span class="n">takeExtension</span> <span class="o">==?</span> <span class="s">&quot;.cpp&quot;</span><span class="p">)</span> <span class="o">&amp;&amp;?</span> <span class="p">(</span><span class="n">sizeP</span> <span class="o">&gt;?</span> <span class="mi">131072</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>这个括号在定义中是必要的，因为并未告诉Haskell有关之前和相关的操作，领域语言的操作如果没有边界（fixities）声明将会被以 <code class="docutils literal"><span class="pre">infixl</span> <span class="pre">9</span></code> 之类的东西对待，计算从左到右，如果跳过这个括号，表达式将被解析成具有可怕错误的 <code class="docutils literal"><span class="pre">(((liftPath</span> <span class="pre">takeExtension)</span> <span class="pre">==?</span> <span class="pre">&quot;.cpp&quot;)</span> <span class="pre">&amp;&amp;?</span> <span class="pre">sizeP)</span> <span class="pre">&gt;?</span> <span class="pre">131072</span></code> 。</p>
+<p>可以给操作添加边界声明，第一步是找出未提升的操作的，这样就可以模仿他们了：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">info</span> <span class="o">==</span>
+<span class="kr">class</span> <span class="kt">Eq</span> <span class="n">a</span> <span class="kr">where</span>
+  <span class="p">(</span><span class="o">==</span><span class="p">)</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+  <span class="o">...</span>
+      <span class="c1">-- Defined in GHC.Base</span>
+<span class="kr">infix</span> <span class="mi">4</span> <span class="o">==</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">info</span> <span class="o">&amp;&amp;</span>
+<span class="p">(</span><span class="o">&amp;&amp;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Bool</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>        <span class="c1">-- Defined in GHC.Base</span>
+<span class="kr">infixr</span> <span class="mi">3</span> <span class="o">&amp;&amp;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">info</span> <span class="o">&gt;</span>
+<span class="kr">class</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Ord</span> <span class="n">a</span> <span class="kr">where</span>
+  <span class="o">...</span>
+  <span class="p">(</span><span class="o">&gt;</span><span class="p">)</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+  <span class="o">...</span>
+    <span class="c1">-- Defined in GHC.Base</span>
+<span class="kr">infix</span> <span class="mi">4</span> <span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>学会这些就可以写一个不用括号的表达式，却和 <code class="docutils literal"><span class="pre">myTest3</span></code> 的解析结果一致的表达式了</p>
+</div>
+<div class="section" id="id11">
+<h2>控制遍历<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h2>
+<p>遍历文件系统时，我们喜欢在需要遍历的文件夹上有更多的控制权，简便方法之一是可以在函数中允许给定文件夹的部分子文件夹通过，然后返回另一个列表，这个列表可以移除元素，也可以要求和原始列表不同，或两者皆有，最简单的控制函数就是id，原样返回未修改的列表。</p>
+<p>为了应付多种情况，我们正在尝试改变部分表达，为了替代精心刻画的函数类型 <code class="docutils literal"><span class="pre">InfoP</span></code> ，我们将使用一个普通代数数据类型来表达相同的含义</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/ControlledVisit.hs</span>
+<span class="kr">data</span> <span class="kt">Info</span> <span class="ow">=</span> <span class="kt">Info</span> <span class="p">{</span>
+      <span class="n">infoPath</span> <span class="ow">::</span> <span class="kt">FilePath</span>
+    <span class="p">,</span> <span class="n">infoPerms</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">Permissions</span>
+    <span class="p">,</span> <span class="n">infoSize</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">Integer</span>
+    <span class="p">,</span> <span class="n">infoModTime</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">ClockTime</span>
+    <span class="p">}</span> <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+
+<span class="nf">getInfo</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">Info</span>
+</pre></div>
+</div>
+<p>记录语法给我们自由控制函数的权限，如 <code class="docutils literal"><span class="pre">infoPath</span></code> ， <code class="docutils literal"><span class="pre">traverse</span></code> 函数中的这种类型是简单地，正如我们之前期望的那样，如果需要一个文件或者目录的信息，就调用 <code class="docutils literal"><span class="pre">getInfo</span></code> 函数：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/ControlledVisit.hs</span>
+<span class="nf">traverse</span> <span class="ow">::</span> <span class="p">([</span><span class="kt">Info</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Info</span><span class="p">])</span> <span class="ow">-&gt;</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">Info</span><span class="p">]</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">traverse</span></code> 的定义很短，但很有分量：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/ControlledVisit.hs</span>
+<span class="nf">traverse</span> <span class="n">order</span> <span class="n">path</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">names</span> <span class="ow">&lt;-</span> <span class="n">getUsefulContents</span> <span class="n">path</span>
+    <span class="n">contents</span> <span class="ow">&lt;-</span> <span class="n">mapM</span> <span class="n">getInfo</span> <span class="p">(</span><span class="n">path</span> <span class="kt">:</span> <span class="n">map</span> <span class="p">(</span><span class="n">path</span> <span class="o">&lt;/&gt;</span><span class="p">)</span> <span class="n">names</span><span class="p">)</span>
+    <span class="n">liftM</span> <span class="n">concat</span> <span class="o">$</span> <span class="n">forM</span> <span class="p">(</span><span class="n">order</span> <span class="n">contents</span><span class="p">)</span> <span class="o">$</span> <span class="nf">\</span><span class="n">info</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+      <span class="kr">if</span> <span class="n">isDirectory</span> <span class="n">info</span> <span class="o">&amp;&amp;</span> <span class="n">infoPath</span> <span class="n">info</span> <span class="o">/=</span> <span class="n">path</span>
+        <span class="kr">then</span> <span class="n">traverse</span> <span class="n">order</span> <span class="p">(</span><span class="n">infoPath</span> <span class="n">info</span><span class="p">)</span>
+        <span class="kr">else</span> <span class="n">return</span> <span class="p">[</span><span class="n">info</span><span class="p">]</span>
+
+<span class="nf">getUsefulContents</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+<span class="nf">getUsefulContents</span> <span class="n">path</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">names</span> <span class="ow">&lt;-</span> <span class="n">getDirectoryContents</span> <span class="n">path</span>
+    <span class="n">return</span> <span class="p">(</span><span class="n">filter</span> <span class="p">(`</span><span class="n">notElem</span><span class="p">`</span> <span class="p">[</span><span class="s">&quot;.&quot;</span><span class="p">,</span> <span class="s">&quot;..&quot;</span><span class="p">])</span> <span class="n">names</span><span class="p">)</span>
+
+<span class="nf">isDirectory</span> <span class="ow">::</span> <span class="kt">Info</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">isDirectory</span> <span class="ow">=</span> <span class="n">maybe</span> <span class="kt">False</span> <span class="n">searchable</span> <span class="o">.</span> <span class="n">infoPerms</span>
+</pre></div>
+</div>
+<p>现在不再引入新技术，这就是我们遇到的最深奥的函数定义，一行行的深入他，解释它每行为何是这样，不过开始部分的那几行没什么神秘的，它们只是之前看到代码的拷贝。</p>
+<p>观察变量 <code class="docutils literal"><span class="pre">contents</span></code> 的时候情况变得有趣起来，从左到右仔细阅读，已经知道 <code class="docutils literal"><span class="pre">names</span></code> 是目录实体的列表，同时确定当前目录的所有元素都在这个列表中，这时通过 <code class="docutils literal"><span class="pre">mapM</span></code> 将 <code class="docutils literal"><span class="pre">getInfo</span></code> 附加到结果返回的路径上。</p>
+<p>接下来的这一行更深奥，继续从左往右看，我们看到本行的最后一个元素以一个匿名函数的定义开始，并持续到这一段的结尾，给定一个Info值，函数或者递归访问一个目录（有额外的方法保证我们不在访问这个路径），或者返回当前值作为列表唯一元素的列表（来匹配递归的返回类型）。</p>
+<p>函数通过 <code class="docutils literal"><span class="pre">forM</span></code> 获得 <code class="docutils literal"><span class="pre">order</span></code> 返回 <code class="docutils literal"><span class="pre">info</span></code> 列表中的每个元素， <code class="docutils literal"><span class="pre">forM</span></code> 是使用者提供的递归控制函数。</p>
+<p>本行的新上下文中使用提升技术， <code class="docutils literal"><span class="pre">liftM</span></code> 函数需要一个规则函数， <code class="docutils literal"><span class="pre">concat</span></code> ，并且提升到 <code class="docutils literal"><span class="pre">IO</span></code> 的monad操作，换言之，他需要 <code class="docutils literal"><span class="pre">forM</span></code> 通过 <code class="docutils literal"><span class="pre">IO</span></code> monad 操作的的返回值，并将 <code class="docutils literal"><span class="pre">concat</span></code> 附加其上（获得一个 <code class="docutils literal"><span class="pre">[Info]</span></code> 类型的返回值，这也是我们所需要的）并将结果值返回给 <code class="docutils literal"><span class="pre">IO</span></code> monad 。</p>
+<p>最后不要忘记定义 <code class="docutils literal"><span class="pre">getInfo</span></code> 函数：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/ControlledVisit.hs</span>
+<span class="nf">maybeIO</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">a</span><span class="p">)</span>
+<span class="nf">maybeIO</span> <span class="n">act</span> <span class="ow">=</span> <span class="n">handle</span> <span class="p">(</span><span class="nf">\</span><span class="kr">_</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="kt">Nothing</span><span class="p">)</span> <span class="p">(</span><span class="kt">Just</span> <span class="p">`</span><span class="n">liftM</span><span class="p">`</span> <span class="n">act</span><span class="p">)</span>
+
+<span class="nf">getInfo</span> <span class="n">path</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">perms</span> <span class="ow">&lt;-</span> <span class="n">maybeIO</span> <span class="p">(</span><span class="n">getPermissions</span> <span class="n">path</span><span class="p">)</span>
+  <span class="n">size</span> <span class="ow">&lt;-</span> <span class="n">maybeIO</span> <span class="p">(</span><span class="n">bracket</span> <span class="p">(</span><span class="n">openFile</span> <span class="n">path</span> <span class="kt">ReadMode</span><span class="p">)</span> <span class="n">hClose</span> <span class="n">hFileSize</span><span class="p">)</span>
+  <span class="n">modified</span> <span class="ow">&lt;-</span> <span class="n">maybeIO</span> <span class="p">(</span><span class="n">getModificationTime</span> <span class="n">path</span><span class="p">)</span>
+  <span class="n">return</span> <span class="p">(</span><span class="kt">Info</span> <span class="n">path</span> <span class="n">perms</span> <span class="n">size</span> <span class="n">modified</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>在此唯一值得记录的事情是一个有用的组合字， <code class="docutils literal"><span class="pre">maybeIO</span></code> ，将一个可能抛出异常的 IO 操作转换成用 <code class="docutils literal"><span class="pre">Maybe</span></code> 包装的结果</p>
+<div class="section" id="id12">
+<h3>练习<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
+<ol class="arabic simple">
+<li>在以代数顺序遍历一个目录树时如何确定需要通过的内容。</li>
+<li>使用 <code class="docutils literal"><span class="pre">id</span></code> 作为控制函数， <code class="docutils literal"><span class="pre">traverse</span> <span class="pre">id</span></code> 扮演一个前序递归树，在子目录之前他返回一个父目录，写一个控制函数让 <code class="docutils literal"><span class="pre">traverse</span></code> 表现为一个后序遍历，返回子目录在父目录之前。</li>
+<li>使得《谓词组合》一节里面的断言和组合字可以处理新的 <code class="docutils literal"><span class="pre">info</span></code> 类型。</li>
+<li>给 <code class="docutils literal"><span class="pre">traverse</span></code> 写一个包装器，让你通过谓词控制递归，并通过谓词过滤返回结果</li>
+</ol>
+</div>
+</div>
+<div class="section" id="id13">
+<h2>代码深度，可读性和学习过程<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h2>
+<p><code class="docutils literal"><span class="pre">traverse</span></code> 这样深度的代码在Haskell中并不多见，在这种表达方式中里学习的收获是巨大的，同时也并不需要大量的练习才能以这种方式流利的阅读和写作代码：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/ControlledVisit.hs</span>
+<span class="nf">traverseVerbose</span> <span class="n">order</span> <span class="n">path</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">names</span> <span class="ow">&lt;-</span> <span class="n">getDirectoryContents</span> <span class="n">path</span>
+    <span class="kr">let</span> <span class="n">usefulNames</span> <span class="ow">=</span> <span class="n">filter</span> <span class="p">(`</span><span class="n">notElem</span><span class="p">`</span> <span class="p">[</span><span class="s">&quot;.&quot;</span><span class="p">,</span> <span class="s">&quot;..&quot;</span><span class="p">])</span> <span class="n">names</span>
+    <span class="n">contents</span> <span class="ow">&lt;-</span> <span class="n">mapM</span> <span class="n">getEntryName</span> <span class="p">(</span><span class="s">&quot;&quot;</span> <span class="kt">:</span> <span class="n">usefulNames</span><span class="p">)</span>
+    <span class="n">recursiveContents</span> <span class="ow">&lt;-</span> <span class="n">mapM</span> <span class="n">recurse</span> <span class="p">(</span><span class="n">order</span> <span class="n">contents</span><span class="p">)</span>
+    <span class="n">return</span> <span class="p">(</span><span class="n">concat</span> <span class="n">recursiveContents</span><span class="p">)</span>
+  <span class="kr">where</span> <span class="n">getEntryName</span> <span class="n">name</span> <span class="ow">=</span> <span class="n">getInfo</span> <span class="p">(</span><span class="n">path</span> <span class="o">&lt;/&gt;</span> <span class="n">name</span><span class="p">)</span>
+        <span class="n">isDirectory</span> <span class="n">info</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">infoPerms</span> <span class="n">info</span> <span class="kr">of</span>
+                             <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">False</span>
+                             <span class="kt">Just</span> <span class="n">perms</span> <span class="ow">-&gt;</span> <span class="n">searchable</span> <span class="n">perms</span>
+        <span class="n">recurse</span> <span class="n">info</span> <span class="ow">=</span> <span class="kr">do</span>
+            <span class="kr">if</span> <span class="n">isDirectory</span> <span class="n">info</span> <span class="o">&amp;&amp;</span> <span class="n">infoPath</span> <span class="n">info</span> <span class="o">/=</span> <span class="n">path</span>
+                <span class="kr">then</span> <span class="n">traverseVerbose</span> <span class="n">order</span> <span class="p">(</span><span class="n">infoPath</span> <span class="n">info</span><span class="p">)</span>
+                <span class="kr">else</span> <span class="n">return</span> <span class="p">[</span><span class="n">info</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>作为对比，这里有一个不那么复杂的代码，这也许适合一个对Haskell了解不那么深入的程序员</p>
+<p>这里所做的一切都是创建一个新的替代，通过部分应用（partial application）和函数组合（function composition）替代liberally，在 <code class="docutils literal"><span class="pre">where</span></code> 块中我们已经定义了一些本地函数，在 <code class="docutils literal"><span class="pre">maybe</span></code> 组合子中，使用了 <code class="docutils literal"><span class="pre">case</span></code> 表达式，为了替代 <code class="docutils literal"><span class="pre">liftM</span></code> ，我们手动将 <code class="docutils literal"><span class="pre">concat</span></code> 提升。</p>
+<p>并不是说深度是一个不好的特征， <code class="docutils literal"><span class="pre">traverse</span></code> 函数的每一行原始代码都很短，我们引入一个本地变量和本地函数来保证代码干净且足够短，命名注意可读性，同时使用函数组合管道，最长的管道只含有三个元素。</p>
+<p>编写可维护的Haskell代码核心是找到深度和可读性的折中，能否做到这点取决于你的实践层次：</p>
+<ul class="simple">
+<li>成为Haskell程序员之前，Andrew并不知道使用标准库的方式，为此付出的代价则是写了一大堆不必要的重复代码。</li>
+<li>Zack是一个有数月编程经验的，并且精通通过( <code class="docutils literal"><span class="pre">.</span></code> )组合长管道的技巧。每当代码需要改动，就需要重构一个管道，他无法更深入的理解已经存在的管道的意义，而这些管道也太脆弱而无法修正。</li>
+<li>Monica有相当时间的编程经验，他对Haskell库和编写整洁的代码非常熟悉，但他避免使用高深度的风格，她的代码可维护，同时她还找到了一种简单地方法来面对快速的需求变更</li>
+</ul>
+</div>
+<div class="section" id="id14">
+<h2>观察迭代函数的另一种方法<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h2>
+<p>相比原始的 <code class="docutils literal"><span class="pre">betterFind</span></code> 函数，迭代函数给我们更多控制权的同时仍存在一个问题，我们可以避免递归目录，但我们不能过滤其他文件名直到我们获得整个名称树，如果递归含有100000个文件的目录的同时只关注其中三个，在获得这三个需要的文件名之前需要给出一个含有10000个元素的表。</p>
+<p>一个可能的方法是提供一个过滤器作为递归的新参数，我们将它应用到生成的名单中，这将允许我们获得一个只包含我们需要元素的列表</p>
+<p>然而，这个方法也存在缺点，假如说我们知道需要比三个多很多的实体组，并且这些实体组是这10000个我们需要遍历实体中的前几个，这种情况下就不需要访问剩下的实体，这并不是个故弄玄虚的问题，举个栗子，邮箱文件夹中存放了包含许多邮件信息的文件夹——就像一个有大量文件的目录，那么代表邮箱的目录含有数千个文件就很正常。</p>
+<p>从另一个角度看，我们尝试定位之前两个遍历函数的弱点：我们如何看待文件系统遍历阶级目录下的一个文件夹？</p>
+<p>相似的文件夹， <code class="docutils literal"><span class="pre">foldr</span></code> 和 <code class="docutils literal"><span class="pre">foldl'</span></code> ，干净的生成遍历并计算出一个结果，很难把这个想法从列表扩展到目录树，但我们仍乐于在 <code class="docutils literal"><span class="pre">fold</span></code> 中加入一个控制元素，我们将这个控制表达为一个代数数据类型：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/FoldDir.hs</span>
+<span class="kr">data</span> <span class="kt">Iterate</span> <span class="n">seed</span> <span class="ow">=</span> <span class="kt">Done</span>     <span class="p">{</span> <span class="n">unwrap</span> <span class="ow">::</span> <span class="n">seed</span> <span class="p">}</span>
+                  <span class="o">|</span> <span class="kt">Skip</span>     <span class="p">{</span> <span class="n">unwrap</span> <span class="ow">::</span> <span class="n">seed</span> <span class="p">}</span>
+                  <span class="o">|</span> <span class="kt">Continue</span> <span class="p">{</span> <span class="n">unwrap</span> <span class="ow">::</span> <span class="n">seed</span> <span class="p">}</span>
+                    <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">)</span>
+
+<span class="kr">type</span> <span class="kt">Iterator</span> <span class="n">seed</span> <span class="ow">=</span> <span class="n">seed</span> <span class="ow">-&gt;</span> <span class="kt">Info</span> <span class="ow">-&gt;</span> <span class="kt">Iterate</span> <span class="n">seed</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">Iterator</span></code> 类型给函数一个便于使用的别名，它需要一个种子和一个 <code class="docutils literal"><span class="pre">info</span></code> 值来表达这个目录实体，并返回一个新种子和一个我们 <code class="docutils literal"><span class="pre">fold</span></code> 函数的说明，这个说明通过 <code class="docutils literal"><span class="pre">Iterate</span></code> 类型的构造器来表达：</p>
+<ul class="simple">
+<li>如果这个构造器已经完成，遍历将立即释放，被 <code class="docutils literal"><span class="pre">Done</span></code> 包裹的值将作为结果返回。</li>
+<li>如果这个说明被跳过，并且当前 <code class="docutils literal"><span class="pre">info</span></code> 代表一个目录，遍历将不在递归寻找这个目录。</li>
+<li>其他，这个便利仍将继续，使用包裹值作为下一个调用 <code class="docutils literal"><span class="pre">fold</span></code> 函数的参数。</li>
+</ul>
+<p>目录逻辑上是左序的，因为我们开始从我们第一个遇到的实体开始 <code class="docutils literal"><span class="pre">fold</span></code> 操作，而每步中的种子是之前一步的结果。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/FoldDir.hs</span>
+<span class="nf">foldTree</span> <span class="ow">::</span> <span class="kt">Iterator</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">a</span>
+
+<span class="nf">foldTree</span> <span class="n">iter</span> <span class="n">initSeed</span> <span class="n">path</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">endSeed</span> <span class="ow">&lt;-</span> <span class="n">fold</span> <span class="n">initSeed</span> <span class="n">path</span>
+    <span class="n">return</span> <span class="p">(</span><span class="n">unwrap</span> <span class="n">endSeed</span><span class="p">)</span>
+  <span class="kr">where</span>
+    <span class="n">fold</span> <span class="n">seed</span> <span class="n">subpath</span> <span class="ow">=</span> <span class="n">getUsefulContents</span> <span class="n">subpath</span> <span class="o">&gt;&gt;=</span> <span class="n">walk</span> <span class="n">seed</span>
+
+    <span class="n">walk</span> <span class="n">seed</span> <span class="p">(</span><span class="n">name</span><span class="kt">:</span><span class="n">names</span><span class="p">)</span> <span class="ow">=</span> <span class="kr">do</span>
+      <span class="kr">let</span> <span class="n">path&#39;</span> <span class="ow">=</span> <span class="n">path</span> <span class="o">&lt;/&gt;</span> <span class="n">name</span>
+      <span class="n">info</span> <span class="ow">&lt;-</span> <span class="n">getInfo</span> <span class="n">path&#39;</span>
+      <span class="kr">case</span> <span class="n">iter</span> <span class="n">seed</span> <span class="n">info</span> <span class="kr">of</span>
+        <span class="n">done</span><span class="o">@</span><span class="p">(</span><span class="kt">Done</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="n">done</span>
+        <span class="kt">Skip</span> <span class="n">seed&#39;</span>    <span class="ow">-&gt;</span> <span class="n">walk</span> <span class="n">seed&#39;</span> <span class="n">names</span>
+        <span class="kt">Continue</span> <span class="n">seed&#39;</span>
+          <span class="o">|</span> <span class="n">isDirectory</span> <span class="n">info</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+              <span class="n">next</span> <span class="ow">&lt;-</span> <span class="n">fold</span> <span class="n">seed&#39;</span> <span class="n">path&#39;</span>
+              <span class="kr">case</span> <span class="n">next</span> <span class="kr">of</span>
+                <span class="n">done</span><span class="o">@</span><span class="p">(</span><span class="kt">Done</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="n">done</span>
+                <span class="n">seed&#39;&#39;</span>        <span class="ow">-&gt;</span> <span class="n">walk</span> <span class="p">(</span><span class="n">unwrap</span> <span class="n">seed&#39;&#39;</span><span class="p">)</span> <span class="n">names</span>
+          <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">-&gt;</span> <span class="n">walk</span> <span class="n">seed&#39;</span> <span class="n">names</span>
+    <span class="n">walk</span> <span class="n">seed</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">return</span> <span class="p">(</span><span class="kt">Continue</span> <span class="n">seed</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>这部分代码中有意思的部分很少，开始是通过 <code class="docutils literal"><span class="pre">scoping</span></code> 避免通过额外的参数，最高层 <code class="docutils literal"><span class="pre">foldTree</span></code> 函数只是 <code class="docutils literal"><span class="pre">fold</span></code> 的包装器，用来揭开 <code class="docutils literal"><span class="pre">fold</span></code> 的最后结果的生成器。</p>
+<p>由于 <code class="docutils literal"><span class="pre">fold</span></code> 是本地函数，我们不需要通过 <code class="docutils literal"><span class="pre">foldTree</span></code> 的 <code class="docutils literal"><span class="pre">iter</span></code> 变量来进入他，可以从外部进入，相似的， <code class="docutils literal"><span class="pre">walk</span></code> 也可以在外部看到 <code class="docutils literal"><span class="pre">path</span></code> 。</p>
+<p>另一个需要指出的点是 <code class="docutils literal"><span class="pre">walk</span></code> 是一个尾递归，在我们最初的函数中用来替代一个匿名函数调用。通过外部控制，可以在任何需要的时候停止，这使得当 <code class="docutils literal"><span class="pre">iterator</span></code> 返回 <code class="docutils literal"><span class="pre">Done</span></code> 的时候就可以退出。</p>
+<p>即使 <code class="docutils literal"><span class="pre">fold</span></code> 调用 <code class="docutils literal"><span class="pre">walk</span></code> ， <code class="docutils literal"><span class="pre">walk</span></code> 调用 <code class="docutils literal"><span class="pre">fold</span></code> 这样的递归来遍历子目录，每个函数返回一个用 <code class="docutils literal"><span class="pre">Iterate</span></code> 包装起来的种子，当 <code class="docutils literal"><span class="pre">fold</span></code> 被调用，并且返回， <code class="docutils literal"><span class="pre">walk</span></code> 检查返回并观察需要继续还是退出，通过这种方式，一个 <code class="docutils literal"><span class="pre">Done</span></code> 的返回直接终止两个函数中的所有递归调用。</p>
+<p>实践中一个 <code class="docutils literal"><span class="pre">iterator</span></code> 像什么，下面是一个观察三个位图文件（至多）的同时并不逆向递归元数据目录的复杂例子：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/FoldDir.hs</span>
+<span class="nf">atMostThreePictures</span> <span class="ow">::</span> <span class="kt">Iterator</span> <span class="p">[</span><span class="kt">FilePath</span><span class="p">]</span>
+
+<span class="nf">atMostThreePictures</span> <span class="n">paths</span> <span class="n">info</span>
+    <span class="o">|</span> <span class="n">length</span> <span class="n">paths</span> <span class="o">==</span> <span class="mi">3</span>
+      <span class="ow">=</span> <span class="kt">Done</span> <span class="n">paths</span>
+    <span class="o">|</span> <span class="n">isDirectory</span> <span class="n">info</span> <span class="o">&amp;&amp;</span> <span class="n">takeFileName</span> <span class="n">path</span> <span class="o">==</span> <span class="s">&quot;.svn&quot;</span>
+      <span class="ow">=</span> <span class="kt">Skip</span> <span class="n">paths</span>
+    <span class="o">|</span> <span class="n">extension</span> <span class="p">`</span><span class="n">elem</span><span class="p">`</span> <span class="p">[</span><span class="s">&quot;.jpg&quot;</span><span class="p">,</span> <span class="s">&quot;.png&quot;</span><span class="p">]</span>
+      <span class="ow">=</span> <span class="kt">Continue</span> <span class="p">(</span><span class="n">path</span> <span class="kt">:</span> <span class="n">paths</span><span class="p">)</span>
+    <span class="o">|</span> <span class="n">otherwise</span>
+      <span class="ow">=</span> <span class="kt">Continue</span> <span class="n">paths</span>
+  <span class="kr">where</span> <span class="n">extension</span> <span class="ow">=</span> <span class="n">map</span> <span class="n">toLower</span> <span class="p">(</span><span class="n">takeExtension</span> <span class="n">path</span><span class="p">)</span>
+        <span class="n">path</span> <span class="ow">=</span> <span class="n">infoPath</span> <span class="n">info</span>
+</pre></div>
+</div>
+<p>为了使用这个需要调用 <code class="docutils literal"><span class="pre">foldTree</span> <span class="pre">atMostThreePictures</span> <span class="pre">[]</span></code> ，它给我们一个 <code class="docutils literal"><span class="pre">IO</span> <span class="pre">[FilePath]</span></code> 类型的返回值。</p>
+<p>当然， <code class="docutils literal"><span class="pre">iterators</span></code> 并不需要如此复杂，下面是个对目录进行计数的代码：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/FoldDir.hs</span>
+<span class="nf">countDirectories</span> <span class="n">count</span> <span class="n">info</span> <span class="ow">=</span>
+    <span class="kt">Continue</span> <span class="p">(</span><span class="kr">if</span> <span class="n">isDirectory</span> <span class="n">info</span>
+              <span class="kr">then</span> <span class="n">count</span> <span class="o">+</span> <span class="mi">1</span>
+              <span class="kr">else</span> <span class="n">count</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>传递给 <code class="docutils literal"><span class="pre">foldTree</span></code> 的初始种子（seed）为数字零。</p>
+<div class="section" id="id15">
+<h3>练习<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h3>
+<ol class="arabic simple">
+<li>修正 <code class="docutils literal"><span class="pre">foldTree</span></code> 来允许调用改变遍历目录实体的顺序。</li>
+<li><code class="docutils literal"><span class="pre">foldTree</span></code> 函数展示了前序遍历，将它修正为允许调用方决定便利顺序。</li>
+<li>写一个组合子的库允许 <code class="docutils literal"><span class="pre">foldTree</span></code> 接收不同类型的 <code class="docutils literal"><span class="pre">iterators</span></code> ，你能写出更简洁的 <code class="docutils literal"><span class="pre">iterators</span></code> 吗？</li>
+</ol>
+</div>
+</div>
+<div class="section" id="id16">
+<h2>代码指南<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h2>
+<p>有许多好的Haskell程序员的习惯来自经验，我们有一些通用的经验给你，这样你可以更快的写出易于阅读的代码。</p>
+<p>正如已经提到的，Haskell中永远使用空格，而不是tab 。</p>
+<p>如果你发现代码里有个片段聪明到炸裂，停下来，然后思考下如果你离开代码一个月是否还能懂这段代码。</p>
+<p>常规命名类型和变量一般是骆驼法，例如 <code class="docutils literal"><span class="pre">myVariableName</span></code> ，这种风格在Haskell中也同样流行，不要去想你的其他命名习惯，如果你遵循一个不标准的惯例，那么你的代码将会对其他人的眼睛造成折磨。</p>
+<p>即使你已经用了Haskell一段时间，在你写小函数之前花费几分钟的时间查阅库函数，如果标准库并没有提供你需要的函数，你可能需要组合出一个新的函数来获得你想要的结果。</p>
+<p>组合函数的长管道难以阅读，长意味着包含三个以上元素的序列，如果你有这样一个管道，使用 <code class="docutils literal"><span class="pre">let</span></code> 或者 <code class="docutils literal"><span class="pre">where</span></code> 语句块将它分解成若干个小部分，给每个管道元素一个有意义的名字，然后再将他们回填到代码，如果你想不出一个有意义的名字，问下自己 能不能解释这段代码的功能，如果不能，简化你的代码。</p>
+<p>即使在编辑器中很容易格式化长于八十列的代码，宽度仍然是个重要问题，宽行在80行之外的内容通常会被截断，这非常伤害可读性，每一行不超过八十个字符，这样你就可以写入单独的一行，这帮助你保持每一行代码不那么复杂，从而更容易被人读懂。</p>
+<div class="section" id="id17">
+<h3>常用布局风格<a class="headerlink" href="#id17" title="Permalink to this headline">¶</a></h3>
+<p>只要你的代码遵守布局规范，那么他并不会给人一团乱麻的感觉，因此也不会造成误解，也就是说，有些布局风格是常用的。</p>
+<p><code class="docutils literal"><span class="pre">in</span></code> 关键字通常正对着 <code class="docutils literal"><span class="pre">let</span></code> 关键字，如下所示：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/Style.hs</span>
+<span class="nf">tidyLet</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">foo</span> <span class="ow">=</span> <span class="n">undefinedwei&#39;s</span>
+              <span class="n">bar</span> <span class="ow">=</span> <span class="n">foo</span> <span class="o">*</span> <span class="mi">2</span>
+          <span class="kr">in</span> <span class="n">undefined</span>
+</pre></div>
+</div>
+<p>单独列出 <code class="docutils literal"><span class="pre">in</span></code> 或者让 <code class="docutils literal"><span class="pre">in</span></code> 在一系列等式之后跟着的写法都是正确的，但下面这种写法则会显得很奇怪：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/Style.hs</span>
+<span class="nf">weirdLet</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">foo</span> <span class="ow">=</span> <span class="n">undefined</span>
+               <span class="n">bar</span> <span class="ow">=</span> <span class="n">foo</span> <span class="o">*</span> <span class="mi">2</span>
+    <span class="kr">in</span> <span class="n">undefined</span>
+
+<span class="nf">strangeLet</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">foo</span> <span class="ow">=</span> <span class="n">undefined</span>
+                 <span class="n">bar</span> <span class="ow">=</span> <span class="n">foo</span> <span class="o">*</span> <span class="mi">2</span> <span class="kr">in</span>
+    <span class="n">undefined</span>
+</pre></div>
+</div>
+<p>与此相反，让 <code class="docutils literal"><span class="pre">do</span></code> 在行尾跟着而非在行首单独列出：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/Style.hs</span>
+<span class="nf">commonDo</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">something</span> <span class="ow">&lt;-</span> <span class="n">undefined</span>
+  <span class="n">return</span> <span class="nb">()</span>
+
+<span class="c1">-- not seen very often</span>
+<span class="nf">rareDo</span> <span class="ow">=</span>
+  <span class="kr">do</span> <span class="n">something</span> <span class="ow">&lt;-</span> <span class="n">undefined</span>
+     <span class="n">return</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>括号和分号即使合法也很少用到，他们的使用并不存在问题，只是让代码看起来奇怪，同时让Haskell写成的代码不必遵守排版规则。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/Style.hs</span>
+<span class="nf">unusualPunctuation</span> <span class="ow">=</span>
+    <span class="p">[</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span> <span class="o">|</span> <span class="n">x</span> <span class="ow">&lt;-</span> <span class="p">[</span><span class="mi">1</span><span class="o">..</span><span class="n">a</span><span class="p">],</span> <span class="n">y</span> <span class="ow">&lt;-</span> <span class="p">[</span><span class="mi">1</span><span class="o">..</span><span class="n">b</span><span class="p">]</span> <span class="p">]</span> <span class="kr">where</span> <span class="p">{</span>
+                                           <span class="n">b</span> <span class="ow">=</span> <span class="mi">7</span><span class="p">;</span>
+ <span class="n">a</span> <span class="ow">=</span> <span class="mi">6</span> <span class="p">}</span>
+
+<span class="nf">preferredLayout</span> <span class="ow">=</span> <span class="p">[</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span> <span class="o">|</span> <span class="n">x</span> <span class="ow">&lt;-</span> <span class="p">[</span><span class="mi">1</span><span class="o">..</span><span class="n">a</span><span class="p">],</span> <span class="n">y</span> <span class="ow">&lt;-</span> <span class="p">[</span><span class="mi">1</span><span class="o">..</span><span class="n">b</span><span class="p">]</span> <span class="p">]</span>
+    <span class="kr">where</span> <span class="n">b</span> <span class="ow">=</span> <span class="mi">7</span>
+          <span class="n">a</span> <span class="ow">=</span> <span class="mi">6</span>
+</pre></div>
+</div>
+<p>如果等式的右侧另起一行，通常在和他本行内，相关变量名或者函数定义的下方之前留出一些空格。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/Style.hs</span>
+<span class="nf">normalIndent</span> <span class="ow">=</span>
+    <span class="n">undefined</span>
+
+<span class="nf">strangeIndent</span> <span class="ow">=</span>
+                           <span class="n">undefined</span>
+</pre></div>
+</div>
+<p>空格缩进的数量有多种选择，有时候在一个文件中，二，三，四格缩进都很正常，一个缩进也合法，但不常用，而且容易被误读。</p>
+<p>写 <code class="docutils literal"><span class="pre">where</span></code> 语句的缩进时，最好让它分辨起来比较容易：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/Style.hs</span>
+<span class="nf">goodWhere</span> <span class="ow">=</span> <span class="n">take</span> <span class="mi">5</span> <span class="n">lambdas</span>
+    <span class="kr">where</span> <span class="n">lambdas</span> <span class="ow">=</span> <span class="kt">[]</span>
+
+<span class="nf">alsoGood</span> <span class="ow">=</span>
+    <span class="n">take</span> <span class="mi">5</span> <span class="n">lambdas</span>
+  <span class="kr">where</span>
+    <span class="n">lambdas</span> <span class="ow">=</span> <span class="kt">[]</span>
+
+<span class="nf">badWhere</span> <span class="ow">=</span>           <span class="c1">-- legal, but ugly and hard to read</span>
+    <span class="n">take</span> <span class="mi">5</span> <span class="n">lambdas</span>
+    <span class="kr">where</span>
+    <span class="n">lambdas</span> <span class="ow">=</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="id18">
+<h2>练习<a class="headerlink" href="#id18" title="Permalink to this headline">¶</a></h2>
+<p>即使本章内容指导你们完成文件查找代码，但这并不意味着真正的系统编程，因为haskell移植的 <code class="docutils literal"><span class="pre">IO</span></code> 库并不暴露足够的消息给我们写有趣和复杂的查询。</p>
+<ol class="arabic simple">
+<li>把本章代码移植到你使用平台的 <code class="docutils literal"><span class="pre">api</span></code> 上， <code class="docutils literal"><span class="pre">System.Posix</span></code> 或者 <code class="docutils literal"><span class="pre">System.Win32</span></code> 。</li>
+<li>加入查找文件所有者的功能，将这个属性对谓词可见。</li>
+</ol>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="8.html">第八章：高效文件处理、正则表达式、文件名匹配</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="10.html">第十章：代码案例学习：解析二进制数据格式</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.1.
+    </div>
+  </body>
+</html>

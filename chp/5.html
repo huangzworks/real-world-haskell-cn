@@ -1,0 +1,1001 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>第五章：编写 JSON 库 &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
+    <link rel="next" title="第六章：类型类" href="6.html" />
+    <link rel="prev" title="第四章：函数式编程" href="4.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="4.html">第四章：函数式编程</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="6.html">第六章：类型类</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="json">
+<h1>第五章：编写 JSON 库<a class="headerlink" href="#json" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="id1">
+<h2>JSON 简介<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>在这一章，我们将开发一个小而完整的 Haskell 库，这个库用于处理和序列化 JSON 数据。</p>
+<p>JSON （JavaScript 对象符号）是一种小型、表示简单、便于存储和发送的语言。它通常用于从 web 服务向基于浏览器的 JavaScript 程序传送数据。JSON 的格式由 <a class="reference external" href="www.json.org">www.json.org</a> 描述，而细节由 <a class="reference external" href="http://www.ietf.org/rfc/rfc4627.txt">RFC 4627</a> 补充。</p>
+<p>JSON 支持四种基本类型值：字符串、数字、布尔值和一个特殊值， <code class="docutils literal"><span class="pre">null</span></code> 。</p>
+<div class="highlight-json"><div class="highlight"><pre><span class="s2">&quot;a string&quot;</span>
+
+<span class="mi">12345</span>
+
+<span class="kc">true</span>
+
+<span class="kc">null</span>
+</pre></div>
+</div>
+<p>JSON 还提供了两种复合类型：<em>数组</em>是值的有序序列，而<em>对象</em>则是“名字/值”对的无序收集器（unordered collection of name/value pairs）。其中对象的名字必须是字符串，而对象和数组的值则可以是任何 JSON 类型。</p>
+<div class="highlight-json"><div class="highlight"><pre><span class="p">[</span><span class="mf">-3.14</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="kc">null</span><span class="p">,</span> <span class="s2">&quot;a string&quot;</span><span class="p">]</span>
+
+<span class="p">{</span><span class="nt">&quot;numbers&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">],</span> <span class="nt">&quot;useful&quot;</span><span class="p">:</span> <span class="kc">false</span><span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="haskell-json">
+<span id="representing-json-data-in-haskell"></span><h2>在 Haskell 中表示 JSON 数据<a class="headerlink" href="#haskell-json" title="Permalink to this headline">¶</a></h2>
+<p>要在 Haskell 中处理 JSON 数据，可以用一个代数数据类型来表示 JSON 的各个数据类型：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/SimpleJSON.hs</span>
+<span class="kr">data</span> <span class="kt">JValue</span> <span class="ow">=</span> <span class="kt">JString</span> <span class="kt">String</span>
+            <span class="o">|</span> <span class="kt">JNumber</span> <span class="kt">Double</span>
+            <span class="o">|</span> <span class="kt">JBool</span> <span class="kt">Bool</span>
+            <span class="o">|</span> <span class="kt">JNull</span>
+            <span class="o">|</span> <span class="kt">JObject</span> <span class="p">[(</span><span class="kt">String</span><span class="p">,</span> <span class="kt">JValue</span><span class="p">)]</span>
+            <span class="o">|</span> <span class="kt">JArray</span> <span class="p">[</span><span class="kt">JValue</span><span class="p">]</span>
+              <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>[译注：这里的 <code class="docutils literal"><span class="pre">JObject</span> <span class="pre">[(String,</span> <span class="pre">JValue)]</span></code> 不能改为 <code class="docutils literal"><span class="pre">JObject</span> <span class="pre">[(JString,</span> <span class="pre">JValue)]</span></code> ，因为值构造器里面声明的是类构造器，不能是值构造器。</p>
+<p>另外，严格来说， <code class="docutils literal"><span class="pre">JObject</span></code> 并不是完全无序的，因为它的定义使用了列表来包围，在书本的后面会介绍 <code class="docutils literal"><span class="pre">Map</span></code> 类型，它可以创建一个无序的键-值对结构。]</p>
+<p>对于每个 JSON 类型，代码都定义了一个单独的值构造器。部分构造器带有参数，比如说，如果你要创建一个 JSON 字符串，那么就要给 <code class="docutils literal"><span class="pre">JString</span></code> 值构造器传入一个 <code class="docutils literal"><span class="pre">String</span></code> 类型值作为参数。</p>
+<p>将这些定义载入到 ghci 试试看：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">SimpleJSON</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">SimpleJSON</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">JString</span> <span class="s">&quot;the quick brown fox&quot;</span>
+<span class="kt">JString</span> <span class="s">&quot;the quick brown fox&quot;</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">JNumber</span> <span class="mf">3.14</span>
+<span class="kt">JNumber</span> <span class="mf">3.14</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">JBool</span> <span class="kt">True</span>
+<span class="kt">JBool</span> <span class="kt">True</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">JNull</span>
+<span class="kt">JNull</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">JObject</span> <span class="p">[(</span><span class="s">&quot;language&quot;</span><span class="p">,</span> <span class="kt">JString</span> <span class="s">&quot;Haskell&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s">&quot;complier&quot;</span><span class="p">,</span> <span class="kt">JString</span> <span class="s">&quot;GHC&quot;</span><span class="p">)]</span>
+<span class="kt">JObject</span> <span class="p">[(</span><span class="s">&quot;language&quot;</span><span class="p">,</span><span class="kt">JString</span> <span class="s">&quot;Haskell&quot;</span><span class="p">),(</span><span class="s">&quot;complier&quot;</span><span class="p">,</span><span class="kt">JString</span> <span class="s">&quot;GHC&quot;</span><span class="p">)]</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">JArray</span> <span class="p">[</span><span class="kt">JString</span> <span class="s">&quot;Haskell&quot;</span><span class="p">,</span> <span class="kt">JString</span> <span class="s">&quot;Clojure&quot;</span><span class="p">,</span> <span class="kt">JString</span> <span class="s">&quot;Python&quot;</span><span class="p">]</span>
+<span class="kt">JArray</span> <span class="p">[</span><span class="kt">JString</span> <span class="s">&quot;Haskell&quot;</span><span class="p">,</span><span class="kt">JString</span> <span class="s">&quot;Clojure&quot;</span><span class="p">,</span><span class="kt">JString</span> <span class="s">&quot;Python&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>前面代码中的构造器将一个 Haskell 值转换为一个 <code class="docutils literal"><span class="pre">JValue</span></code> 。反过来，同样可以通过模式匹配，从 <code class="docutils literal"><span class="pre">JValue</span></code> 中取出 Haskell 值。</p>
+<p>以下函数试图从一个 <code class="docutils literal"><span class="pre">JString</span></code> 值中取出一个 Haskell 字符串：如果 <code class="docutils literal"><span class="pre">JValue</span></code> 真的包含一个字符串，那么程序返回一个用 <code class="docutils literal"><span class="pre">Just</span></code> 构造器包裹的字符串；否则，它返回一个 <code class="docutils literal"><span class="pre">Nothing</span></code> 。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/SimpleJSON.hs</span>
+<span class="nf">getString</span> <span class="ow">::</span> <span class="kt">JValue</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">String</span>
+<span class="nf">getString</span> <span class="p">(</span><span class="kt">JString</span> <span class="n">s</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="n">s</span>
+<span class="nf">getString</span> <span class="kr">_</span>           <span class="ow">=</span> <span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>保存修改过的源码文件，然后使用 <code class="docutils literal"><span class="pre">:reload</span></code> 命令重新载入 <code class="docutils literal"><span class="pre">SimpleJSON.hs</span></code> 文件（<code class="docutils literal"><span class="pre">:reload</span></code> 会自动记忆最近一次载入的文件）：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">reload</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">SimpleJSON</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">getString</span> <span class="p">(</span><span class="kt">JString</span> <span class="s">&quot;hello&quot;</span><span class="p">)</span>
+<span class="kt">Just</span> <span class="s">&quot;hello&quot;</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">getString</span> <span class="p">(</span><span class="kt">JNumber</span> <span class="mi">3</span><span class="p">)</span>
+<span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>再加上一些其他函数，初步完成一些基本功能：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/SimpleJSON.hs</span>
+<span class="nf">getInt</span> <span class="p">(</span><span class="kt">JNumber</span> <span class="n">n</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="p">(</span><span class="n">truncate</span> <span class="n">n</span><span class="p">)</span>
+<span class="nf">getInt</span> <span class="kr">_</span>           <span class="ow">=</span> <span class="kt">Nothing</span>
+
+<span class="nf">getBool</span> <span class="p">(</span><span class="kt">JBool</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="n">b</span>
+<span class="nf">getBool</span> <span class="kr">_</span>         <span class="ow">=</span> <span class="kt">Nothing</span>
+
+<span class="nf">getObject</span> <span class="p">(</span><span class="kt">JObject</span> <span class="n">o</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="n">o</span>
+<span class="nf">getObject</span> <span class="kr">_</span>           <span class="ow">=</span> <span class="kt">Nothing</span>
+
+<span class="nf">getArray</span> <span class="p">(</span><span class="kt">JArray</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="n">a</span>
+<span class="nf">getArray</span> <span class="kr">_</span>          <span class="ow">=</span> <span class="kt">Nothing</span>
+
+<span class="nf">isNull</span> <span class="n">v</span>            <span class="ow">=</span> <span class="n">v</span> <span class="o">==</span> <span class="kt">JNull</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">truncate</span></code> 函数返回浮点数或者有理数的整数部分：</p>
+<div class="highlight-haskell"><div class="highlight"><pre>Prelude&gt; truncate 5.8
+5
+
+Prelude&gt; :module +Data.Ratio
+
+Prelude Data.Ratio&gt; truncate (22 % 7)
+3
+</pre></div>
+</div>
+</div>
+<div class="section" id="haskell">
+<h2>Haskell 模块<a class="headerlink" href="#haskell" title="Permalink to this headline">¶</a></h2>
+<p>一个 Haskell 文件可以包含一个模块定义，模块可以决定模块中的哪些名字可以被外部访问。</p>
+<p>模块的定义必须放在其它定义之前：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/SimpleJSON.hs</span>
+<span class="kr">module</span> <span class="nn">SimpleJSON</span>
+    <span class="p">(</span>
+        <span class="kt">JValue</span><span class="p">(</span><span class="o">..</span><span class="p">)</span>
+    <span class="p">,</span>   <span class="nf">getString</span>
+    <span class="p">,</span>   <span class="nf">getInt</span>
+    <span class="p">,</span>   <span class="nf">getDouble</span>
+    <span class="p">,</span>   <span class="nf">getBool</span>
+    <span class="p">,</span>   <span class="nf">getObject</span>
+    <span class="p">,</span>   <span class="nf">getArray</span>
+    <span class="p">,</span>   <span class="nf">isNull</span>
+    <span class="p">)</span> <span class="kr">where</span>
+</pre></div>
+</div>
+<p>单词 <code class="docutils literal"><span class="pre">module</span></code> 是保留字，跟在它之后的是模块的名字：模块名字必须以大写字母开头，并且它必须和包含这个模块的文件的基础名（不包含后缀的文件名）一致。比如上面定义的模块就以 <code class="docutils literal"><span class="pre">SimpleJSON</span></code> 命名，因为包含它的文件名为 <code class="docutils literal"><span class="pre">SimpleJSON.hs</span></code> 。</p>
+<p>在模块名之后，用括号包围的是<em>导出</em>列表（list of exports）。 <code class="docutils literal"><span class="pre">where</span></code> 关键字之后的内容为模块的体。</p>
+<p>导出列表决定模块中的哪些名字对于外部模块是可见的，使得私有代码可以隐藏在模块的内部。跟在 <code class="docutils literal"><span class="pre">JValue</span></code> 之后的 <code class="docutils literal"><span class="pre">(..)</span></code> 符号表示导出 <code class="docutils literal"><span class="pre">JValue</span></code> 类型以及它的所有值构造器。</p>
+<p>事实上，模块甚至可以只导出类型的名字（类构造器），而不导出这个类型的值构造器。这种能力非常重要：它允许模块对用户隐藏类型的细节，将一个类型变得<em>抽象</em>。如果用户看不见类型的值构造器，他就没办法对类型的值进行模式匹配，也不能使用值构造器显式创建这种类型的值[译注：只能通过相应的 API 来创建这种类型的值]。本章稍后会说明，在什么情况下，我们需要将一个类型变得抽象。</p>
+<p>如果省略掉模块定义中的导出部分，那么所有名字都会被导出：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kr">module</span> <span class="nn">ExportEverything</span> <span class="kr">where</span>
+</pre></div>
+</div>
+<p>如果不想导出模块中的任何名字（通常不会这么用），那么可以将导出列表留空，仅保留一对括号：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kr">module</span> <span class="nn">ExportNothing</span> <span class="p">()</span> <span class="kr">where</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id2">
+<h2>编译 Haskell 代码<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
+<p>除了 ghci 之外， GHC 还包括一个生成本地码（native code）的编译器： ghc 。如果你熟悉 gcc 或者 cl （微软 Visual Studio 使用的 C++ 编译器组件）之类的编译器，那么你对 ghc 应该不会感到陌生。</p>
+<p>编译一个 Haskell 源码文件可以通过 <code class="docutils literal"><span class="pre">ghc</span></code> 命令来完成：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="n">c</span> <span class="kt">SimpleJSON</span><span class="o">.</span><span class="n">hs</span>
+
+<span class="o">$</span> <span class="n">ls</span>
+<span class="kt">SimpleJSON</span><span class="o">.</span><span class="n">hi</span>  <span class="kt">SimpleJSON</span><span class="o">.</span><span class="n">hs</span>  <span class="kt">SimpleJSON</span><span class="o">.</span><span class="n">o</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">-c</span></code> 表示让 ghc 只生成目标代码。如果省略 <code class="docutils literal"><span class="pre">-c</span></code> 选项，那么 ghc 就会试图生成一个完整的可执行文件，这会失败，因为目前的 <code class="docutils literal"><span class="pre">SimpleJSON.hs</span></code> 还没有定义 <code class="docutils literal"><span class="pre">main</span></code> 函数，而 GHC 在执行一个独立程序时会调用这个 <code class="docutils literal"><span class="pre">main</span></code> 函数。</p>
+<p>在编译完成之后，会生成两个新文件。其中 <code class="docutils literal"><span class="pre">SimpleJSON.hi</span></code> 是<em>接口文件</em>（interface file）， ghc 以机器可读的格式，将模块中导出名字的信息保存在这个文件。而 <code class="docutils literal"><span class="pre">SimpleJSON.o</span></code> 则是<em>目标文件</em>（object file），它包含了已生成的机器码。</p>
+</div>
+<div class="section" id="id3">
+<h2>载入模块和生成可执行文件<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<p>既然已经成功编译了 <code class="docutils literal"><span class="pre">SimpleJSON</span></code> 库，是时候写个小程序来执行它了。打开编辑器，将以下内容保存为 <code class="docutils literal"><span class="pre">Main.hs</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Main.hs</span>
+
+<span class="kr">module</span> <span class="nn">Main</span> <span class="p">(</span><span class="nf">main</span><span class="p">)</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">SimpleJSON</span>
+
+<span class="nf">main</span> <span class="ow">=</span> <span class="n">print</span> <span class="p">(</span><span class="kt">JObject</span> <span class="p">[(</span><span class="s">&quot;foo&quot;</span><span class="p">,</span> <span class="kt">JNumber</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="s">&quot;bar&quot;</span><span class="p">,</span> <span class="kt">JBool</span> <span class="kt">False</span><span class="p">)])</span>
+</pre></div>
+</div>
+<p>[译注：原文说，可以不导出 <code class="docutils literal"><span class="pre">main</span></code> 函数，但是实际中测试这种做法并不能通过编译。]</p>
+<p>放在模块定义之后的 <code class="docutils literal"><span class="pre">import</span></code> 表示载入所有 <code class="docutils literal"><span class="pre">SimpleJSON</span></code> 模块导出的名字，使得它们在 <code class="docutils literal"><span class="pre">Main</span></code> 模块中可用。</p>
+<p>所有 <code class="docutils literal"><span class="pre">import</span></code> 指令（directive）都必须出现在模块的开头，并且位于其他模块代码之前。不可以随意摆放 <code class="docutils literal"><span class="pre">import</span></code> 。</p>
+<p><code class="docutils literal"><span class="pre">Main.hs</span></code> 的名字和 <code class="docutils literal"><span class="pre">main</span></code> 函数的命名是有特别含义的，要创建一个可执行文件， ghc 需要一个命名为 <code class="docutils literal"><span class="pre">Main</span></code> 的模块，并且这个模块里面还要有一个 <code class="docutils literal"><span class="pre">main</span></code> 函数，而 <code class="docutils literal"><span class="pre">main</span></code> 函数在程序执行时会被调用。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghc</span> <span class="o">-</span><span class="n">o</span> <span class="n">simple</span> <span class="kt">Main</span><span class="o">.</span><span class="n">hs</span>
+</pre></div>
+</div>
+<p>这次编译没有使用 <code class="docutils literal"><span class="pre">-c</span></code> 选项，因此 ghc 会尝试生成一个可执行程序，这个过程被称为<em>链接</em>（linking）。ghc 可以在一条命令中同时完成编译和链接的任务。</p>
+<p><code class="docutils literal"><span class="pre">-o</span></code> 选项用于指定可执行程序的名字。在 Windows 平台下，它会生成一个 <code class="docutils literal"><span class="pre">.exe</span></code> 后缀的文件，而 UNIX 平台的文件则没有后缀。</p>
+<p>ghc 会自动找到所需的文件，进行编译和链接，然后产生可执行文件，我们唯一要做的就是提供 <code class="docutils literal"><span class="pre">Main.hs</span></code> 文件。</p>
+<p>[译注：在原文中说到，编译时必须手动列出所有相关文件，但是在新版 GHC 中，编译时提供 <code class="docutils literal"><span class="pre">Main.hs</span></code> 就可以了，编译器会自动找到、编译和链接相关代码。因此，本段内容做了相应的修改。]</p>
+<p>一旦编译完成，就可以运行编译所得的可执行文件了：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="o">./</span><span class="n">simple</span>
+<span class="kt">JObject</span> <span class="p">[(</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="kt">JNumber</span> <span class="mf">1.0</span><span class="p">),(</span><span class="s">&quot;bar&quot;</span><span class="p">,</span><span class="kt">JBool</span> <span class="kt">False</span><span class="p">)]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id4">
+<h2>打印 JSON 数据<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
+<p>SimpleJSON 模块已经有了 JSON 类型的表示了，那么下一步要做的就是将 Haskell 值翻译（render）成 JSON 数据。</p>
+<p>有好几种方法可以将 Haskell 值翻译成 JSON 数据，最直接的一种是编写翻译函数，以 JSON 格式来打印 Haskell 值。稍后会介绍完成这个任务的其他更有趣方法。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kr">module</span> <span class="nn">PutJSON</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">Data.List</span> <span class="p">(</span><span class="nf">intercalate</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">SimpleJSON</span>
+
+<span class="nf">renderJValue</span> <span class="ow">::</span> <span class="kt">JValue</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+
+<span class="nf">renderJValue</span> <span class="p">(</span><span class="kt">JString</span> <span class="n">s</span><span class="p">)</span>   <span class="ow">=</span> <span class="n">show</span> <span class="n">s</span>
+<span class="nf">renderJValue</span> <span class="p">(</span><span class="kt">JNumber</span> <span class="n">n</span><span class="p">)</span>   <span class="ow">=</span> <span class="n">show</span> <span class="n">n</span>
+<span class="nf">renderJValue</span> <span class="p">(</span><span class="kt">JBool</span> <span class="kt">True</span><span class="p">)</span>  <span class="ow">=</span> <span class="s">&quot;true&quot;</span>
+<span class="nf">renderJValue</span> <span class="p">(</span><span class="kt">JBool</span> <span class="kt">False</span><span class="p">)</span> <span class="ow">=</span> <span class="s">&quot;false&quot;</span>
+<span class="nf">renderJValue</span> <span class="kt">JNull</span>         <span class="ow">=</span> <span class="s">&quot;null&quot;</span>
+
+<span class="nf">renderJValue</span> <span class="p">(</span><span class="kt">JObject</span> <span class="n">o</span><span class="p">)</span> <span class="ow">=</span> <span class="s">&quot;{&quot;</span> <span class="o">++</span> <span class="n">pairs</span> <span class="n">o</span> <span class="o">++</span> <span class="s">&quot;}&quot;</span>
+  <span class="kr">where</span> <span class="n">pairs</span> <span class="kt">[]</span> <span class="ow">=</span> <span class="s">&quot;&quot;</span>
+    <span class="n">pairs</span> <span class="n">ps</span> <span class="ow">=</span> <span class="n">intercalate</span> <span class="s">&quot;, &quot;</span> <span class="p">(</span><span class="n">map</span> <span class="n">renderPair</span> <span class="n">ps</span><span class="p">)</span>
+    <span class="n">renderPair</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="n">v</span><span class="p">)</span>   <span class="ow">=</span> <span class="n">show</span> <span class="n">k</span> <span class="o">++</span> <span class="s">&quot;: &quot;</span> <span class="o">++</span> <span class="n">renderJValue</span> <span class="n">v</span>
+
+<span class="nf">renderJValue</span> <span class="p">(</span><span class="kt">JArray</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=</span> <span class="s">&quot;[&quot;</span> <span class="o">++</span> <span class="n">values</span> <span class="n">a</span> <span class="o">++</span> <span class="s">&quot;]&quot;</span>
+  <span class="kr">where</span> <span class="n">values</span> <span class="kt">[]</span> <span class="ow">=</span> <span class="s">&quot;&quot;</span>
+    <span class="n">values</span> <span class="n">vs</span> <span class="ow">=</span> <span class="n">intercalate</span> <span class="s">&quot;, &quot;</span> <span class="p">(</span><span class="n">map</span> <span class="n">renderJValue</span> <span class="n">vs</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>分割纯代码和带有 IO 的代码是一种良好的 Haskell 风格。这里我们用 <code class="docutils literal"><span class="pre">putJValue</span></code> 来进行打印操作，这样就不会影响 <code class="docutils literal"><span class="pre">renderJValue</span></code> 的纯洁性：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">putJValue</span> <span class="ow">::</span> <span class="kt">JValue</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">putJValue</span> <span class="n">v</span> <span class="ow">=</span> <span class="n">putStrLn</span> <span class="p">(</span><span class="n">renderJValue</span> <span class="n">v</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>现在打印 JSON 值变得容易得多了：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">SimpleJSON</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">PutJSON</span>
+<span class="p">[</span><span class="mi">2</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">PutJSON</span>          <span class="p">(</span> <span class="kt">PutJSON</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">PutJSON</span><span class="p">,</span> <span class="kt">SimpleJSON</span><span class="o">.</span>
+
+<span class="o">*</span><span class="kt">PutJSON</span><span class="o">&gt;</span> <span class="n">putJValue</span> <span class="p">(</span><span class="kt">JString</span> <span class="s">&quot;a&quot;</span><span class="p">)</span>
+<span class="s">&quot;a&quot;</span>
+
+<span class="o">*</span><span class="kt">PutJSON</span><span class="o">&gt;</span> <span class="n">putJValue</span> <span class="p">(</span><span class="kt">JBool</span> <span class="kt">True</span><span class="p">)</span>
+<span class="nf">true</span>
+</pre></div>
+</div>
+<p>除了风格上的考虑之外，将翻译代码和实际打印代码分开，也有助于提升灵活性。比如说，如果想在数据写出之前进行压缩，那么只需要修改 <code class="docutils literal"><span class="pre">putJValue</span></code> 就可以了，不必改动整个 <code class="docutils literal"><span class="pre">renderJValue</span></code> 函数。</p>
+<p>将纯代码和不纯代码分离的理念非常强大，并且在 Haskell 代码中无处不在。现有的一些 Haskell 压缩模块，它们都拥有简单的接口：压缩函数接受一个未压缩的字符串，并返回一个压缩后的字符串。通过组合使用不同的函数，可以在打印 JSON 值之前，对数据进行各种不同的处理。</p>
+</div>
+<div class="section" id="type-inference-is-a-double-edge-sword">
+<span id="id5"></span><h2>类型推导是一把双刃剑<a class="headerlink" href="#type-inference-is-a-double-edge-sword" title="Permalink to this headline">¶</a></h2>
+<p>Haskell 编译器的类型推导能力非常强大也非常有价值。在刚开始的时候，我们通常会倾向于尽可能地省略所有类型签名，让类型推导去决定所有函数的类型定义。</p>
+<p>但是，这种做法是有缺陷的，它通常是 Haskell 新手引发类型错误的主要来源。</p>
+<p>如果我们省略显式的类型信息时，那么编译器就必须猜测我们的意图：它会推导出合乎逻辑且相容的（consistent）类型，但是，这些类型可能并不是我们想要的。一旦程序员和编译器之间的想法产生了分歧，那么寻找 bug 的工作就会变得更困难。</p>
+<p>作为例子，假设有一个函数，它预计会返回 <code class="docutils literal"><span class="pre">String</span></code> 类型的值，但是没有显式地为它编写类型签名：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Trouble.hs</span>
+
+<span class="kr">import</span> <span class="nn">Data.Char</span> <span class="p">(</span><span class="nf">toUpper</span><span class="p">)</span>
+
+<span class="nf">upcaseFirst</span> <span class="p">(</span><span class="n">c</span><span class="kt">:</span><span class="n">cs</span><span class="p">)</span> <span class="ow">=</span> <span class="n">toUpper</span> <span class="n">c</span>  <span class="c1">-- 这里忘记了 &quot;:cs&quot;</span>
+</pre></div>
+</div>
+<p>这个函数试图将输入单词的第一个字母设置为大写，但是它在设置之后，忘记了重新拼接字符串的后续部分 <code class="docutils literal"><span class="pre">xs</span></code> 。在我们的预想中，这个函数的类型应该是 <code class="docutils literal"><span class="pre">String</span> <span class="pre">-&gt;</span> <span class="pre">String</span></code> ，但编译器推导出的类型却是 <code class="docutils literal"><span class="pre">String</span> <span class="pre">-&gt;</span> <span class="pre">Char</span></code> 。</p>
+<p>现在，有另一个函数调用这个 <code class="docutils literal"><span class="pre">upcaseFirst</span></code> 函数：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Trouble.hs</span>
+
+<span class="nf">camelCase</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">camelCase</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">concat</span> <span class="p">(</span><span class="n">map</span> <span class="n">upcaseFirst</span> <span class="p">(</span><span class="n">words</span> <span class="n">xs</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>这段代码在载入 ghci 时会发生错误：</p>
+<div class="highlight-haskell"><div class="highlight"><pre>Prelude&gt; :load Trouble.hs
+[1 of 1] Compiling Main             ( Trouble.hs, interpreted )
+
+Trouble.hs:8:28:
+    Couldn&#39;t match expected type `[Char]&#39; with actual type `Char&#39;
+    Expected type: [Char] -&gt; [Char]
+        Actual type: [Char] -&gt; Char
+    In the first argument of `map&#39;, namely `upcaseFirst&#39;
+    In the first argument of `concat&#39;, namely            `(map upcaseFirst (words xs))&#39;
+Failed, modules loaded: none.
+</pre></div>
+</div>
+<p>请注意，如果不是 <code class="docutils literal"><span class="pre">upcaseFirst</span></code> 被其他函数所调用的话，它的错误可能并不会被发现！相反，如果我们之前为 <code class="docutils literal"><span class="pre">upcaseFirst</span></code> 编写了类型签名的话，那么 <code class="docutils literal"><span class="pre">upcaseFirst</span></code> 的类型错误就会立即被捕捉到，并且可以即刻定位出错误发生的位置。</p>
+<p>为函数编写类型签名，既可以移除我们实际想要的类型和编译器推导出的类型之间的分歧，也可以作为函数的一种文档，帮助阅读和理解函数的行为。</p>
+<p>这并不是说要巨细无遗地为所有函数都编写类型签名。不过，为所有顶层（top-level）函数添加类型签名通常是一种不错的做法。在刚开始的时候最好尽可能地为函数添加类型签名，然后随着对类型系统了解的加深，逐步放松要求。</p>
+</div>
+<div class="section" id="a-more-general-look-at-rendering">
+<span id="id6"></span><h2>更通用的转换方式<a class="headerlink" href="#a-more-general-look-at-rendering" title="Permalink to this headline">¶</a></h2>
+<p>在前面构造 SimpleJSON 库时，我们的目标主要是按照 JSON 的格式，将 Haskell 数据转换为 JSON 值。而这些转换所得值的输出可能并不是那么适合人去阅读。有一些被称为美观打印器（pretty printer）的库，它们的输出既适合机器读入，也适合人类阅读。我们这就来编写一个美观打印器，学习库设计和函数式编程的相关技术。</p>
+<p>这个美观打印器库命名为 Prettify ，它被包含在 <code class="docutils literal"><span class="pre">Prettify.hs</span></code> 文件里。为了让 Prettify 适用于实际需求，我们先编写一个新的 JSON 转换器，它使用 Prettify 提供的 API 。等完成这个 JSON 转换器之后，再转过头来补充 Prettify 模块的细节。</p>
+<p>和前面的 SimpleJSON 模块不同，Prettify 模块将数据转换为一种称为 <code class="docutils literal"><span class="pre">Doc</span></code> 类型的抽象数据，而不是字符串：抽象类型允许我们随意选择不同的实现，最大化灵活性和效率，而且在更改实现时，不会影响到用户。</p>
+<p>新的 JSON 转换模块被命名为 <code class="docutils literal"><span class="pre">PrettyJSON.hs</span></code> ，转换的工作依然由 <code class="docutils literal"><span class="pre">renderJValue</span></code> 函数进行，它的定义和之前一样简单直观：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/PrettyJSON.hs</span>
+<span class="nf">renderJValue</span> <span class="ow">::</span> <span class="kt">JValue</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">renderJValue</span> <span class="p">(</span><span class="kt">JBool</span> <span class="kt">True</span><span class="p">)</span>  <span class="ow">=</span> <span class="n">text</span> <span class="s">&quot;true&quot;</span>
+<span class="nf">renderJValue</span> <span class="p">(</span><span class="kt">JBool</span> <span class="kt">False</span><span class="p">)</span> <span class="ow">=</span> <span class="n">text</span> <span class="s">&quot;false&quot;</span>
+<span class="nf">renderJValue</span> <span class="kt">JNull</span>         <span class="ow">=</span> <span class="n">text</span> <span class="s">&quot;null&quot;</span>
+<span class="nf">renderJValue</span> <span class="p">(</span><span class="kt">JNumber</span> <span class="n">num</span><span class="p">)</span> <span class="ow">=</span> <span class="n">double</span> <span class="n">num</span>
+<span class="nf">renderJValue</span> <span class="p">(</span><span class="kt">JString</span> <span class="n">str</span><span class="p">)</span> <span class="ow">=</span> <span class="n">string</span> <span class="n">str</span>
+</pre></div>
+</div>
+<p>其中 <code class="docutils literal"><span class="pre">text</span></code> 、 <code class="docutils literal"><span class="pre">double</span></code> 和 <code class="docutils literal"><span class="pre">string</span></code> 都由 Prettify 模块提供。</p>
+</div>
+<div class="section" id="developing-haskell-code-without-going-nuts">
+<span id="id7"></span><h2>Haskell 开发诀窍<a class="headerlink" href="#developing-haskell-code-without-going-nuts" title="Permalink to this headline">¶</a></h2>
+<p>在刚开始进行 Haskell 开发的时候，通常需要面对大量崭新、不熟悉的概念，要一次性完成程序的编写，并顺利通过编译器检查，难度非常的高。</p>
+<p>在每次完成一个功能点时，花几分钟停下来，对程序进行编译，是非常有益的：因为 Haskell 是强类型语言，如果程序能成功通过编译，那么说明程序和我们预想中的目标相去不远。</p>
+<p>编写函数和类型的占位符（placeholder）版本，对于快速原型开发非常有效。举个例子，前文断言， <code class="docutils literal"><span class="pre">string</span></code> 、 <code class="docutils literal"><span class="pre">text</span></code> 和 <code class="docutils literal"><span class="pre">double</span></code> 函数都由 <code class="docutils literal"><span class="pre">Prettify</span></code> 模块提供，如果 <code class="docutils literal"><span class="pre">Prettify</span></code> 模块里不定义这些函数，或者不定义 <code class="docutils literal"><span class="pre">Doc</span></code> 类型，那么对程序的编译就会失败，我们的“早编译，常编译”战术就没有办法施展。通过编写占位符代码，可以避免这些问题：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/PrettyStub.hs</span>
+<span class="kr">import</span> <span class="nn">SimpleJSON</span>
+
+<span class="kr">data</span> <span class="kt">Doc</span> <span class="ow">=</span> <span class="kt">ToBeDefined</span>
+         <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">)</span>
+
+ <span class="n">string</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+ <span class="n">string</span> <span class="n">str</span> <span class="ow">=</span> <span class="n">undefined</span>
+
+ <span class="n">text</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+ <span class="n">text</span> <span class="n">str</span> <span class="ow">=</span> <span class="n">undefined</span>
+
+ <span class="n">double</span> <span class="ow">::</span> <span class="kt">Double</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+ <span class="n">double</span> <span class="n">num</span> <span class="ow">=</span> <span class="n">undefined</span>
+</pre></div>
+</div>
+<p>特殊值 <code class="docutils literal"><span class="pre">undefined</span></code> 的类型为 <code class="docutils literal"><span class="pre">a</span></code> ，因此它可以让代码顺利通过类型检查。因为它只是一个占位符，没有什么实际作用，所以对它进行求值只会产生错误：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">undefined</span>
+<span class="nf">undefined</span> <span class="ow">::</span> <span class="n">a</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">undefined</span>
+<span class="o">***</span> <span class="kt">Exception:</span> <span class="kt">Prelude</span><span class="o">.</span><span class="n">undefined</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">PrettyStub</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">2</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">PrettyStub</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="p">,</span> <span class="kt">SimpleJSON</span><span class="o">.</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">double</span>
+<span class="nf">double</span> <span class="ow">::</span> <span class="kt">Double</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">double</span> <span class="mf">3.14</span>
+<span class="o">***</span> <span class="kt">Exception:</span> <span class="kt">Prelude</span><span class="o">.</span><span class="n">undefined</span>
+</pre></div>
+</div>
+<p>尽管程序里还没有任何实际可执行的代码，但是编译器的类型检查器可以保证程序中类型的正确性，这为接下来的进一步开发奠定了良好基础。</p>
+<p>[译注：原文中 <code class="docutils literal"><span class="pre">PrettyStub.hs</span></code> 和 <code class="docutils literal"><span class="pre">Prettify.hs</span></code> 混合使用，给读者阅读带来了很大麻烦。为了避免混淆，下文统一在 <code class="docutils literal"><span class="pre">Prettify.hs</span></code>
+中书写代码，并列出编译通过所需要的占位符代码。随着文章进行，读者只要不断将占位符版本替换为可用版本即可。]</p>
+</div>
+<div class="section" id="pretty-printing-a-string">
+<span id="id8"></span><h2>美观打印字符串<a class="headerlink" href="#pretty-printing-a-string" title="Permalink to this headline">¶</a></h2>
+<p>当需要美观地打印字符串时，我们需要遵守 JSON 的转义规则。字符串，顾名思义，仅仅是一串被包含在引号中的字符而已。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">string</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">string</span> <span class="ow">=</span> <span class="n">enclose</span> <span class="sc">&#39;&quot;&#39;</span> <span class="sc">&#39;&quot;&#39;</span> <span class="o">.</span> <span class="n">hcat</span> <span class="o">.</span> <span class="n">map</span> <span class="n">oneChar</span>
+
+<span class="nf">enclose</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">enclose</span> <span class="n">left</span> <span class="n">right</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">undefined</span>
+
+<span class="nf">hcat</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Doc</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">hcat</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">undefined</span>
+
+<span class="nf">oneChar</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">oneChar</span> <span class="n">c</span> <span class="ow">=</span> <span class="n">undefined</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">enclose</span></code> 函数把一个 <code class="docutils literal"><span class="pre">Doc</span></code> 值用起始字符和终止字符包起来。
+<code class="docutils literal"><span class="pre">(&lt;&gt;)</span></code> 函数将两个 <code class="docutils literal"><span class="pre">Doc</span></code> 值拼接起来。也就是说，它是 <code class="docutils literal"><span class="pre">Doc</span></code> 中的 <code class="docutils literal"><span class="pre">++</span></code> 函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">enclose</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">enclose</span> <span class="n">left</span> <span class="n">right</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">char</span> <span class="n">left</span> <span class="o">&lt;&gt;</span> <span class="n">x</span> <span class="o">&lt;&gt;</span> <span class="n">char</span> <span class="n">right</span>
+
+<span class="p">(</span><span class="o">&lt;&gt;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">a</span> <span class="o">&lt;&gt;</span> <span class="n">b</span> <span class="ow">=</span> <span class="n">undefined</span>
+
+<span class="nf">char</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">char</span> <span class="n">c</span> <span class="ow">=</span> <span class="n">undefined</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">hcat</span></code> 函数将多个 <code class="docutils literal"><span class="pre">Doc</span></code> 值拼接成一个，类似列表中的 <code class="docutils literal"><span class="pre">concat</span></code> 函数。</p>
+<p><code class="docutils literal"><span class="pre">string</span></code> 函数将 <code class="docutils literal"><span class="pre">oneChar</span></code> 函数应用于字符串的每一个字符，然后把拼接起来的结果放入引号中。 <code class="docutils literal"><span class="pre">oneChar</span></code> 函数将一个单独的字符进行转义（escape）或转换（render）。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">oneChar</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">oneChar</span> <span class="n">c</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">lookup</span> <span class="n">c</span> <span class="n">simpleEscapes</span> <span class="kr">of</span>
+              <span class="kt">Just</span> <span class="n">r</span> <span class="ow">-&gt;</span> <span class="n">text</span> <span class="n">r</span>
+              <span class="kt">Nothing</span> <span class="o">|</span> <span class="n">mustEscape</span> <span class="n">c</span> <span class="ow">-&gt;</span> <span class="n">hexEscape</span> <span class="n">c</span>
+                      <span class="o">|</span> <span class="n">otherwise</span>    <span class="ow">-&gt;</span> <span class="n">char</span> <span class="n">c</span>
+    <span class="kr">where</span> <span class="n">mustEscape</span> <span class="n">c</span> <span class="ow">=</span> <span class="n">c</span> <span class="o">&lt;</span> <span class="sc">&#39; &#39;</span> <span class="o">||</span> <span class="n">c</span> <span class="o">==</span> <span class="sc">&#39;</span><span class="se">\x7f</span><span class="sc">&#39;</span> <span class="o">||</span> <span class="n">c</span> <span class="o">&gt;</span> <span class="sc">&#39;</span><span class="se">\xff</span><span class="sc">&#39;</span>
+
+<span class="nf">simpleEscapes</span> <span class="ow">::</span> <span class="p">[(</span><span class="kt">Char</span><span class="p">,</span> <span class="kt">String</span><span class="p">)]</span>
+<span class="nf">simpleEscapes</span> <span class="ow">=</span> <span class="n">zipWith</span> <span class="n">ch</span> <span class="s">&quot;</span><span class="se">\b\n\f\r\t\\\&quot;</span><span class="s">/&quot;</span> <span class="s">&quot;bnfrt</span><span class="se">\\\&quot;</span><span class="s">/&quot;</span>
+    <span class="kr">where</span> <span class="n">ch</span> <span class="n">a</span> <span class="n">b</span> <span class="ow">=</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="p">[</span><span class="sc">&#39;</span><span class="se">\\</span><span class="sc">&#39;</span><span class="p">,</span><span class="n">b</span><span class="p">])</span>
+
+<span class="nf">hexEscape</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">hexEscape</span> <span class="n">c</span> <span class="ow">=</span> <span class="n">undefined</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">simpleEscapes</span></code> 是一个序对组成的列表。我们把由序对组成的列表称为<em>关联列表（association list）</em>，或简称为<em>alist</em>。我们的 alist 将字符和其对应的转义形式关联起来。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="kt">Prettify</span><span class="o">.</span><span class="n">hs</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">take</span> <span class="mi">4</span> <span class="n">simpleEscapes</span>
+<span class="p">[(</span><span class="sc">&#39;</span><span class="se">\b</span><span class="sc">&#39;</span><span class="p">,</span><span class="s">&quot;</span><span class="se">\\</span><span class="s">b&quot;</span><span class="p">),(</span><span class="sc">&#39;</span><span class="se">\n</span><span class="sc">&#39;</span><span class="p">,</span><span class="s">&quot;</span><span class="se">\\</span><span class="s">n&quot;</span><span class="p">),(</span><span class="sc">&#39;</span><span class="se">\f</span><span class="sc">&#39;</span><span class="p">,</span><span class="s">&quot;</span><span class="se">\\</span><span class="s">f&quot;</span><span class="p">),(</span><span class="sc">&#39;</span><span class="se">\r</span><span class="sc">&#39;</span><span class="p">,</span><span class="s">&quot;</span><span class="se">\\</span><span class="s">r&quot;</span><span class="p">)]</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">case</span></code> 表达式试图确定一个字符是否存在于 alist 当中。如果存在，我们就返回它对应的转义形式，否则我们就要用更复杂的方法来转义它。当两种转义都不需要时我们返回字符本身。保守地说，我们返回的非转义字符只包含可打印的 ASCII 字符。</p>
+<p>上文提到的复杂的转义是指将一个 Unicode 字符转为一个 “<em>\u</em>” 加上四个表示它编码16进制数字。</p>
+<p>[译注：<code class="docutils literal"><span class="pre">smallHex</span></code> 函数为 <code class="docutils literal"><span class="pre">hexEscape</span></code> 函数的一部分，只处理较为简单的一种情况。]</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="kr">import</span> <span class="nn">Numeric</span> <span class="p">(</span><span class="nf">showHex</span><span class="p">)</span>
+
+<span class="nf">smallHex</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">smallHex</span> <span class="n">x</span>  <span class="ow">=</span> <span class="n">text</span> <span class="s">&quot;</span><span class="se">\\</span><span class="s">u&quot;</span>
+           <span class="o">&lt;&gt;</span> <span class="n">text</span> <span class="p">(</span><span class="n">replicate</span> <span class="p">(</span><span class="mi">4</span> <span class="o">-</span> <span class="n">length</span> <span class="n">h</span><span class="p">)</span> <span class="sc">&#39;0&#39;</span><span class="p">)</span>
+           <span class="o">&lt;&gt;</span> <span class="n">text</span> <span class="n">h</span>
+    <span class="kr">where</span> <span class="n">h</span> <span class="ow">=</span> <span class="n">showHex</span> <span class="n">x</span> <span class="s">&quot;&quot;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">showHex</span></code> 函数来自于 <code class="docutils literal"><span class="pre">Numeric</span></code> 库（需要在 <code class="docutils literal"><span class="pre">Prettify.hs</span></code> 开头载入)，它返回一个数字的16进制表示。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">showHex</span> <span class="mi">114111</span> <span class="s">&quot;&quot;</span>
+<span class="s">&quot;1bdbf&quot;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">replicate</span></code> 函数由 <code class="docutils literal"><span class="pre">Prelude</span></code> 提供，它创建一个长度确定的重复列表。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">replicate</span> <span class="mi">5</span> <span class="s">&quot;foo&quot;</span>
+<span class="p">[</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;foo&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>有一点需要注意： <code class="docutils literal"><span class="pre">smallHex</span></code> 提供的4位数字编码仅能够表示 <code class="docutils literal"><span class="pre">0xffff</span></code> 范围之内的 Unicode 字符。而合法的 Unicode 字符范围可达 <code class="docutils literal"><span class="pre">0x10ffff</span></code> 。为了使用 JSON 字符串表示这部分字符，我们需要遵循一些复杂的规则将它们一分为二。这使得我们有机会对 Haskell 数字进行一些位操作(bit-level manipulation)。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="kr">import</span> <span class="nn">Data.Bits</span> <span class="p">(</span><span class="nf">shiftR</span><span class="p">,</span> <span class="p">(</span><span class="o">.&amp;.</span><span class="p">))</span>
+
+<span class="nf">astral</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">astral</span> <span class="n">n</span> <span class="ow">=</span> <span class="n">smallHex</span> <span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="mh">0xd800</span><span class="p">)</span> <span class="o">&lt;&gt;</span> <span class="n">smallHex</span> <span class="p">(</span><span class="n">b</span> <span class="o">+</span> <span class="mh">0xdc00</span><span class="p">)</span>
+    <span class="kr">where</span> <span class="n">a</span> <span class="ow">=</span> <span class="p">(</span><span class="n">n</span> <span class="p">`</span><span class="n">shiftR</span><span class="p">`</span> <span class="mi">10</span><span class="p">)</span> <span class="o">.&amp;.</span> <span class="mh">0x3ff</span>
+          <span class="n">b</span> <span class="ow">=</span> <span class="n">n</span> <span class="o">.&amp;.</span> <span class="mh">0x3ff</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">shiftR</span></code> 函数来自 <code class="docutils literal"><span class="pre">Data.Bits</span></code> 模块，它把一个数字右移一位。同样来自于 <code class="docutils literal"><span class="pre">Data.Bits</span></code> 模块的 <code class="docutils literal"><span class="pre">(.&amp;.)</span></code> 函数将两个数字进行按位与操作。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="mh">0x10000</span> <span class="p">`</span><span class="n">shiftR</span><span class="p">`</span> <span class="mi">4</span>   <span class="ow">::</span> <span class="kt">Int</span>
+<span class="mi">4096</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="mi">7</span> <span class="o">.&amp;.</span> <span class="mi">2</span>   <span class="ow">::</span> <span class="kt">Int</span>
+<span class="mi">2</span>
+</pre></div>
+</div>
+<p>有了 <code class="docutils literal"><span class="pre">smallHex</span></code> 和 <code class="docutils literal"><span class="pre">astral</span></code> ，我们可以如下定义 <code class="docutils literal"><span class="pre">hexEscape</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="kr">import</span> <span class="nn">Data.Char</span> <span class="p">(</span><span class="nf">ord</span><span class="p">)</span>
+
+<span class="nf">hexEscape</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">hexEscape</span> <span class="n">c</span> <span class="o">|</span> <span class="n">d</span> <span class="o">&lt;</span> <span class="mh">0x10000</span> <span class="ow">=</span> <span class="n">smallHex</span> <span class="n">d</span>
+            <span class="o">|</span> <span class="n">otherwise</span>   <span class="ow">=</span> <span class="n">astral</span> <span class="p">(</span><span class="n">d</span> <span class="o">-</span> <span class="mh">0x10000</span><span class="p">)</span>
+    <span class="kr">where</span> <span class="n">d</span> <span class="ow">=</span> <span class="n">ord</span> <span class="n">c</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="arrays-and-objects-and-the-module-header">
+<span id="id9"></span><h2>数组和对象<a class="headerlink" href="#arrays-and-objects-and-the-module-header" title="Permalink to this headline">¶</a></h2>
+<p>跟字符串比起来，美观打印数组和对象就简单多了。我们已经知道它们两个看起来很像：以起始字符开头，中间是用逗号隔开的一系列值，以终止字符结束。我们写个函数来体现它们的共同特点：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/PrettyJSON.hs</span>
+<span class="nf">series</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">series</span> <span class="n">open</span> <span class="n">close</span> <span class="n">f</span> <span class="ow">=</span> <span class="n">enclose</span> <span class="n">open</span> <span class="n">close</span>
+                    <span class="o">.</span> <span class="n">fsep</span> <span class="o">.</span> <span class="n">punctuate</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;,&#39;</span><span class="p">)</span> <span class="o">.</span> <span class="n">map</span> <span class="n">f</span>
+</pre></div>
+</div>
+<p>首先我们来解释这个函数的类型。它的参数是一个起始字符和一个终止字符 ，然后是一个知道怎样打印未知类型 <code class="docutils literal"><span class="pre">a</span></code> 的函数，接着是一个包含 <code class="docutils literal"><span class="pre">a</span></code> 类型数据的列表，最后返回一个 <code class="docutils literal"><span class="pre">Doc</span></code> 类型的值。</p>
+<p>尽管函数的类型签名有4个参数，我们在函数定义中只列出了3个。这跟我们把 <code class="docutils literal"><span class="pre">myLength</span> <span class="pre">xs</span> <span class="pre">=</span> <span class="pre">length</span> <span class="pre">xs</span></code> 简化成 <code class="docutils literal"><span class="pre">myLength</span> <span class="pre">=</span> <span class="pre">length</span></code> 是一个道理。</p>
+<p>我们已经有了把 <code class="docutils literal"><span class="pre">Doc</span></code> 包在起始字符和终止字符之间的 <code class="docutils literal"><span class="pre">enclose</span></code> 函数。<code class="docutils literal"><span class="pre">fsep</span></code> 会在 <code class="docutils literal"><span class="pre">Prettify</span></code> 模块中定义。它将多个 <code class="docutils literal"><span class="pre">Doc</span></code> 值拼接成一个，并且在需要的时候换行。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">fsep</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Doc</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">fsep</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">undefined</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">punctuate</span></code> 函数也会在 <code class="docutils literal"><span class="pre">Prettify</span></code> 中定义。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">punctuate</span> <span class="ow">::</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Doc</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Doc</span><span class="p">]</span>
+<span class="nf">punctuate</span> <span class="n">p</span> <span class="kt">[]</span>     <span class="ow">=</span> <span class="kt">[]</span>
+<span class="nf">punctuate</span> <span class="n">p</span> <span class="p">[</span><span class="n">d</span><span class="p">]</span>    <span class="ow">=</span> <span class="p">[</span><span class="n">d</span><span class="p">]</span>
+<span class="nf">punctuate</span> <span class="n">p</span> <span class="p">(</span><span class="n">d</span><span class="kt">:</span><span class="n">ds</span><span class="p">)</span> <span class="ow">=</span> <span class="p">(</span><span class="n">d</span> <span class="o">&lt;&gt;</span> <span class="n">p</span><span class="p">)</span> <span class="kt">:</span> <span class="n">punctuate</span> <span class="n">p</span> <span class="n">ds</span>
+</pre></div>
+</div>
+<p>有了 <code class="docutils literal"><span class="pre">series</span></code>，美观打印数组就非常直观了。我们在 <code class="docutils literal"><span class="pre">renderJValue</span></code> 的定义的最后加上下面一行。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/PrettyJSON.hs</span>
+<span class="nf">renderJValue</span> <span class="p">(</span><span class="kt">JArray</span> <span class="n">ary</span><span class="p">)</span> <span class="ow">=</span> <span class="n">series</span> <span class="sc">&#39;[&#39;</span> <span class="sc">&#39;]&#39;</span> <span class="n">renderJValue</span> <span class="n">ary</span>
+</pre></div>
+</div>
+<p>美观打印对象稍微麻烦一点：对于每个元素，我们还要额外处理名字和值。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/PrettyJSON.hs</span>
+<span class="nf">renderJValue</span> <span class="p">(</span><span class="kt">JObject</span> <span class="n">obj</span><span class="p">)</span> <span class="ow">=</span> <span class="n">series</span> <span class="sc">&#39;{&#39;</span> <span class="sc">&#39;}&#39;</span> <span class="n">field</span> <span class="n">obj</span>
+    <span class="kr">where</span> <span class="n">field</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span><span class="n">val</span><span class="p">)</span> <span class="ow">=</span> <span class="n">string</span> <span class="n">name</span>
+                          <span class="o">&lt;&gt;</span> <span class="n">text</span> <span class="s">&quot;: &quot;</span>
+                          <span class="o">&lt;&gt;</span> <span class="n">renderJValue</span> <span class="n">val</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="writing-a-module-header">
+<span id="id10"></span><h2>书写模块头<a class="headerlink" href="#writing-a-module-header" title="Permalink to this headline">¶</a></h2>
+<p><code class="docutils literal"><span class="pre">PrettyJSON.hs</span></code> 文件写得差不多了，我们现在回到文件顶部书写模块声明。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/PrettyJSON.hs</span>
+<span class="kr">module</span> <span class="nn">PrettyJSON</span>
+    <span class="p">(</span>
+      <span class="nf">renderJValue</span>
+    <span class="p">)</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">SimpleJSON</span> <span class="p">(</span><span class="kt">JValue</span><span class="p">(</span><span class="o">..</span><span class="p">))</span>
+<span class="kr">import</span> <span class="nn">Prettify</span> <span class="p">(</span><span class="kt">Doc</span><span class="p">,</span> <span class="p">(</span><span class="o">&lt;&gt;</span><span class="p">),</span> <span class="nf">char</span><span class="p">,</span> <span class="nf">double</span><span class="p">,</span> <span class="nf">fsep</span><span class="p">,</span> <span class="nf">hcat</span><span class="p">,</span> <span class="nf">punctuate</span><span class="p">,</span> <span class="nf">text</span><span class="p">,</span> <span class="nf">compact</span><span class="p">,</span> <span class="nf">pretty</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>[译注：<code class="docutils literal"><span class="pre">compact</span></code> 和 <code class="docutils literal"><span class="pre">pretty</span></code> 函数会在稍后介绍。]</p>
+<p>我们只从这个模块导出了一个函数，<code class="docutils literal"><span class="pre">renderJValue</span></code>，也就是我们的 JSON 转换函数。其它的函数只是为了支持 <code class="docutils literal"><span class="pre">renderJValue</span></code>，因此没必要对其它模块可见。</p>
+<p>关于载入部分，<code class="docutils literal"><span class="pre">Numeric</span></code> 和 <code class="docutils literal"><span class="pre">Data.Bits</span></code> 模块是 GHC 内置的。我们已经写好了 <code class="docutils literal"><span class="pre">SimpleJSON</span></code> 模块，<code class="docutils literal"><span class="pre">Prettify</span></code> 模块的框架也搭好了。
+可以看出载入标准模块和我们自己写的模块没什么区别。[译注：原文在 <code class="docutils literal"><span class="pre">PrettyJSON.hs</span></code> 头部载入了 <code class="docutils literal"><span class="pre">Numeric</span></code> 和 <code class="docutils literal"><span class="pre">Data.Bits</span></code> 模块。但事实上并无必要，因此在译文中删除。
+此处作者的说明部分未作改动。]</p>
+<p>在每个 <code class="docutils literal"><span class="pre">import</span></code> 命令中，我们都列出了想要引入我们的模块的命名空间的名字。这并非强制：如果省略这些名字，我们就可以使用一个模块导出的所有名字。然而，通常来讲显式地载入更好。</p>
+<ul class="simple">
+<li>一个显式列表清楚地表明了我们从哪里载入了哪个名字。如果读者碰到了不熟悉的函数，这便于他们查看文档。</li>
+<li>有时候库的维护者会删除或者重命名函数。一个函数很可能在我们写完模块很久之后才从第三方库中消失并导致编译错误。显式列表提醒我们消失的名字是从哪儿载入的，有助于我们更快找到问题。</li>
+<li>另外一种情况是库的维护者在模块中加入的函数与我们代码中现有的函数名字一样。如果不用显式列表，这个函数就会在我们的模块中出现两次。当我们用这个函数的时候，GHC 就会报告歧义错误。</li>
+</ul>
+<p>通常情况下使用显式列表更好，但这并不是硬性规定。有的时候，我们需要一个模块中的很多名字，一一列举会非常麻烦。有的时候，有些模块已经被广泛使用，有经验的 Hashell 程序员会知道哪个名字来自那些模块。</p>
+</div>
+<div class="section" id="fleshing-out-the-pretty-printing-library">
+<span id="id11"></span><h2>完成美观打印库<a class="headerlink" href="#fleshing-out-the-pretty-printing-library" title="Permalink to this headline">¶</a></h2>
+<p>在 <code class="docutils literal"><span class="pre">Prettify</span></code> 模块中，我们用代数数据类型来表示 <code class="docutils literal"><span class="pre">Doc</span></code> 类型。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="kr">data</span> <span class="kt">Doc</span> <span class="ow">=</span> <span class="kt">Empty</span>
+         <span class="o">|</span> <span class="kt">Char</span> <span class="kt">Char</span>
+         <span class="o">|</span> <span class="kt">Text</span> <span class="kt">String</span>
+         <span class="o">|</span> <span class="kt">Line</span>
+         <span class="o">|</span> <span class="kt">Concat</span> <span class="kt">Doc</span> <span class="kt">Doc</span>
+         <span class="o">|</span> <span class="kt">Union</span> <span class="kt">Doc</span> <span class="kt">Doc</span>
+           <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">,</span><span class="kt">Eq</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>可以看出 <code class="docutils literal"><span class="pre">Doc</span></code> 类型其实是一棵树。<code class="docutils literal"><span class="pre">Concat</span></code> 和 <code class="docutils literal"><span class="pre">Union</span></code> 构造器以两个 <code class="docutils literal"><span class="pre">Doc</span></code> 值构造一个内部节点，<code class="docutils literal"><span class="pre">Empty</span></code> 和其它简单的构造器构造叶子。</p>
+<p>在模块头中，我们导出了这个类型的名字，但是不包含任何它的构造器：这样可以保证使用这个类型的模块无法创建 Doc 值和对其进行模式匹配。</p>
+<p>如果想创建 Doc，<code class="docutils literal"><span class="pre">Prettify</span></code> 模块的用户可以调用我们提供的函数。下面是一些简单的构造函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">empty</span> <span class="ow">::</span> <span class="kt">Doc</span>
+<span class="nf">empty</span> <span class="ow">=</span> <span class="kt">Empty</span>
+
+<span class="nf">char</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">char</span> <span class="n">c</span> <span class="ow">=</span> <span class="kt">Char</span> <span class="n">c</span>
+
+<span class="nf">text</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">text</span> <span class="s">&quot;&quot;</span> <span class="ow">=</span> <span class="kt">Empty</span>
+<span class="nf">text</span> <span class="n">s</span>  <span class="ow">=</span> <span class="kt">Text</span> <span class="n">s</span>
+
+<span class="nf">double</span> <span class="ow">::</span> <span class="kt">Double</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">double</span> <span class="n">d</span> <span class="ow">=</span> <span class="n">text</span> <span class="p">(</span><span class="n">show</span> <span class="n">d</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">Line</span></code> 构造器表示一个换行。<code class="docutils literal"><span class="pre">line</span></code> 函数创建一个<em>硬</em>换行，它总是出现在美观打印器的输出中。有时候我们想要一个<em>软</em>换行，只有在行太宽，一个窗口或一页放不下的时候才用。稍后我们就会介绍这个
+<code class="docutils literal"><span class="pre">softline</span></code> 函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">line</span> <span class="ow">::</span> <span class="kt">Doc</span>
+<span class="nf">line</span> <span class="ow">=</span> <span class="kt">Line</span>
+</pre></div>
+</div>
+<p>下面是 <code class="docutils literal"><span class="pre">(&lt;&gt;)</span></code> 函数的实现。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="p">(</span><span class="o">&lt;&gt;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="kt">Empty</span> <span class="o">&lt;&gt;</span> <span class="n">y</span> <span class="ow">=</span> <span class="n">y</span>
+<span class="nf">x</span> <span class="o">&lt;&gt;</span> <span class="kt">Empty</span> <span class="ow">=</span> <span class="n">x</span>
+<span class="nf">x</span> <span class="o">&lt;&gt;</span> <span class="n">y</span> <span class="ow">=</span> <span class="n">x</span> <span class="p">`</span><span class="kt">Concat</span><span class="p">`</span> <span class="n">y</span>
+</pre></div>
+</div>
+<p>我们使用 <code class="docutils literal"><span class="pre">Empty</span></code> 进行模式匹配。将一个 <code class="docutils literal"><span class="pre">Empty</span></code> 拼接在一个 <code class="docutils literal"><span class="pre">Doc</span></code> 值的左侧或右侧都不会有效果。这样可以帮助我们的树减少一些无意义信息。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">text</span> <span class="s">&quot;foo&quot;</span> <span class="o">&lt;&gt;</span> <span class="n">text</span> <span class="s">&quot;bar&quot;</span>
+<span class="kt">Concat</span> <span class="p">(</span><span class="kt">Text</span> <span class="s">&quot;foo&quot;</span><span class="p">)</span> <span class="p">(</span><span class="kt">Text</span> <span class="s">&quot;bar&quot;</span><span class="p">)</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">text</span> <span class="s">&quot;foo&quot;</span> <span class="o">&lt;&gt;</span> <span class="n">empty</span>
+<span class="kt">Text</span> <span class="s">&quot;foo&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">empty</span> <span class="o">&lt;&gt;</span> <span class="n">text</span> <span class="s">&quot;bar&quot;</span>
+<span class="kt">Text</span> <span class="s">&quot;bar&quot;</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">A mathematical moment(to be added)</p>
+</div>
+<p>我们的 <code class="docutils literal"><span class="pre">hcat</span></code> 和 <code class="docutils literal"><span class="pre">fsep</span></code> 函数将 <code class="docutils literal"><span class="pre">Doc</span></code> 列表拼接成一个 <code class="docutils literal"><span class="pre">Doc</span></code> 值。
+在之前的一道题目里（fix link），我们提到了可以用 <code class="docutils literal"><span class="pre">foldr</span></code> 来定义列表拼接。
+[译注：这个例子只是为了回顾，本章代码并没有用到。]</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">concat</span> <span class="ow">::</span> <span class="p">[[</span><span class="n">a</span><span class="p">]]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">concat</span> <span class="ow">=</span> <span class="n">foldr</span> <span class="p">(</span><span class="o">++</span><span class="p">)</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+<p>因为 <code class="docutils literal"><span class="pre">(&lt;&gt;)</span></code> 类比于 <code class="docutils literal"><span class="pre">(++)</span></code>，<code class="docutils literal"><span class="pre">empty</span></code> 类比于 <code class="docutils literal"><span class="pre">[]</span></code>，我们可以用同样的方法来定义 <code class="docutils literal"><span class="pre">hcat</span></code> 和 <code class="docutils literal"><span class="pre">fsep</span></code> 函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">hcat</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Doc</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">hcat</span> <span class="ow">=</span> <span class="n">fold</span> <span class="p">(</span><span class="o">&lt;&gt;</span><span class="p">)</span>
+
+<span class="nf">fold</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Doc</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">fold</span> <span class="n">f</span> <span class="ow">=</span> <span class="n">foldr</span> <span class="n">f</span> <span class="n">empty</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">fsep</span></code> 的定义依赖于其它几个函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">fsep</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Doc</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">fsep</span> <span class="ow">=</span> <span class="n">fold</span> <span class="p">(</span><span class="o">&lt;/&gt;</span><span class="p">)</span>
+
+<span class="p">(</span><span class="o">&lt;/&gt;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">x</span> <span class="o">&lt;/&gt;</span> <span class="n">y</span> <span class="ow">=</span> <span class="n">x</span> <span class="o">&lt;&gt;</span> <span class="n">softline</span> <span class="o">&lt;&gt;</span> <span class="n">y</span>
+
+<span class="nf">softline</span> <span class="ow">::</span> <span class="kt">Doc</span>
+<span class="nf">softline</span> <span class="ow">=</span> <span class="n">group</span> <span class="n">line</span>
+
+<span class="nf">group</span> <span class="ow">::</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">group</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">undefined</span>
+</pre></div>
+</div>
+<p>稍微来解释一下。如果当前行变得太长，<code class="docutils literal"><span class="pre">softline</span></code> 函数就插入一个新行，否则就插入一个空格。
+<code class="docutils literal"><span class="pre">Doc</span></code> 并没有包含“怎样才算太长”的信息，这该怎么实现呢？
+答案是每次碰到这种情况，我们使用 <code class="docutils literal"><span class="pre">Union</span></code> 构造器来用两种不同的方式保存文档。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">group</span> <span class="ow">::</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">group</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">flatten</span> <span class="n">x</span> <span class="p">`</span><span class="kt">Union</span><span class="p">`</span> <span class="n">x</span>
+
+<span class="nf">flatten</span> <span class="ow">::</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">flatten</span> <span class="ow">=</span> <span class="n">undefined</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">flatten</span></code> 函数将 <code class="docutils literal"><span class="pre">Line</span></code> 替换为一个空格，把两行变成一行。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">flatten</span> <span class="ow">::</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+<span class="nf">flatten</span> <span class="p">(</span><span class="n">x</span> <span class="p">`</span><span class="kt">Concat</span><span class="p">`</span> <span class="n">y</span><span class="p">)</span> <span class="ow">=</span> <span class="n">flatten</span> <span class="n">x</span> <span class="p">`</span><span class="kt">Concat</span><span class="p">`</span> <span class="n">flatten</span> <span class="n">y</span>
+<span class="nf">flatten</span> <span class="kt">Line</span>           <span class="ow">=</span> <span class="kt">Char</span> <span class="sc">&#39; &#39;</span>
+<span class="nf">flatten</span> <span class="p">(</span><span class="n">x</span> <span class="p">`</span><span class="kt">Union</span><span class="p">`</span> <span class="kr">_</span><span class="p">)</span>  <span class="ow">=</span> <span class="n">flatten</span> <span class="n">x</span>
+<span class="nf">flatten</span> <span class="n">other</span>          <span class="ow">=</span> <span class="n">other</span>
+</pre></div>
+</div>
+<p>我们只在 <code class="docutils literal"><span class="pre">Union</span></code> 左侧的元素上调用 <code class="docutils literal"><span class="pre">flatten</span></code>： <code class="docutils literal"><span class="pre">Union</span></code> 左侧元素的长度总是大于等于右侧元素的长度。
+下面的转换函数会用到这一性质。</p>
+<div class="section" id="compact-rendering">
+<span id="id12"></span><h3>紧凑转换<a class="headerlink" href="#compact-rendering" title="Permalink to this headline">¶</a></h3>
+<p>我们经常希望一段数据占用的字符数越少越好。例如，如果我们想通过网络传输 JSON 数据，就没必要把它弄得很漂亮：另外一端的软件并不关心它漂不漂亮，
+而使布局变漂亮的空格会增加额外开销。</p>
+<p>在这种情况下，我们提供一个最基本的紧凑转换函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">compact</span> <span class="ow">::</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">compact</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">transform</span> <span class="p">[</span><span class="n">x</span><span class="p">]</span>
+    <span class="kr">where</span> <span class="n">transform</span> <span class="kt">[]</span> <span class="ow">=</span> <span class="s">&quot;&quot;</span>
+          <span class="n">transform</span> <span class="p">(</span><span class="n">d</span><span class="kt">:</span><span class="n">ds</span><span class="p">)</span> <span class="ow">=</span>
+                <span class="kr">case</span> <span class="n">d</span> <span class="kr">of</span>
+                    <span class="kt">Empty</span>        <span class="ow">-&gt;</span> <span class="n">transform</span> <span class="n">ds</span>
+                    <span class="kt">Char</span> <span class="n">c</span>       <span class="ow">-&gt;</span> <span class="n">c</span> <span class="kt">:</span> <span class="n">transform</span> <span class="n">ds</span>
+                    <span class="kt">Text</span> <span class="n">s</span>       <span class="ow">-&gt;</span> <span class="n">s</span> <span class="o">++</span> <span class="n">transform</span> <span class="n">ds</span>
+                    <span class="kt">Line</span>         <span class="ow">-&gt;</span> <span class="sc">&#39;</span><span class="se">\n</span><span class="sc">&#39;</span> <span class="kt">:</span> <span class="n">transform</span> <span class="n">ds</span>
+                    <span class="n">a</span> <span class="p">`</span><span class="kt">Concat</span><span class="p">`</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">transform</span> <span class="p">(</span><span class="n">a</span><span class="kt">:</span><span class="n">b</span><span class="kt">:</span><span class="n">ds</span><span class="p">)</span>
+                    <span class="kr">_</span> <span class="p">`</span><span class="kt">Union</span><span class="p">`</span> <span class="n">b</span>  <span class="ow">-&gt;</span> <span class="n">transform</span> <span class="p">(</span><span class="n">b</span><span class="kt">:</span><span class="n">ds</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">compact</span></code> 函数把它的参数放进一个列表里，然后再对它应用 <code class="docutils literal"><span class="pre">transform</span></code> 辅助函数。
+<code class="docutils literal"><span class="pre">transform</span></code> 函数把参数当做栈来处理，列表的第一个元素即为栈顶。</p>
+<p><code class="docutils literal"><span class="pre">transform</span></code> 函数的 <code class="docutils literal"><span class="pre">(d:ds)</span></code> 模式将栈分为头 <code class="docutils literal"><span class="pre">d</span></code> 和剩余部分 <code class="docutils literal"><span class="pre">ds</span></code>。
+在 <code class="docutils literal"><span class="pre">case</span></code> 表达式里，前几个分支在 <code class="docutils literal"><span class="pre">ds</span></code> 上递归，每次处理一个栈顶的元素。
+最后两个分支在 <code class="docutils literal"><span class="pre">ds</span></code> 前面加了东西：<code class="docutils literal"><span class="pre">Concat</span></code> 分支把两个元素都加到栈里，<code class="docutils literal"><span class="pre">Union</span></code> 分支忽略左侧元素（我们对它调用了 <code class="docutils literal"><span class="pre">flatten</span></code> ），只把右侧元素加进栈里。</p>
+<p>现在我们终于可以在 <strong>ghci</strong> 里试试 <code class="docutils literal"><span class="pre">compact</span></code> 函数了。[译注：这里要对 <code class="docutils literal"><span class="pre">PrettyJSON.hs</span></code> 里 <code class="docutils literal"><span class="pre">import</span> <span class="pre">Prettify</span></code> 部分作一下修改才能使 <code class="docutils literal"><span class="pre">PrettyJSON.hs</span></code> 编译。
+包括去掉还未实现的 <code class="docutils literal"><span class="pre">pretty</span></code> 函数，增加缺少的 <code class="docutils literal"><span class="pre">string</span></code>, <code class="docutils literal"><span class="pre">series</span></code> 函数等。一个可以编译的版本如下。]</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/PrettyJSON.hs</span>
+<span class="kr">import</span> <span class="nn">Prettify</span> <span class="p">(</span><span class="kt">Doc</span><span class="p">,</span> <span class="p">(</span><span class="o">&lt;&gt;</span><span class="p">),</span> <span class="nf">string</span><span class="p">,</span> <span class="nf">series</span><span class="p">,</span> <span class="nf">char</span><span class="p">,</span> <span class="nf">double</span><span class="p">,</span> <span class="nf">fsep</span><span class="p">,</span> <span class="nf">hcat</span><span class="p">,</span> <span class="nf">punctuate</span><span class="p">,</span> <span class="nf">text</span><span class="p">,</span> <span class="nf">compact</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">value</span> <span class="ow">=</span> <span class="n">renderJValue</span> <span class="p">(</span><span class="kt">JObject</span> <span class="p">[(</span><span class="s">&quot;f&quot;</span><span class="p">,</span> <span class="kt">JNumber</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="s">&quot;q&quot;</span><span class="p">,</span> <span class="kt">JBool</span> <span class="kt">True</span><span class="p">)])</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">value</span>
+<span class="nf">value</span> <span class="ow">::</span> <span class="kt">Doc</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">putStrLn</span> <span class="p">(</span><span class="n">compact</span> <span class="n">value</span><span class="p">)</span>
+<span class="p">{</span><span class="s">&quot;f&quot;</span><span class="kt">:</span> <span class="mf">1.0</span><span class="p">,</span>
+<span class="s">&quot;q&quot;</span><span class="kt">:</span> <span class="n">true</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>为了更好地理解代码，我们来分析一个更简单的例子。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">char</span> <span class="sc">&#39;f&#39;</span> <span class="o">&lt;&gt;</span> <span class="n">text</span> <span class="s">&quot;oo&quot;</span>
+<span class="kt">Concat</span> <span class="p">(</span><span class="kt">Char</span> <span class="sc">&#39;f&#39;</span><span class="p">)</span> <span class="p">(</span><span class="kt">Text</span> <span class="s">&quot;oo&quot;</span><span class="p">)</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">compact</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;f&#39;</span> <span class="o">&lt;&gt;</span> <span class="n">text</span> <span class="s">&quot;oo&quot;</span><span class="p">)</span>
+<span class="s">&quot;foo&quot;</span>
+</pre></div>
+</div>
+<p>当我们调用 <code class="docutils literal"><span class="pre">compact</span></code> 时，它把参数转成一个列表并应用 <code class="docutils literal"><span class="pre">transform</span></code>。</p>
+<ul>
+<li><p class="first"><code class="docutils literal"><span class="pre">transform</span></code> 函数的参数是一个单元素列表，匹配 <code class="docutils literal"><span class="pre">(d:ds)</span></code> 模式。因此 <code class="docutils literal"><span class="pre">d</span></code> 是 <code class="docutils literal"><span class="pre">Concat</span> <span class="pre">(Char</span> <span class="pre">'f')</span> <span class="pre">(Text</span> <span class="pre">&quot;oo&quot;)</span></code>，<code class="docutils literal"><span class="pre">ds</span></code> 是个空列表，<code class="docutils literal"><span class="pre">[]</span></code>。</p>
+<p>因为 <code class="docutils literal"><span class="pre">d</span></code> 的构造器是 <code class="docutils literal"><span class="pre">Concat</span></code>，<code class="docutils literal"><span class="pre">case</span></code> 表达式匹配到了 <code class="docutils literal"><span class="pre">Concat</span></code> 分支。我们把 <code class="docutils literal"><span class="pre">Char</span> <span class="pre">'f'</span></code> 和 <code class="docutils literal"><span class="pre">Text</span> <span class="pre">&quot;oo&quot;</span></code> 放进栈里，并递归调用 <code class="docutils literal"><span class="pre">transform</span></code>。</p>
+</li>
+<li><ul class="first simple">
+<li>这次 <code class="docutils literal"><span class="pre">transform</span></code> 的参数是一个二元素列表，匹配 <code class="docutils literal"><span class="pre">(d:ds)</span></code> 模式。变量 <code class="docutils literal"><span class="pre">d</span></code> 被绑定到 <code class="docutils literal"><span class="pre">Char</span> <span class="pre">'f'</span></code>，<code class="docutils literal"><span class="pre">ds</span></code> 被绑定到 <code class="docutils literal"><span class="pre">[Text</span> <span class="pre">&quot;oo&quot;]</span></code>。
+<code class="docutils literal"><span class="pre">case</span></code> 表达式匹配到 <code class="docutils literal"><span class="pre">Char</span></code> 分支。因此我们用 <code class="docutils literal"><span class="pre">(:)</span></code> 构造一个列表，它的头是 <code class="docutils literal"><span class="pre">'f'</span></code>，剩余部分是对 <code class="docutils literal"><span class="pre">transform</span></code> 进行递归调用的结果。</li>
+<li><ul class="first">
+<li>这次递归调用的参数是一个单元素列表，变量 <code class="docutils literal"><span class="pre">d</span></code> 被绑定到 <code class="docutils literal"><span class="pre">Text</span> <span class="pre">&quot;oo&quot;</span></code>，<code class="docutils literal"><span class="pre">ds</span></code> 被绑定到 <code class="docutils literal"><span class="pre">[]</span></code>。
+<code class="docutils literal"><span class="pre">case</span></code> 表达式匹配到 <code class="docutils literal"><span class="pre">Text</span></code> 分支。我们用 <code class="docutils literal"><span class="pre">(++)</span></code> 拼接 <code class="docutils literal"><span class="pre">&quot;oo&quot;</span></code> 和下次递归调用的结果。</li>
+<li><ul class="first">
+<li>最后一次调用，<code class="docutils literal"><span class="pre">transform</span></code> 的参数是一个空列表，因此返回一个空字符串。</li>
+</ul>
+</li>
+<li>结果是 <code class="docutils literal"><span class="pre">&quot;oo&quot;</span> <span class="pre">++</span> <span class="pre">&quot;&quot;</span></code>。</li>
+</ul>
+</li>
+<li>结果是 <code class="docutils literal"><span class="pre">'f'</span> <span class="pre">:</span> <span class="pre">&quot;oo&quot;</span> <span class="pre">++</span> <span class="pre">&quot;&quot;</span></code>。</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="true-pretty-printing">
+<span id="id13"></span><h3>真正的美观打印<a class="headerlink" href="#true-pretty-printing" title="Permalink to this headline">¶</a></h3>
+<p>我们的 <code class="docutils literal"><span class="pre">compact</span></code> 方便了机器之间的交流，人阅读起来却非常困难。我们写一个 <code class="docutils literal"><span class="pre">pretty</span></code> 函数来产生可读性较强的输出。
+跟 <code class="docutils literal"><span class="pre">compact</span></code> 相比，<a href="#id14"><span class="problematic" id="id15">``</span></a>pretty``多了一个参数：每行的最大宽度(有几列)。(假设我们使用等宽字体。)</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">pretty</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">pretty</span> <span class="ow">=</span> <span class="n">undefined</span>
+</pre></div>
+</div>
+<p>更准确地说，这个 <code class="docutils literal"><span class="pre">Int</span></code> 参数控制了 <code class="docutils literal"><span class="pre">pretty</span></code> 遇到 <code class="docutils literal"><span class="pre">softline</span></code> 时的行为。
+只有碰到 <code class="docutils literal"><span class="pre">softline</span></code> 时，<code class="docutils literal"><span class="pre">pretty</span></code> 才能选择继续当前行还是新开一行。
+别的地方，我们必须严格遵守已有的打印规则。</p>
+<p>下面是这个函数的核心部分。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">pretty</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">pretty</span> <span class="n">width</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">best</span> <span class="mi">0</span> <span class="p">[</span><span class="n">x</span><span class="p">]</span>
+    <span class="kr">where</span> <span class="n">best</span> <span class="n">col</span> <span class="p">(</span><span class="n">d</span><span class="kt">:</span><span class="n">ds</span><span class="p">)</span> <span class="ow">=</span>
+        <span class="kr">case</span> <span class="n">d</span> <span class="kr">of</span>
+            <span class="kt">Empty</span>        <span class="ow">-&gt;</span> <span class="n">best</span> <span class="n">col</span> <span class="n">ds</span>
+            <span class="kt">Char</span> <span class="n">c</span>       <span class="ow">-&gt;</span> <span class="n">c</span> <span class="kt">:</span>  <span class="n">best</span> <span class="p">(</span><span class="n">col</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="n">ds</span>
+            <span class="kt">Text</span> <span class="n">s</span>       <span class="ow">-&gt;</span> <span class="n">s</span> <span class="o">++</span> <span class="n">best</span> <span class="p">(</span><span class="n">col</span> <span class="o">+</span> <span class="n">length</span> <span class="n">s</span><span class="p">)</span> <span class="n">ds</span>
+            <span class="kt">Line</span>         <span class="ow">-&gt;</span> <span class="sc">&#39;</span><span class="se">\n</span><span class="sc">&#39;</span> <span class="kt">:</span> <span class="n">best</span> <span class="mi">0</span> <span class="n">ds</span>
+            <span class="n">a</span> <span class="p">`</span><span class="kt">Concat</span><span class="p">`</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">best</span> <span class="n">col</span> <span class="p">(</span><span class="n">a</span><span class="kt">:</span><span class="n">b</span><span class="kt">:</span><span class="n">ds</span><span class="p">)</span>
+            <span class="n">a</span> <span class="p">`</span><span class="kt">Union</span><span class="p">`</span> <span class="n">b</span>  <span class="ow">-&gt;</span> <span class="n">nicest</span> <span class="n">col</span> <span class="p">(</span><span class="n">best</span> <span class="n">col</span> <span class="p">(</span><span class="n">a</span><span class="kt">:</span><span class="n">ds</span><span class="p">))</span>
+                                       <span class="p">(</span><span class="n">best</span> <span class="n">col</span> <span class="p">(</span><span class="n">b</span><span class="kt">:</span><span class="n">ds</span><span class="p">))</span>
+      <span class="n">best</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="s">&quot;&quot;</span>
+
+      <span class="n">nicest</span> <span class="n">col</span> <span class="n">a</span> <span class="n">b</span> <span class="o">|</span> <span class="p">(</span><span class="n">width</span> <span class="o">-</span> <span class="n">least</span><span class="p">)</span> <span class="p">`</span><span class="n">fits</span><span class="p">`</span> <span class="n">a</span> <span class="ow">=</span> <span class="n">a</span>
+                     <span class="o">|</span> <span class="n">otherwise</span>                <span class="ow">=</span> <span class="n">b</span>
+                     <span class="kr">where</span> <span class="n">least</span> <span class="ow">=</span> <span class="n">min</span> <span class="n">width</span> <span class="n">col</span>
+
+<span class="nf">fits</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">fits</span> <span class="ow">=</span> <span class="n">undefined</span>
+</pre></div>
+</div>
+<p>辅助函数 <code class="docutils literal"><span class="pre">best</span></code> 接受两个参数：当前行已经走过的列数和剩余需要处理的 <code class="docutils literal"><span class="pre">Doc</span></code> 列表。
+一般情况下，<code class="docutils literal"><span class="pre">best</span></code> 会简单地消耗输入更新 <code class="docutils literal"><span class="pre">col</span></code>。即使 <code class="docutils literal"><span class="pre">Concat</span></code> 这种情况也显而易见：我们把拼接好的两个元素放进栈里，保持 <code class="docutils literal"><span class="pre">col</span></code> 不变。</p>
+<p>有趣的是涉及到 <code class="docutils literal"><span class="pre">Union</span></code> 构造器的情况。回想一下，我们将 <code class="docutils literal"><span class="pre">flatten</span></code> 应用到了左侧元素，右侧不变。
+并且，<code class="docutils literal"><span class="pre">flatten</span></code> 把换行替换成了空格。
+因此，我们的任务是看看两种布局中，哪一种（如果有的话）能满足我们的 <code class="docutils literal"><span class="pre">width</span></code> 限制。</p>
+<p>我们还需要一个小的辅助函数来确定某一行已经被转换的 <code class="docutils literal"><span class="pre">Doc</span></code> 值是否能放进给定的宽度中。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">fits</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">w</span> <span class="p">`</span><span class="n">fits</span><span class="p">`</span> <span class="kr">_</span> <span class="o">|</span> <span class="n">w</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">=</span> <span class="kt">False</span>
+<span class="nf">w</span> <span class="p">`</span><span class="n">fits</span><span class="p">`</span> <span class="s">&quot;&quot;</span>        <span class="ow">=</span> <span class="kt">True</span>
+<span class="nf">w</span> <span class="p">`</span><span class="n">fits</span><span class="p">`</span> <span class="p">(</span><span class="sc">&#39;</span><span class="se">\n</span><span class="sc">&#39;</span><span class="kt">:</span><span class="kr">_</span><span class="p">)</span>  <span class="ow">=</span> <span class="kt">True</span>
+<span class="nf">w</span> <span class="p">`</span><span class="n">fits</span><span class="p">`</span> <span class="p">(</span><span class="n">c</span><span class="kt">:</span><span class="n">cs</span><span class="p">)</span>    <span class="ow">=</span> <span class="p">(</span><span class="n">w</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="p">`</span><span class="n">fits</span><span class="p">`</span> <span class="n">cs</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="following-the-pretty-printer">
+<span id="id16"></span><h3>理解美观打印器<a class="headerlink" href="#following-the-pretty-printer" title="Permalink to this headline">¶</a></h3>
+<p>为了理解这段代码是如何工作的，我们首先来考虑一个简单的 <code class="docutils literal"><span class="pre">Doc</span></code> 值。[译注：<code class="docutils literal"><span class="pre">PrettyJSON.hs</span></code> 并未载入 <code class="docutils literal"><span class="pre">empty</span></code> 和 <code class="docutils literal"><span class="pre">&lt;/&gt;</span></code>。需要读者自行载入。]</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">empty</span> <span class="o">&lt;/&gt;</span> <span class="n">char</span> <span class="sc">&#39;a&#39;</span>
+<span class="kt">Concat</span> <span class="p">(</span><span class="kt">Union</span> <span class="p">(</span><span class="kt">Char</span> <span class="sc">&#39; &#39;</span><span class="p">)</span> <span class="kt">Line</span><span class="p">)</span> <span class="p">(</span><span class="kt">Char</span> <span class="sc">&#39;a&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>我们会将 <code class="docutils literal"><span class="pre">pretty</span> <span class="pre">2</span></code> 应用到这个值上。第一次应用 <code class="docutils literal"><span class="pre">best</span></code> 时，<code class="docutils literal"><span class="pre">col</span></code> 的值是0。
+它匹配到了 <code class="docutils literal"><span class="pre">Concat</span></code> 分支，于是把 <code class="docutils literal"><span class="pre">Union</span> <span class="pre">(Char</span> <span class="pre">'</span> <span class="pre">')</span> <span class="pre">Line</span></code> 和 <code class="docutils literal"><span class="pre">Char</span> <span class="pre">'a'</span></code> 放进栈里，继续递归。
+在递归调用时，它匹配到了 <code class="docutils literal"><span class="pre">Union</span></code> 分支。</p>
+<p>这个时候，我们忽略 Haskell 通常的求值顺序。这使得在不影响结果的情况下，我们的解释最容易被理解。
+现在我们有两个子表达式：<code class="docutils literal"><span class="pre">best</span> <span class="pre">0</span> <span class="pre">[Char</span> <span class="pre">'</span> <span class="pre">',</span> <span class="pre">Char</span> <span class="pre">'a']</span></code> 和 <code class="docutils literal"><span class="pre">best</span> <span class="pre">0</span> <span class="pre">[Line,</span> <span class="pre">Char</span> <span class="pre">'a']</span></code>。
+第一个被求值成 <code class="docutils literal"><span class="pre">&quot;</span> <span class="pre">a&quot;</span></code>，第二个被求值成 <code class="docutils literal"><span class="pre">&quot;\na&quot;</span></code>。
+我们把这些值替换进函数得到 <code class="docutils literal"><span class="pre">nicest</span> <span class="pre">0</span> <span class="pre">&quot;</span> <span class="pre">a&quot;</span> <span class="pre">&quot;\na&quot;</span></code>。</p>
+<p>为了弄清 <code class="docutils literal"><span class="pre">nicest</span></code> 的结果是什么，我们再做点替换。<code class="docutils literal"><span class="pre">width</span></code> 和 <code class="docutils literal"><span class="pre">col</span></code> 的值分别是0和2，所以 <code class="docutils literal"><span class="pre">least</span></code> 是0，<code class="docutils literal"><span class="pre">width</span> <span class="pre">-</span> <span class="pre">least</span></code> 是2。
+我们在 <strong>ghci</strong> 里试试 <code class="docutils literal"><span class="pre">2</span> <span class="pre">`fits`</span> <span class="pre">&quot;</span> <span class="pre">a&quot;</span></code> 的结果是什么。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="mi">2</span> <span class="p">`</span><span class="n">fits</span><span class="p">`</span> <span class="s">&quot; a&quot;</span>
+<span class="kt">True</span>
+</pre></div>
+</div>
+<p>由于求值结果为 <code class="docutils literal"><span class="pre">True</span></code>，<code class="docutils literal"><span class="pre">nicest</span></code> 的结果是 <code class="docutils literal"><span class="pre">&quot;</span> <span class="pre">a&quot;</span></code>。</p>
+<p>如果我们将 <code class="docutils literal"><span class="pre">pretty</span></code> 函数应用到之前的 JSON 上，我们可以看到随着我们给它的宽度不同，它产生了不同的结果。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">putStrLn</span> <span class="p">(</span><span class="n">pretty</span> <span class="mi">10</span> <span class="n">value</span><span class="p">)</span>
+<span class="p">{</span><span class="s">&quot;f&quot;</span><span class="kt">:</span> <span class="mf">1.0</span><span class="p">,</span>
+<span class="s">&quot;q&quot;</span><span class="kt">:</span> <span class="n">true</span>
+<span class="p">}</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">putStrLn</span> <span class="p">(</span><span class="n">pretty</span> <span class="mi">20</span> <span class="n">value</span><span class="p">)</span>
+<span class="p">{</span><span class="s">&quot;f&quot;</span><span class="kt">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s">&quot;q&quot;</span><span class="kt">:</span> <span class="n">true</span>
+<span class="p">}</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">putStrLn</span> <span class="p">(</span><span class="n">pretty</span> <span class="mi">30</span> <span class="n">value</span><span class="p">)</span>
+<span class="p">{</span><span class="s">&quot;f&quot;</span><span class="kt">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s">&quot;q&quot;</span><span class="kt">:</span> <span class="n">true</span> <span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="exercises">
+<span id="id17"></span><h3>练习<a class="headerlink" href="#exercises" title="Permalink to this headline">¶</a></h3>
+<p>我们现有的美观打印器已经可以满足一定的空间限制要求，我们还可以对它做更多改进。</p>
+<ol class="arabic">
+<li><p class="first">用下面的类型签名写一个函数 <code class="docutils literal"><span class="pre">fill</span></code>。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">fill</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+</pre></div>
+</div>
+<p>它应该给文档添加空格直到指定宽度。如果宽度已经超过指定值，则不加。</p>
+</li>
+<li><p class="first">我们的美观打印器并未考虑嵌套（nesting）这种情况。当左括号（无论是小括号，中括号，还是大括号）出现时，
+之后的行应该缩进，直到对应的右括号出现为止。</p>
+<p>实现这个功能，缩进量应该可控。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
+<span class="nf">nest</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+</div>
+<div class="section" id="creating-a-package">
+<span id="id18"></span><h2>创建包<a class="headerlink" href="#creating-a-package" title="Permalink to this headline">¶</a></h2>
+<p>Cabal 是 Haskell 社区用来构建，安装和发布软件的一套标准工具。Cabal 将软件组织为<em>包（package）</em>。一个包有且只能有一个库，但可以有多个可执行程序。</p>
+<div class="section" id="id19">
+<h3>为包添加描述<a class="headerlink" href="#id19" title="Permalink to this headline">¶</a></h3>
+<p>Cabal 要求你给每个包添加描述。这些描述放在一个以 <code class="docutils literal"><span class="pre">.cabal</span></code> 结尾的文件当中。这个文件需要放在你项目的顶层目录里。它的格式很简单，下面我们就来介绍它。</p>
+<p>每个 Cabal 包都需要有个名字。通常来说，包的名字和 <code class="docutils literal"><span class="pre">.cabal</span></code> 文件的名字相同。如果我们的包叫做 <code class="docutils literal"><span class="pre">mypretty</span></code> ，那我们的文件就是 <code class="docutils literal"><span class="pre">mypretty.cabal</span></code> 。通常，包含 <code class="docutils literal"><span class="pre">.cabal</span></code>
+文件的目录名字和包名字相同，如 <code class="docutils literal"><span class="pre">mypretty</span></code> 。</p>
+<p>放在包描述开头的是一些全局属性，它们适用于包里所有的库和可执行程序。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Name:</span>          <span class="n">mypretty</span>
+<span class="kt">Version:</span>       <span class="mf">0.1</span>
+
+<span class="c1">-- This is a comment.  It stretches to the end of the line.</span>
+</pre></div>
+</div>
+<p>包的名字必须独一无二。如果你创建安装的包和你系统里已经存在的某个包名字相同，GHC 会搞不清楚用哪个。</p>
+<p>全局属性中的很多信息都是给人而不是 Cabal 自己来读的。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Synopsis:</span>      <span class="kt">My</span> <span class="n">pretty</span> <span class="n">printing</span> <span class="n">library</span><span class="p">,</span> <span class="n">with</span> <span class="kt">JSON</span> <span class="n">support</span>
+<span class="kt">Description:</span>
+    <span class="kt">A</span> <span class="n">simple</span> <span class="n">pretty</span> <span class="n">printing</span> <span class="n">library</span> <span class="n">that</span> <span class="n">illustrates</span> <span class="n">how</span> <span class="n">to</span>
+    <span class="n">develop</span> <span class="n">a</span> <span class="kt">Haskell</span> <span class="n">library</span><span class="o">.</span>
+<span class="kt">Author:</span>        <span class="kt">Real</span> <span class="kt">World</span> <span class="kt">Haskell</span>
+<span class="kt">Maintainer:</span>    <span class="n">somebody</span><span class="o">@</span><span class="n">realworldhaskell</span><span class="o">.</span><span class="n">org</span>
+</pre></div>
+</div>
+<p>如 <code class="docutils literal"><span class="pre">Description</span></code> 所示，一个字段可以有多行，只要缩进即可。</p>
+<p>许可协议也被放在全局属性中。大部分 Haskell 包使用 BSD 协议，Cabal 称之为 <code class="docutils literal"><span class="pre">BSD3</span></code>。（当然，你可以随意选择合适的协议。）
+我们可以在 <code class="docutils literal"><span class="pre">License-File</span></code> 这个非强制字段中加入许可协议文件，这个文件包含了我们的包所使用的协议的全部协议条款。</p>
+<p>Cabal 所支持的功能会不断变化，因此，指定我们期望兼容的 Cabal 版本是非常明智的。我们增加的功能可以被 Cabal 1.2及以上的版本支持。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Cabal</span><span class="o">-</span><span class="kt">Version:</span> <span class="o">&gt;=</span> <span class="mf">1.2</span>
+</pre></div>
+</div>
+<p>我们使用 <em>library</em> 区域来描述包中单独的库。缩进的使用非常重要：处于一个区域中的内容必须缩进。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">library</span>
+    <span class="kt">Exposed</span><span class="o">-</span><span class="kt">Modules:</span> <span class="kt">Prettify</span>
+                     <span class="kt">PrettyJSON</span>
+                     <span class="kt">SimpleJSON</span>
+    <span class="kt">Build</span><span class="o">-</span><span class="kt">Depends:</span>   <span class="n">base</span> <span class="o">&gt;=</span> <span class="mf">2.0</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">Exposed-Modules</span></code> 列出了本包中用户可用的模块。可选字段字段 <code class="docutils literal"><span class="pre">Other-Modules</span></code> 列出了<em>内部模块</em>。这些内部模块用来支持这个库的功能，然而对用户不可见。</p>
+<p><code class="docutils literal"><span class="pre">Build-Depends</span></code> 包含了构建我们库所需要的包，它们之间用逗号分开。对于每一个包，我们可以选择性地说明这个库可以与之工作的版本号范围。
+<code class="docutils literal"><span class="pre">base</span></code> 包包含了很多 Haskell 的核心模块，如Prelude，因此实际上它总是被需要的。</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>处理依赖关系</p>
+<p>我们并不需要猜测或者调查我们依赖于哪些包。如果我们在构建包的时候没有包含 <code class="docutils literal"><span class="pre">Build-Depends</span></code> 字段，编译会失败，并返回一条有用的错误信息。
+我们可以试试把 <code class="docutils literal"><span class="pre">base</span></code> 注释掉会发生什么。</p>
+<div class="highlight-haskell"><div class="highlight"><pre>$ runghc Setup build
+Preprocessing library mypretty-0.1...
+Building mypretty-0.1...
+
+PrettyJSON.hs:8:7:
+    Could not find module `Data.Bits&#39;:
+        it is a member of package base, which is hidden
+</pre></div>
+</div>
+<p>错误信息清楚地表明我们需要增加 <code class="docutils literal"><span class="pre">base</span></code> 包，尽管它已经被安装了。强制我们显式地列出所有包有一个实际好处：<code class="docutils literal"><span class="pre">cabal-install</span></code> 这个命令行工具会自动下载，构建并安装一个包和所有它依赖的包。</p>
+<p class="last">[译注，在运行 <code class="docutils literal"><span class="pre">runghc</span> <span class="pre">Setup</span> <span class="pre">build</span></code> 之前，Cabal 会首先要求你运行 <code class="docutils literal"><span class="pre">configure</span></code>。具体方法见下文。]</p>
+</div>
+</div>
+<div class="section" id="ghc">
+<h3>GHC 的包管理器<a class="headerlink" href="#ghc" title="Permalink to this headline">¶</a></h3>
+<p>GHC 内置了一个简单的包管理器用来记录安装了哪些包以及它们的版本号。我们可以使用 <strong>ghc-pkg</strong> 命令来查看包数据库。</p>
+<p>我们说<em>数据库</em>，是因为 GHC 区分所有用户都能使用的<em>系统包（system-wide packages）</em>和只有当前用户才能使用的<em>用户包（per-user packages）</em>。
+用户数据库（per-user database）使我们没有管理员权限也可以安装包。</p>
+<p><strong>ghc-pkg</strong> 命令为不同的任务提供了不同的子命令。大多数时间，我们只用到两个。
+<code class="docutils literal"><span class="pre">ghc-pkg</span> <span class="pre">list</span></code> 命令列出已安装的包。当我们想要卸载一个包时，<code class="docutils literal"><span class="pre">ghc-pkg</span> <span class="pre">unregister</span></code> 告诉 GHC 我们不再用这个包了。
+（我们需要手动删除已安装的文件。）</p>
+</div>
+<div class="section" id="id20">
+<h3>配置，构建和安装<a class="headerlink" href="#id20" title="Permalink to this headline">¶</a></h3>
+<p>除了 <code class="docutils literal"><span class="pre">.cabal</span></code> 文件，每个包还必须包含一个 <em>setup</em> 文件。 这使得 Cabal 可以在需要的时候自定义构建过程。一个最简单的配置文件如下所示。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Setup.hs</span>
+<span class="o">#!/</span><span class="n">usr</span><span class="o">/</span><span class="n">bin</span><span class="o">/</span><span class="n">env</span> <span class="n">runhaskell</span>
+<span class="kr">import</span> <span class="nn">Distribution.Simple</span>
+<span class="nf">main</span> <span class="ow">=</span> <span class="n">defaultMain</span>
+</pre></div>
+</div>
+<p>我们把这个文件保存为 <code class="docutils literal"><span class="pre">Setup.hs</span></code>。</p>
+<p>有了 <code class="docutils literal"><span class="pre">.cabal</span></code> 和 <code class="docutils literal"><span class="pre">Setup.hs</span></code> 文件之后，我们只有三步之遥。</p>
+<p>我们用一个简单的命令告诉 Cabal 如何构建一个包以及往哪里安装这个包。</p>
+<p>[译注：运行此命令时，Cabal 提示我没有指定 <code class="docutils literal"><span class="pre">build-type</span></code>。于是我按照提示在 <code class="docutils literal"><span class="pre">.cabal</span></code> 文件里加了 <code class="docutils literal"><span class="pre">build-type:</span> <span class="pre">Simple</span></code> 字段。]</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">runghc</span> <span class="kt">Setup</span> <span class="n">configure</span>
+</pre></div>
+</div>
+<p>这个命令保证了我们的包可用，并且保存设置让后续的 Cabal 命令使用。</p>
+<p>如果我们不给 configure 提供任何参数，Cabal 会把我们的包安装在系统包数据库里。如果想安装在指定目录下和用户包数据库内，我们需要提供更多的信息。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">runghc</span> <span class="kt">Setup</span> <span class="n">configure</span> <span class="c1">--prefix=$HOME --user</span>
+</pre></div>
+</div>
+<p>完成之后，我们来构建这个包。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">runghc</span> <span class="kt">Setup</span> <span class="n">build</span>
+</pre></div>
+</div>
+<p>成功之后，我们就可以安装包了。我们不需要告诉 Cabal 装在哪儿，它会使用我们在第一步里提供的信息。它会把包装在我们指定的目录下然后更新 GHC 的用户包数据库。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">runghc</span> <span class="kt">Setup</span> <span class="n">install</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="practical-pointers-and-further-reading">
+<span id="id21"></span><h2>实用链接和扩展阅读<a class="headerlink" href="#practical-pointers-and-further-reading" title="Permalink to this headline">¶</a></h2>
+<p>GHC 内置了一个美观打印库，<code class="docutils literal"><span class="pre">Text.PrettyPrint.HughesPJ</span></code>。它提供的 API 和我们的例子相同并且有更丰富有用的美观打印函数。与自己实现相比，我们更推荐使用它。</p>
+<p>John Hughes 在 <a class="reference internal" href="#hughes95" id="id22">[Hughes95]</a> 中介绍了 <code class="docutils literal"><span class="pre">HughesPJ</span></code> 美观打印器的设计。这个库后来被 Simon Peyton Jones 改进，也因此得名。
+Hughes 的论文很长，但他对怎样设计 Haskell 库的讨论非常值得一读。</p>
+<p>本章介绍的美观打印库基于 Philip Wadler 在 <a class="reference internal" href="#wadler98" id="id23">[Wadler98]</a> 中描述的一个更简单的系统。
+Daan Leijen 扩展了这个库，扩展之后的版本可以从 Hackage 里下载： <code class="docutils literal"><span class="pre">wl-pprint</span></code>。
+如果你用 <strong>cabal</strong> 命令行工具，一个命令即可完成下载，构建和安装： <strong>cabal install wl-pprint</strong>。</p>
+<table class="docutils citation" frame="void" id="hughes95" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id22">[Hughes95]</a></td><td>John Hughes. &#8220;<a class="reference external" href="http://citeseer.ist.psu.edu/hughes95design.html">The design of a pretty-printing library</a>&#8221;.
+May, 1995. First International Spring School on Advanced Functional Programming Techniques. Bastad, Sweden. .</td></tr>
+</tbody>
+</table>
+<table class="docutils citation" frame="void" id="wadler98" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id23">[Wadler98]</a></td><td>Philip Wadler. “<a class="reference external" href="http://citeseer.ist.psu.edu/wadler98prettier.html">A prettier printer</a>”. March 1998.</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="4.html">第四章：函数式编程</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="6.html">第六章：类型类</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.1.
+    </div>
+  </body>
+</html>

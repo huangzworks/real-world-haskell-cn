@@ -1,0 +1,1066 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>第二十章：使用 Haskell 进行系统编程 &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
+    <link rel="next" title="第二十一章：数据库的使用" href="21.html" />
+    <link rel="prev" title="第十九章： 错误处理" href="19.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="19.html">第十九章： 错误处理</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="21.html">第二十一章：数据库的使用</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="haskell">
+<h1>第二十章：使用 Haskell 进行系统编程<a class="headerlink" href="#haskell" title="Permalink to this headline">¶</a></h1>
+<p>目前为止，我们讨论的大多数是高阶概念。 Haskell 也可以用于底层系统编程。完全可以使用 Haskell 编写使用操作系统底层接口的程序。</p>
+<p>本章中，我们将尝试一些很有野心的东西：编写一种类似 Perl 实际上是合法的 Haskell 的“语言”，完全使用 Haskell 实现，用于简化编写 shell 脚本。我们将实现管道，简单命令调用，和一些简单的工具用于执行由 <code class="docutils literal"><span class="pre">grep</span></code> 和 <code class="docutils literal"><span class="pre">sed</span></code> 处理的任务。</p>
+<p>有些模块是依赖操作系统的。本章中，我们将尽可能使用不依赖特殊操作系统的通用模块。不过，本章将有很多内容着眼于 POSIX 环境。 POSIX 是一种类 Unix 标准， 如 Linux ，FreeBSD ，MacOS X ，或 Solaris 。Windows 默认情况下不支持 POSIX ，但是 Cygwin 环境为 Windows 提供了 POSIX 兼容层。</p>
+<div class="section" id="id1">
+<h2>调用外部程序<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>Haskell 可以调用外部命令。为了这么做，我们建议使用 <code class="docutils literal"><span class="pre">System.Cmd</span></code> 模块中的 <code class="docutils literal"><span class="pre">rawSystem</span></code> 。其用特定的参数调用特定的程序，并将返回程序的退出状态码。你可以在 ghci 中练习一下。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">module</span> <span class="nn">System.Cmd</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">rawSystem</span> <span class="s">&quot;ls&quot;</span> <span class="p">[</span><span class="s">&quot;-l&quot;</span><span class="p">,</span> <span class="s">&quot;/usr&quot;</span><span class="p">]</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">locale</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">time</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">filepath</span><span class="o">-</span><span class="mf">1.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">directory</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">unix</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">process</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="nf">total</span> <span class="mi">124</span>
+<span class="nf">drwxr</span><span class="o">-</span><span class="n">xr</span><span class="o">-</span><span class="n">x</span>   <span class="mi">2</span> <span class="n">root</span> <span class="n">root</span>  <span class="mi">49152</span> <span class="mi">2008</span><span class="o">-</span><span class="mi">08</span><span class="o">-</span><span class="mi">18</span> <span class="mi">11</span><span class="kt">:</span><span class="mi">04</span> <span class="n">bin</span>
+<span class="nf">drwxr</span><span class="o">-</span><span class="n">xr</span><span class="o">-</span><span class="n">x</span>   <span class="mi">2</span> <span class="n">root</span> <span class="n">root</span>   <span class="mi">4096</span> <span class="mi">2008</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">09</span> <span class="mi">05</span><span class="kt">:</span><span class="mi">53</span> <span class="n">games</span>
+<span class="nf">drwxr</span><span class="o">-</span><span class="n">sr</span><span class="o">-</span><span class="n">x</span>  <span class="mi">10</span> <span class="n">jimb</span> <span class="n">guile</span>  <span class="mi">4096</span> <span class="mi">2006</span><span class="o">-</span><span class="mi">02</span><span class="o">-</span><span class="mi">04</span> <span class="mi">09</span><span class="kt">:</span><span class="mi">13</span> <span class="n">guile</span>
+<span class="nf">drwxr</span><span class="o">-</span><span class="n">xr</span><span class="o">-</span><span class="n">x</span>  <span class="mi">47</span> <span class="n">root</span> <span class="n">root</span>   <span class="mi">8192</span> <span class="mi">2008</span><span class="o">-</span><span class="mi">08</span><span class="o">-</span><span class="mi">08</span> <span class="mi">08</span><span class="kt">:</span><span class="mi">18</span> <span class="n">include</span>
+<span class="nf">drwxr</span><span class="o">-</span><span class="n">xr</span><span class="o">-</span><span class="n">x</span> <span class="mi">107</span> <span class="n">root</span> <span class="n">root</span>  <span class="mi">32768</span> <span class="mi">2008</span><span class="o">-</span><span class="mi">08</span><span class="o">-</span><span class="mi">18</span> <span class="mi">11</span><span class="kt">:</span><span class="mi">04</span> <span class="n">lib</span>
+<span class="nf">lrwxrwxrwx</span>   <span class="mi">1</span> <span class="n">root</span> <span class="n">root</span>      <span class="mi">3</span> <span class="mi">2007</span><span class="o">-</span><span class="mi">09</span><span class="o">-</span><span class="mi">24</span> <span class="mi">16</span><span class="kt">:</span><span class="mi">55</span> <span class="n">lib64</span> <span class="ow">-&gt;</span> <span class="n">lib</span>
+<span class="nf">drwxrwsr</span><span class="o">-</span><span class="n">x</span>  <span class="mi">17</span> <span class="n">root</span> <span class="n">staff</span>  <span class="mi">4096</span> <span class="mi">2008</span><span class="o">-</span><span class="mi">06</span><span class="o">-</span><span class="mi">24</span> <span class="mi">17</span><span class="kt">:</span><span class="mi">35</span> <span class="n">local</span>
+<span class="nf">drwxr</span><span class="o">-</span><span class="n">xr</span><span class="o">-</span><span class="n">x</span>   <span class="mi">2</span> <span class="n">root</span> <span class="n">root</span>   <span class="mi">8192</span> <span class="mi">2008</span><span class="o">-</span><span class="mi">08</span><span class="o">-</span><span class="mi">18</span> <span class="mi">11</span><span class="kt">:</span><span class="mi">03</span> <span class="n">sbin</span>
+<span class="nf">drwxr</span><span class="o">-</span><span class="n">xr</span><span class="o">-</span><span class="n">x</span> <span class="mi">181</span> <span class="n">root</span> <span class="n">root</span>   <span class="mi">8192</span> <span class="mi">2008</span><span class="o">-</span><span class="mi">08</span><span class="o">-</span><span class="mi">12</span> <span class="mi">10</span><span class="kt">:</span><span class="mi">11</span> <span class="n">share</span>
+<span class="nf">drwxrwsr</span><span class="o">-</span><span class="n">x</span>   <span class="mi">2</span> <span class="n">root</span> <span class="n">src</span>    <span class="mi">4096</span> <span class="mi">2007</span><span class="o">-</span><span class="mi">04</span><span class="o">-</span><span class="mi">10</span> <span class="mi">16</span><span class="kt">:</span><span class="mi">28</span> <span class="n">src</span>
+<span class="nf">drwxr</span><span class="o">-</span><span class="n">xr</span><span class="o">-</span><span class="n">x</span>   <span class="mi">3</span> <span class="n">root</span> <span class="n">root</span>   <span class="mi">4096</span> <span class="mi">2008</span><span class="o">-</span><span class="mi">07</span><span class="o">-</span><span class="mi">04</span> <span class="mi">19</span><span class="kt">:</span><span class="mi">03</span> <span class="kt">X11R6</span>
+<span class="kt">ExitSuccess</span>
+</pre></div>
+</div>
+<p>此处，我们相当于执行了 shell 命令 <code class="docutils literal"><span class="pre">ls</span> <span class="pre">-l</span> <span class="pre">/usr</span></code> 。 <code class="docutils literal"><span class="pre">rawSystem</span></code> 并不从字符串解析输入参数或是扩展通配符 <a class="footnote-reference" href="#id16" id="id2">[43]</a> 。取而代之，其接受一个包含所有参数的列表。如果不想提供参数，可以像这样简单地输入一个空列表。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">rawSystem</span> <span class="s">&quot;ls&quot;</span> <span class="kt">[]</span>
+<span class="nf">calendartime</span><span class="o">.</span><span class="n">ghci</span>  <span class="n">modtime</span><span class="o">.</span><span class="n">ghci</span>    <span class="n">rp</span><span class="o">.</span><span class="n">ghci</span>    <span class="kt">RunProcessSimple</span><span class="o">.</span><span class="n">hs</span>
+<span class="nf">cmd</span><span class="o">.</span><span class="n">ghci</span>       <span class="n">posixtime</span><span class="o">.</span><span class="n">hs</span>    <span class="n">rps</span><span class="o">.</span><span class="n">ghci</span>   <span class="n">timediff</span><span class="o">.</span><span class="n">ghci</span>
+<span class="nf">dir</span><span class="o">.</span><span class="n">ghci</span>       <span class="n">rawSystem</span><span class="o">.</span><span class="n">ghci</span>  <span class="kt">RunProcess</span><span class="o">.</span><span class="n">hs</span>  <span class="n">time</span><span class="o">.</span><span class="n">ghci</span>
+<span class="kt">ExitSuccess</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id3">
+<h2>目录和文件信息<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<p><code class="docutils literal"><span class="pre">System.Directory</span></code> 模块包含了相当多可以从文件系统获取信息的函数。你可以获取某目录包含的文件列表，重命名或删除文件，复制文件，改变当前工作路径，或者建立新目录。 <code class="docutils literal"><span class="pre">System.Directory</span></code> 是可移植的，在可以跑 GHC 的平台都可以使用。</p>
+<p><a class="reference external" href="http://hackage.haskell.org/package/directory-1.0.0.0/docs/System-Directory.html">System.Directory 的库文档</a> 中含有一份详尽的函数列表。让我们通过 ghci 来对其中一些进行演示。这些函数大多数简单的等价于其对应的 C 语言库函数或 shell 命令。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">module</span> <span class="nn">System.Directory</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">setCurrentDirectory</span> <span class="s">&quot;/etc&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">locale</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">time</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">filepath</span><span class="o">-</span><span class="mf">1.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">directory</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getCurrentDirectory</span>
+<span class="s">&quot;/etc&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">setCurrentDirectory</span> <span class="s">&quot;..&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getCurrentDirectory</span>
+<span class="s">&quot;/&quot;</span>
+</pre></div>
+</div>
+<p>此处我们看到了改变工作目录和获取当前工作目录的命令。它们类似 POSIX shell 中的 <code class="docutils literal"><span class="pre">cd</span></code> 和 <code class="docutils literal"><span class="pre">pwd</span></code> 命令。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getDirectoryContents</span> <span class="s">&quot;/&quot;</span>
+<span class="p">[</span><span class="s">&quot;.&quot;</span><span class="p">,</span><span class="s">&quot;..&quot;</span><span class="p">,</span><span class="s">&quot;lost+found&quot;</span><span class="p">,</span><span class="s">&quot;boot&quot;</span><span class="p">,</span><span class="s">&quot;etc&quot;</span><span class="p">,</span><span class="s">&quot;media&quot;</span><span class="p">,</span><span class="s">&quot;initrd.img&quot;</span><span class="p">,</span><span class="s">&quot;var&quot;</span><span class="p">,</span><span class="s">&quot;usr&quot;</span><span class="p">,</span><span class="s">&quot;bin&quot;</span><span class="p">,</span><span class="s">&quot;dev&quot;</span><span class="p">,</span><span class="s">&quot;home&quot;</span><span class="p">,</span><span class="s">&quot;lib&quot;</span><span class="p">,</span><span class="s">&quot;mnt&quot;</span><span class="p">,</span><span class="s">&quot;proc&quot;</span><span class="p">,</span><span class="s">&quot;root&quot;</span><span class="p">,</span><span class="s">&quot;sbin&quot;</span><span class="p">,</span><span class="s">&quot;tmp&quot;</span><span class="p">,</span><span class="s">&quot;sys&quot;</span><span class="p">,</span><span class="s">&quot;lib64&quot;</span><span class="p">,</span><span class="s">&quot;srv&quot;</span><span class="p">,</span><span class="s">&quot;opt&quot;</span><span class="p">,</span><span class="s">&quot;initrd&quot;</span><span class="p">,</span><span class="s">&quot;vmlinuz&quot;</span><span class="p">,</span><span class="s">&quot;.rnd&quot;</span><span class="p">,</span><span class="s">&quot;www&quot;</span><span class="p">,</span><span class="s">&quot;ultra60&quot;</span><span class="p">,</span><span class="s">&quot;emul&quot;</span><span class="p">,</span><span class="s">&quot;.fonts.cache-1&quot;</span><span class="p">,</span><span class="s">&quot;selinux&quot;</span><span class="p">,</span><span class="s">&quot;razor-agent.log&quot;</span><span class="p">,</span><span class="s">&quot;.svn&quot;</span><span class="p">,</span><span class="s">&quot;initrd.img.old&quot;</span><span class="p">,</span><span class="s">&quot;vmlinuz.old&quot;</span><span class="p">,</span><span class="s">&quot;ugid-survey.bulkdata&quot;</span><span class="p">,</span><span class="s">&quot;ugid-survey.brief&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">getDirectoryContents</span></code> 返回一个列表，包含给定目录的所有内容。注意，在 POSIX 系统中，这个列表通常包含特殊值 &#8221;.&#8221; 和 &#8221;..&#8221; 。通常在处理目录内容时，你可能会希望将他们过滤出去，像这样：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getDirectoryContents</span> <span class="s">&quot;/&quot;</span> <span class="o">&gt;&gt;=</span> <span class="n">return</span> <span class="o">.</span> <span class="n">filter</span> <span class="p">(`</span><span class="n">notElem</span><span class="p">`</span> <span class="p">[</span><span class="s">&quot;.&quot;</span><span class="p">,</span> <span class="s">&quot;..&quot;</span><span class="p">])</span>
+<span class="p">[</span><span class="s">&quot;lost+found&quot;</span><span class="p">,</span><span class="s">&quot;boot&quot;</span><span class="p">,</span><span class="s">&quot;etc&quot;</span><span class="p">,</span><span class="s">&quot;media&quot;</span><span class="p">,</span><span class="s">&quot;initrd.img&quot;</span><span class="p">,</span><span class="s">&quot;var&quot;</span><span class="p">,</span><span class="s">&quot;usr&quot;</span><span class="p">,</span><span class="s">&quot;bin&quot;</span><span class="p">,</span><span class="s">&quot;dev&quot;</span><span class="p">,</span><span class="s">&quot;home&quot;</span><span class="p">,</span><span class="s">&quot;lib&quot;</span><span class="p">,</span><span class="s">&quot;mnt&quot;</span><span class="p">,</span><span class="s">&quot;proc&quot;</span><span class="p">,</span><span class="s">&quot;root&quot;</span><span class="p">,</span><span class="s">&quot;sbin&quot;</span><span class="p">,</span><span class="s">&quot;tmp&quot;</span><span class="p">,</span><span class="s">&quot;sys&quot;</span><span class="p">,</span><span class="s">&quot;lib64&quot;</span><span class="p">,</span><span class="s">&quot;srv&quot;</span><span class="p">,</span><span class="s">&quot;opt&quot;</span><span class="p">,</span><span class="s">&quot;initrd&quot;</span><span class="p">,</span><span class="s">&quot;vmlinuz&quot;</span><span class="p">,</span><span class="s">&quot;.rnd&quot;</span><span class="p">,</span><span class="s">&quot;www&quot;</span><span class="p">,</span><span class="s">&quot;ultra60&quot;</span><span class="p">,</span><span class="s">&quot;emul&quot;</span><span class="p">,</span><span class="s">&quot;.fonts.cache-1&quot;</span><span class="p">,</span><span class="s">&quot;selinux&quot;</span><span class="p">,</span><span class="s">&quot;razor-agent.log&quot;</span><span class="p">,</span><span class="s">&quot;.svn&quot;</span><span class="p">,</span><span class="s">&quot;initrd.img.old&quot;</span><span class="p">,</span><span class="s">&quot;vmlinuz.old&quot;</span><span class="p">,</span><span class="s">&quot;ugid-survey.bulkdata&quot;</span><span class="p">,</span><span class="s">&quot;ugid-survey.brief&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<div class="admonition tip">
+<p class="first admonition-title">Tip</p>
+<p>更细致的讨论如何过滤 <code class="docutils literal"><span class="pre">getDirectoryContents</span></code> 函数的结果，请参考 <a class="reference internal" href="8.html"><em>第八章：高效文件处理、正则表达式、文件名匹配</em></a></p>
+<p class="last"><code class="samp docutils literal"><span class="pre">filter</span> <span class="pre">(`notElem`</span> <span class="pre">[&quot;.&quot;,</span> <span class="pre">&quot;..&quot;])</span></code> 这段代码是否有点莫名其妙？也可以写作 <code class="samp docutils literal"><span class="pre">filter</span> <span class="pre">(c</span> <span class="pre">-&gt;</span> <span class="pre">not</span> <span class="pre">$</span> <span class="pre">elem</span> <span class="pre">c</span> <span class="pre">[&quot;.&quot;,</span> <span class="pre">&quot;..&quot;])</span></code> 。反引号让我们更有效的将第二个参数传给 <code class="docutils literal"><span class="pre">notElem</span></code> ；在 “中序函数” 一节中有关于反引号更详细的信息。</p>
+</div>
+<p>也可以向系统查询某些路径的位置。这将向底层操作系统发起查询相关信息。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getHomeDirectory</span>
+<span class="s">&quot;/home/bos&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getAppUserDataDirectory</span> <span class="s">&quot;myApp&quot;</span>
+<span class="s">&quot;/home/bos/.myApp&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getUserDocumentsDirectory</span>
+<span class="s">&quot;/home/bos&quot;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id4">
+<h2>终止程序<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
+<p>开发者经常编写独立的程序以完成特定任务。这些独立的部分可能会被组合起来完成更大的任务。一段 shell 脚本或者其他程序将会执行它们。发起调用的脚本需要获知被调用程序是否执行成功。 Haskell 自动为异常退出的程序分配一个 “不成功” 的状态码。</p>
+<p>不过，你需要对状态码进行更细粒度的控制。可能你需要对不同类型的错误返回不同的代码。 <code class="docutils literal"><span class="pre">System.Exit</span></code> 模块提供一个途径可以在程序退出时返回特定的状态码。通过调用 <code class="samp docutils literal"><span class="pre">exitWith</span> <span class="pre">ExitSuccess</span></code> 表示程序执行成功（POSIX 系统中的 0）。或者可以调用 <code class="samp docutils literal"><span class="pre">exitWith</span> <span class="pre">(ExitFailure</span> <span class="pre">5)</span></code> ，表示将在程序退出时向系统返回 <code class="docutils literal"><span class="pre">5</span></code> 作为状态码。</p>
+</div>
+<div class="section" id="id5">
+<h2>日期和时间<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h2>
+<p>从文件时间戳到商业事务的很多事情都涉及到日期和时间。 除了从系统获取日期时间信息之外，Haskell 提供了很多关于时间日期的操作方法。</p>
+<div class="section" id="clocktime-calendartime">
+<h3>ClockTime 和 CalendarTime<a class="headerlink" href="#clocktime-calendartime" title="Permalink to this headline">¶</a></h3>
+<p>在 Haskell 中，日期和时间主要由 <code class="docutils literal"><span class="pre">System.Time</span></code> 模块处理。它定义了两个类型： <code class="docutils literal"><span class="pre">ClockTime</span></code> 和 <code class="docutils literal"><span class="pre">CalendarTime</span></code> 。</p>
+<p><code class="docutils literal"><span class="pre">ClockTime</span></code> 是传统 POSIX 中时间戳的 Haskell 版本。 <code class="docutils literal"><span class="pre">ClockTime</span></code> 表示一个相对于 UTC 1970 年 1 月 1 日 零点的时间。负值的 <code class="docutils literal"><span class="pre">ClockTime</span></code> 表示在其之前的秒数，正值表示在其之后的秒数。</p>
+<p><code class="docutils literal"><span class="pre">ClockTime</span></code> 便于计算。因为它遵循协调世界时（Coordinated Universal Time，UTC），其不必调整本地时区、夏令时或其他时间处理中的特例。每天是精确的 (60 * 60 * 24) 或 86,400 秒 <a class="footnote-reference" href="#id17" id="id6">[44]</a>，这易于计算时间间隔。举个例子，你可以简单的记录某个程序开始执行的时间和其结束的时间，相减即可确定程序的执行时间。如果需要的话，还可以除以 3600，这样就可以按小时显示。</p>
+<p>使用 <code class="docutils literal"><span class="pre">ClockTime</span></code> 的典型场景：</p>
+<blockquote>
+<div><ul class="simple">
+<li>经过了多长时间？</li>
+<li>相对此刻 14 天前是什么时间？</li>
+<li>文件的最后修改时间是何时？</li>
+<li>当下的精确时间是何时？</li>
+</ul>
+</div></blockquote>
+<p>ClockTime 善于处理这些问题，因为它们使用无法混淆的精确时间。但是， <code class="docutils literal"><span class="pre">ClockTime</span></code> 不善于处理下列问题：</p>
+<blockquote>
+<div><ul class="simple">
+<li>今天是周一吗？</li>
+<li>明年 5 月 1 日是周几？</li>
+<li>在我的时区当前是什么时间，考虑夏令时。</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal"><span class="pre">CalendarTime</span></code> 按人类的方式存储时间：年，月，日，小时，分，秒，时区，夏令时信息。很容易的转换为便于显示的字符串，或者以上问题的答案。</p>
+<p>你可以任意转换 <code class="docutils literal"><span class="pre">ClockTime</span></code> 和 <code class="docutils literal"><span class="pre">CalendarTime</span></code> 。Haskell 将 <code class="docutils literal"><span class="pre">ClockTime</span></code> 可以按本地时区转换为 <code class="docutils literal"><span class="pre">CalendarTime</span></code> ，或者按 <code class="docutils literal"><span class="pre">CalendarTime</span></code> 格式表示的 UTC 时间。</p>
+<div class="section" id="clocktime">
+<h4>使用 ClockTime<a class="headerlink" href="#clocktime" title="Permalink to this headline">¶</a></h4>
+<p><code class="docutils literal"><span class="pre">ClockTime</span></code> 在 <code class="docutils literal"><span class="pre">System.Time</span></code> 中这样定义：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kr">data</span> <span class="kt">ClockTime</span> <span class="ow">=</span> <span class="kt">TOD</span> <span class="kt">Integer</span> <span class="kt">Integer</span>
+</pre></div>
+</div>
+<p>第一个 <code class="docutils literal"><span class="pre">Integer</span></code> 表示从 Unix 纪元开始经过的秒数。第二个 <code class="docutils literal"><span class="pre">Integer</span></code> 表示附加的皮秒数。因为 Haskell 中的 <code class="docutils literal"><span class="pre">ClockTime</span></code> 使用无边界的 <code class="docutils literal"><span class="pre">Integer</span></code> 类型，所以其能够表示的数据范围仅受计算资源限制。</p>
+<p>让我们看看使用 <code class="docutils literal"><span class="pre">ClockTime</span></code> 的一些方法。首先是按系统时钟获取当前时间的 <code class="docutils literal"><span class="pre">getClockTime</span></code> 函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">module</span> <span class="nn">System.Time</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getClockTime</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">locale</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">time</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Mon</span> <span class="kt">Aug</span> <span class="mi">18</span> <span class="mi">12</span><span class="kt">:</span><span class="mi">10</span><span class="kt">:</span><span class="mi">38</span> <span class="kt">CDT</span> <span class="mi">2008</span>
+</pre></div>
+</div>
+<p>如果一秒钟再次运行 <code class="docutils literal"><span class="pre">getClockTime</span></code> ，它将返回一个更新后的时间。这条命令会输出一个便于观察的字符串，补全了周相关的信息。这是由于 <code class="docutils literal"><span class="pre">ClockTime</span></code> 的 <code class="docutils literal"><span class="pre">Show</span></code> 实例。让我们从更底层看一下 <code class="docutils literal"><span class="pre">ClockTime</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">TOD</span> <span class="mi">1000</span> <span class="mi">0</span>
+<span class="kt">Wed</span> <span class="kt">Dec</span> <span class="mi">31</span> <span class="mi">18</span><span class="kt">:</span><span class="mi">16</span><span class="kt">:</span><span class="mi">40</span> <span class="kt">CST</span> <span class="mi">1969</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getClockTime</span> <span class="o">&gt;&gt;=</span> <span class="p">(</span><span class="nf">\</span><span class="p">(</span><span class="kt">TOD</span> <span class="n">sec</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="n">sec</span><span class="p">)</span>
+<span class="mi">1219079438</span>
+</pre></div>
+</div>
+<p>这里我们先构建一个 <code class="docutils literal"><span class="pre">ClockTime</span></code> ，表示 UTC 时间 1970 年 1 月 1 日午夜后 1000 秒这个时间点。在你的时区这个时间相当于 1969 年 12 月 31 日晚。</p>
+<p>第二个例子演示如何从 <code class="docutils literal"><span class="pre">getClockTime</span></code> 返值中将秒数取出来。我们可以像这样操作它：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getClockTime</span> <span class="o">&gt;&gt;=</span> <span class="p">(</span><span class="nf">\</span><span class="p">(</span><span class="kt">TOD</span> <span class="n">sec</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="p">(</span><span class="kt">TOD</span> <span class="p">(</span><span class="n">sec</span> <span class="o">+</span> <span class="mi">86400</span><span class="p">)</span> <span class="mi">0</span><span class="p">))</span>
+<span class="kt">Tue</span> <span class="kt">Aug</span> <span class="mi">19</span> <span class="mi">12</span><span class="kt">:</span><span class="mi">10</span><span class="kt">:</span><span class="mi">38</span> <span class="kt">CDT</span> <span class="mi">2008</span>
+</pre></div>
+</div>
+<p>这将显精确示你的时区 24 小时后的时间，因为 24 小时等于 86,400 秒。</p>
+</div>
+<div class="section" id="calendartime">
+<h4>使用 CalendarTime<a class="headerlink" href="#calendartime" title="Permalink to this headline">¶</a></h4>
+<p>正如其名字暗示的， <code class="docutils literal"><span class="pre">CalendarTime</span></code> 按日历上的方式表示时间。它包括年、月、日等信息。 <code class="docutils literal"><span class="pre">CalendarTime</span></code> 和其相关类型定义如下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kr">data</span> <span class="kt">CalendarTime</span> <span class="ow">=</span> <span class="kt">CalendarTime</span>
+   <span class="p">{</span><span class="n">ctYear</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>         <span class="c1">-- Year (post-Gregorian)</span>
+    <span class="n">ctMonth</span> <span class="ow">::</span> <span class="kt">Month</span><span class="p">,</span>
+    <span class="n">ctDay</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>          <span class="c1">-- Day of the month (1 to 31)</span>
+    <span class="n">ctHour</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>         <span class="c1">-- Hour of the day (0 to 23)</span>
+    <span class="n">ctMin</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>          <span class="c1">-- Minutes (0 to 59)</span>
+    <span class="n">ctSec</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>          <span class="c1">-- Seconds (0 to 61, allowing for leap seconds)</span>
+    <span class="n">ctPicosec</span> <span class="ow">::</span> <span class="kt">Integer</span><span class="p">,</span>  <span class="c1">-- Picoseconds</span>
+    <span class="n">ctWDay</span> <span class="ow">::</span> <span class="kt">Day</span><span class="p">,</span>         <span class="c1">-- Day of the week</span>
+    <span class="n">ctYDay</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>         <span class="c1">-- Day of the year (0 to 364 or 365)</span>
+    <span class="n">ctTZName</span> <span class="ow">::</span> <span class="kt">String</span><span class="p">,</span>    <span class="c1">-- Name of timezone</span>
+    <span class="n">ctTZ</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>           <span class="c1">-- Variation from UTC in seconds</span>
+    <span class="n">ctIsDST</span> <span class="ow">::</span> <span class="kt">Bool</span>        <span class="c1">-- True if Daylight Saving Time in effect</span>
+   <span class="p">}</span>
+
+<span class="kr">data</span> <span class="kt">Month</span> <span class="ow">=</span> <span class="kt">January</span> <span class="o">|</span> <span class="kt">February</span> <span class="o">|</span> <span class="kt">March</span> <span class="o">|</span> <span class="kt">April</span> <span class="o">|</span> <span class="kt">May</span> <span class="o">|</span> <span class="kt">June</span>
+             <span class="o">|</span> <span class="kt">July</span> <span class="o">|</span> <span class="kt">August</span> <span class="o">|</span> <span class="kt">September</span> <span class="o">|</span> <span class="kt">October</span> <span class="o">|</span> <span class="kt">November</span> <span class="o">|</span> <span class="kt">December</span>
+
+<span class="kr">data</span> <span class="kt">Day</span> <span class="ow">=</span> <span class="kt">Sunday</span> <span class="o">|</span> <span class="kt">Monday</span> <span class="o">|</span> <span class="kt">Tuesday</span> <span class="o">|</span> <span class="kt">Wednesday</span>
+           <span class="o">|</span> <span class="kt">Thursday</span> <span class="o">|</span> <span class="kt">Friday</span> <span class="o">|</span> <span class="kt">Saturday</span>
+</pre></div>
+</div>
+<p>关于以上结构有些事情需要强调：</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">ctWDay</span></code>, <code class="docutils literal"><span class="pre">ctYDay</span></code>, <code class="docutils literal"><span class="pre">ctTZName</span></code> 是被创建 <code class="docutils literal"><span class="pre">CalendarTime</span></code> 的库函数生成的，但是并不参与计算。如果你手工创建一个 <code class="docutils literal"><span class="pre">CalendarTime</span></code> ，不必向其中填写准确的值，除非你的计算依赖于它们。</li>
+<li>这三个类型都是 <code class="docutils literal"><span class="pre">Eq</span></code>, <code class="docutils literal"><span class="pre">Ord</span></code>, <code class="docutils literal"><span class="pre">Read</span></code>, <code class="docutils literal"><span class="pre">Show</span></code> 类型类的成员。另外， <code class="docutils literal"><span class="pre">Month</span></code> 和 <code class="docutils literal"><span class="pre">Day</span></code> 都被声明为 <code class="docutils literal"><span class="pre">Enum</span></code> 和 <code class="docutils literal"><span class="pre">Bounded</span></code> 类型类的成员。更多的信息请参考 “重要的类型类” 这一章节。</li>
+</ul>
+</div></blockquote>
+<p>有几种不同的途径可以生成 <code class="docutils literal"><span class="pre">CalendarTime</span></code> 。可以像这样将 <code class="docutils literal"><span class="pre">ClockTime</span></code> 转换为 <code class="docutils literal"><span class="pre">CalendarTime</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">module</span> <span class="nn">System.Time</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">now</span> <span class="ow">&lt;-</span> <span class="n">getClockTime</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">locale</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">time</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Mon</span> <span class="kt">Aug</span> <span class="mi">18</span> <span class="mi">12</span><span class="kt">:</span><span class="mi">10</span><span class="kt">:</span><span class="mi">35</span> <span class="kt">CDT</span> <span class="mi">2008</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">nowCal</span> <span class="ow">&lt;-</span> <span class="n">toCalendarTime</span> <span class="n">now</span>
+<span class="kt">CalendarTime</span> <span class="p">{</span><span class="n">ctYear</span> <span class="ow">=</span> <span class="mi">2008</span><span class="p">,</span> <span class="n">ctMonth</span> <span class="ow">=</span> <span class="kt">August</span><span class="p">,</span> <span class="n">ctDay</span> <span class="ow">=</span> <span class="mi">18</span><span class="p">,</span> <span class="n">ctHour</span> <span class="ow">=</span> <span class="mi">12</span><span class="p">,</span> <span class="n">ctMin</span> <span class="ow">=</span> <span class="mi">10</span><span class="p">,</span> <span class="n">ctSec</span> <span class="ow">=</span> <span class="mi">35</span><span class="p">,</span> <span class="n">ctPicosec</span> <span class="ow">=</span> <span class="mi">804267000000</span><span class="p">,</span> <span class="n">ctWDay</span> <span class="ow">=</span> <span class="kt">Monday</span><span class="p">,</span> <span class="n">ctYDay</span> <span class="ow">=</span> <span class="mi">230</span><span class="p">,</span> <span class="n">ctTZName</span> <span class="ow">=</span> <span class="s">&quot;CDT&quot;</span><span class="p">,</span> <span class="n">ctTZ</span> <span class="ow">=</span> <span class="o">-</span><span class="mi">18000</span><span class="p">,</span> <span class="n">ctIsDST</span> <span class="ow">=</span> <span class="kt">True</span><span class="p">}</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">nowUTC</span> <span class="ow">=</span> <span class="n">toUTCTime</span> <span class="n">now</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">nowCal</span>
+<span class="kt">CalendarTime</span> <span class="p">{</span><span class="n">ctYear</span> <span class="ow">=</span> <span class="mi">2008</span><span class="p">,</span> <span class="n">ctMonth</span> <span class="ow">=</span> <span class="kt">August</span><span class="p">,</span> <span class="n">ctDay</span> <span class="ow">=</span> <span class="mi">18</span><span class="p">,</span> <span class="n">ctHour</span> <span class="ow">=</span> <span class="mi">12</span><span class="p">,</span> <span class="n">ctMin</span> <span class="ow">=</span> <span class="mi">10</span><span class="p">,</span> <span class="n">ctSec</span> <span class="ow">=</span> <span class="mi">35</span><span class="p">,</span> <span class="n">ctPicosec</span> <span class="ow">=</span> <span class="mi">804267000000</span><span class="p">,</span> <span class="n">ctWDay</span> <span class="ow">=</span> <span class="kt">Monday</span><span class="p">,</span> <span class="n">ctYDay</span> <span class="ow">=</span> <span class="mi">230</span><span class="p">,</span> <span class="n">ctTZName</span> <span class="ow">=</span> <span class="s">&quot;CDT&quot;</span><span class="p">,</span> <span class="n">ctTZ</span> <span class="ow">=</span> <span class="o">-</span><span class="mi">18000</span><span class="p">,</span> <span class="n">ctIsDST</span> <span class="ow">=</span> <span class="kt">True</span><span class="p">}</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">nowUTC</span>
+<span class="kt">CalendarTime</span> <span class="p">{</span><span class="n">ctYear</span> <span class="ow">=</span> <span class="mi">2008</span><span class="p">,</span> <span class="n">ctMonth</span> <span class="ow">=</span> <span class="kt">August</span><span class="p">,</span> <span class="n">ctDay</span> <span class="ow">=</span> <span class="mi">18</span><span class="p">,</span> <span class="n">ctHour</span> <span class="ow">=</span> <span class="mi">17</span><span class="p">,</span> <span class="n">ctMin</span> <span class="ow">=</span> <span class="mi">10</span><span class="p">,</span> <span class="n">ctSec</span> <span class="ow">=</span> <span class="mi">35</span><span class="p">,</span> <span class="n">ctPicosec</span> <span class="ow">=</span> <span class="mi">804267000000</span><span class="p">,</span> <span class="n">ctWDay</span> <span class="ow">=</span> <span class="kt">Monday</span><span class="p">,</span> <span class="n">ctYDay</span> <span class="ow">=</span> <span class="mi">230</span><span class="p">,</span> <span class="n">ctTZName</span> <span class="ow">=</span> <span class="s">&quot;UTC&quot;</span><span class="p">,</span> <span class="n">ctTZ</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctIsDST</span> <span class="ow">=</span> <span class="kt">False</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>用 <code class="docutils literal"><span class="pre">getClockTime</span></code> 从系统获得当前的 <code class="docutils literal"><span class="pre">ClockTime</span></code> 。接下来， <code class="docutils literal"><span class="pre">toCalendarTime</span></code> 按本地时间区将 <code class="docutils literal"><span class="pre">ClockTime</span></code> 转换为 <code class="docutils literal"><span class="pre">CalendarTime</span></code> 。 <code class="docutils literal"><span class="pre">toUTCtime</span></code> 执行类似的转换，但其结果将以 UTC 时区表示。</p>
+<p>注意， <code class="docutils literal"><span class="pre">toCalendarTime</span></code> 是一个 <code class="docutils literal"><span class="pre">IO</span></code> 函数，但是 <code class="docutils literal"><span class="pre">toUTCTime</span></code> 不是。原因是 <code class="docutils literal"><span class="pre">toCalendarTime</span></code> 依赖本地时区返回不同的结果，但是针对相同的 <code class="docutils literal"><span class="pre">ClockTime</span></code> ， <code class="docutils literal"><span class="pre">toUTCTime</span></code> 将始终返回相同的结果。</p>
+<p>很容易改变一个 <code class="docutils literal"><span class="pre">CalendarTime</span></code> 的值</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">nowCal</span> <span class="p">{</span><span class="n">ctYear</span> <span class="ow">=</span> <span class="mi">1960</span><span class="p">}</span>
+<span class="kt">CalendarTime</span> <span class="p">{</span><span class="n">ctYear</span> <span class="ow">=</span> <span class="mi">1960</span><span class="p">,</span> <span class="n">ctMonth</span> <span class="ow">=</span> <span class="kt">August</span><span class="p">,</span> <span class="n">ctDay</span> <span class="ow">=</span> <span class="mi">18</span><span class="p">,</span> <span class="n">ctHour</span> <span class="ow">=</span> <span class="mi">12</span><span class="p">,</span> <span class="n">ctMin</span> <span class="ow">=</span> <span class="mi">10</span><span class="p">,</span> <span class="n">ctSec</span> <span class="ow">=</span> <span class="mi">35</span><span class="p">,</span> <span class="n">ctPicosec</span> <span class="ow">=</span> <span class="mi">804267000000</span><span class="p">,</span> <span class="n">ctWDay</span> <span class="ow">=</span> <span class="kt">Monday</span><span class="p">,</span> <span class="n">ctYDay</span> <span class="ow">=</span> <span class="mi">230</span><span class="p">,</span> <span class="n">ctTZName</span> <span class="ow">=</span> <span class="s">&quot;CDT&quot;</span><span class="p">,</span> <span class="n">ctTZ</span> <span class="ow">=</span> <span class="o">-</span><span class="mi">18000</span><span class="p">,</span> <span class="n">ctIsDST</span> <span class="ow">=</span> <span class="kt">True</span><span class="p">}</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="nf">\</span><span class="p">(</span><span class="kt">TOD</span> <span class="n">sec</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">sec</span><span class="p">)</span> <span class="p">(</span><span class="n">toClockTime</span> <span class="n">nowCal</span><span class="p">)</span>
+<span class="mi">1219079435</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="nf">\</span><span class="p">(</span><span class="kt">TOD</span> <span class="n">sec</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">sec</span><span class="p">)</span> <span class="p">(</span><span class="n">toClockTime</span> <span class="p">(</span><span class="n">nowCal</span> <span class="p">{</span><span class="n">ctYear</span> <span class="ow">=</span> <span class="mi">1960</span><span class="p">}))</span>
+<span class="o">-</span><span class="mi">295685365</span>
+</pre></div>
+</div>
+<p>此处，先将之前的 <code class="docutils literal"><span class="pre">CalendarTime</span></code> 年份修改为 1960 。然后用 <code class="docutils literal"><span class="pre">toClockTime</span></code> 将其初始值转换为一个 <code class="docutils literal"><span class="pre">ClockTime</span></code> ，接着转换新值，以便观察其差别。注意新值在转换为 <code class="docutils literal"><span class="pre">ClockTime</span></code> 后显示了一个负的秒数。这是意料中的， <code class="docutils literal"><span class="pre">ClockTime</span></code> 表示的是 UTC 时间 1970 年 1 月 1 日午夜之后的秒数。</p>
+<p>也可以像这样手工创建 <code class="docutils literal"><span class="pre">CalendarTime</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">newCT</span> <span class="ow">=</span> <span class="kt">CalendarTime</span> <span class="mi">2010</span> <span class="kt">January</span> <span class="mi">15</span> <span class="mi">12</span> <span class="mi">30</span> <span class="mi">0</span> <span class="mi">0</span> <span class="kt">Sunday</span> <span class="mi">0</span> <span class="s">&quot;UTC&quot;</span> <span class="mi">0</span> <span class="kt">False</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">newCT</span>
+<span class="kt">CalendarTime</span> <span class="p">{</span><span class="n">ctYear</span> <span class="ow">=</span> <span class="mi">2010</span><span class="p">,</span> <span class="n">ctMonth</span> <span class="ow">=</span> <span class="kt">January</span><span class="p">,</span> <span class="n">ctDay</span> <span class="ow">=</span> <span class="mi">15</span><span class="p">,</span> <span class="n">ctHour</span> <span class="ow">=</span> <span class="mi">12</span><span class="p">,</span> <span class="n">ctMin</span> <span class="ow">=</span> <span class="mi">30</span><span class="p">,</span> <span class="n">ctSec</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctPicosec</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctWDay</span> <span class="ow">=</span> <span class="kt">Sunday</span><span class="p">,</span> <span class="n">ctYDay</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctTZName</span> <span class="ow">=</span> <span class="s">&quot;UTC&quot;</span><span class="p">,</span> <span class="n">ctTZ</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctIsDST</span> <span class="ow">=</span> <span class="kt">False</span><span class="p">}</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="nf">\</span><span class="p">(</span><span class="kt">TOD</span> <span class="n">sec</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">sec</span><span class="p">)</span> <span class="p">(</span><span class="n">toClockTime</span> <span class="n">newCT</span><span class="p">)</span>
+<span class="mi">1263558600</span>
+</pre></div>
+</div>
+<p>注意，尽管 2010 年 1 月 15 日并不是一个周日 &#8211; 并且也不是一年中的第 0 天 &#8211; 系统可以很好的处理这些情况。实际上，如果将其转换为 <code class="docutils literal"><span class="pre">ClockTime</span></code> 后再转回 <code class="docutils literal"><span class="pre">CalendarTime</span></code> ，你将发现这些域已经被正确的处理了。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">toUTCTime</span> <span class="o">.</span> <span class="n">toClockTime</span> <span class="o">$</span> <span class="n">newCT</span>
+<span class="kt">CalendarTime</span> <span class="p">{</span><span class="n">ctYear</span> <span class="ow">=</span> <span class="mi">2010</span><span class="p">,</span> <span class="n">ctMonth</span> <span class="ow">=</span> <span class="kt">January</span><span class="p">,</span> <span class="n">ctDay</span> <span class="ow">=</span> <span class="mi">15</span><span class="p">,</span> <span class="n">ctHour</span> <span class="ow">=</span> <span class="mi">12</span><span class="p">,</span> <span class="n">ctMin</span> <span class="ow">=</span> <span class="mi">30</span><span class="p">,</span> <span class="n">ctSec</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctPicosec</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctWDay</span> <span class="ow">=</span> <span class="kt">Friday</span><span class="p">,</span> <span class="n">ctYDay</span> <span class="ow">=</span> <span class="mi">14</span><span class="p">,</span> <span class="n">ctTZName</span> <span class="ow">=</span> <span class="s">&quot;UTC&quot;</span><span class="p">,</span> <span class="n">ctTZ</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctIsDST</span> <span class="ow">=</span> <span class="kt">False</span><span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="clocktime-timediff">
+<h4>ClockTime 的 TimeDiff<a class="headerlink" href="#clocktime-timediff" title="Permalink to this headline">¶</a></h4>
+<p>以对人类友好的方式难于处理 ClockTime 值之间的差异， <code class="docutils literal"><span class="pre">System.Time</span></code> 模块包括了一个 <code class="docutils literal"><span class="pre">TimeDiff</span></code> 类型。 <code class="docutils literal"><span class="pre">TimeDiff</span></code> 用于方便的处理这些差异。其定义如下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kr">data</span> <span class="kt">TimeDiff</span> <span class="ow">=</span> <span class="kt">TimeDiff</span>
+   <span class="p">{</span><span class="n">tdYear</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>
+    <span class="n">tdMonth</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>
+    <span class="n">tdDay</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>
+    <span class="n">tdHour</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>
+    <span class="n">tdMin</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>
+    <span class="n">tdSec</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>
+    <span class="n">tdPicosec</span> <span class="ow">::</span> <span class="kt">Integer</span><span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">diffClockTimes</span></code> 和 <code class="docutils literal"><span class="pre">addToClockTime</span></code> 两个函数接收一个 <code class="docutils literal"><span class="pre">ClockTime</span></code> 和一个 <code class="docutils literal"><span class="pre">TimeDiff</span></code> 并在内部将 <code class="docutils literal"><span class="pre">ClockTime</span></code> 转换为一个 UTC 时区的 <code class="docutils literal"><span class="pre">CalendarTime</span></code> ，在其上执行 <code class="docutils literal"><span class="pre">TimeDiff</span></code> ，最后将结果转换回一个 <code class="docutils literal"><span class="pre">ClockTime</span></code> 。</p>
+<p>看看它怎样工作：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">module</span> <span class="nn">System.Time</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">feb5</span> <span class="ow">=</span> <span class="n">toClockTime</span> <span class="o">$</span> <span class="kt">CalendarTime</span> <span class="mi">2008</span> <span class="kt">February</span> <span class="mi">5</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="kt">Sunday</span> <span class="mi">0</span> <span class="s">&quot;UTC&quot;</span> <span class="mi">0</span> <span class="kt">False</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">locale</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">time</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">feb5</span>
+<span class="kt">Mon</span> <span class="kt">Feb</span>  <span class="mi">4</span> <span class="mi">18</span><span class="kt">:</span><span class="mi">00</span><span class="kt">:</span><span class="mi">00</span> <span class="kt">CST</span> <span class="mi">2008</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">addToClockTime</span> <span class="p">(</span><span class="kt">TimeDiff</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span><span class="p">)</span> <span class="n">feb5</span>
+<span class="kt">Tue</span> <span class="kt">Mar</span>  <span class="mi">4</span> <span class="mi">18</span><span class="kt">:</span><span class="mi">00</span><span class="kt">:</span><span class="mi">00</span> <span class="kt">CST</span> <span class="mi">2008</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">toUTCTime</span> <span class="o">$</span> <span class="n">addToClockTime</span> <span class="p">(</span><span class="kt">TimeDiff</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span><span class="p">)</span> <span class="n">feb5</span>
+<span class="kt">CalendarTime</span> <span class="p">{</span><span class="n">ctYear</span> <span class="ow">=</span> <span class="mi">2008</span><span class="p">,</span> <span class="n">ctMonth</span> <span class="ow">=</span> <span class="kt">March</span><span class="p">,</span> <span class="n">ctDay</span> <span class="ow">=</span> <span class="mi">5</span><span class="p">,</span> <span class="n">ctHour</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctMin</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctSec</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctPicosec</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctWDay</span> <span class="ow">=</span> <span class="kt">Wednesday</span><span class="p">,</span> <span class="n">ctYDay</span> <span class="ow">=</span> <span class="mi">64</span><span class="p">,</span> <span class="n">ctTZName</span> <span class="ow">=</span> <span class="s">&quot;UTC&quot;</span><span class="p">,</span> <span class="n">ctTZ</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctIsDST</span> <span class="ow">=</span> <span class="kt">False</span><span class="p">}</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">jan30</span> <span class="ow">=</span> <span class="n">toClockTime</span> <span class="o">$</span> <span class="kt">CalendarTime</span> <span class="mi">2009</span> <span class="kt">January</span> <span class="mi">30</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="kt">Sunday</span> <span class="mi">0</span> <span class="s">&quot;UTC&quot;</span> <span class="mi">0</span> <span class="kt">False</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">jan30</span>
+<span class="kt">Thu</span> <span class="kt">Jan</span> <span class="mi">29</span> <span class="mi">18</span><span class="kt">:</span><span class="mi">00</span><span class="kt">:</span><span class="mi">00</span> <span class="kt">CST</span> <span class="mi">2009</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">addToClockTime</span> <span class="p">(</span><span class="kt">TimeDiff</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span><span class="p">)</span> <span class="n">jan30</span>
+<span class="kt">Sun</span> <span class="kt">Mar</span>  <span class="mi">1</span> <span class="mi">18</span><span class="kt">:</span><span class="mi">00</span><span class="kt">:</span><span class="mi">00</span> <span class="kt">CST</span> <span class="mi">2009</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">toUTCTime</span> <span class="o">$</span> <span class="n">addToClockTime</span> <span class="p">(</span><span class="kt">TimeDiff</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span><span class="p">)</span> <span class="n">jan30</span>
+<span class="kt">CalendarTime</span> <span class="p">{</span><span class="n">ctYear</span> <span class="ow">=</span> <span class="mi">2009</span><span class="p">,</span> <span class="n">ctMonth</span> <span class="ow">=</span> <span class="kt">March</span><span class="p">,</span> <span class="n">ctDay</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span> <span class="n">ctHour</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctMin</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctSec</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctPicosec</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctWDay</span> <span class="ow">=</span> <span class="kt">Monday</span><span class="p">,</span> <span class="n">ctYDay</span> <span class="ow">=</span> <span class="mi">60</span><span class="p">,</span> <span class="n">ctTZName</span> <span class="ow">=</span> <span class="s">&quot;UTC&quot;</span><span class="p">,</span> <span class="n">ctTZ</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ctIsDST</span> <span class="ow">=</span> <span class="kt">False</span><span class="p">}</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">diffClockTimes</span> <span class="n">jan30</span> <span class="n">feb5</span>
+<span class="kt">TimeDiff</span> <span class="p">{</span><span class="n">tdYear</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">tdMonth</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">tdDay</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">tdHour</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">tdMin</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">tdSec</span> <span class="ow">=</span> <span class="mi">31104000</span><span class="p">,</span> <span class="n">tdPicosec</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">}</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">normalizeTimeDiff</span> <span class="o">$</span> <span class="n">diffClockTimes</span> <span class="n">jan30</span> <span class="n">feb5</span>
+<span class="kt">TimeDiff</span> <span class="p">{</span><span class="n">tdYear</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">tdMonth</span> <span class="ow">=</span> <span class="mi">12</span><span class="p">,</span> <span class="n">tdDay</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">tdHour</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">tdMin</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">tdSec</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">tdPicosec</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>首先我们生成一个 <code class="docutils literal"><span class="pre">ClockTime</span></code> 表示 UTC 时间 2008 年 2 月 5 日。注意，若你的时区不是 UTC，按你本地时区的格式，当其被显示的时候可能是 2 月 4 日晚。</p>
+<p>其次，我们用 <code class="docutils literal"><span class="pre">addToClockTime</span></code> 在其上加一个月。2008 是闰年，但系统可以正确的处理，然后我们得到了一个月后的相同日期。使用 <code class="docutils literal"><span class="pre">toUTCTime</span></code> ，我们可以看到以 UTC 时间表示的结果。</p>
+<p>第二个实验，设定一个表示 UTC 时间 2009 年 1 月 30 日午夜的时间。2009 年不是闰年，所以我们可能很好奇其加上一个月是什么结果。因为 2009 年没有 2 月 29 日和 2 月 30 日，所以我们得到了 3 月 2 日。</p>
+<p>最后，我们可以看到 <code class="docutils literal"><span class="pre">diffClockTimes</span></code> 怎样通过两个 <code class="docutils literal"><span class="pre">ClockTime</span></code> 值得到一个 <code class="docutils literal"><span class="pre">TimeDiff</span></code> ， 尽管其只包含秒和皮秒。 <code class="docutils literal"><span class="pre">normalizeTimeDiff</span></code> 函数接受一个 <code class="docutils literal"><span class="pre">TimeDiff</span></code> 将其重新按照人类的习惯格式化。</p>
+</div>
+</div>
+<div class="section" id="id7">
+<h3>文件修改日期<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h3>
+<p>很多程序需要找出某些文件的最后修改日期。 <code class="docutils literal"><span class="pre">ls</span></code> 和图形化的文件管理器是典型的需要显示文件最后变更时间的程序。 <code class="docutils literal"><span class="pre">System.Directory</span></code> 模块包含一个跨平台的 <code class="docutils literal"><span class="pre">getModificationTime</span></code> 函数。其接受一个文件名，返回一个表示文件最后变更日期的 <code class="docutils literal"><span class="pre">ClockTime</span></code> 。例如：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">module</span> <span class="nn">System.Directory</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getModificationTime</span> <span class="s">&quot;/etc/passwd&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">locale</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">time</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">filepath</span><span class="o">-</span><span class="mf">1.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">directory</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Fri</span> <span class="kt">Aug</span> <span class="mi">15</span> <span class="mi">08</span><span class="kt">:</span><span class="mi">29</span><span class="kt">:</span><span class="mi">48</span> <span class="kt">CDT</span> <span class="mi">2008</span>
+</pre></div>
+</div>
+<p>POSIX 平台不仅维护变更时间 (被称为 mtime)， 还有最后读或写访问时间 (atime)以及最后状态变更时间 (ctime)。这是 POSIX 平台独有的，所以跨平台的 <code class="docutils literal"><span class="pre">System.Directory</span></code> 模块无法访问它。取而代之，需要使用 <code class="docutils literal"><span class="pre">System.Posix.Files</span></code> 模块中的函数。下面有一个例子：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch20/posixtime.hs</span>
+<span class="c1">-- posixtime.hs</span>
+
+<span class="kr">import</span> <span class="nn">System.Posix.Files</span>
+<span class="kr">import</span> <span class="nn">System.Time</span>
+<span class="kr">import</span> <span class="nn">System.Posix.Types</span>
+
+<span class="c1">-- | Given a path, returns (atime, mtime, ctime)</span>
+<span class="nf">getTimes</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">(</span><span class="kt">ClockTime</span><span class="p">,</span> <span class="kt">ClockTime</span><span class="p">,</span> <span class="kt">ClockTime</span><span class="p">)</span>
+<span class="nf">getTimes</span> <span class="n">fp</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">stat</span> <span class="ow">&lt;-</span> <span class="n">getFileStatus</span> <span class="n">fp</span>
+       <span class="n">return</span> <span class="p">(</span><span class="n">toct</span> <span class="p">(</span><span class="n">accessTime</span> <span class="n">stat</span><span class="p">),</span>
+               <span class="n">toct</span> <span class="p">(</span><span class="n">modificationTime</span> <span class="n">stat</span><span class="p">),</span>
+               <span class="n">toct</span> <span class="p">(</span><span class="n">statusChangeTime</span> <span class="n">stat</span><span class="p">))</span>
+
+<span class="c1">-- | Convert an EpochTime to a ClockTime</span>
+<span class="nf">toct</span> <span class="ow">::</span> <span class="kt">EpochTime</span> <span class="ow">-&gt;</span> <span class="kt">ClockTime</span>
+<span class="nf">toct</span> <span class="n">et</span> <span class="ow">=</span>
+    <span class="kt">TOD</span> <span class="p">(</span><span class="n">truncate</span> <span class="p">(</span><span class="n">toRational</span> <span class="n">et</span><span class="p">))</span> <span class="mi">0</span>
+</pre></div>
+</div>
+<p>注意对 <code class="docutils literal"><span class="pre">getFileStatus</span></code> 的调用。 这个调用直接映射到 C 语言的 <code class="docutils literal"><span class="pre">stat()</span></code> 函数。其返回一个包含了大量不同种类信息的值，包括文件类型、权限、属主、组、和我们感性去的三种时间值。 <code class="docutils literal"><span class="pre">System.Posix.Files</span></code> 提供了 <code class="docutils literal"><span class="pre">accessTime</span></code> 等多个函数，可以将我们感兴趣的时间从 <code class="docutils literal"><span class="pre">getFileStatus</span></code> 返回的 <code class="docutils literal"><span class="pre">FileStatus</span></code> 类型中提取出来。</p>
+<blockquote>
+<div><code class="docutils literal"><span class="pre">accessTime</span></code> 等函数返回一个POSIX 平台特有的类型，称为 <code class="docutils literal"><span class="pre">EpochTime</span></code> ，  可以通过  <code class="docutils literal"><span class="pre">toct</span></code> 函数转换 <code class="docutils literal"><span class="pre">ClockTime</span></code> 。 <code class="docutils literal"><span class="pre">System.Posix.Files</span></code> 模块同样提供了 <code class="docutils literal"><span class="pre">setFileTimes</span></code> 函数，以设置文件的 <code class="docutils literal"><span class="pre">atime</span></code> 和 <code class="docutils literal"><span class="pre">mtime</span></code> 。 <a class="footnote-reference" href="#id18" id="id8">[45]</a></div></blockquote>
+</div>
+</div>
+<div class="section" id="id9">
+<h2>延伸的例子: 管道<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h2>
+<p>我们已经了解了如何调用外部程序。有时候需要更多的控制。比如获得程序的标准输出、提供输入，甚至将不同的外部程序串起来调用。管道有助于实现所有这些需求。管道经常用在 shell 脚本中。 在 shell 中设置一个管道，会调用多个程序。第一个程序的输入会做为第二个程序的输入。其输出又会作为第三个的输入，以此类推。最后一个程序通常将输出打印到终端，或者写入文件。下面是一个 POSIX shell 的例子，演示如何使用管道：</p>
+<div class="highlight-bash"><div class="highlight"><pre><span class="nv">$ </span>ls /etc <span class="p">|</span> grep <span class="s1">&#39;m.*ap&#39;</span> <span class="p">|</span> tr a-z A-Z
+IDMAPD.CONF
+MAILCAP
+MAILCAP.ORDER
+MEDIAPRM
+TERMCAP
+</pre></div>
+</div>
+<p>这条命令运行了三个程序，使用管道在它们之间传输数据。它以 <code class="docutils literal"><span class="pre">ls/etc</span></code> 开始，输出是 <code class="docutils literal"><span class="pre">/etc</span></code> 目录下全部文件和目录的列表。 <code class="docutils literal"><span class="pre">ls</span></code> 的输出被作为 <code class="docutils literal"><span class="pre">grep</span></code> 的输入。我们想 <code class="docutils literal"><span class="pre">grep</span></code> 输入一条正则使其只输出以 &#8216;m&#8217; 开头并且在某处包含 &#8220;ap&#8221; 的行。最后，其结果被传入 <code class="docutils literal"><span class="pre">tr</span></code> 。我们给 <code class="docutils literal"><span class="pre">tr</span></code> 设置一个选项，使其将所有字符转换为大写。 <code class="docutils literal"><span class="pre">tr</span></code> 的输出没有特殊的去处，所以直接在屏幕显示。</p>
+<p>这种情况下，程序之间的管道线路由 shell 设置。我们可以使用 Haskell 中的 POSIX 工具实现同的事情。</p>
+<p>在讲解如何实现之前，要提醒你一下， <code class="docutils literal"><span class="pre">System.Posix</span></code> 模块提供的是很低阶的 Unix 系统接口。无论使用何种编程语言，这些接口都可以相互组合，组合的结果也可以相互组合。这些低阶接口的完整性质可以用一整本书来讨论，这章中我们只会简单介绍。</p>
+<div class="section" id="id10">
+<h3>使用管道做重定向<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
+<p>POSIX 定义了一个函数用于创建管道。这个函数返回两个文件描述符（FD），与 Haskell 中的句柄概念类似。一个 FD 用于读端，另一个用于写端。任何从写端写入的东西，都可以从读端读取。这些数据就是“通过管道推送”的。在 Haskell 中，你可以通过 <code class="docutils literal"><span class="pre">createPipe</span></code> 使用这个接口。</p>
+<p>在外部程序之间传递数据之前，要做的第一步是建立一个管道。同时还要将一个程序的输出重定向到管道，并将管道做为另一个程序的输入。 Haskell 的 <code class="docutils literal"><span class="pre">dupTo</span></code> 函数就是做这个的。其接收一个 FD 并将其拷贝为另一个 FD 号。 POSIX 的标准输入、标准输出和标准错误的 FD 分别被预定义为 0, 1, 2 。将管道的某一端设置为这些 FD 号，我们就可以有效的重定向程序的输入和输出。</p>
+<p>不过还有问题需要解决。我们不能简单的只是在某个调用比如 <code class="docutils literal"><span class="pre">rawSystem</span></code> 之前使用 <code class="docutils literal"><span class="pre">dupTo</span></code> ，因为这回混淆我们的 Haskell 主程序的输入和输出。此外， <code class="docutils literal"><span class="pre">rawSystem</span></code> 会一直阻塞直到被调用的程序执行完毕，这让我们无法启动并行执行的进程。 为了解决这个问题，可以使用 <code class="docutils literal"><span class="pre">forkProcess</span></code> 。这是一个很特殊的函数。它实际上生成了一份当前进程的拷贝，并使这两份进程同时运行。 Haskell 的 <code class="docutils literal"><span class="pre">forkProcess</span></code> 函数接收一个函数，使其在新进程（称为子进程）中运行。我们让这个函数调用 <code class="docutils literal"><span class="pre">dupTo</span></code> 。之后，其调用 <code class="docutils literal"><span class="pre">executeFile</span></code> 调用真正希望执行的命令。这同样也是一个特殊的函数：如果一切顺利，他将不会返回。这是因为 <code class="docutils literal"><span class="pre">executeFile</span></code> 使用一个不同的程序替换了当前执行的进程。最后，初始的 Haskell 进程调用 <code class="docutils literal"><span class="pre">getProcessStatus</span></code> 以等待子进程结束，并获得其状态码。</p>
+<p>在 POSIX 系统中，无论何时你执行一条命令，不关是在命令上上敲 <code class="docutils literal"><span class="pre">ls</span></code> 还是在 Haskell 中使用 <code class="docutils literal"><span class="pre">rawSystem</span></code> ，其内部机理都是调用 <code class="docutils literal"><span class="pre">forkProcess</span></code> , <code class="docutils literal"><span class="pre">executeFile</span></code> , 和 <code class="docutils literal"><span class="pre">getProcessStatusa</span></code> (或是它们对应的 C 函数)。为了使用管道，我们复制了系统启动程序的进程，并且加入了一些调用和重定向管道的步骤。</p>
+<p>还有另外一些辅助步骤需要注意。当调用 <code class="docutils literal"><span class="pre">forkProcess</span></code> 时，“几乎”和程序有关的一切都被复制 <a class="footnote-reference" href="#id19" id="id11">[46]</a> 。包括所有已经打开的文件描述符（句柄）。程序通过检查管道是否传来文件结束符判断数据接收是否结束。写端进程关闭管道时，读端程序将收到文件结束符。然而，如果同一个写端文件描述符在多个进程中同时存在，则文件结束符要在所有进程中都被关闭才会发送文件结束符。因此，我们必须在子进程中追踪打开了哪些文件描述符，以便关闭它们。同样，也必须尽早在主进程中关闭子进程的写管道。</p>
+<p>下面是一个用 Haskell 编写的管道系统的初始实现：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch20/RunProcessSimple.hs</span>
+
+<span class="cm">{-# OPTIONS_GHC -XDatatypeContexts #-}</span>
+<span class="cm">{-# OPTIONS_GHC -XTypeSynonymInstances #-}</span>
+<span class="cm">{-# OPTIONS_GHC -XFlexibleInstances #-}</span>
+
+<span class="kr">module</span> <span class="nn">RunProcessSimple</span> <span class="kr">where</span>
+
+<span class="c1">--import System.Process</span>
+<span class="kr">import</span> <span class="nn">Control.Concurrent</span>
+<span class="kr">import</span> <span class="nn">Control.Concurrent.MVar</span>
+<span class="kr">import</span> <span class="nn">System.IO</span>
+<span class="kr">import</span> <span class="nn">System.Exit</span>
+<span class="kr">import</span> <span class="nn">Text.Regex.Posix</span>
+<span class="kr">import</span> <span class="nn">System.Posix.Process</span>
+<span class="kr">import</span> <span class="nn">System.Posix.IO</span>
+<span class="kr">import</span> <span class="nn">System.Posix.Types</span>
+<span class="kr">import</span> <span class="nn">Control.Exception</span>
+
+<span class="cm">{- | The type for running external commands.  The first part</span>
+<span class="cm">of the tuple is the program name.  The list represents the</span>
+<span class="cm">command-line parameters to pass to the command. -}</span>
+<span class="kr">type</span> <span class="kt">SysCommand</span> <span class="ow">=</span> <span class="p">(</span><span class="kt">String</span><span class="p">,</span> <span class="p">[</span><span class="kt">String</span><span class="p">])</span>
+
+<span class="cm">{- | The result of running any command -}</span>
+<span class="kr">data</span> <span class="kt">CommandResult</span> <span class="ow">=</span> <span class="kt">CommandResult</span> <span class="p">{</span>
+    <span class="n">cmdOutput</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">String</span><span class="p">,</span>              <span class="c1">-- ^ IO action that yields the output</span>
+    <span class="n">getExitStatus</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">ProcessStatus</span>    <span class="c1">-- ^ IO action that yields exit result</span>
+    <span class="p">}</span>
+
+<span class="cm">{- | The type for handling global lists of FDs to always close in the clients</span>
+<span class="cm">-}</span>
+<span class="kr">type</span> <span class="kt">CloseFDs</span> <span class="ow">=</span> <span class="kt">MVar</span> <span class="p">[</span><span class="kt">Fd</span><span class="p">]</span>
+
+<span class="cm">{- | Class representing anything that is a runnable command -}</span>
+<span class="kr">class</span> <span class="kt">CommandLike</span> <span class="n">a</span> <span class="kr">where</span>
+    <span class="cm">{- | Given the command and a String representing input,</span>
+<span class="cm">         invokes the command.  Returns a String</span>
+<span class="cm">         representing the output of the command. -}</span>
+    <span class="n">invoke</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">CloseFDs</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">CommandResult</span>
+
+<span class="c1">-- Support for running system commands</span>
+<span class="kr">instance</span> <span class="kt">CommandLike</span> <span class="kt">SysCommand</span> <span class="kr">where</span>
+    <span class="n">invoke</span> <span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span> <span class="n">closefds</span> <span class="n">input</span> <span class="ow">=</span>
+        <span class="kr">do</span> <span class="c1">-- Create two pipes: one to handle stdin and the other</span>
+           <span class="c1">-- to handle stdout.  We do not redirect stderr in this program.</span>
+           <span class="p">(</span><span class="n">stdinread</span><span class="p">,</span> <span class="n">stdinwrite</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">createPipe</span>
+           <span class="p">(</span><span class="n">stdoutread</span><span class="p">,</span> <span class="n">stdoutwrite</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">createPipe</span>
+
+           <span class="c1">-- We add the parent FDs to this list because we always need</span>
+           <span class="c1">-- to close them in the clients.</span>
+           <span class="n">addCloseFDs</span> <span class="n">closefds</span> <span class="p">[</span><span class="n">stdinwrite</span><span class="p">,</span> <span class="n">stdoutread</span><span class="p">]</span>
+
+           <span class="c1">-- Now, grab the closed FDs list and fork the child.</span>
+           <span class="n">childPID</span> <span class="ow">&lt;-</span> <span class="n">withMVar</span> <span class="n">closefds</span> <span class="p">(</span><span class="nf">\</span><span class="n">fds</span> <span class="ow">-&gt;</span>
+                          <span class="n">forkProcess</span> <span class="p">(</span><span class="n">child</span> <span class="n">fds</span> <span class="n">stdinread</span> <span class="n">stdoutwrite</span><span class="p">))</span>
+
+           <span class="c1">-- Now, on the parent, close the client-side FDs.</span>
+           <span class="n">closeFd</span> <span class="n">stdinread</span>
+           <span class="n">closeFd</span> <span class="n">stdoutwrite</span>
+
+           <span class="c1">-- Write the input to the command.</span>
+           <span class="n">stdinhdl</span> <span class="ow">&lt;-</span> <span class="n">fdToHandle</span> <span class="n">stdinwrite</span>
+           <span class="n">forkIO</span> <span class="o">$</span> <span class="kr">do</span> <span class="n">hPutStr</span> <span class="n">stdinhdl</span> <span class="n">input</span>
+                       <span class="n">hClose</span> <span class="n">stdinhdl</span>
+
+           <span class="c1">-- Prepare to receive output from the command</span>
+           <span class="n">stdouthdl</span> <span class="ow">&lt;-</span> <span class="n">fdToHandle</span> <span class="n">stdoutread</span>
+
+           <span class="c1">-- Set up the function to call when ready to wait for the</span>
+           <span class="c1">-- child to exit.</span>
+           <span class="kr">let</span> <span class="n">waitfunc</span> <span class="ow">=</span>
+                <span class="kr">do</span> <span class="n">status</span> <span class="ow">&lt;-</span> <span class="n">getProcessStatus</span> <span class="kt">True</span> <span class="kt">False</span> <span class="n">childPID</span>
+                   <span class="kr">case</span> <span class="n">status</span> <span class="kr">of</span>
+                       <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">fail</span> <span class="o">$</span> <span class="s">&quot;Error: Nothing from getProcessStatus&quot;</span>
+                       <span class="kt">Just</span> <span class="n">ps</span> <span class="ow">-&gt;</span> <span class="kr">do</span> <span class="n">removeCloseFDs</span> <span class="n">closefds</span>
+                                          <span class="p">[</span><span class="n">stdinwrite</span><span class="p">,</span> <span class="n">stdoutread</span><span class="p">]</span>
+                                     <span class="n">return</span> <span class="n">ps</span>
+           <span class="n">return</span> <span class="o">$</span> <span class="kt">CommandResult</span> <span class="p">{</span><span class="n">cmdOutput</span> <span class="ow">=</span> <span class="n">hGetContents</span> <span class="n">stdouthdl</span><span class="p">,</span>
+                                   <span class="n">getExitStatus</span> <span class="ow">=</span> <span class="n">waitfunc</span><span class="p">}</span>
+
+        <span class="c1">-- Define what happens in the child process</span>
+        <span class="kr">where</span> <span class="n">child</span> <span class="n">closefds</span> <span class="n">stdinread</span> <span class="n">stdoutwrite</span> <span class="ow">=</span>
+                <span class="kr">do</span> <span class="c1">-- Copy our pipes over the regular stdin/stdout FDs</span>
+                   <span class="n">dupTo</span> <span class="n">stdinread</span> <span class="n">stdInput</span>
+                   <span class="n">dupTo</span> <span class="n">stdoutwrite</span> <span class="n">stdOutput</span>
+
+                   <span class="c1">-- Now close the original pipe FDs</span>
+                   <span class="n">closeFd</span> <span class="n">stdinread</span>
+                   <span class="n">closeFd</span> <span class="n">stdoutwrite</span>
+
+                   <span class="c1">-- Close all the open FDs we inherited from the parent</span>
+                   <span class="n">mapM_</span> <span class="p">(</span><span class="nf">\</span><span class="n">fd</span> <span class="ow">-&gt;</span> <span class="n">catch</span> <span class="p">(</span><span class="n">closeFd</span> <span class="n">fd</span><span class="p">)</span> <span class="p">(</span><span class="nf">\</span><span class="p">(</span><span class="kt">SomeException</span> <span class="n">e</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="nb">()</span><span class="p">))</span> <span class="n">closefds</span>
+
+                   <span class="c1">-- Start the program</span>
+                   <span class="n">executeFile</span> <span class="n">cmd</span> <span class="kt">True</span> <span class="n">args</span> <span class="kt">Nothing</span>
+
+<span class="c1">-- Add FDs to the list of FDs that must be closed post-fork in a child</span>
+<span class="nf">addCloseFDs</span> <span class="ow">::</span> <span class="kt">CloseFDs</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Fd</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">addCloseFDs</span> <span class="n">closefds</span> <span class="n">newfds</span> <span class="ow">=</span>
+    <span class="n">modifyMVar_</span> <span class="n">closefds</span> <span class="p">(</span><span class="nf">\</span><span class="n">oldfds</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="o">$</span> <span class="n">oldfds</span> <span class="o">++</span> <span class="n">newfds</span><span class="p">)</span>
+
+<span class="c1">-- Remove FDs from the list</span>
+<span class="nf">removeCloseFDs</span> <span class="ow">::</span> <span class="kt">CloseFDs</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Fd</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">removeCloseFDs</span> <span class="n">closefds</span> <span class="n">removethem</span> <span class="ow">=</span>
+    <span class="n">modifyMVar_</span> <span class="n">closefds</span> <span class="p">(</span><span class="nf">\</span><span class="n">fdlist</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="o">$</span> <span class="n">procfdlist</span> <span class="n">fdlist</span> <span class="n">removethem</span><span class="p">)</span>
+
+    <span class="kr">where</span>
+    <span class="n">procfdlist</span> <span class="n">fdlist</span> <span class="kt">[]</span> <span class="ow">=</span> <span class="n">fdlist</span>
+    <span class="n">procfdlist</span> <span class="n">fdlist</span> <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="ow">=</span> <span class="n">procfdlist</span> <span class="p">(</span><span class="n">removefd</span> <span class="n">fdlist</span> <span class="n">x</span><span class="p">)</span> <span class="n">xs</span>
+
+    <span class="c1">-- We want to remove only the first occurance ot any given fd</span>
+    <span class="n">removefd</span> <span class="kt">[]</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">[]</span>
+    <span class="n">removefd</span> <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="n">fd</span>
+        <span class="o">|</span> <span class="n">fd</span> <span class="o">==</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">xs</span>
+        <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="n">x</span> <span class="kt">:</span> <span class="n">removefd</span> <span class="n">xs</span> <span class="n">fd</span>
+
+<span class="cm">{- | Type representing a pipe.  A &#39;PipeCommand&#39; consists of a source</span>
+<span class="cm">and destination part, both of which must be instances of</span>
+<span class="cm">&#39;CommandLike&#39;. -}</span>
+<span class="kr">data</span> <span class="p">(</span><span class="kt">CommandLike</span> <span class="n">src</span><span class="p">,</span> <span class="kt">CommandLike</span> <span class="n">dest</span><span class="p">)</span> <span class="ow">=&gt;</span>
+     <span class="kt">PipeCommand</span> <span class="n">src</span> <span class="n">dest</span> <span class="ow">=</span> <span class="kt">PipeCommand</span> <span class="n">src</span> <span class="n">dest</span>
+
+<span class="cm">{- | A convenient function for creating a &#39;PipeCommand&#39;. -}</span>
+<span class="p">(</span><span class="o">-|-</span><span class="p">)</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">CommandLike</span> <span class="n">a</span><span class="p">,</span> <span class="kt">CommandLike</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="kt">PipeCommand</span> <span class="n">a</span> <span class="n">b</span>
+<span class="p">(</span><span class="o">-|-</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">PipeCommand</span>
+
+<span class="cm">{- | Make &#39;PipeCommand&#39; runnable as a command -}</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">CommandLike</span> <span class="n">a</span><span class="p">,</span> <span class="kt">CommandLike</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=&gt;</span>
+         <span class="kt">CommandLike</span> <span class="p">(</span><span class="kt">PipeCommand</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">invoke</span> <span class="p">(</span><span class="kt">PipeCommand</span> <span class="n">src</span> <span class="n">dest</span><span class="p">)</span> <span class="n">closefds</span> <span class="n">input</span> <span class="ow">=</span>
+        <span class="kr">do</span> <span class="n">res1</span> <span class="ow">&lt;-</span> <span class="n">invoke</span> <span class="n">src</span> <span class="n">closefds</span> <span class="n">input</span>
+           <span class="n">output1</span> <span class="ow">&lt;-</span> <span class="n">cmdOutput</span> <span class="n">res1</span>
+           <span class="n">res2</span> <span class="ow">&lt;-</span> <span class="n">invoke</span> <span class="n">dest</span> <span class="n">closefds</span> <span class="n">output1</span>
+           <span class="n">return</span> <span class="o">$</span> <span class="kt">CommandResult</span> <span class="p">(</span><span class="n">cmdOutput</span> <span class="n">res2</span><span class="p">)</span> <span class="p">(</span><span class="n">getEC</span> <span class="n">res1</span> <span class="n">res2</span><span class="p">)</span>
+
+<span class="cm">{- | Given two &#39;CommandResult&#39; items, evaluate the exit codes for</span>
+<span class="cm">both and then return a &quot;combined&quot; exit code.  This will be ExitSuccess</span>
+<span class="cm">if both exited successfully.  Otherwise, it will reflect the first</span>
+<span class="cm">error encountered. -}</span>
+<span class="nf">getEC</span> <span class="ow">::</span> <span class="kt">CommandResult</span> <span class="ow">-&gt;</span> <span class="kt">CommandResult</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">ProcessStatus</span>
+<span class="nf">getEC</span> <span class="n">src</span> <span class="n">dest</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">sec</span> <span class="ow">&lt;-</span> <span class="n">getExitStatus</span> <span class="n">src</span>
+       <span class="n">dec</span> <span class="ow">&lt;-</span> <span class="n">getExitStatus</span> <span class="n">dest</span>
+       <span class="kr">case</span> <span class="n">sec</span> <span class="kr">of</span>
+            <span class="kt">Exited</span> <span class="kt">ExitSuccess</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="n">dec</span>
+            <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="n">x</span>
+
+<span class="cm">{- | Execute a &#39;CommandLike&#39;. -}</span>
+<span class="nf">runIO</span> <span class="ow">::</span> <span class="kt">CommandLike</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">runIO</span> <span class="n">cmd</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="c1">-- Initialize our closefds list</span>
+       <span class="n">closefds</span> <span class="ow">&lt;-</span> <span class="n">newMVar</span> <span class="kt">[]</span>
+
+       <span class="c1">-- Invoke the command</span>
+       <span class="n">res</span> <span class="ow">&lt;-</span> <span class="n">invoke</span> <span class="n">cmd</span> <span class="n">closefds</span> <span class="kt">[]</span>
+
+       <span class="c1">-- Process its output</span>
+       <span class="n">output</span> <span class="ow">&lt;-</span> <span class="n">cmdOutput</span> <span class="n">res</span>
+       <span class="n">putStr</span> <span class="n">output</span>
+
+       <span class="c1">-- Wait for termination and get exit status</span>
+       <span class="n">ec</span> <span class="ow">&lt;-</span> <span class="n">getExitStatus</span> <span class="n">res</span>
+       <span class="kr">case</span> <span class="n">ec</span> <span class="kr">of</span>
+            <span class="kt">Exited</span> <span class="kt">ExitSuccess</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="nb">()</span>
+            <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">fail</span> <span class="o">$</span> <span class="s">&quot;Exited: &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">x</span>
+</pre></div>
+</div>
+<p>在研究这个函数的运作原理之前，
+让我们先来在 <code class="docutils literal"><span class="pre">ghci</span></code> 里面尝试运行它一下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">runIO</span> <span class="o">$</span> <span class="p">(</span><span class="s">&quot;pwd&quot;</span><span class="p">,</span> <span class="kt">[]</span><span class="ow">::</span><span class="p">[</span><span class="kt">String</span><span class="p">])</span>
+<span class="o">/</span><span class="kt">Users</span><span class="o">/</span><span class="kt">Blade</span><span class="o">/</span><span class="n">sandbox</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">runIO</span> <span class="o">$</span> <span class="p">(</span><span class="s">&quot;ls&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s">&quot;/usr&quot;</span><span class="p">])</span>
+<span class="kt">NX</span>
+<span class="kt">X11</span>
+<span class="kt">X11R6</span>
+<span class="nf">bin</span>
+<span class="nf">include</span>
+<span class="nf">lib</span>
+<span class="nf">libexec</span>
+<span class="nf">local</span>
+<span class="nf">sbin</span>
+<span class="nf">share</span>
+<span class="nf">standalone</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">runIO</span> <span class="o">$</span> <span class="p">(</span><span class="s">&quot;ls&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s">&quot;/usr&quot;</span><span class="p">])</span> <span class="o">-|-</span> <span class="p">(</span><span class="s">&quot;grep&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s">&quot;^l&quot;</span><span class="p">])</span>
+<span class="nf">lib</span>
+<span class="nf">libexec</span>
+<span class="nf">local</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">runIO</span> <span class="o">$</span> <span class="p">(</span><span class="s">&quot;ls&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s">&quot;/etc&quot;</span><span class="p">])</span> <span class="o">-|-</span> <span class="p">(</span><span class="s">&quot;grep&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s">&quot;m.*ap&quot;</span><span class="p">])</span> <span class="o">-|-</span> <span class="p">(</span><span class="s">&quot;tr&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s">&quot;a-z&quot;</span><span class="p">,</span> <span class="s">&quot;A-Z&quot;</span><span class="p">])</span>
+<span class="kt">COM</span><span class="o">.</span><span class="kt">APPLE</span><span class="o">.</span><span class="kt">SCREENSHARING</span><span class="o">.</span><span class="kt">AGENT</span><span class="o">.</span><span class="kt">LAUNCHD</span>
+</pre></div>
+</div>
+<p>我们从一个简单的命令 <code class="docutils literal"><span class="pre">pwd</span></code> 开始，它会打印当前工作目录。我们将 [] 做为参数列表，因为 <code class="docutils literal"><span class="pre">pwd</span></code> 不需要任何参数。由于使用了类型类， Haskell 无法自动推导出 [] 的类型，所以我们说明其类型为字符串组成的列表。</p>
+<p>下面是一个更复杂些的例子。我们执行了 <code class="docutils literal"><span class="pre">ls</span></code> ，将其输出传入 <code class="docutils literal"><span class="pre">grep</span></code> 。最后我们通过管道，调用了一个与本节开始处 shell 内置管道的例子中相同的命令。不像 shell 中那样舒服，但是相对于 shell 我们的程序始终相对简单。</p>
+<p>让我们读一下程序。起始处的 <code class="docutils literal"><span class="pre">OPTIONS_GHC</span></code>  语句，作用与 ghc 或 ghci 开始时传入 <code class="docutils literal"><span class="pre">-fglasgow-exts</span></code> 参数相同。我们使用了一个 GHC 扩展，以允许使用  <code class="docutils literal"><span class="pre">(String,</span> <span class="pre">[String])</span></code> 类型作为一个类型类的实例 <a class="footnote-reference" href="#id20" id="id12">[47]</a> 。将此类声明加入源码文件，就不用在每次调用这个模块的时候都要记得手工打开编译器开关。</p>
+<p>在载入了所需模块之后，定义了一些类型。首先，定义 <code class="docutils literal"><span class="pre">type</span> <span class="pre">SysCommand</span> <span class="pre">=</span> <span class="pre">(String,</span> <span class="pre">[String])</span></code> 作为一个别名。这是系统将接收并执行的命令的类型。例子中的每条领命都要用到这个类型的数据。 <code class="docutils literal"><span class="pre">CommandResult</span></code> 命令用于表示给定命令的执行结果， <code class="docutils literal"><span class="pre">CloseFDs</span></code>  用于表示必须在新的子进程中关闭的文件描述符列表。</p>
+<p>接着，定义一个类称为 <code class="docutils literal"><span class="pre">CommandLike</span></code>  。这个类用来跑 “东西” ，这个“东西” 可以是独立的程序，可以是两个程序之间的管道，未来也可以跑纯 Haskell 函数。任何一个类型想为这个类的成员，只需实现一个函数 &#8211; <code class="docutils literal"><span class="pre">invoke</span></code> 。这将允许以 <code class="docutils literal"><span class="pre">runIO</span></code> 启动一个独立命令或者一个管道。这在定义管道时也很有用，因为我们可以拥有某个管道的读写两端的完整调用栈。</p>
+<p>我们的管道基础设施将使用字符串在进程间传递数据。我们将通过 <code class="docutils literal"><span class="pre">hGetContents</span></code> 获得 Haskell 在延迟读取方面的优势，并使用 <code class="docutils literal"><span class="pre">forkIO</span></code> 在后台写入。这种设计工作得不错，尽管传输速度不像将两个进程的管道读写端直接连接起来那样快 <a class="footnote-reference" href="#id21" id="id13">[48]</a> 。但这让实现很简单。我们仅需要小心，不要做任何会让整个字符串被缓冲的操作，把接下来的工作完全交给 Haskell 的延迟特性。</p>
+<p>接下来，为 <code class="docutils literal"><span class="pre">SysCommand</span></code> 定义一个 <code class="docutils literal"><span class="pre">CommandLike</span></code> 实例。我们创建两个管道：一个用来作为新进程的标准输入，另一个用于其标准输出。将产生两个读端两个写端，四个文件描述符。我们将要在子进程中关闭的文件描述符加入列表。这包括子进程标准输入的写端，和子进程标准输出的读端。接着，我们 <code class="docutils literal"><span class="pre">fork</span></code> 出子进程。然后可以在父进程中关闭相关的子进程文件描述符。 <code class="docutils literal"><span class="pre">fork</span></code> 之前不能这样做，因为那时子进程还不可用。获取 <code class="docutils literal"><span class="pre">stdinwrite</span></code> 的句柄，并通过 <code class="docutils literal"><span class="pre">forkIO</span></code> 启动一个现成向其写入数据。接着定义 <code class="docutils literal"><span class="pre">waitfunc</span></code> , 其中定义了调用这在准备好等待子进程结束时要执行的动作。同时，子进程使用 <code class="docutils literal"><span class="pre">dupTo</span></code> ，关闭其不需要的文件描述符。并执行命令。</p>
+<p>然后定义一些工具函数用来管理文件描述符。此后，定义一些工具用于建立管道。首先，定义一个新类型 <code class="docutils literal"><span class="pre">PipeCommand</span></code> ，其有源和目的两个属性。源和目的都必须是 <code class="docutils literal"><span class="pre">CommandLike</span></code> 的成员。为了方便，我们还定义了 <code class="docutils literal"><span class="pre">-|-</span></code> 操作符。然后使 <code class="docutils literal"><span class="pre">PipeCommand</span></code> 成为 <code class="docutils literal"><span class="pre">CommandLike</span></code> 的实例。它调用第一个命令并获得输出，将其传入第二个命令。之后返回第二个命令的输出，并调用 <code class="docutils literal"><span class="pre">getExitStatus</span></code> 函数等待命令执行结束并检查整组命令执行之后的状态码。</p>
+<p>最后以定义 <code class="docutils literal"><span class="pre">runIO</span></code> 结束。这个函数建立了需要在子进程中关闭的 FDS 列表，执行程序，显示输出，并检查其退出状态。</p>
+</div>
+<div class="section" id="id14">
+<h3>更好的管道<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h3>
+<p>上个例子中解决了一个类似 shell 的管道系统的基本需求。但是为它加上下面这些特点之后就更好了：</p>
+<blockquote>
+<div><ul class="simple">
+<li>支持更多的 shell 语法。</li>
+<li>使管道同时支持外部程序和正规 Haskell 函数，并使二者可以自由的混合使用。</li>
+<li>以易于 Haskell 程序利用的方式返回标准输出和退出状态码。</li>
+</ul>
+</div></blockquote>
+<p>幸运的是，支持这些功能的代码片段已经差不多就位了。只需要为 <code class="docutils literal"><span class="pre">CommandLike</span></code> 多加入几个实例，以及一些类似 <code class="docutils literal"><span class="pre">runIO</span></code> 的函数。下面是修订后实现了以上功能的例子代码：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch20/RunProcess.hs</span>
+<span class="cm">{-# OPTIONS_GHC -XDatatypeContexts #-}</span>
+<span class="cm">{-# OPTIONS_GHC -XTypeSynonymInstances #-}</span>
+<span class="cm">{-# OPTIONS_GHC -XFlexibleInstances #-}</span>
+
+<span class="kr">module</span> <span class="nn">RunProcess</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">System.Process</span>
+<span class="kr">import</span> <span class="nn">Control.Concurrent</span>
+<span class="kr">import</span> <span class="nn">Control.Concurrent.MVar</span>
+<span class="kr">import</span> <span class="nn">Control.Exception</span>
+<span class="kr">import</span> <span class="nn">System.Posix.Directory</span>
+<span class="kr">import</span> <span class="nn">System.Directory</span><span class="p">(</span><span class="n">setCurrentDirectory</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.IO</span>
+<span class="kr">import</span> <span class="nn">System.Exit</span>
+<span class="kr">import</span> <span class="nn">Text.Regex</span>
+<span class="kr">import</span> <span class="nn">System.Posix.Process</span>
+<span class="kr">import</span> <span class="nn">System.Posix.IO</span>
+<span class="kr">import</span> <span class="nn">System.Posix.Types</span>
+<span class="kr">import</span> <span class="nn">Data.List</span>
+<span class="kr">import</span> <span class="nn">System.Posix.Env</span><span class="p">(</span><span class="n">getEnv</span><span class="p">)</span>
+
+<span class="cm">{- | The type for running external commands.  The first part</span>
+<span class="cm">of the tuple is the program name.  The list represents the</span>
+<span class="cm">command-line parameters to pass to the command. -}</span>
+<span class="kr">type</span> <span class="kt">SysCommand</span> <span class="ow">=</span> <span class="p">(</span><span class="kt">String</span><span class="p">,</span> <span class="p">[</span><span class="kt">String</span><span class="p">])</span>
+
+<span class="cm">{- | The result of running any command -}</span>
+<span class="kr">data</span> <span class="kt">CommandResult</span> <span class="ow">=</span> <span class="kt">CommandResult</span> <span class="p">{</span>
+    <span class="n">cmdOutput</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">String</span><span class="p">,</span>              <span class="c1">-- ^ IO action that yields the output</span>
+    <span class="n">getExitStatus</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">ProcessStatus</span>    <span class="c1">-- ^ IO action that yields exit result</span>
+    <span class="p">}</span>
+
+<span class="cm">{- | The type for handling global lists of FDs to always close in the clients</span>
+<span class="cm">-}</span>
+<span class="kr">type</span> <span class="kt">CloseFDs</span> <span class="ow">=</span> <span class="kt">MVar</span> <span class="p">[</span><span class="kt">Fd</span><span class="p">]</span>
+
+<span class="cm">{- | Class representing anything that is a runnable command -}</span>
+<span class="kr">class</span> <span class="kt">CommandLike</span> <span class="n">a</span> <span class="kr">where</span>
+    <span class="cm">{- | Given the command and a String representing input,</span>
+<span class="cm">         invokes the command.  Returns a String</span>
+<span class="cm">         representing the output of the command. -}</span>
+    <span class="n">invoke</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">CloseFDs</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">CommandResult</span>
+
+<span class="c1">-- Support for running system commands</span>
+<span class="kr">instance</span> <span class="kt">CommandLike</span> <span class="kt">SysCommand</span> <span class="kr">where</span>
+    <span class="n">invoke</span> <span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span> <span class="n">closefds</span> <span class="n">input</span> <span class="ow">=</span>
+        <span class="kr">do</span> <span class="c1">-- Create two pipes: one to handle stdin and the other</span>
+           <span class="c1">-- to handle stdout.  We do not redirect stderr in this program.</span>
+           <span class="p">(</span><span class="n">stdinread</span><span class="p">,</span> <span class="n">stdinwrite</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">createPipe</span>
+           <span class="p">(</span><span class="n">stdoutread</span><span class="p">,</span> <span class="n">stdoutwrite</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">createPipe</span>
+
+           <span class="c1">-- We add the parent FDs to this list because we always need</span>
+           <span class="c1">-- to close them in the clients.</span>
+           <span class="n">addCloseFDs</span> <span class="n">closefds</span> <span class="p">[</span><span class="n">stdinwrite</span><span class="p">,</span> <span class="n">stdoutread</span><span class="p">]</span>
+
+           <span class="c1">-- Now, grab the closed FDs list and fork the child.</span>
+           <span class="n">childPID</span> <span class="ow">&lt;-</span> <span class="n">withMVar</span> <span class="n">closefds</span> <span class="p">(</span><span class="nf">\</span><span class="n">fds</span> <span class="ow">-&gt;</span>
+                          <span class="n">forkProcess</span> <span class="p">(</span><span class="n">child</span> <span class="n">fds</span> <span class="n">stdinread</span> <span class="n">stdoutwrite</span><span class="p">))</span>
+
+           <span class="c1">-- Now, on the parent, close the client-side FDs.</span>
+           <span class="n">closeFd</span> <span class="n">stdinread</span>
+           <span class="n">closeFd</span> <span class="n">stdoutwrite</span>
+
+           <span class="c1">-- Write the input to the command.</span>
+           <span class="n">stdinhdl</span> <span class="ow">&lt;-</span> <span class="n">fdToHandle</span> <span class="n">stdinwrite</span>
+           <span class="n">forkIO</span> <span class="o">$</span> <span class="kr">do</span> <span class="n">hPutStr</span> <span class="n">stdinhdl</span> <span class="n">input</span>
+                       <span class="n">hClose</span> <span class="n">stdinhdl</span>
+
+           <span class="c1">-- Prepare to receive output from the command</span>
+           <span class="n">stdouthdl</span> <span class="ow">&lt;-</span> <span class="n">fdToHandle</span> <span class="n">stdoutread</span>
+
+           <span class="c1">-- Set up the function to call when ready to wait for the</span>
+           <span class="c1">-- child to exit.</span>
+           <span class="kr">let</span> <span class="n">waitfunc</span> <span class="ow">=</span>
+                <span class="kr">do</span> <span class="n">status</span> <span class="ow">&lt;-</span> <span class="n">getProcessStatus</span> <span class="kt">True</span> <span class="kt">False</span> <span class="n">childPID</span>
+                   <span class="kr">case</span> <span class="n">status</span> <span class="kr">of</span>
+                       <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">fail</span> <span class="o">$</span> <span class="s">&quot;Error: Nothing from getProcessStatus&quot;</span>
+                       <span class="kt">Just</span> <span class="n">ps</span> <span class="ow">-&gt;</span> <span class="kr">do</span> <span class="n">removeCloseFDs</span> <span class="n">closefds</span>
+                                          <span class="p">[</span><span class="n">stdinwrite</span><span class="p">,</span> <span class="n">stdoutread</span><span class="p">]</span>
+                                     <span class="n">return</span> <span class="n">ps</span>
+           <span class="n">return</span> <span class="o">$</span> <span class="kt">CommandResult</span> <span class="p">{</span><span class="n">cmdOutput</span> <span class="ow">=</span> <span class="n">hGetContents</span> <span class="n">stdouthdl</span><span class="p">,</span>
+                                   <span class="n">getExitStatus</span> <span class="ow">=</span> <span class="n">waitfunc</span><span class="p">}</span>
+
+        <span class="c1">-- Define what happens in the child process</span>
+        <span class="kr">where</span> <span class="n">child</span> <span class="n">closefds</span> <span class="n">stdinread</span> <span class="n">stdoutwrite</span> <span class="ow">=</span>
+                <span class="kr">do</span> <span class="c1">-- Copy our pipes over the regular stdin/stdout FDs</span>
+                   <span class="n">dupTo</span> <span class="n">stdinread</span> <span class="n">stdInput</span>
+                   <span class="n">dupTo</span> <span class="n">stdoutwrite</span> <span class="n">stdOutput</span>
+
+                   <span class="c1">-- Now close the original pipe FDs</span>
+                   <span class="n">closeFd</span> <span class="n">stdinread</span>
+                   <span class="n">closeFd</span> <span class="n">stdoutwrite</span>
+
+                   <span class="c1">-- Close all the open FDs we inherited from the parent</span>
+                   <span class="n">mapM_</span> <span class="p">(</span><span class="nf">\</span><span class="n">fd</span> <span class="ow">-&gt;</span> <span class="n">catch</span> <span class="p">(</span><span class="n">closeFd</span> <span class="n">fd</span><span class="p">)</span> <span class="p">(</span><span class="nf">\</span><span class="p">(</span><span class="kt">SomeException</span> <span class="n">e</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="nb">()</span><span class="p">))</span> <span class="n">closefds</span>
+
+                   <span class="c1">-- Start the program</span>
+                   <span class="n">executeFile</span> <span class="n">cmd</span> <span class="kt">True</span> <span class="n">args</span> <span class="kt">Nothing</span>
+
+<span class="cm">{- | An instance of &#39;CommandLike&#39; for an external command.  The String is</span>
+<span class="cm">passed to a shell for evaluation and invocation. -}</span>
+<span class="kr">instance</span> <span class="kt">CommandLike</span> <span class="kt">String</span> <span class="kr">where</span>
+    <span class="n">invoke</span> <span class="n">cmd</span> <span class="n">closefds</span> <span class="n">input</span> <span class="ow">=</span>
+        <span class="kr">do</span> <span class="c1">-- Use the shell given by the environment variable SHELL,</span>
+           <span class="c1">-- if any.  Otherwise, use /bin/sh</span>
+           <span class="n">esh</span> <span class="ow">&lt;-</span> <span class="n">getEnv</span> <span class="s">&quot;SHELL&quot;</span>
+           <span class="kr">let</span> <span class="n">sh</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">esh</span> <span class="kr">of</span>
+                       <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="s">&quot;/bin/sh&quot;</span>
+                       <span class="kt">Just</span> <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">x</span>
+           <span class="n">invoke</span> <span class="p">(</span><span class="n">sh</span><span class="p">,</span> <span class="p">[</span><span class="s">&quot;-c&quot;</span><span class="p">,</span> <span class="n">cmd</span><span class="p">])</span> <span class="n">closefds</span> <span class="n">input</span>
+
+<span class="c1">-- Add FDs to the list of FDs that must be closed post-fork in a child</span>
+<span class="nf">addCloseFDs</span> <span class="ow">::</span> <span class="kt">CloseFDs</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Fd</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">addCloseFDs</span> <span class="n">closefds</span> <span class="n">newfds</span> <span class="ow">=</span>
+    <span class="n">modifyMVar_</span> <span class="n">closefds</span> <span class="p">(</span><span class="nf">\</span><span class="n">oldfds</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="o">$</span> <span class="n">oldfds</span> <span class="o">++</span> <span class="n">newfds</span><span class="p">)</span>
+
+<span class="c1">-- Remove FDs from the list</span>
+<span class="nf">removeCloseFDs</span> <span class="ow">::</span> <span class="kt">CloseFDs</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Fd</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">removeCloseFDs</span> <span class="n">closefds</span> <span class="n">removethem</span> <span class="ow">=</span>
+    <span class="n">modifyMVar_</span> <span class="n">closefds</span> <span class="p">(</span><span class="nf">\</span><span class="n">fdlist</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="o">$</span> <span class="n">procfdlist</span> <span class="n">fdlist</span> <span class="n">removethem</span><span class="p">)</span>
+
+    <span class="kr">where</span>
+    <span class="n">procfdlist</span> <span class="n">fdlist</span> <span class="kt">[]</span> <span class="ow">=</span> <span class="n">fdlist</span>
+    <span class="n">procfdlist</span> <span class="n">fdlist</span> <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="ow">=</span> <span class="n">procfdlist</span> <span class="p">(</span><span class="n">removefd</span> <span class="n">fdlist</span> <span class="n">x</span><span class="p">)</span> <span class="n">xs</span>
+
+    <span class="c1">-- We want to remove only the first occurance ot any given fd</span>
+    <span class="n">removefd</span> <span class="kt">[]</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">[]</span>
+    <span class="n">removefd</span> <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="n">fd</span>
+        <span class="o">|</span> <span class="n">fd</span> <span class="o">==</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">xs</span>
+        <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="n">x</span> <span class="kt">:</span> <span class="n">removefd</span> <span class="n">xs</span> <span class="n">fd</span>
+
+<span class="c1">-- Support for running Haskell commands</span>
+<span class="kr">instance</span> <span class="kt">CommandLike</span> <span class="p">(</span><span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">String</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">invoke</span> <span class="n">func</span> <span class="kr">_</span> <span class="n">input</span> <span class="ow">=</span>
+       <span class="n">return</span> <span class="o">$</span> <span class="kt">CommandResult</span> <span class="p">(</span><span class="n">func</span> <span class="n">input</span><span class="p">)</span> <span class="p">(</span><span class="n">return</span> <span class="p">(</span><span class="kt">Exited</span> <span class="kt">ExitSuccess</span><span class="p">))</span>
+
+<span class="c1">-- Support pure Haskell functions by wrapping them in IO</span>
+<span class="kr">instance</span> <span class="kt">CommandLike</span> <span class="p">(</span><span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">invoke</span> <span class="n">func</span> <span class="ow">=</span> <span class="n">invoke</span> <span class="n">iofunc</span>
+        <span class="kr">where</span> <span class="n">iofunc</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">String</span>
+              <span class="n">iofunc</span> <span class="ow">=</span> <span class="n">return</span> <span class="o">.</span> <span class="n">func</span>
+
+<span class="c1">-- It&#39;s also useful to operate on lines.  Define support for line-based</span>
+<span class="c1">-- functions both within and without the IO monad.</span>
+
+<span class="kr">instance</span> <span class="kt">CommandLike</span> <span class="p">([</span><span class="kt">String</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">String</span><span class="p">])</span> <span class="kr">where</span>
+    <span class="n">invoke</span> <span class="n">func</span> <span class="kr">_</span> <span class="n">input</span> <span class="ow">=</span>
+           <span class="n">return</span> <span class="o">$</span> <span class="kt">CommandResult</span> <span class="n">linedfunc</span> <span class="p">(</span><span class="n">return</span> <span class="p">(</span><span class="kt">Exited</span> <span class="kt">ExitSuccess</span><span class="p">))</span>
+       <span class="kr">where</span> <span class="n">linedfunc</span> <span class="ow">=</span> <span class="n">func</span> <span class="p">(</span><span class="n">lines</span> <span class="n">input</span><span class="p">)</span> <span class="o">&gt;&gt;=</span> <span class="p">(</span><span class="n">return</span> <span class="o">.</span> <span class="n">unlines</span><span class="p">)</span>
+
+<span class="kr">instance</span> <span class="kt">CommandLike</span> <span class="p">([</span><span class="kt">String</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">String</span><span class="p">])</span> <span class="kr">where</span>
+    <span class="n">invoke</span> <span class="n">func</span> <span class="ow">=</span> <span class="n">invoke</span> <span class="p">(</span><span class="n">unlines</span> <span class="o">.</span> <span class="n">func</span> <span class="o">.</span> <span class="n">lines</span><span class="p">)</span>
+
+<span class="cm">{- | Type representing a pipe.  A &#39;PipeCommand&#39; consists of a source</span>
+<span class="cm">and destination part, both of which must be instances of</span>
+<span class="cm">&#39;CommandLike&#39;. -}</span>
+<span class="kr">data</span> <span class="p">(</span><span class="kt">CommandLike</span> <span class="n">src</span><span class="p">,</span> <span class="kt">CommandLike</span> <span class="n">dest</span><span class="p">)</span> <span class="ow">=&gt;</span>
+     <span class="kt">PipeCommand</span> <span class="n">src</span> <span class="n">dest</span> <span class="ow">=</span> <span class="kt">PipeCommand</span> <span class="n">src</span> <span class="n">dest</span>
+
+<span class="cm">{- | A convenient function for creating a &#39;PipeCommand&#39;. -}</span>
+<span class="p">(</span><span class="o">-|-</span><span class="p">)</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">CommandLike</span> <span class="n">a</span><span class="p">,</span> <span class="kt">CommandLike</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="kt">PipeCommand</span> <span class="n">a</span> <span class="n">b</span>
+<span class="p">(</span><span class="o">-|-</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">PipeCommand</span>
+
+<span class="cm">{- | Make &#39;PipeCommand&#39; runnable as a command -}</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">CommandLike</span> <span class="n">a</span><span class="p">,</span> <span class="kt">CommandLike</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=&gt;</span>
+         <span class="kt">CommandLike</span> <span class="p">(</span><span class="kt">PipeCommand</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">invoke</span> <span class="p">(</span><span class="kt">PipeCommand</span> <span class="n">src</span> <span class="n">dest</span><span class="p">)</span> <span class="n">closefds</span> <span class="n">input</span> <span class="ow">=</span>
+        <span class="kr">do</span> <span class="n">res1</span> <span class="ow">&lt;-</span> <span class="n">invoke</span> <span class="n">src</span> <span class="n">closefds</span> <span class="n">input</span>
+           <span class="n">output1</span> <span class="ow">&lt;-</span> <span class="n">cmdOutput</span> <span class="n">res1</span>
+           <span class="n">res2</span> <span class="ow">&lt;-</span> <span class="n">invoke</span> <span class="n">dest</span> <span class="n">closefds</span> <span class="n">output1</span>
+           <span class="n">return</span> <span class="o">$</span> <span class="kt">CommandResult</span> <span class="p">(</span><span class="n">cmdOutput</span> <span class="n">res2</span><span class="p">)</span> <span class="p">(</span><span class="n">getEC</span> <span class="n">res1</span> <span class="n">res2</span><span class="p">)</span>
+
+<span class="cm">{- | Given two &#39;CommandResult&#39; items, evaluate the exit codes for</span>
+<span class="cm">both and then return a &quot;combined&quot; exit code.  This will be ExitSuccess</span>
+<span class="cm">if both exited successfully.  Otherwise, it will reflect the first</span>
+<span class="cm">error encountered. -}</span>
+<span class="nf">getEC</span> <span class="ow">::</span> <span class="kt">CommandResult</span> <span class="ow">-&gt;</span> <span class="kt">CommandResult</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">ProcessStatus</span>
+<span class="nf">getEC</span> <span class="n">src</span> <span class="n">dest</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">sec</span> <span class="ow">&lt;-</span> <span class="n">getExitStatus</span> <span class="n">src</span>
+       <span class="n">dec</span> <span class="ow">&lt;-</span> <span class="n">getExitStatus</span> <span class="n">dest</span>
+       <span class="kr">case</span> <span class="n">sec</span> <span class="kr">of</span>
+            <span class="kt">Exited</span> <span class="kt">ExitSuccess</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="n">dec</span>
+            <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="n">x</span>
+
+<span class="cm">{- | Different ways to get data from &#39;run&#39;.</span>
+
+<span class="cm"> * IO () runs, throws an exception on error, and sends stdout to stdout</span>
+
+<span class="cm"> * IO String runs, throws an exception on error, reads stdout into</span>
+<span class="cm">   a buffer, and returns it as a string.</span>
+
+<span class="cm"> * IO [String] is same as IO String, but returns the results as lines</span>
+
+<span class="cm"> * IO ProcessStatus runs and returns a ProcessStatus with the exit</span>
+<span class="cm">   information.  stdout is sent to stdout.  Exceptions are not thrown.</span>
+
+<span class="cm"> * IO (String, ProcessStatus) is like IO ProcessStatus, but also</span>
+<span class="cm">   includes a description of the last command in the pipe to have</span>
+<span class="cm">   an error (or the last command, if there was no error)</span>
+
+<span class="cm"> * IO Int returns the exit code from a program directly.  If a signal</span>
+<span class="cm">   caused the command to be reaped, returns 128 + SIGNUM.</span>
+
+<span class="cm"> * IO Bool returns True if the program exited normally (exit code 0,</span>
+<span class="cm">   not stopped by a signal) and False otherwise.</span>
+
+<span class="cm">-}</span>
+<span class="kr">class</span> <span class="kt">RunResult</span> <span class="n">a</span> <span class="kr">where</span>
+    <span class="cm">{- | Runs a command (or pipe of commands), with results presented</span>
+<span class="cm">       in any number of different ways. -}</span>
+    <span class="n">run</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">CommandLike</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+
+<span class="c1">-- | Utility function for use by &#39;RunResult&#39; instances</span>
+<span class="nf">setUpCommand</span> <span class="ow">::</span> <span class="kt">CommandLike</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">CommandResult</span>
+<span class="nf">setUpCommand</span> <span class="n">cmd</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="c1">-- Initialize our closefds list</span>
+       <span class="n">closefds</span> <span class="ow">&lt;-</span> <span class="n">newMVar</span> <span class="kt">[]</span>
+
+       <span class="c1">-- Invoke the command</span>
+       <span class="n">invoke</span> <span class="n">cmd</span> <span class="n">closefds</span> <span class="kt">[]</span>
+
+<span class="kr">instance</span> <span class="kt">RunResult</span> <span class="p">(</span><span class="kt">IO</span> <span class="nb">()</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">run</span> <span class="n">cmd</span> <span class="ow">=</span> <span class="n">run</span> <span class="n">cmd</span> <span class="o">&gt;&gt;=</span> <span class="n">checkResult</span>
+
+<span class="kr">instance</span> <span class="kt">RunResult</span> <span class="p">(</span><span class="kt">IO</span> <span class="kt">ProcessStatus</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">run</span> <span class="n">cmd</span> <span class="ow">=</span>
+        <span class="kr">do</span> <span class="n">res</span> <span class="ow">&lt;-</span> <span class="n">setUpCommand</span> <span class="n">cmd</span>
+
+           <span class="c1">-- Process its output</span>
+           <span class="n">output</span> <span class="ow">&lt;-</span> <span class="n">cmdOutput</span> <span class="n">res</span>
+           <span class="n">putStr</span> <span class="n">output</span>
+
+           <span class="n">getExitStatus</span> <span class="n">res</span>
+
+<span class="kr">instance</span> <span class="kt">RunResult</span> <span class="p">(</span><span class="kt">IO</span> <span class="kt">Int</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">run</span> <span class="n">cmd</span> <span class="ow">=</span> <span class="kr">do</span> <span class="n">rc</span> <span class="ow">&lt;-</span> <span class="n">run</span> <span class="n">cmd</span>
+                 <span class="kr">case</span> <span class="n">rc</span> <span class="kr">of</span>
+                   <span class="kt">Exited</span> <span class="p">(</span><span class="kt">ExitSuccess</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="mi">0</span>
+                   <span class="kt">Exited</span> <span class="p">(</span><span class="kt">ExitFailure</span> <span class="n">x</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="n">x</span>
+                   <span class="p">(</span><span class="kt">Terminated</span> <span class="n">x</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="p">(</span><span class="mi">128</span> <span class="o">+</span> <span class="p">(</span><span class="n">fromIntegral</span> <span class="n">x</span><span class="p">))</span>
+                   <span class="kt">Stopped</span> <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="p">(</span><span class="mi">128</span> <span class="o">+</span> <span class="p">(</span><span class="n">fromIntegral</span> <span class="n">x</span><span class="p">))</span>
+
+<span class="kr">instance</span> <span class="kt">RunResult</span> <span class="p">(</span><span class="kt">IO</span> <span class="kt">Bool</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">run</span> <span class="n">cmd</span> <span class="ow">=</span> <span class="kr">do</span> <span class="n">rc</span> <span class="ow">&lt;-</span> <span class="n">run</span> <span class="n">cmd</span>
+                 <span class="n">return</span> <span class="p">((</span><span class="n">rc</span><span class="ow">::</span><span class="kt">Int</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+
+<span class="kr">instance</span> <span class="kt">RunResult</span> <span class="p">(</span><span class="kt">IO</span> <span class="p">[</span><span class="kt">String</span><span class="p">])</span> <span class="kr">where</span>
+    <span class="n">run</span> <span class="n">cmd</span> <span class="ow">=</span> <span class="kr">do</span> <span class="n">r</span> <span class="ow">&lt;-</span> <span class="n">run</span> <span class="n">cmd</span>
+                 <span class="n">return</span> <span class="p">(</span><span class="n">lines</span> <span class="n">r</span><span class="p">)</span>
+
+<span class="kr">instance</span> <span class="kt">RunResult</span> <span class="p">(</span><span class="kt">IO</span> <span class="kt">String</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">run</span> <span class="n">cmd</span> <span class="ow">=</span>
+        <span class="kr">do</span> <span class="n">res</span> <span class="ow">&lt;-</span> <span class="n">setUpCommand</span> <span class="n">cmd</span>
+
+           <span class="n">output</span> <span class="ow">&lt;-</span> <span class="n">cmdOutput</span> <span class="n">res</span>
+
+           <span class="c1">-- Force output to be buffered</span>
+           <span class="n">evaluate</span> <span class="p">(</span><span class="n">length</span> <span class="n">output</span><span class="p">)</span>
+
+           <span class="n">ec</span> <span class="ow">&lt;-</span> <span class="n">getExitStatus</span> <span class="n">res</span>
+           <span class="n">checkResult</span> <span class="n">ec</span>
+           <span class="n">return</span> <span class="n">output</span>
+
+<span class="nf">checkResult</span> <span class="ow">::</span> <span class="kt">ProcessStatus</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">checkResult</span> <span class="n">ps</span> <span class="ow">=</span>
+    <span class="kr">case</span> <span class="n">ps</span> <span class="kr">of</span>
+         <span class="kt">Exited</span> <span class="p">(</span><span class="kt">ExitSuccess</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="nb">()</span>
+         <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">fail</span> <span class="p">(</span><span class="n">show</span> <span class="n">x</span><span class="p">)</span>
+
+<span class="cm">{- | A convenience function.  Refers only to the version of &#39;run&#39;</span>
+<span class="cm">that returns @IO ()@.  This prevents you from having to cast to it</span>
+<span class="cm">all the time when you do not care about the result of &#39;run&#39;.</span>
+<span class="cm">-}</span>
+<span class="nf">runIO</span> <span class="ow">::</span> <span class="kt">CommandLike</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">runIO</span> <span class="ow">=</span> <span class="n">run</span>
+
+<span class="c1">------------------------------------------------------------</span>
+<span class="c1">-- Utility Functions</span>
+<span class="c1">------------------------------------------------------------</span>
+<span class="nf">cd</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">cd</span> <span class="ow">=</span> <span class="n">setCurrentDirectory</span>
+
+<span class="cm">{- | Takes a string and sends it on as standard output.</span>
+<span class="cm">The input to this function is never read. -}</span>
+<span class="nf">echo</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">echo</span> <span class="n">inp</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">inp</span>
+
+<span class="c1">-- | Search for the regexp in the lines.  Return those that match.</span>
+<span class="nf">grep</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+<span class="nf">grep</span> <span class="n">pat</span> <span class="ow">=</span> <span class="n">filter</span> <span class="p">(</span><span class="n">ismatch</span> <span class="n">regex</span><span class="p">)</span>
+    <span class="kr">where</span> <span class="n">regex</span> <span class="ow">=</span> <span class="n">mkRegex</span> <span class="n">pat</span>
+          <span class="n">ismatch</span> <span class="n">r</span> <span class="n">inp</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">matchRegex</span> <span class="n">r</span> <span class="n">inp</span> <span class="kr">of</span>
+                            <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">False</span>
+                            <span class="kt">Just</span> <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="kt">True</span>
+
+<span class="cm">{- | Creates the given directory.  A value of 0o755 for mode would be typical.</span>
+<span class="cm">An alias for System.Posix.Directory.createDirectory. -}</span>
+<span class="nf">mkdir</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">FileMode</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">mkdir</span> <span class="ow">=</span> <span class="n">createDirectory</span>
+
+<span class="cm">{- | Remove duplicate lines from a file (like Unix uniq).</span>
+<span class="cm">Takes a String representing a file or output and plugs it through</span>
+<span class="cm">lines and then nub to uniqify on a line basis. -}</span>
+<span class="nf">uniq</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">uniq</span> <span class="ow">=</span> <span class="n">unlines</span> <span class="o">.</span> <span class="n">nub</span> <span class="o">.</span> <span class="n">lines</span>
+
+<span class="c1">-- | Count number of lines.  wc -l</span>
+<span class="nf">wcL</span><span class="p">,</span> <span class="n">wcW</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+<span class="nf">wcL</span> <span class="n">inp</span> <span class="ow">=</span> <span class="p">[</span><span class="n">show</span> <span class="p">(</span><span class="n">genericLength</span> <span class="n">inp</span> <span class="ow">::</span> <span class="kt">Integer</span><span class="p">)]</span>
+
+<span class="c1">-- | Count number of words in a file (like wc -w)</span>
+<span class="nf">wcW</span> <span class="n">inp</span> <span class="ow">=</span> <span class="p">[</span><span class="n">show</span> <span class="p">((</span><span class="n">genericLength</span> <span class="o">$</span> <span class="n">words</span> <span class="o">$</span> <span class="n">unlines</span> <span class="n">inp</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Integer</span><span class="p">)]</span>
+
+<span class="nf">sortLines</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+<span class="nf">sortLines</span> <span class="ow">=</span> <span class="n">sort</span>
+
+<span class="c1">-- | Count the lines in the input</span>
+<span class="nf">countLines</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">String</span>
+<span class="nf">countLines</span> <span class="ow">=</span> <span class="n">return</span> <span class="o">.</span> <span class="p">(</span><span class="o">++</span><span class="p">)</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">.</span> <span class="n">show</span> <span class="o">.</span> <span class="n">length</span> <span class="o">.</span> <span class="n">lines</span>
+</pre></div>
+</div>
+<p>主要改变是：</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">String</span></code> 的 <code class="docutils literal"><span class="pre">CommandLike</span></code> 实例，以便在 shell 中对字符串进行求值和调用。</li>
+<li><code class="docutils literal"><span class="pre">String</span> <span class="pre">-&gt;</span> <span class="pre">IO</span> <span class="pre">String</span></code> 的实例，以及其它几种相关类型的实现。这样就可以像处理命令一样处理 Haskell 函数。</li>
+<li><code class="docutils literal"><span class="pre">RunResult</span></code> 类型类，定义了一个 <code class="docutils literal"><span class="pre">run</span></code> 函数，其可以用多种不同方式返回命令的相关信息。</li>
+<li>一些工具函数，提供了用 Haskell 实现的类 Unix shell 命令。</li>
+</ul>
+</div></blockquote>
+<p>现在来试试这些新特性。首先确定一下之前例子中的命令是否还能工作。然后，使用新的类 shell 语法运行一下。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">RunProcess</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">RunProcess</span>       <span class="p">(</span> <span class="kt">RunProcess</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">RunProcess</span><span class="o">.</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">runIO</span> <span class="o">$</span> <span class="p">(</span><span class="s">&quot;ls&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s">&quot;/etc&quot;</span><span class="p">])</span> <span class="o">-|-</span> <span class="p">(</span><span class="s">&quot;grep&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s">&quot;m.*ap&quot;</span><span class="p">])</span> <span class="o">-|-</span> <span class="p">(</span><span class="s">&quot;tr&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s">&quot;a-z&quot;</span><span class="p">,</span> <span class="s">&quot;A-Z&quot;</span><span class="p">])</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">array</span><span class="o">-</span><span class="mf">0.5</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">deepseq</span><span class="o">-</span><span class="mf">1.3</span><span class="o">.</span><span class="mf">0.2</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">bytestring</span><span class="o">-</span><span class="mf">0.10</span><span class="o">.</span><span class="mf">4.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">containers</span><span class="o">-</span><span class="mf">0.5</span><span class="o">.</span><span class="mf">5.1</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">filepath</span><span class="o">-</span><span class="mf">1.3</span><span class="o">.</span><span class="mf">0.2</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">old</span><span class="o">-</span><span class="n">locale</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.6</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">time</span><span class="o">-</span><span class="mf">1.4</span><span class="o">.</span><span class="mi">2</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">unix</span><span class="o">-</span><span class="mf">2.7</span><span class="o">.</span><span class="mf">0.1</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">directory</span><span class="o">-</span><span class="mf">1.2</span><span class="o">.</span><span class="mf">1.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">process</span><span class="o">-</span><span class="mf">1.2</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">transformers</span><span class="o">-</span><span class="mf">0.3</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">mtl</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">3.1</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">regex</span><span class="o">-</span><span class="n">base</span><span class="o">-</span><span class="mf">0.93</span><span class="o">.</span><span class="mi">2</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">regex</span><span class="o">-</span><span class="n">posix</span><span class="o">-</span><span class="mf">0.95</span><span class="o">.</span><span class="mi">2</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">regex</span><span class="o">-</span><span class="n">compat</span><span class="o">-</span><span class="mf">0.95</span><span class="o">.</span><span class="mi">1</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">COM</span><span class="o">.</span><span class="kt">APPLE</span><span class="o">.</span><span class="kt">SCREENSHARING</span><span class="o">.</span><span class="kt">AGENT</span><span class="o">.</span><span class="kt">LAUNCHD</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">runIO</span> <span class="o">$</span> <span class="s">&quot;ls /etc&quot;</span> <span class="o">-|-</span> <span class="s">&quot;grep &#39;m.*ap&#39;&quot;</span> <span class="o">-|-</span> <span class="s">&quot;tr a-z A-Z&quot;</span>
+<span class="kt">COM</span><span class="o">.</span><span class="kt">APPLE</span><span class="o">.</span><span class="kt">SCREENSHARING</span><span class="o">.</span><span class="kt">AGENT</span><span class="o">.</span><span class="kt">LAUNCHD</span>
+</pre></div>
+</div>
+<p>输入起来容易多了。试试使用 Haskell 实现的 grep 来试一下其它的新特性：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">runIO</span> <span class="o">$</span> <span class="s">&quot;ls /usr/local/bin&quot;</span> <span class="o">-|-</span> <span class="n">grep</span> <span class="s">&quot;m.*ap&quot;</span> <span class="o">-|-</span> <span class="s">&quot;tr a-z A-Z&quot;</span>
+<span class="kt">DUMPCAP</span>
+<span class="kt">MERGECAP</span>
+<span class="kt">NMAP</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">run</span> <span class="o">$</span> <span class="s">&quot;ls /usr/local/bin&quot;</span> <span class="o">-|-</span> <span class="n">grep</span> <span class="s">&quot;m.*ap&quot;</span> <span class="o">-|-</span> <span class="s">&quot;tr a-z A-Z&quot;</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">String</span>
+<span class="s">&quot;DUMPCAP</span><span class="se">\n</span><span class="s">MERGECAP</span><span class="se">\n</span><span class="s">NMAP</span><span class="se">\n</span><span class="s">&quot;</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">run</span> <span class="o">$</span> <span class="s">&quot;ls /usr/local/bin&quot;</span> <span class="o">-|-</span> <span class="n">grep</span> <span class="s">&quot;m.*ap&quot;</span> <span class="o">-|-</span> <span class="s">&quot;tr a-z A-Z&quot;</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+<span class="p">[</span><span class="s">&quot;DUMPCAP&quot;</span><span class="p">,</span><span class="s">&quot;MERGECAP&quot;</span><span class="p">,</span><span class="s">&quot;NMAP&quot;</span><span class="p">]</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">run</span> <span class="o">$</span> <span class="s">&quot;ls /usr&quot;</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">String</span>
+<span class="s">&quot;X11</span><span class="se">\n</span><span class="s">X11R6</span><span class="se">\n</span><span class="s">bin</span><span class="se">\n</span><span class="s">include</span><span class="se">\n</span><span class="s">lib</span><span class="se">\n</span><span class="s">libexec</span><span class="se">\n</span><span class="s">local</span><span class="se">\n</span><span class="s">sbin</span><span class="se">\n</span><span class="s">share</span><span class="se">\n</span><span class="s">standalone</span><span class="se">\n</span><span class="s">texbin</span><span class="se">\n</span><span class="s">&quot;</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">run</span> <span class="o">$</span> <span class="s">&quot;ls /usr&quot;</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">Int</span>
+<span class="kt">X11</span>
+<span class="kt">X11R6</span>
+<span class="nf">bin</span>
+<span class="nf">include</span>
+<span class="nf">lib</span>
+<span class="nf">libexec</span>
+<span class="nf">local</span>
+<span class="nf">sbin</span>
+<span class="nf">share</span>
+<span class="nf">standalone</span>
+<span class="nf">texbin</span>
+<span class="mi">0</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">runIO</span> <span class="o">$</span> <span class="n">echo</span> <span class="s">&quot;Line1</span><span class="se">\n</span><span class="s">Hi, test</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">-|-</span> <span class="s">&quot;tr a-z A-Z&quot;</span> <span class="o">-|-</span> <span class="n">sortLines</span>
+<span class="kt">HI</span><span class="p">,</span> <span class="kt">TEST</span>
+<span class="kt">LINE1</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id15">
+<h3>关于管道，最后说几句<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h3>
+<p>我们开发了一个精巧的系统。前面时醒过， POSIX 有时会很复杂。另外要强调一下：要始终注意确保先将这些函数返回的字符串求值，然后再尝试获取子进程的退出状态码。子进程经常要等待写出其所有输出之后才能退出，如果搞错了获取输出和退出状态码的顺序，你的程序会挂住。</p>
+<p>本章中，我们从零开始开发了一个精简版的 <code class="docutils literal"><span class="pre">HSH</span></code> 。如果你希望使程序具有这样类 shell 的功能，我们推荐使用 <code class="docutils literal"><span class="pre">HSH</span></code> 而非上面开发的例子，因为 <code class="docutils literal"><span class="pre">HSH</span></code> 的实现更加优化。<code class="docutils literal"><span class="pre">HSH</span></code> 还有一个数量庞大的工具函数集和更多功能，但其背后的代码也更加庞大和复杂。其实例子中很多工具函数的代码我们是直接从 <code class="docutils literal"><span class="pre">HSH</span></code> 抄过来的。可以从 <a class="reference external" href="http://software.complete.org">http://software.complete.org</a>/hsh访问 <code class="docutils literal"><span class="pre">HSH</span></code> 的源码。</p>
+<p class="rubric">注</p>
+<table class="docutils footnote" frame="void" id="id16" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[43]</a></td><td>也有一个 <code class="docutils literal"><span class="pre">system</span></code> 函数，接受单个字符串为参数，并将其传入 shell 解析。我们推荐使用 <code class="docutils literal"><span class="pre">rawSystem</span></code> ，因为某些字符在 shell 中具有特殊含义，可能会导致安全隐患或者意外的行为。</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id17" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id6">[44]</a></td><td>可能有人会注意到 UTC 定义了不规则的闰秒。在 Haskell 使用的 POSIX 标准中，规定了在其表示的时间中，每天必须都是精确的 86,400 秒，所以在执行日常计算时无需担心闰秒。精确的处理闰秒依赖于系统而且复杂，不过通常其可以被解释为一个“长秒”。这个问题大体上只是在执行精确的亚秒级计算时才需要关心。</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id18" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id8">[45]</a></td><td>POSIX 系统上通常无法设置 <code class="docutils literal"><span class="pre">ctime</span></code> 。</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id19" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id11">[46]</a></td><td>线程是一个主要例外，其不会被复制，所以说“几乎”。</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id20" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id12">[47]</a></td><td>Haskell 社区对这个扩展支持得很好。 Hugs 用户可以通过 <code class="docutils literal"><span class="pre">hugs</span> <span class="pre">-98</span> <span class="pre">+o</span></code> 使用。</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id21" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id13">[48]</a></td><td>Haskell 的 HSH 库提供了与此相近的 API ，使用了更高效（也更复杂）的机构将外部进程使用管道直接连接起来，没有要传给 Haskell 处理的数据。shell 采用了相同的方法，而且这样可以降低处理管道的 CPU 负载。</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="19.html">第十九章： 错误处理</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="21.html">第二十一章：数据库的使用</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.1.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,661 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Real World Haskell 中文版 &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="#" />
+    <link rel="next" title="第一章：入门" href="chp/1.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="#">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        <a class="uplink" href="#">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="chp/1.html">第一章：入门</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="real-world-haskell">
+<h1>Real World Haskell 中文版<a class="headerlink" href="#real-world-haskell" title="Permalink to this headline">¶</a></h1>
+<a class="reference internal image-reference" href="_images/cover.jpg"><img alt="_images/cover.jpg" class="align-right" src="_images/cover.jpg" style="width: 225.0px; height: 292.5px;" /></a>
+<p>本文档是 <a class="reference external" href="http://book.realworldhaskell.org/">Real World Haskell</a> 一书的简体中文翻译版本，
+翻译工作正在进行中，
+欢迎加入： <a class="reference external" href="https://github.com/huangz1990/real-world-haskell-cn">https://github.com/huangz1990/real-world-haskell-cn</a></p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="chp/1.html">第一章：入门</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/1.html#haskell">Haskell编程环境</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/1.html#ghci">初识解释器ghci</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/1.html#id3">基本交互: 把ghci当作一个计算器</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/1.html#id4">基本算术运算</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/1.html#quirk">算术奇事(quirk),负数的表示</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/1.html#id5">布尔逻辑，运算符以及值比较</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/1.html#id6">运算符优先级以及结合性</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/1.html#id7">未定义的变量以及定义变量</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/1.html#id8">处理优先级以及结合性规则</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/1.html#id9">ghci里的命令行编辑</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/1.html#lists">列表(Lists)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/1.html#id10">列表的操作符</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/1.html#id11">字符串和字符</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/1.html#id12">初识类型</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/1.html#id13">行计数程序</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/1.html#id14">练习</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/2.html">第二章：类型和函数</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#why-care-about-types">类型是干什么用的？</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#haskell">Haskell 的类型系统</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#strong-types">强类型</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#static-types">静态类型</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#type-inference">类型推导</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#what-to-expect-from-type-system">正确理解类型系统</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#some-common-basic-types">一些常用的基本类型</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#function-application">调用函数</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#useful-composite-data-types-lists-and-tuples">复合数据类型：列表和元组</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#functions-over-lists-and-tuples">处理列表和元组的函数</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#passing-an-expression-to-function">将表达式传给函数</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#function-types">函数类型</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#purity">纯度</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#haskell-source-files-and-writing-simple-function">Haskell 源码，以及简单函数的定义</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#just-what-is-a-variable-anyway">变量</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#conditional-evaluation">条件求值</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#understanding-evaluation-by-example">通过示例了解求值</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#lazy-evaluation">惰性求值</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#a-more-involved-example">一个更复杂的例子</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#recursion">递归</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#ending-the-recursion">终止递归</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#returning-from-the-recursion">从递归中返回</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#id23">学到了什么？</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#polymorphism-in-haskell">Haskell 里的多态</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#reasoning-about-polymorphic-functions">对多态函数进行推理</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/2.html#further-reading">延伸阅读</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#the-type-of-a-function-of-more-than-one-argument">多参数函数的类型</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#why-the-fuss-over-purity">为什么要对纯度斤斤计较？</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/2.html#conculsion">回顾</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/3.html">第三章：Defining Types, Streamlining Functions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#id1">定义新的数据类型</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#id2">类型构造器和值构造器的命名</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#id3">类型别名</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#id4">代数数据类型</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#id5">什么情况下该用元组，而什么情况下又该用代数数据类型？</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#id6">其他语言里类似代数数据类型的东西</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#id10">模式匹配</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#id11">组成和解构</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#id12">更进一步</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#id13">模式匹配中的变量名命名</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#id14">通配符模式匹配</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#id15">穷举匹配模式和通配符</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#id16">记录语法</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#id17">参数化类型</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#id18">递归类型</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#id19">练习</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#id20">报告错误</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#id21">让过程更可控的方法</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#id22">引入局部变量</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#id23">屏蔽</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#where">where 从句</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#id24">局部函数与全局变量</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#the-offside-rule-and-whitespace-in-an-expression">The Offside Rule and Whitespace in an Expression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#the-case-expression">The Case Expression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#common-beginner-mistakes-with-patterns">Common Beginner Mistakes with Patterns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#conditional-evaluation-with-guards">Conditional Evaluation with Guards</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/3.html#exercises">Exercises</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/4.html">第四章：函数式编程</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/4.html#haskell">使用 Haskell 思考</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/4.html#id2">一个简单的命令行程序</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/4.html#id3">循环的表示</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/4.html#id4">显式递归</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/4.html#id5">对列表元素进行转换</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/4.html#id6">列表映射</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/4.html#id7">筛选列表元素</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/4.html#id8">处理收集器并得出结果</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/4.html#id9">左折叠</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/4.html#fold-map-filter">为什么使用 <code class="docutils literal"><span class="pre">fold</span></code> 、 <code class="docutils literal"><span class="pre">map</span></code> 和 <code class="docutils literal"><span class="pre">filter</span></code> ？</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/4.html#id10">从右边开始折叠</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/4.html#id11">左折叠、惰性和内存泄漏</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/4.html#id12">延伸阅读</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/4.html#lambda">匿名（lambda）函数</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/4.html#id13">部分函数应用和柯里化</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/4.html#sections">节</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/4.html#as">As-模式</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/4.html#id15">通过组合函数来进行代码复用</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/4.html#id16">编写可读代码的提示</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/4.html#id17">内存泄漏和严格求值</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/4.html#seq">通过 seq 函数避免内存泄漏</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/4.html#id18">seq 的用法</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/5.html">第五章：编写 JSON 库</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#id1">JSON 简介</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#haskell-json">在 Haskell 中表示 JSON 数据</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#haskell">Haskell 模块</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#id2">编译 Haskell 代码</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#id3">载入模块和生成可执行文件</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#id4">打印 JSON 数据</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#type-inference-is-a-double-edge-sword">类型推导是一把双刃剑</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#a-more-general-look-at-rendering">更通用的转换方式</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#developing-haskell-code-without-going-nuts">Haskell 开发诀窍</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#pretty-printing-a-string">美观打印字符串</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#arrays-and-objects-and-the-module-header">数组和对象</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#writing-a-module-header">书写模块头</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#fleshing-out-the-pretty-printing-library">完成美观打印库</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/5.html#compact-rendering">紧凑转换</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/5.html#true-pretty-printing">真正的美观打印</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/5.html#following-the-pretty-printer">理解美观打印器</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/5.html#exercises">练习</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#creating-a-package">创建包</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/5.html#id19">为包添加描述</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/5.html#ghc">GHC 的包管理器</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/5.html#id20">配置，构建和安装</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/5.html#practical-pointers-and-further-reading">实用链接和扩展阅读</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/6.html">第六章：类型类</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/6.html#the-need-for-typeclasses">类型类的作用</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/6.html#what-are-typeclasses">什么是类型类？</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/6.html#declaring-typeclass-instances">定义类型类实例</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/6.html#important-built-in-typeclasses">几个重要的内置类型类</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/6.html#show">Show</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/6.html#read">Read</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/6.html#read-show">使用 <code class="docutils literal"><span class="pre">Read</span></code> 和 <code class="docutils literal"><span class="pre">Show</span></code> 进行序列化</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/6.html#numeric-types">数字类型</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/6.html#id7">相等性，有序和对比</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/6.html#id8">自动派生</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/6.html#json">类型类实战：让 JSON 更好用</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/6.html#more-helpful-errors">让错误信息更有用</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/6.html#making-an-instance-with-a-type-synonym">使用类型别名创建实例</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/6.html#living-in-an-open-world">生活在开放世界</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/6.html#overlapping-instances">什么时候重叠实例（Overlapping instances）会出问题？</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/6.html#relaxing-some-restrictions-on-typeclasses">取消类型类的一些限制</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/6.html#how-does-show-work-for-strings">字符串的 show 是如何工作的？</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/6.html#how-to-give-a-type-a-new-identity">如何给类型定义新身份（Identity）</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/6.html#data-newtype">data 和 newtype 的区别</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/6.html#summary-the-three-ways-of-naming-types">命名类型的三种方式</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/6.html#json-typeclasses-without-overlapping-instances">JSON typeclasses without overlapping instances</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/6.html#monomorphism-restriction">可怕的单一同态限定（monomorphism restriction）</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/6.html#conclusion">结论</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/7.html">第七章：I/O</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/7.html#haskelli-o">Haskell经典I/O</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#pure-vs-i-o">Pure vs. I/O</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id1">为什么纯不纯很重要？</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/7.html#handle">使用文件和句柄（Handle）</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#openfile">关于 openFile 的更多信息</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id2">关闭句柄</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#seek-and-tell">Seek and Tell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id3">标准输入，输出和错误</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id4">删除和重命名文件</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id5">临时文件</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/7.html#id6">扩展例子：函数式I/O和临时文件</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/7.html#id7">惰性I/O</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#hgetcontents">hGetContents</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#readfilewritefile">readFile和writeFile</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id8">一言以蔽惰性输出</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#interact">interact</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id9">interact 过滤器</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/7.html#the-io-monad">The IO Monad</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#actions">动作（Actions）</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id10">串联化</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#return">Return的本色</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/7.html#haskell">Haskell 实际上是命令式的吗？</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/7.html#id11">惰性I/O的副作用</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/7.html#buffering">缓冲区（Buffering）</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id12">缓冲区模式</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id13">刷新缓冲区</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/7.html#id14">读取命令行参数</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/7.html#id15">环境变量</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/8.html">第八章：高效文件处理、正则表达式、文件名匹配</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/8.html#id2">高效文件处理</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/8.html#i-o">二进制 I/O 和有限载入</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/8.html#id3">文本 I/O</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/8.html#id4">匹配文件名</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/8.html#haskell">Haskell 中的正则表达式</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/8.html#id5">结果的多种类型</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/8.html#id6">进一步了解正则表达式</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/8.html#id7">不同类型字符串的混合与匹配</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/8.html#id8">你要知道的其他一些事情</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/8.html#glob">将 glob 模式翻译为正则表达式</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/8.html#id9">练习</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/8.html#id10">重要的题外话：编写惰性函数</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/8.html#id11">利用我们的模式匹配器</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/8.html#id12">练习</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/8.html#api">通过 API 设计进行错误处理</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/8.html#id13">练习</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/8.html#id14">让我们的代码工作</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/8.html#id15">练习</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/9.html">第九章：I/O学习 —— 构建一个用于搜索文件系统的库</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/9.html#find">find命令</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/9.html#id1">简单的开始：递归遍历目录</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/9.html#id2">再次认识匿名和命名函数</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/9.html#mapm-form">为什么提供 <code class="docutils literal"><span class="pre">mapM</span></code> 和 <code class="docutils literal"><span class="pre">forM</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/9.html#id3">一个本地查找函数</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/9.html#id4">谓词在保持纯粹的同时支持从贫类型到富类型</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/9.html#id5">安全的获得一个文件的大小</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/9.html#id6">请求-使用-释放循环</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/9.html#id8">为谓词而开发的领域特定语言</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/9.html#lifting">多用提升（lifting）少用模板</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/9.html#id9">谓词组合</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/9.html#id10">定义并使用新算符</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/9.html#id11">控制遍历</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/9.html#id12">练习</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/9.html#id13">代码深度，可读性和学习过程</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/9.html#id14">观察迭代函数的另一种方法</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/9.html#id15">练习</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/9.html#id16">代码指南</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/9.html#id17">常用布局风格</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/9.html#id18">练习</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/10.html">第十章：代码案例学习：解析二进制数据格式</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/10.html#greyscale-files">灰度文件</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/10.html#pgm">解析原始 PGM 文件</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/10.html#getting-rid-of-boilerplate-code">消除样板代码</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/10.html#implicit-state">隐式状态</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/10.html#the-identity-parser">identity 解析器</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/10.html#record-syntax-updates-and-pattern-matching">记录语法、更新以及模式匹配</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/10.html#a-more-interesting-parser">一个更有趣的解析器</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/10.html#obtaining-and-modifying-the-parse-state">获取和修改解析状态</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/10.html#reporting-parse-errors">报告解析错误</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/10.html#chaining-parsers-together">把解析器串联起来</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/10.html#functor">Functor 简介</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/10.html#constraints-on-type-definitions-are-bad">给类型定义加约束不好</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/10.html#fmap">fmap 的中缀使用</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/10.html#flexible-instances">灵活实例</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/10.html#thinking-more-about-functors">更多关于 Functor 的思考</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/10.html#parse-functor">给 Parse 写一个 Functor 实例</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/10.html#using-functors-for-parsing">利用 Functor 解析</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/10.html#rewriting-our-pgm-parser">重构 PGM 解析器</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/10.html#future-directions">未来方向</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/10.html#id16">练习</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/11.html">第十一章：测试和质量保障</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/11.html#quickcheck">QuickCheck: 基于类型的测试</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/11.html#testing-for-properties">性质测试</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/11.html#testing-against-a-model">利用模型进行测试</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/11.html#testing-case-study-specifying-a-pretty-printer">测试案例学习：美观打印器</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/11.html#generating-test-data">生成测试数据</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/11.html#testing-document-construction">测试文档构建</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/11.html#using-lists-as-a-model">以列表为模型</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/11.html#putting-it-altogether">完成测试框架</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/11.html#hpc">用 HPC 衡量测试覆盖率</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/13.html">第十三章：数据结构</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/13.html#id2">关联列表</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/13.html#map">Map 类型</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/13.html#id3">函数也是数据</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/13.html#etc-password">扩展示例： /etc/password</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/13.html#numeric-types">扩展示例：数字类型（Numeric Types）</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/13.html#first-steps">第一步</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/13.html#completed-code">完整代码</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/13.html#exercises">练习</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/13.html#taking-advantage-of-functions-as-data">把函数当成数据来用</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/13.html#turning-difference-lists-into-a-proper-library">把差异列表转成库</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/13.html#monoids">列表、差异列表和幺半群（monoids）</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/13.html#id9">通用序列</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/18.html">第十八章： Monad变换器</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/18.html#id1">动机： 避免样板代码</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/18.html#id2">简单的Monad变换器实例</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/18.html#monadmonad">Monad和Monad变换器中的模式</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/18.html#id3">叠加多个Monad变换器</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/18.html#id4">缺失的类型参数呢？</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/18.html#id5">隐藏细节</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/18.html#id6">练习</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/18.html#id7">深入Monad栈中</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/18.html#id8">何时需要显式的抬举？</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/18.html#id9">构建以理解Monad变换器</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/18.html#id10">建立Monad变换器</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/18.html#id11">更多的类型类实例</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/18.html#monadparse">以Monad栈替代Parse类型</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/18.html#id12">练习</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/18.html#id13">注意变换器堆叠顺序</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/18.html#id14">纵观Monad与Monad变换器</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/18.html#id15">对纯代码的干涉</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/18.html#id16">对次序的过度限定</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/18.html#id17">运行时开销</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/18.html#id18">缺乏灵活性的接口</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/18.html#id19">综述</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/19.html">第十九章： 错误处理</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/19.html#id2">使用数据类型进行错误处理</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/19.html#maybe">使用Maybe</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/19.html#either">使用Either</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/19.html#id5">异常</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/19.html#id6">异常第一步</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/19.html#id7">惰性和异常处理</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/19.html#handle">使用handle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/19.html#id8">选择性地处理异常</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/19.html#i-o">I/O异常</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/19.html#id10">抛出异常</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/19.html#id11">动态异常</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/19.html#id12">练习</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/19.html#monad">monad中的错误处理</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/19.html#id14">一个小的解析构架</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/19.html#id15">级习</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/20.html">第二十章：使用 Haskell 进行系统编程</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/20.html#id1">调用外部程序</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/20.html#id3">目录和文件信息</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/20.html#id4">终止程序</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/20.html#id5">日期和时间</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/20.html#clocktime-calendartime">ClockTime 和 CalendarTime</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/20.html#id7">文件修改日期</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/20.html#id9">延伸的例子: 管道</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/20.html#id10">使用管道做重定向</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/20.html#id14">更好的管道</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/20.html#id15">关于管道，最后说几句</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/21.html">第二十一章：数据库的使用</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/21.html#hdbc">HDBC 简介</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/21.html#id6">安装 HDBC 和驱动</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/21.html#id9">连接数据库</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/21.html#id10">事务</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/21.html#id11">简单的查询示例</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/21.html#sqlvalue"><code class="docutils literal"><span class="pre">SqlValue</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/21.html#id12">查询参数</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/21.html#id13">预备语句</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/21.html#id16">读取结果</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/21.html#id17">使用语句进行数据读取操作</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/21.html#id18">惰性读取</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/21.html#id19">数据库元数据</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/21.html#id20">错误处理</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/22.html">第二十二章：扩展示例 —— Web 客户端编程</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/22.html#id1">基本类型</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/22.html#id2">数据库</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/22.html#id3">分析器</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/22.html#id4">下载</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/22.html#id5">主程序</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/27.html">第二七章：Socket 和 Syslog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/27.html#id1">基本网络</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/27.html#udp">使用 UDP 通信</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/27.html#udp-syslog">UDP 客户端例子：syslog</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/27.html#id3">UDP Syslog 服务器</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/27.html#tcp">使用 TCP 通信</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/27.html#id4">处理多个 TCP 流</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/27.html#tcp-syslog">TCP Syslog 服务器</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/27.html#id5">TCP Syslog 客户端</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/28.html">第二十八章：软件事务内存 (STM)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/28.html#id1">基础知识</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/28.html#id2">一些简单的例子</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/28.html#id3">STM的安全性</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/28.html#id4">重试一个事务</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/28.html#retry"><code class="docutils literal"><span class="pre">retry</span></code> 时到底发生了什么?</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/28.html#id5">选择替代方案</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/28.html#id6">在事务中使用高阶代码</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/28.html#i-o-stm">I/O 和 STM</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/28.html#id7">线程之间的通讯</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/28.html#id8">并发网络链接检查器</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/28.html#id9">检查一个链接</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/28.html#id10">工作者线程</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/28.html#id11">查找链接</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/28.html#id12">命令行的实现</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/28.html#pattern-guards">模式守卫 (Pattern guards)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/28.html#id13">STM的实践意义</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/28.html#id14">合理的放弃控制权</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/28.html#id15">使用不变量</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id2">
+<h2>翻译约定<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="convention.html">翻译约定</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="convention.html#id2">第二章</a></li>
+<li class="toctree-l2"><a class="reference internal" href="convention.html#id3">第三章</a></li>
+<li class="toctree-l2"><a class="reference internal" href="convention.html#id4">第四章</a></li>
+<li class="toctree-l2"><a class="reference internal" href="convention.html#id5">第五章</a></li>
+<li class="toctree-l2"><a class="reference internal" href="convention.html#id6">第六章</a></li>
+<li class="toctree-l2"><a class="reference internal" href="convention.html#id7">第十八章</a></li>
+<li class="toctree-l2"><a class="reference internal" href="convention.html#id8">第八章</a></li>
+<li class="toctree-l2"><a class="reference internal" href="convention.html#id9">第十九章</a></li>
+<li class="toctree-l2"><a class="reference internal" href="convention.html#id10">第二十八章</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="id3">
+<h2>关于<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<p>以下人员参与了本文档的翻译工作：</p>
+<ul class="simple">
+<li><a class="reference external" href="https://github.com/huangz1990">huangz</a></li>
+<li><a class="reference external" href="https://github.com/freizl">Haisheng, Wu</a></li>
+<li><a class="reference external" href="https://github.com/hbrls">Albert</a></li>
+<li><a class="reference external" href="https://github.com/yanguango">Guang Yang</a></li>
+<li><a class="reference external" href="https://github.com/labyrlnth">labyrlnth</a></li>
+<li><a class="reference external" href="https://github.com/Javran">Javran Cheng</a></li>
+<li><a class="reference external" href="https://github.com/bladewang">bladewang</a></li>
+<li><a class="reference external" href="https://github.com/spectatorwatcher">spectator</a></li>
+<li><a class="reference external" href="https://github.com/tiancaiamao">tiancaiamao</a></li>
+</ul>
+<p>除了进行翻译之外，本文档还在原书的基础上做了以下改进：</p>
+<ul class="simple">
+<li>修正原文正文和代码中的错误</li>
+<li>更新代码以符合最新的 Hasekll 规范</li>
+<li>在一些比较复杂的地方添加注释，帮助理解</li>
+</ul>
+<p>关注项目进度 / 反馈意见或建议 / 提交你的翻译贡献，
+请访问<a class="reference external" href="https://github.com/huangz1990/real-world-haskell-cn">项目的 github 页面</a>。</p>
+<p>本文档的部分内容参考了 <a class="reference external" href="http://www.feime.net/">AlbertLee</a> 的译本，在此对他表示感谢。</p>
+</div>
+<div class="section" id="id4">
+<h2>版权<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
+<p>本文档和原书一样，通过 CC 协议进行<a class="reference external" href="http://creativecommons.org/licenses/by-nc/3.0/deed.zh">署名-非商业性使用</a>授权。</p>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        <a class="uplink" href="#">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="chp/1.html">第一章：入门</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.1.
+    </div>
+  </body>
+</html>

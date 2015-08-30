@@ -1,0 +1,756 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>第二十二章：扩展示例 —— Web 客户端编程 &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
+    <link rel="next" title="第二七章：Socket 和 Syslog" href="27.html" />
+    <link rel="prev" title="第二十一章：数据库的使用" href="21.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="21.html">第二十一章：数据库的使用</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="27.html">第二七章：Socket 和 Syslog</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="web">
+<h1>第二十二章：扩展示例 —— Web 客户端编程<a class="headerlink" href="#web" title="Permalink to this headline">¶</a></h1>
+<p>到目前为止，
+我们已经了解过如何与数据库进行交互、如何进行语法分析（parse）以及如何处理错误。
+接下来，
+让我们更进一步，
+通过引入一个 web 客户端库来将这些知识结合在一起。</p>
+<p>在这一章，
+我们将要构建一个实际的程序：
+一个播客下载器（podcast downloader），
+或者叫“播客抓取器”（podcatcher）。
+这个博客抓取器的概念非常简单，
+它接受一系列 URL 作为输入，
+通过下载这些 URL 来得到一些 RSS 格式的 XML 文件，
+然后在这些 XML 文件里面找到下载音频文件所需的 URL 。</p>
+<p>播客抓取器常常会让用户通过将 RSS URL 添加到配置文件里面的方法来订阅播客，
+之后用户就可以定期地进行更新操作：
+播客抓取器会下载 RSS 文档，
+对它们进行检查以寻找音频文件的下载链接，
+并为用户下载所有目前尚未存在的音频文件。</p>
+<div class="admonition tip">
+<p class="first admonition-title">Tip</p>
+<p class="last">用户通常将 RSS 文件称之为“广播”（podcast）或是“广播源”（podcast feed），
+而每个单独的音频文件则是播客的其中一集（episode）。</p>
+</div>
+<p>为了实现具有类似功能的播客抓取器，
+我们需要以下几样东西：</p>
+<ul class="simple">
+<li>一个用于下载文件的 HTTP 客户端库；</li>
+<li>一个 XML 分析器；</li>
+<li>一种能够记录我们感兴趣的广播，并将这些记录永久地储存起来的方法；</li>
+<li>一种能够永久地记录已下载广播分集（episodes）的方法。</li>
+</ul>
+<p>这个列表的后两样可以通过使用 HDBC 设置的数据库来完成，
+而前两样则可以通过本章介绍的其他库模块来完成。</p>
+<div class="admonition tip">
+<p class="first admonition-title">Tip</p>
+<p class="last">本章的代码是专为本书而写的，
+但这些代码实际上是基于 hpodder —— 一个使用 Haskell 编写的播客抓取器来编写的。
+hpodder 拥有的特性比本书展示的播客抓取器要多得多，
+因此本书不太可能详细地对它进行介绍。
+如果读者对 hpodder 感兴趣的话，
+可以在 <a class="reference external" href="http://software.complete.org/hpodder">http://software.complete.org/hpodder</a> 找到 hpodder 的源代码。</p>
+</div>
+<p>本章的所有代码都是以自成一体的方式来编写的，
+每段代码都是一个独立的 Haskell 模块，
+读者可以通过 <strong>ghci</strong> 独立地运行这些模块。
+本章的最后会写出一段代码，
+将这些模块全部结合起来，
+构成一个完整的程序。
+我们首先要做的就是写出构建博客抓取器需要用到的基本类型。</p>
+<div class="section" id="id1">
+<h2>基本类型<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>为了构建播客抓取器，
+我们首先需要思考抓取器需要引入（important）的基本信息有那些。
+一般来说，
+抓取器关心的都是记录用户感兴趣的博客的信息，
+以及那些记录了用户已经看过和处理过的分集的信息。
+在有需要的时候改变这些信息并不困难，
+但是因为我们在整个抓取器里面都要用到这些信息，
+所以我们最好还是先定义它们：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch22/PodTypes.hs</span>
+<span class="kr">module</span> <span class="nn">PodTypes</span> <span class="kr">where</span>
+
+<span class="kr">data</span> <span class="kt">Podcast</span> <span class="ow">=</span>
+    <span class="kt">Podcast</span> <span class="p">{</span><span class="n">castId</span> <span class="ow">::</span> <span class="kt">Integer</span><span class="p">,</span> <span class="c1">-- ^ 这个播客的数字 ID</span>
+             <span class="n">castURL</span> <span class="ow">::</span> <span class="kt">String</span>  <span class="c1">-- ^ 这个播客的源 URL</span>
+            <span class="p">}</span>
+    <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Show</span><span class="p">,</span> <span class="kt">Read</span><span class="p">)</span>
+
+<span class="kr">data</span> <span class="kt">Episode</span> <span class="ow">=</span>
+    <span class="kt">Episode</span> <span class="p">{</span><span class="n">epId</span> <span class="ow">::</span> <span class="kt">Integer</span><span class="p">,</span>     <span class="c1">-- ^ 这个分集的数字 ID</span>
+             <span class="n">epCast</span> <span class="ow">::</span> <span class="kt">Podcast</span><span class="p">,</span>   <span class="c1">-- ^ 这个分集所属播客的 ID</span>
+             <span class="n">epURL</span> <span class="ow">::</span> <span class="kt">String</span><span class="p">,</span>     <span class="c1">-- ^ 下载这一集所使用的 URL</span>
+             <span class="n">epDone</span> <span class="ow">::</span> <span class="kt">Bool</span>       <span class="c1">-- ^ 记录用户是否已经看过这一集</span>
+            <span class="p">}</span>
+    <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Show</span><span class="p">,</span> <span class="kt">Read</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>这些信息将被储存到数据库里面。
+通过为每个播客和博客的每一集都创建一个独一无二的 ID ，
+程序可以更容易找到分集所属的播客，
+也可以更容易地从一个特定的播客或者分集里面载入信息，
+并且更好地应对将来可能会出现的“博客 URL 改变”这类情况。</p>
+</div>
+<div class="section" id="id2">
+<h2>数据库<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
+<p>接下来，
+我们需要编写代码，
+以便将信息永久地储存到数据库里面。
+我们最感兴趣的，
+就是通过数据库，
+将 <code class="docutils literal"><span class="pre">PodTypes.hs</span></code> 文件定义的 Haskell 结构中的数据储存到硬盘里面。
+并在用户首次运行程序的时候，
+创建储存数据所需的数据库表。</p>
+<p>我们将使用 21 章介绍过的 HDBC 与 Sqlite 数据库进行交互。
+Sqlite 非常轻量，
+并且是自包含的（self-contained），
+因此它对于这个小项目来说简直是再合适不过了。
+HDBC 和 Sqlite 的安装方法可以在 21 章的《安装 HDBC 和驱动》一节看到。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch22/PodDB.hs</span>
+<span class="kr">module</span> <span class="nn">PodDB</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">Database.HDBC</span>
+<span class="kr">import</span> <span class="nn">Database.HDBC.Sqlite3</span>
+<span class="kr">import</span> <span class="nn">PodTypes</span>
+<span class="kr">import</span> <span class="nn">Control.Monad</span><span class="p">(</span><span class="n">when</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Data.List</span><span class="p">(</span><span class="n">sort</span><span class="p">)</span>
+
+<span class="c1">-- | Initialize DB and return database Connection</span>
+<span class="nf">connect</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">Connection</span>
+<span class="nf">connect</span> <span class="n">fp</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">dbh</span> <span class="ow">&lt;-</span> <span class="n">connectSqlite3</span> <span class="n">fp</span>
+       <span class="n">prepDB</span> <span class="n">dbh</span>
+       <span class="n">return</span> <span class="n">dbh</span>
+
+<span class="cm">{- | 对数据库进行设置，做好储存数据的准备。</span>
+
+<span class="cm">这个程序会创建两个表，并要求数据库引擎为我们检查某些数据的一致性：</span>
+
+<span class="cm">* castid 和 epid 都是独一无二的主键（unique primary keys），它们的值不能重复</span>
+<span class="cm">* castURL 的值也应该是独一无二的</span>
+<span class="cm">* 在记录分集的表里面，对于一个给定的播客（epcast)，每个给定的 URL 或者分集 ID 只能出现一次</span>
+<span class="cm">-}</span>
+<span class="nf">prepDB</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span> <span class="n">conn</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">prepDB</span> <span class="n">dbh</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">tables</span> <span class="ow">&lt;-</span> <span class="n">getTables</span> <span class="n">dbh</span>
+        <span class="n">when</span> <span class="p">(</span><span class="n">not</span> <span class="p">(</span><span class="s">&quot;podcasts&quot;</span> <span class="p">`</span><span class="n">elem</span><span class="p">`</span> <span class="n">tables</span><span class="p">))</span> <span class="o">$</span>
+            <span class="kr">do</span> <span class="n">run</span> <span class="n">dbh</span> <span class="s">&quot;CREATE TABLE podcasts (</span><span class="se">\</span>
+<span class="se">                        \</span><span class="s">castid INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,</span><span class="se">\</span>
+<span class="se">                        \</span><span class="s">castURL TEXT NOT NULL UNIQUE)&quot;</span> <span class="kt">[]</span>
+               <span class="n">return</span> <span class="nb">()</span>
+        <span class="n">when</span> <span class="p">(</span><span class="n">not</span> <span class="p">(</span><span class="s">&quot;episodes&quot;</span> <span class="p">`</span><span class="n">elem</span><span class="p">`</span> <span class="n">tables</span><span class="p">))</span> <span class="o">$</span>
+            <span class="kr">do</span> <span class="n">run</span> <span class="n">dbh</span> <span class="s">&quot;CREATE TABLE episodes (</span><span class="se">\</span>
+<span class="se">                        \</span><span class="s">epid INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,</span><span class="se">\</span>
+<span class="se">                        \</span><span class="s">epcastid INTEGER NOT NULL,</span><span class="se">\</span>
+<span class="se">                        \</span><span class="s">epurl TEXT NOT NULL,</span><span class="se">\</span>
+<span class="se">                        \</span><span class="s">epdone INTEGER NOT NULL,</span><span class="se">\</span>
+<span class="se">                        \</span><span class="s">UNIQUE(epcastid, epurl),</span><span class="se">\</span>
+<span class="se">                        \</span><span class="s">UNIQUE(epcastid, epid))&quot;</span> <span class="kt">[]</span>
+               <span class="n">return</span> <span class="nb">()</span>
+        <span class="n">commit</span> <span class="n">dbh</span>
+
+<span class="cm">{- | 将一个新的播客添加到数据库里面。</span>
+<span class="cm">在创建播客时忽略播客的 castid ，并返回一个包含了 castid 的新对象。</span>
+
+<span class="cm">尝试添加一个已经存在的播客将引发一个错误。 -}</span>
+<span class="nf">addPodcast</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span> <span class="n">conn</span> <span class="ow">-&gt;</span> <span class="kt">Podcast</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">Podcast</span>
+<span class="nf">addPodcast</span> <span class="n">dbh</span> <span class="n">podcast</span> <span class="ow">=</span>
+    <span class="n">handleSql</span> <span class="n">errorHandler</span> <span class="o">$</span>
+        <span class="kr">do</span> <span class="c1">-- Insert the castURL into the table.  The database</span>
+           <span class="c1">-- will automatically assign a cast ID.</span>
+           <span class="n">run</span> <span class="n">dbh</span> <span class="s">&quot;INSERT INTO podcasts (castURL) VALUES (?)&quot;</span>
+               <span class="p">[</span><span class="n">toSql</span> <span class="p">(</span><span class="n">castURL</span> <span class="n">podcast</span><span class="p">)]</span>
+           <span class="c1">-- Find out the castID for the URL we just added.</span>
+           <span class="n">r</span> <span class="ow">&lt;-</span> <span class="n">quickQuery&#39;</span> <span class="n">dbh</span> <span class="s">&quot;SELECT castid FROM podcasts WHERE castURL = ?&quot;</span>
+                <span class="p">[</span><span class="n">toSql</span> <span class="p">(</span><span class="n">castURL</span> <span class="n">podcast</span><span class="p">)]</span>
+           <span class="kr">case</span> <span class="n">r</span> <span class="kr">of</span>
+             <span class="p">[[</span><span class="n">x</span><span class="p">]]</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="o">$</span> <span class="n">podcast</span> <span class="p">{</span><span class="n">castId</span> <span class="ow">=</span> <span class="n">fromSql</span> <span class="n">x</span><span class="p">}</span>
+             <span class="n">y</span> <span class="ow">-&gt;</span> <span class="n">fail</span> <span class="o">$</span> <span class="s">&quot;addPodcast: unexpected result: &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">y</span>
+    <span class="kr">where</span> <span class="n">errorHandler</span> <span class="n">e</span> <span class="ow">=</span>
+              <span class="kr">do</span> <span class="n">fail</span> <span class="o">$</span> <span class="s">&quot;Error adding podcast; does this URL already exist?</span><span class="se">\n</span><span class="s">&quot;</span>
+                     <span class="o">++</span> <span class="n">show</span> <span class="n">e</span>
+
+<span class="cm">{- | 将一个新的分集添加到数据库里面。</span>
+
+<span class="cm">因为这一操作是自动执行而非用户请求执行的，我们将简单地忽略创建重复分集的请求。</span>
+<span class="cm">这样的话，在对播客源进行处理的时候，我们就可以把遇到的所有 URL 到传给这个函数，</span>
+<span class="cm">而不必先检查这个 URL 是否已经存在于数据库当中。</span>
+
+<span class="cm">这个函数在创建新的分集时同样不会考虑如何创建新的 ID ，</span>
+<span class="cm">因此它也没有必要去考虑如何去获取这个 ID 。 -}</span>
+<span class="nf">addEpisode</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span> <span class="n">conn</span> <span class="ow">-&gt;</span> <span class="kt">Episode</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">addEpisode</span> <span class="n">dbh</span> <span class="n">ep</span> <span class="ow">=</span>
+    <span class="n">run</span> <span class="n">dbh</span> <span class="s">&quot;INSERT OR IGNORE INTO episodes (epCastId, epURL, epDone) </span><span class="se">\</span>
+<span class="se">            \</span><span class="s">VALUES (?, ?, ?)&quot;</span>
+            <span class="p">[</span><span class="n">toSql</span> <span class="p">(</span><span class="n">castId</span> <span class="o">.</span> <span class="n">epCast</span> <span class="o">$</span> <span class="n">ep</span><span class="p">),</span> <span class="n">toSql</span> <span class="p">(</span><span class="n">epURL</span> <span class="n">ep</span><span class="p">),</span>
+             <span class="n">toSql</span> <span class="p">(</span><span class="n">epDone</span> <span class="n">ep</span><span class="p">)]</span>
+    <span class="o">&gt;&gt;</span> <span class="n">return</span> <span class="nb">()</span>
+
+<span class="cm">{- | 对一个已经存在的播客进行修改。</span>
+<span class="cm">根据 ID 来查找指定的播客，并根据传入的 Podcast 结构对数据库记录进行修改。 -}</span>
+<span class="nf">updatePodcast</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span> <span class="n">conn</span> <span class="ow">-&gt;</span> <span class="kt">Podcast</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">updatePodcast</span> <span class="n">dbh</span> <span class="n">podcast</span> <span class="ow">=</span>
+    <span class="n">run</span> <span class="n">dbh</span> <span class="s">&quot;UPDATE podcasts SET castURL = ? WHERE castId = ?&quot;</span>
+            <span class="p">[</span><span class="n">toSql</span> <span class="p">(</span><span class="n">castURL</span> <span class="n">podcast</span><span class="p">),</span> <span class="n">toSql</span> <span class="p">(</span><span class="n">castId</span> <span class="n">podcast</span><span class="p">)]</span>
+    <span class="o">&gt;&gt;</span> <span class="n">return</span> <span class="nb">()</span>
+
+<span class="cm">{- | 对一个已经存在的分集进行修改。</span>
+<span class="cm">根据 ID 来查找指定的分集，并根据传入的 episode 结构对数据库记录进行修改。 -}</span>
+<span class="nf">updateEpisode</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span> <span class="n">conn</span> <span class="ow">-&gt;</span> <span class="kt">Episode</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">updateEpisode</span> <span class="n">dbh</span> <span class="n">episode</span> <span class="ow">=</span>
+    <span class="n">run</span> <span class="n">dbh</span> <span class="s">&quot;UPDATE episodes SET epCastId = ?, epURL = ?, epDone = ? </span><span class="se">\</span>
+<span class="se">            \</span><span class="s">WHERE epId = ?&quot;</span>
+            <span class="p">[</span><span class="n">toSql</span> <span class="p">(</span><span class="n">castId</span> <span class="o">.</span> <span class="n">epCast</span> <span class="o">$</span> <span class="n">episode</span><span class="p">),</span>
+             <span class="n">toSql</span> <span class="p">(</span><span class="n">epURL</span> <span class="n">episode</span><span class="p">),</span>
+             <span class="n">toSql</span> <span class="p">(</span><span class="n">epDone</span> <span class="n">episode</span><span class="p">),</span>
+             <span class="n">toSql</span> <span class="p">(</span><span class="n">epId</span> <span class="n">episode</span><span class="p">)]</span>
+    <span class="o">&gt;&gt;</span> <span class="n">return</span> <span class="nb">()</span>
+
+<span class="cm">{- | 移除一个播客。 这个操作在执行之前会先移除这个播客已有的所有分集。 -}</span>
+<span class="nf">removePodcast</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span> <span class="n">conn</span> <span class="ow">-&gt;</span> <span class="kt">Podcast</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">removePodcast</span> <span class="n">dbh</span> <span class="n">podcast</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">run</span> <span class="n">dbh</span> <span class="s">&quot;DELETE FROM episodes WHERE epcastid = ?&quot;</span>
+         <span class="p">[</span><span class="n">toSql</span> <span class="p">(</span><span class="n">castId</span> <span class="n">podcast</span><span class="p">)]</span>
+       <span class="n">run</span> <span class="n">dbh</span> <span class="s">&quot;DELETE FROM podcasts WHERE castid = ?&quot;</span>
+         <span class="p">[</span><span class="n">toSql</span> <span class="p">(</span><span class="n">castId</span> <span class="n">podcast</span><span class="p">)]</span>
+       <span class="n">return</span> <span class="nb">()</span>
+
+<span class="cm">{- | 获取一个包含所有播客的列表。 -}</span>
+<span class="nf">getPodcasts</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span> <span class="n">conn</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">Podcast</span><span class="p">]</span>
+<span class="nf">getPodcasts</span> <span class="n">dbh</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">res</span> <span class="ow">&lt;-</span> <span class="n">quickQuery&#39;</span> <span class="n">dbh</span>
+              <span class="s">&quot;SELECT castid, casturl FROM podcasts ORDER BY castid&quot;</span> <span class="kt">[]</span>
+       <span class="n">return</span> <span class="p">(</span><span class="n">map</span> <span class="n">convPodcastRow</span> <span class="n">res</span><span class="p">)</span>
+
+<span class="cm">{- | 获取特定的广播。</span>
+<span class="cm">函数在成功执行时返回 Just Podcast ；在 ID 不匹配时返回 Nothing 。 -}</span>
+<span class="nf">getPodcast</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span> <span class="n">conn</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="kt">Podcast</span><span class="p">)</span>
+<span class="nf">getPodcast</span> <span class="n">dbh</span> <span class="n">wantedId</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">res</span> <span class="ow">&lt;-</span> <span class="n">quickQuery&#39;</span> <span class="n">dbh</span>
+              <span class="s">&quot;SELECT castid, casturl FROM podcasts WHERE castid = ?&quot;</span>
+              <span class="p">[</span><span class="n">toSql</span> <span class="n">wantedId</span><span class="p">]</span>
+       <span class="kr">case</span> <span class="n">res</span> <span class="kr">of</span>
+         <span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="p">(</span><span class="kt">Just</span> <span class="p">(</span><span class="n">convPodcastRow</span> <span class="n">x</span><span class="p">))</span>
+         <span class="kt">[]</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="kt">Nothing</span>
+         <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">fail</span> <span class="o">$</span> <span class="s">&quot;Really bad error; more than one podcast with ID&quot;</span>
+
+<span class="cm">{- | 将 SELECT 语句的执行结果转换为 Podcast 记录 -}</span>
+<span class="nf">convPodcastRow</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">SqlValue</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Podcast</span>
+<span class="nf">convPodcastRow</span> <span class="p">[</span><span class="n">svId</span><span class="p">,</span> <span class="n">svURL</span><span class="p">]</span> <span class="ow">=</span>
+    <span class="kt">Podcast</span> <span class="p">{</span><span class="n">castId</span> <span class="ow">=</span> <span class="n">fromSql</span> <span class="n">svId</span><span class="p">,</span>
+             <span class="n">castURL</span> <span class="ow">=</span> <span class="n">fromSql</span> <span class="n">svURL</span><span class="p">}</span>
+<span class="nf">convPodcastRow</span> <span class="n">x</span> <span class="ow">=</span> <span class="ne">error</span> <span class="o">$</span> <span class="s">&quot;Can&#39;t convert podcast row &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">x</span>
+
+<span class="cm">{- | 获取特定播客的所有分集。 -}</span>
+<span class="nf">getPodcastEpisodes</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span> <span class="n">conn</span> <span class="ow">-&gt;</span> <span class="kt">Podcast</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">Episode</span><span class="p">]</span>
+<span class="nf">getPodcastEpisodes</span> <span class="n">dbh</span> <span class="n">pc</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">r</span> <span class="ow">&lt;-</span> <span class="n">quickQuery&#39;</span> <span class="n">dbh</span>
+            <span class="s">&quot;SELECT epId, epURL, epDone FROM episodes WHERE epCastId = ?&quot;</span>
+            <span class="p">[</span><span class="n">toSql</span> <span class="p">(</span><span class="n">castId</span> <span class="n">pc</span><span class="p">)]</span>
+       <span class="n">return</span> <span class="p">(</span><span class="n">map</span> <span class="n">convEpisodeRow</span> <span class="n">r</span><span class="p">)</span>
+    <span class="kr">where</span> <span class="n">convEpisodeRow</span> <span class="p">[</span><span class="n">svId</span><span class="p">,</span> <span class="n">svURL</span><span class="p">,</span> <span class="n">svDone</span><span class="p">]</span> <span class="ow">=</span>
+              <span class="kt">Episode</span> <span class="p">{</span><span class="n">epId</span> <span class="ow">=</span> <span class="n">fromSql</span> <span class="n">svId</span><span class="p">,</span> <span class="n">epURL</span> <span class="ow">=</span> <span class="n">fromSql</span> <span class="n">svURL</span><span class="p">,</span>
+                       <span class="n">epDone</span> <span class="ow">=</span> <span class="n">fromSql</span> <span class="n">svDone</span><span class="p">,</span> <span class="n">epCast</span> <span class="ow">=</span> <span class="n">pc</span><span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">PodDB</span></code> 模块定义了连接数据库的函数、创建所需数据库表的函数、将数据添加到数据库里面的函数、查询数据库的函数以及从数据库里面移除数据的函数。
+以下代码展示了一个与数据库进行交互的 <strong>ghci</strong> 会话，
+这个会话将在当前目录里面创建一个名为 <code class="docutils literal"><span class="pre">poddbtest.db</span></code> 的数据库文件，
+并将广播和分集添加到这个文件里面。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">PodDB</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">PodTypes</span>         <span class="p">(</span> <span class="kt">PodTypes</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="p">[</span><span class="mi">2</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">PodDB</span>            <span class="p">(</span> <span class="kt">PodDB</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">PodDB</span><span class="p">,</span> <span class="kt">PodTypes</span><span class="o">.</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">dbh</span> <span class="ow">&lt;-</span> <span class="n">connect</span> <span class="s">&quot;poddbtest.db&quot;</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">dbh</span>
+<span class="nf">dbh</span> <span class="ow">::</span> <span class="kt">Connection</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getTables</span> <span class="n">dbh</span>
+<span class="p">[</span><span class="s">&quot;episodes&quot;</span><span class="p">,</span><span class="s">&quot;podcasts&quot;</span><span class="p">,</span><span class="s">&quot;sqlite_sequence&quot;</span><span class="p">]</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">url</span> <span class="ow">=</span> <span class="s">&quot;http://feeds.thisamericanlife.org/talpodcast&quot;</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">pc</span> <span class="ow">&lt;-</span> <span class="n">addPodcast</span> <span class="n">dbh</span> <span class="p">(</span><span class="kt">Podcast</span> <span class="p">{</span><span class="n">castId</span><span class="ow">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">castURL</span><span class="ow">=</span><span class="n">url</span><span class="p">})</span>
+<span class="kt">Podcast</span> <span class="p">{</span><span class="n">castId</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">castURL</span> <span class="ow">=</span> <span class="s">&quot;http://feeds.thisamericanlife.org/talpodcast&quot;</span><span class="p">}</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getPodcasts</span> <span class="n">dbh</span>
+<span class="p">[</span><span class="kt">Podcast</span> <span class="p">{</span><span class="n">castId</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">castURL</span> <span class="ow">=</span> <span class="s">&quot;http://feeds.thisamericanlife.org/talpodcast&quot;</span><span class="p">}]</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">addEpisode</span> <span class="n">dbh</span> <span class="p">(</span><span class="kt">Episode</span> <span class="p">{</span><span class="n">epId</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">epCast</span> <span class="ow">=</span> <span class="n">pc</span><span class="p">,</span> <span class="n">epURL</span> <span class="ow">=</span> <span class="s">&quot;http://www.example.com/foo.mp3&quot;</span><span class="p">,</span> <span class="n">epDone</span> <span class="ow">=</span> <span class="kt">False</span><span class="p">})</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getPodcastEpisodes</span> <span class="n">dbh</span> <span class="n">pc</span>
+<span class="p">[</span><span class="kt">Episode</span> <span class="p">{</span><span class="n">epId</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">epCast</span> <span class="ow">=</span> <span class="kt">Podcast</span> <span class="p">{</span><span class="n">castId</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">castURL</span> <span class="ow">=</span> <span class="s">&quot;http://feeds.thisamericanlife.org/talpodcast&quot;</span><span class="p">},</span> <span class="n">epURL</span> <span class="ow">=</span> <span class="s">&quot;http://www.example.com/foo.mp3&quot;</span><span class="p">,</span> <span class="n">epDone</span> <span class="ow">=</span> <span class="kt">False</span><span class="p">}]</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">commit</span> <span class="n">dbh</span>
+
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">disconnect</span> <span class="n">dbh</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id3">
+<h2>分析器<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<p>在实现了抓取器的数据库部分之后，
+我们接下来就需要实现抓取器中负责对广播源进行语法分析的部分，
+这个部分要分析的是一些包含着多种信息的 XML 文件，
+例子如下：</p>
+<div class="highlight-xml"><div class="highlight"><pre><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
+<span class="nt">&lt;rss</span> <span class="na">xmlns:itunes=</span><span class="s">&quot;http://www.itunes.com/DTDs/Podcast-1.0.dtd&quot;</span> <span class="na">version=</span><span class="s">&quot;2.0&quot;</span><span class="nt">&gt;</span>
+<span class="nt">&lt;channel&gt;</span>
+<span class="nt">&lt;title&gt;</span>Haskell Radio<span class="nt">&lt;/title&gt;</span>
+<span class="nt">&lt;link&gt;</span>http://www.example.com/radio/<span class="nt">&lt;/link&gt;</span>
+<span class="nt">&lt;description&gt;</span>Description of this podcast<span class="nt">&lt;/description&gt;</span>
+<span class="nt">&lt;item&gt;</span>
+<span class="nt">&lt;title&gt;</span>Episode 2: Lambdas<span class="nt">&lt;/title&gt;</span>
+<span class="nt">&lt;link&gt;</span>http://www.example.com/radio/lambdas<span class="nt">&lt;/link&gt;</span>
+<span class="nt">&lt;enclosure</span> <span class="na">url=</span><span class="s">&quot;http://www.example.com/radio/lambdas.mp3&quot;</span>
+<span class="na">type=</span><span class="s">&quot;audio/mpeg&quot;</span> <span class="na">length=</span><span class="s">&quot;10485760&quot;</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/item&gt;</span>
+<span class="nt">&lt;item&gt;</span>
+<span class="nt">&lt;title&gt;</span>Episode 1: Parsec<span class="nt">&lt;/title&gt;</span>
+<span class="nt">&lt;link&gt;</span>http://www.example.com/radio/parsec<span class="nt">&lt;/link&gt;</span>
+<span class="nt">&lt;enclosure</span> <span class="na">url=</span><span class="s">&quot;http://www.example.com/radio/parsec.mp3&quot;</span>
+<span class="na">type=</span><span class="s">&quot;audio/mpeg&quot;</span> <span class="na">length=</span><span class="s">&quot;10485150&quot;</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/item&gt;</span>
+<span class="nt">&lt;/channel&gt;</span>
+<span class="nt">&lt;/rss&gt;</span>
+</pre></div>
+</div>
+<p>在这些文件里面，
+我们最关心的是两样东西：
+广播的标题以及它们的附件（enclosure） URL 。
+我们将使用 <a class="reference external" href="http://www.cs.york.ac.uk/fp/HaXml/">HaXml 工具包</a>来对 XML 文件进行分析，
+以下代码就是这个工具包的源码：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch22/PodParser.hs</span>
+<span class="kr">module</span> <span class="nn">PodParser</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">PodTypes</span>
+<span class="kr">import</span> <span class="nn">Text.XML.HaXml</span>
+<span class="kr">import</span> <span class="nn">Text.XML.HaXml.Parse</span>
+<span class="kr">import</span> <span class="nn">Text.XML.HaXml.Html.Generate</span><span class="p">(</span><span class="n">showattr</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Data.Char</span>
+<span class="kr">import</span> <span class="nn">Data.List</span>
+
+<span class="kr">data</span> <span class="kt">PodItem</span> <span class="ow">=</span> <span class="kt">PodItem</span> <span class="p">{</span><span class="n">itemtitle</span> <span class="ow">::</span> <span class="kt">String</span><span class="p">,</span>
+                  <span class="n">enclosureurl</span> <span class="ow">::</span> <span class="kt">String</span>
+                  <span class="p">}</span>
+          <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Show</span><span class="p">,</span> <span class="kt">Read</span><span class="p">)</span>
+
+<span class="kr">data</span> <span class="kt">Feed</span> <span class="ow">=</span> <span class="kt">Feed</span> <span class="p">{</span><span class="n">channeltitle</span> <span class="ow">::</span> <span class="kt">String</span><span class="p">,</span>
+                  <span class="n">items</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">PodItem</span><span class="p">]}</span>
+            <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Show</span><span class="p">,</span> <span class="kt">Read</span><span class="p">)</span>
+
+<span class="cm">{- | 根据给定的广播和 PodItem ，产生一个分集。 -}</span>
+<span class="nf">item2ep</span> <span class="ow">::</span> <span class="kt">Podcast</span> <span class="ow">-&gt;</span> <span class="kt">PodItem</span> <span class="ow">-&gt;</span> <span class="kt">Episode</span>
+<span class="nf">item2ep</span> <span class="n">pc</span> <span class="n">item</span> <span class="ow">=</span>
+    <span class="kt">Episode</span> <span class="p">{</span><span class="n">epId</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span>
+             <span class="n">epCast</span> <span class="ow">=</span> <span class="n">pc</span><span class="p">,</span>
+             <span class="n">epURL</span> <span class="ow">=</span> <span class="n">enclosureurl</span> <span class="n">item</span><span class="p">,</span>
+             <span class="n">epDone</span> <span class="ow">=</span> <span class="kt">False</span><span class="p">}</span>
+
+<span class="cm">{- | 从给定的字符串里面分析出数据，给定的名字在有需要的时候会被用在错误消息里面。 -}</span>
+<span class="nf">parse</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Feed</span>
+<span class="nf">parse</span> <span class="n">content</span> <span class="n">name</span> <span class="ow">=</span>
+    <span class="kt">Feed</span> <span class="p">{</span><span class="n">channeltitle</span> <span class="ow">=</span> <span class="n">getTitle</span> <span class="n">doc</span><span class="p">,</span>
+          <span class="n">items</span> <span class="ow">=</span> <span class="n">getEnclosures</span> <span class="n">doc</span><span class="p">}</span>
+
+    <span class="kr">where</span> <span class="n">parseResult</span> <span class="ow">=</span> <span class="n">xmlParse</span> <span class="n">name</span> <span class="p">(</span><span class="n">stripUnicodeBOM</span> <span class="n">content</span><span class="p">)</span>
+          <span class="n">doc</span> <span class="ow">=</span> <span class="n">getContent</span> <span class="n">parseResult</span>
+
+          <span class="n">getContent</span> <span class="ow">::</span> <span class="kt">Document</span> <span class="ow">-&gt;</span> <span class="kt">Content</span>
+          <span class="n">getContent</span> <span class="p">(</span><span class="kt">Document</span> <span class="kr">_</span> <span class="kr">_</span> <span class="n">e</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">CElem</span> <span class="n">e</span>
+
+          <span class="cm">{- | Some Unicode documents begin with a binary sequence;</span>
+<span class="cm">          strip it off before processing. -}</span>
+          <span class="n">stripUnicodeBOM</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+          <span class="n">stripUnicodeBOM</span> <span class="p">(</span><span class="sc">&#39;</span><span class="se">\xef</span><span class="sc">&#39;</span><span class="kt">:</span><span class="sc">&#39;</span><span class="se">\xbb</span><span class="sc">&#39;</span><span class="kt">:</span><span class="sc">&#39;</span><span class="se">\xbf</span><span class="sc">&#39;</span><span class="kt">:</span><span class="n">x</span><span class="p">)</span> <span class="ow">=</span> <span class="n">x</span>
+          <span class="n">stripUnicodeBOM</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">x</span>
+
+<span class="cm">{- | 从文档里面提取出频道部分（channel part）</span>
+
+<span class="cm">注意 HaXml 会将 CFilter 定义为：</span>
+
+<span class="cm">&gt; type CFilter = Content -&gt; [Content]</span>
+<span class="cm">-}</span>
+<span class="nf">channel</span> <span class="ow">::</span> <span class="kt">CFilter</span>
+<span class="nf">channel</span> <span class="ow">=</span> <span class="n">tag</span> <span class="s">&quot;rss&quot;</span> <span class="o">/&gt;</span> <span class="n">tag</span> <span class="s">&quot;channel&quot;</span>
+
+<span class="nf">getTitle</span> <span class="ow">::</span> <span class="kt">Content</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">getTitle</span> <span class="n">doc</span> <span class="ow">=</span>
+    <span class="n">contentToStringDefault</span> <span class="s">&quot;Untitled Podcast&quot;</span>
+        <span class="p">(</span><span class="n">channel</span> <span class="o">/&gt;</span> <span class="n">tag</span> <span class="s">&quot;title&quot;</span> <span class="o">/&gt;</span> <span class="n">txt</span> <span class="o">$</span> <span class="n">doc</span><span class="p">)</span>
+
+<span class="nf">getEnclosures</span> <span class="ow">::</span> <span class="kt">Content</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">PodItem</span><span class="p">]</span>
+<span class="nf">getEnclosures</span> <span class="n">doc</span> <span class="ow">=</span>
+    <span class="n">concatMap</span> <span class="n">procPodItem</span> <span class="o">$</span> <span class="n">getPodItems</span> <span class="n">doc</span>
+    <span class="kr">where</span> <span class="n">procPodItem</span> <span class="ow">::</span> <span class="kt">Content</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">PodItem</span><span class="p">]</span>
+          <span class="n">procPodItem</span> <span class="n">item</span> <span class="ow">=</span> <span class="n">concatMap</span> <span class="p">(</span><span class="n">procEnclosure</span> <span class="n">title</span><span class="p">)</span> <span class="n">enclosure</span>
+              <span class="kr">where</span> <span class="n">title</span> <span class="ow">=</span> <span class="n">contentToStringDefault</span> <span class="s">&quot;Untitled Episode&quot;</span>
+                               <span class="p">(</span><span class="n">keep</span> <span class="o">/&gt;</span> <span class="n">tag</span> <span class="s">&quot;title&quot;</span> <span class="o">/&gt;</span> <span class="n">txt</span> <span class="o">$</span> <span class="n">item</span><span class="p">)</span>
+                    <span class="n">enclosure</span> <span class="ow">=</span> <span class="p">(</span><span class="n">keep</span> <span class="o">/&gt;</span> <span class="n">tag</span> <span class="s">&quot;enclosure&quot;</span><span class="p">)</span> <span class="n">item</span>
+
+          <span class="n">getPodItems</span> <span class="ow">::</span> <span class="kt">CFilter</span>
+          <span class="n">getPodItems</span> <span class="ow">=</span> <span class="n">channel</span> <span class="o">/&gt;</span> <span class="n">tag</span> <span class="s">&quot;item&quot;</span>
+
+          <span class="n">procEnclosure</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Content</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">PodItem</span><span class="p">]</span>
+          <span class="n">procEnclosure</span> <span class="n">title</span> <span class="n">enclosure</span> <span class="ow">=</span>
+              <span class="n">map</span> <span class="n">makePodItem</span> <span class="p">(</span><span class="n">showattr</span> <span class="s">&quot;url&quot;</span> <span class="n">enclosure</span><span class="p">)</span>
+              <span class="kr">where</span> <span class="n">makePodItem</span> <span class="ow">::</span> <span class="kt">Content</span> <span class="ow">-&gt;</span> <span class="kt">PodItem</span>
+                    <span class="n">makePodItem</span> <span class="n">x</span> <span class="ow">=</span> <span class="kt">PodItem</span> <span class="p">{</span><span class="n">itemtitle</span> <span class="ow">=</span> <span class="n">title</span><span class="p">,</span>
+                                       <span class="n">enclosureurl</span> <span class="ow">=</span> <span class="n">contentToString</span> <span class="p">[</span><span class="n">x</span><span class="p">]}</span>
+
+<span class="cm">{- | 将 [Content] 转换为可打印的字符串，</span>
+<span class="cm">如果传入的 [Content] 为 [] ，那么向用户说明此次匹配未成功。 -}</span>
+<span class="nf">contentToStringDefault</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Content</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">contentToStringDefault</span> <span class="n">msg</span> <span class="kt">[]</span> <span class="ow">=</span> <span class="n">msg</span>
+<span class="nf">contentToStringDefault</span> <span class="kr">_</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">contentToString</span> <span class="n">x</span>
+
+<span class="cm">{- | 将 [Content] 转换为可打印的字符串，并且小心地对它进行反解码（unescape）。</span>
+
+<span class="cm">一个没有反解码实现的实现可以简单地定义为：</span>
+
+<span class="cm">&gt; contentToString = concatMap (show . content)</span>
+
+<span class="cm">因为 HaXml 的反解码操作只能对 Elements 使用，</span>
+<span class="cm">我们必须保证每个 Content 都被包裹为 Element ，</span>
+<span class="cm">然后使用 txt 函数去将 Element 内部的数据提取出来。 -}</span>
+<span class="nf">contentToString</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Content</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">contentToString</span> <span class="ow">=</span>
+    <span class="n">concatMap</span> <span class="n">procContent</span>
+    <span class="kr">where</span> <span class="n">procContent</span> <span class="n">x</span> <span class="ow">=</span>
+              <span class="n">verbatim</span> <span class="o">$</span> <span class="n">keep</span> <span class="o">/&gt;</span> <span class="n">txt</span> <span class="o">$</span> <span class="kt">CElem</span> <span class="p">(</span><span class="n">unesc</span> <span class="p">(</span><span class="n">fakeElem</span> <span class="n">x</span><span class="p">))</span>
+
+          <span class="n">fakeElem</span> <span class="ow">::</span> <span class="kt">Content</span> <span class="ow">-&gt;</span> <span class="kt">Element</span>
+          <span class="n">fakeElem</span> <span class="n">x</span> <span class="ow">=</span> <span class="kt">Elem</span> <span class="s">&quot;fake&quot;</span> <span class="kt">[]</span> <span class="p">[</span><span class="n">x</span><span class="p">]</span>
+
+          <span class="n">unesc</span> <span class="ow">::</span> <span class="kt">Element</span> <span class="ow">-&gt;</span> <span class="kt">Element</span>
+          <span class="n">unesc</span> <span class="ow">=</span> <span class="n">xmlUnEscape</span> <span class="n">stdXmlEscaper</span>
+</pre></div>
+</div>
+<p>让我们好好看看这段代码。
+它首先定义了两种类型：
+<code class="docutils literal"><span class="pre">PodItem</span></code> 和 <code class="docutils literal"><span class="pre">Feed</span></code> 。
+程序会将 XML 文件转换为 <code class="docutils literal"><span class="pre">Feed</span></code> ，
+而每个 <code class="docutils literal"><span class="pre">Feed</span></code> 可以包含多个 <code class="docutils literal"><span class="pre">PodItem</span></code> 。
+此外，
+程序还提供了一个函数，
+它可以将 <code class="docutils literal"><span class="pre">PodItem</span></code> 转换为 <code class="docutils literal"><span class="pre">PodTypes.hs</span></code> 文件中定义的 <code class="docutils literal"><span class="pre">Episode</span></code> 。</p>
+<p>接下来，
+程序开始定义与语法分析有关的函数。
+<code class="docutils literal"><span class="pre">parse</span></code> 函数接受两个参数，
+一个是 <code class="docutils literal"><span class="pre">String</span></code> 表示的 XML 文本，
+另一个则是用于展示错误信息的 <code class="docutils literal"><span class="pre">String</span></code> 表示的名字，
+这个函数也会返回一个 <code class="docutils literal"><span class="pre">Feed</span></code> 。</p>
+<p>HaXml 被设计成一个将数据从一种类型转换为另一种类型的“过滤器”，
+它是一个简单直接的转换操作，
+可以将 XML 转换为 XML 、将 XML 转换为 Haskell 数据、或者将 Haskell 数据转换为 XML 。
+HaXml 拥有一种名为 <code class="docutils literal"><span class="pre">CFilter</span></code> 的数据类型，
+它的定义如下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kr">type</span> <span class="kt">CFilter</span> <span class="ow">=</span> <span class="kt">Content</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Content</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>一个 <code class="docutils literal"><span class="pre">CFilter</span></code> 接受一个 XML 文档片段（fragments），
+然后返回 0 个或多个片段。
+<code class="docutils literal"><span class="pre">CFilter</span></code> 可能会被要求找出指定标签（tag）的所有子标签、所有具有指定名字的标签、XML 文档某一部分包含的文本，
+又或者其他几样东西（a number of other things）。
+操作符 <code class="docutils literal"><span class="pre">(/&gt;)</span></code> 可以将多个 <code class="docutils literal"><span class="pre">CFilter</span></code> 函数组合在一起。
+抓取器想要的是那些包围在 <code class="docutils literal"><span class="pre">&lt;channel&gt;</span></code> 标签里面的数据，
+所以我们首先要做的就是找出这些数据。
+以下是实现这一操作的一个简单的 <code class="docutils literal"><span class="pre">CFilter</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">channel</span> <span class="ow">=</span> <span class="n">tag</span> <span class="s">&quot;rss&quot;</span> <span class="o">/&gt;</span> <span class="n">tag</span> <span class="s">&quot;channel&quot;</span>
+</pre></div>
+</div>
+<p>当我们将一个文档传递给 <code class="docutils literal"><span class="pre">channel</span></code> 函数时，
+函数会从文档的顶层（top level）查找名为 <code class="docutils literal"><span class="pre">rss</span></code> 的标签。
+并在发现这些标签之后，
+寻找 <code class="docutils literal"><span class="pre">channel</span></code> 标签。</p>
+<p>余下的程序也会遵循这一基本方法进行。
+<code class="docutils literal"><span class="pre">txt</span></code> 函数会从标签中提取出文本，
+然后通过使用 <code class="docutils literal"><span class="pre">CFilter</span></code> 函数，
+程序可以取得文档的任意部分。</p>
+</div>
+<div class="section" id="id4">
+<h2>下载<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
+<p>构建抓取器的下一个步骤是完成用于下载数据的模块。
+抓取器需要下载两种不同类型的数据：
+它们分别是广播的内容以及每个分集的音频。
+对于前者，
+程序需要对数据进行语法分析并更新数据库；
+而对于后者，
+程序则需要将数据写入到文件里面并储存到硬盘上。</p>
+<p>抓取器将通过 HTTP 服务器进行下载，
+所以我们需要使用一个 Haskell HTTP 库。
+为了下载广播源，
+抓取器需要下载文档、对文档进行语法分析并更新数据库。
+对于分集音频，
+程序会下载文件、将它写入到硬盘并在数据库里面将该分集标记为“已下载”。
+以下是执行这一工作的代码：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch22/PodDownload.hs</span>
+<span class="kr">module</span> <span class="nn">PodDownload</span> <span class="kr">where</span>
+<span class="kr">import</span> <span class="nn">PodTypes</span>
+<span class="kr">import</span> <span class="nn">PodDB</span>
+<span class="kr">import</span> <span class="nn">PodParser</span>
+<span class="kr">import</span> <span class="nn">Network.HTTP</span>
+<span class="kr">import</span> <span class="nn">System.IO</span>
+<span class="kr">import</span> <span class="nn">Database.HDBC</span>
+<span class="kr">import</span> <span class="nn">Data.Maybe</span>
+<span class="kr">import</span> <span class="nn">Network.URI</span>
+
+<span class="cm">{- | 下载 URL 。</span>
+<span class="cm">函数在发生错误时返回 (Left errorMessage) ；</span>
+<span class="cm">下载成功时返回 (Right doc) 。 -}</span>
+<span class="nf">downloadURL</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">(</span><span class="kt">Either</span> <span class="kt">String</span> <span class="kt">String</span><span class="p">)</span>
+<span class="nf">downloadURL</span> <span class="n">url</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">resp</span> <span class="ow">&lt;-</span> <span class="n">simpleHTTP</span> <span class="n">request</span>
+       <span class="kr">case</span> <span class="n">resp</span> <span class="kr">of</span>
+         <span class="kt">Left</span> <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="o">$</span> <span class="kt">Left</span> <span class="p">(</span><span class="s">&quot;Error connecting: &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">x</span><span class="p">)</span>
+         <span class="kt">Right</span> <span class="n">r</span> <span class="ow">-&gt;</span>
+             <span class="kr">case</span> <span class="n">rspCode</span> <span class="n">r</span> <span class="kr">of</span>
+               <span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="kr">_</span><span class="p">,</span><span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="o">$</span> <span class="kt">Right</span> <span class="p">(</span><span class="n">rspBody</span> <span class="n">r</span><span class="p">)</span>
+               <span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="kr">_</span><span class="p">,</span><span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="c1">-- A HTTP redirect</span>
+                 <span class="kr">case</span> <span class="n">findHeader</span> <span class="kt">HdrLocation</span> <span class="n">r</span> <span class="kr">of</span>
+                   <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="o">$</span> <span class="kt">Left</span> <span class="p">(</span><span class="n">show</span> <span class="n">r</span><span class="p">)</span>
+                   <span class="kt">Just</span> <span class="n">url</span> <span class="ow">-&gt;</span> <span class="n">downloadURL</span> <span class="n">url</span>
+               <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="o">$</span> <span class="kt">Left</span> <span class="p">(</span><span class="n">show</span> <span class="n">r</span><span class="p">)</span>
+    <span class="kr">where</span> <span class="n">request</span> <span class="ow">=</span> <span class="kt">Request</span> <span class="p">{</span><span class="n">rqURI</span> <span class="ow">=</span> <span class="n">uri</span><span class="p">,</span>
+                             <span class="n">rqMethod</span> <span class="ow">=</span> <span class="kt">GET</span><span class="p">,</span>
+                             <span class="n">rqHeaders</span> <span class="ow">=</span> <span class="kt">[]</span><span class="p">,</span>
+                             <span class="n">rqBody</span> <span class="ow">=</span> <span class="s">&quot;&quot;</span><span class="p">}</span>
+          <span class="n">uri</span> <span class="ow">=</span> <span class="n">fromJust</span> <span class="o">$</span> <span class="n">parseURI</span> <span class="n">url</span>
+
+<span class="cm">{- | 对数据库中的广播源进行更新。 -}</span>
+<span class="nf">updatePodcastFromFeed</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span> <span class="n">conn</span> <span class="ow">-&gt;</span> <span class="kt">Podcast</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">updatePodcastFromFeed</span> <span class="n">dbh</span> <span class="n">pc</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">resp</span> <span class="ow">&lt;-</span> <span class="n">downloadURL</span> <span class="p">(</span><span class="n">castURL</span> <span class="n">pc</span><span class="p">)</span>
+       <span class="kr">case</span> <span class="n">resp</span> <span class="kr">of</span>
+         <span class="kt">Left</span> <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">putStrLn</span> <span class="n">x</span>
+         <span class="kt">Right</span> <span class="n">doc</span> <span class="ow">-&gt;</span> <span class="n">updateDB</span> <span class="n">doc</span>
+
+    <span class="kr">where</span> <span class="n">updateDB</span> <span class="n">doc</span> <span class="ow">=</span>
+              <span class="kr">do</span> <span class="n">mapM_</span> <span class="p">(</span><span class="n">addEpisode</span> <span class="n">dbh</span><span class="p">)</span> <span class="n">episodes</span>
+                 <span class="n">commit</span> <span class="n">dbh</span>
+              <span class="kr">where</span> <span class="n">feed</span> <span class="ow">=</span> <span class="n">parse</span> <span class="n">doc</span> <span class="p">(</span><span class="n">castURL</span> <span class="n">pc</span><span class="p">)</span>
+                    <span class="n">episodes</span> <span class="ow">=</span> <span class="n">map</span> <span class="p">(</span><span class="n">item2ep</span> <span class="n">pc</span><span class="p">)</span> <span class="p">(</span><span class="n">items</span> <span class="n">feed</span><span class="p">)</span>
+
+<span class="cm">{- | 下载一个分集，并以 String 表示的形式，将储存该分集的文件名返回给调用者。</span>
+<span class="cm">函数在发生错误时返回一个 Nothing 。 -}</span>
+<span class="nf">getEpisode</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span> <span class="n">conn</span> <span class="ow">-&gt;</span> <span class="kt">Episode</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="kt">String</span><span class="p">)</span>
+<span class="nf">getEpisode</span> <span class="n">dbh</span> <span class="n">ep</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">resp</span> <span class="ow">&lt;-</span> <span class="n">downloadURL</span> <span class="p">(</span><span class="n">epURL</span> <span class="n">ep</span><span class="p">)</span>
+       <span class="kr">case</span> <span class="n">resp</span> <span class="kr">of</span>
+         <span class="kt">Left</span> <span class="n">x</span> <span class="ow">-&gt;</span> <span class="kr">do</span> <span class="n">putStrLn</span> <span class="n">x</span>
+                      <span class="n">return</span> <span class="kt">Nothing</span>
+         <span class="kt">Right</span> <span class="n">doc</span> <span class="ow">-&gt;</span>
+             <span class="kr">do</span> <span class="n">file</span> <span class="ow">&lt;-</span> <span class="n">openBinaryFile</span> <span class="n">filename</span> <span class="kt">WriteMode</span>
+                <span class="n">hPutStr</span> <span class="n">file</span> <span class="n">doc</span>
+                <span class="n">hClose</span> <span class="n">file</span>
+                <span class="n">updateEpisode</span> <span class="n">dbh</span> <span class="p">(</span><span class="n">ep</span> <span class="p">{</span><span class="n">epDone</span> <span class="ow">=</span> <span class="kt">True</span><span class="p">})</span>
+                <span class="n">commit</span> <span class="n">dbh</span>
+                <span class="n">return</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">filename</span><span class="p">)</span>
+          <span class="c1">-- This function ought to apply an extension based on the filetype</span>
+    <span class="kr">where</span> <span class="n">filename</span> <span class="ow">=</span> <span class="s">&quot;pod.&quot;</span> <span class="o">++</span> <span class="p">(</span><span class="n">show</span> <span class="o">.</span> <span class="n">castId</span> <span class="o">.</span> <span class="n">epCast</span> <span class="o">$</span> <span class="n">ep</span><span class="p">)</span> <span class="o">++</span> <span class="s">&quot;.&quot;</span> <span class="o">++</span>
+                     <span class="p">(</span><span class="n">show</span> <span class="p">(</span><span class="n">epId</span> <span class="n">ep</span><span class="p">))</span> <span class="o">++</span> <span class="s">&quot;.mp3&quot;</span>
+</pre></div>
+</div>
+<p>这个函数定义了三个函数：</p>
+<ul class="simple">
+<li><code class="docutils literal"><span class="pre">downloadURL</span></code> 函数对 URL 进行下载，并以 <code class="docutils literal"><span class="pre">String</span></code> 形式返回它；</li>
+<li><code class="docutils literal"><span class="pre">updatePodcastFromFeed</span></code> 函数对 XML 源文件进行下载，对文件进行分析，并更新数据库；</li>
+<li><code class="docutils literal"><span class="pre">getEpisode</span></code> 下载一个给定的分集，并在数据库里面将该分集标记为“已下载”。</li>
+</ul>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">这里使用的 HTTP 库并不会以惰性的方式读取 HTTP 结果，
+因此在下载诸如广播这样的大文件的时候，
+这个库可能会消耗掉大量的内容。
+其他一些 HTTP 库并没有这一限制。
+我们之所以在这里使用这个有缺陷的库，
+是因为它稳定、易于安装并且也易于使用。
+对于正式的 HTTP 需要，
+我们推荐使用 <code class="docutils literal"><span class="pre">mini-http</span></code> 库，
+这个库可以从 Hackage 里面获得。</p>
+</div>
+</div>
+<div class="section" id="id5">
+<h2>主程序<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h2>
+<p>最后，
+我们需要编写一个程序来将上面展示的各个部分结合在一起。
+以下是这个主模块（main module）：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch22/PodMain.hs</span>
+<span class="kr">module</span> <span class="nn">Main</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">PodDownload</span>
+<span class="kr">import</span> <span class="nn">PodDB</span>
+<span class="kr">import</span> <span class="nn">PodTypes</span>
+<span class="kr">import</span> <span class="nn">System.Environment</span>
+<span class="kr">import</span> <span class="nn">Database.HDBC</span>
+<span class="kr">import</span> <span class="nn">Network.Socket</span><span class="p">(</span><span class="n">withSocketsDo</span><span class="p">)</span>
+
+<span class="nf">main</span> <span class="ow">=</span> <span class="n">withSocketsDo</span> <span class="o">$</span> <span class="n">handleSqlError</span> <span class="o">$</span>
+    <span class="kr">do</span> <span class="n">args</span> <span class="ow">&lt;-</span> <span class="n">getArgs</span>
+       <span class="n">dbh</span> <span class="ow">&lt;-</span> <span class="n">connect</span> <span class="s">&quot;pod.db&quot;</span>
+       <span class="kr">case</span> <span class="n">args</span> <span class="kr">of</span>
+         <span class="p">[</span><span class="s">&quot;add&quot;</span><span class="p">,</span> <span class="n">url</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">add</span> <span class="n">dbh</span> <span class="n">url</span>
+         <span class="p">[</span><span class="s">&quot;update&quot;</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">update</span> <span class="n">dbh</span>
+         <span class="p">[</span><span class="s">&quot;download&quot;</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">download</span> <span class="n">dbh</span>
+         <span class="p">[</span><span class="s">&quot;fetch&quot;</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kr">do</span> <span class="n">update</span> <span class="n">dbh</span>
+                         <span class="n">download</span> <span class="n">dbh</span>
+         <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="n">syntaxError</span>
+    <span class="n">disconnect</span> <span class="n">dbh</span>
+
+<span class="nf">add</span> <span class="n">dbh</span> <span class="n">url</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">addPodcast</span> <span class="n">dbh</span> <span class="n">pc</span>
+       <span class="n">commit</span> <span class="n">dbh</span>
+    <span class="kr">where</span> <span class="n">pc</span> <span class="ow">=</span> <span class="kt">Podcast</span> <span class="p">{</span><span class="n">castId</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">castURL</span> <span class="ow">=</span> <span class="n">url</span><span class="p">}</span>
+
+<span class="nf">update</span> <span class="n">dbh</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">pclist</span> <span class="ow">&lt;-</span> <span class="n">getPodcasts</span> <span class="n">dbh</span>
+       <span class="n">mapM_</span> <span class="n">procPodcast</span> <span class="n">pclist</span>
+    <span class="kr">where</span> <span class="n">procPodcast</span> <span class="n">pc</span> <span class="ow">=</span>
+              <span class="kr">do</span> <span class="n">putStrLn</span> <span class="o">$</span> <span class="s">&quot;Updating from &quot;</span> <span class="o">++</span> <span class="p">(</span><span class="n">castURL</span> <span class="n">pc</span><span class="p">)</span>
+                 <span class="n">updatePodcastFromFeed</span> <span class="n">dbh</span> <span class="n">pc</span>
+
+<span class="nf">download</span> <span class="n">dbh</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">pclist</span> <span class="ow">&lt;-</span> <span class="n">getPodcasts</span> <span class="n">dbh</span>
+       <span class="n">mapM_</span> <span class="n">procPodcast</span> <span class="n">pclist</span>
+    <span class="kr">where</span> <span class="n">procPodcast</span> <span class="n">pc</span> <span class="ow">=</span>
+              <span class="kr">do</span> <span class="n">putStrLn</span> <span class="o">$</span> <span class="s">&quot;Considering &quot;</span> <span class="o">++</span> <span class="p">(</span><span class="n">castURL</span> <span class="n">pc</span><span class="p">)</span>
+                 <span class="n">episodelist</span> <span class="ow">&lt;-</span> <span class="n">getPodcastEpisodes</span> <span class="n">dbh</span> <span class="n">pc</span>
+                 <span class="kr">let</span> <span class="n">dleps</span> <span class="ow">=</span> <span class="n">filter</span> <span class="p">(</span><span class="nf">\</span><span class="n">ep</span> <span class="ow">-&gt;</span> <span class="n">epDone</span> <span class="n">ep</span> <span class="o">==</span> <span class="kt">False</span><span class="p">)</span>
+                             <span class="n">episodelist</span>
+                 <span class="n">mapM_</span> <span class="n">procEpisode</span> <span class="n">dleps</span>
+          <span class="n">procEpisode</span> <span class="n">ep</span> <span class="ow">=</span>
+              <span class="kr">do</span> <span class="n">putStrLn</span> <span class="o">$</span> <span class="s">&quot;Downloading &quot;</span> <span class="o">++</span> <span class="p">(</span><span class="n">epURL</span> <span class="n">ep</span><span class="p">)</span>
+                 <span class="n">getEpisode</span> <span class="n">dbh</span> <span class="n">ep</span>
+
+<span class="nf">syntaxError</span> <span class="ow">=</span> <span class="n">putStrLn</span>
+  <span class="s">&quot;Usage: pod command [args]</span><span class="se">\n\</span>
+<span class="se">  \\n\</span>
+<span class="se">  \</span><span class="s">pod add url      Adds a new podcast with the given URL</span><span class="se">\n\</span>
+<span class="se">  \</span><span class="s">pod download     Downloads all pending episodes</span><span class="se">\n\</span>
+<span class="se">  \</span><span class="s">pod fetch        Updates, then downloads</span><span class="se">\n\</span>
+<span class="se">  \</span><span class="s">pod update       Downloads podcast feeds, looks for new episodes</span><span class="se">\n</span><span class="s">&quot;</span>
+</pre></div>
+</div>
+<p>这个程序使用了一个非常简单的命令行解释器，
+并且这个解释器还包含了一个用于展示命令行语法错误的函数，
+以及一些用于处理不同命令行参数的小函数。</p>
+<p>通过以下命令，
+可以对这个程序进行编译：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghc</span> <span class="c1">--make -O2 -o pod -package HTTP -package HaXml -package network \</span>
+    <span class="o">-</span><span class="n">package</span> <span class="kt">HDBC</span> <span class="o">-</span><span class="n">package</span> <span class="kt">HDBC</span><span class="o">-</span><span class="n">sqlite3</span> <span class="kt">PodMain</span><span class="o">.</span><span class="n">hs</span>
+</pre></div>
+</div>
+<p>你也可以通过《创建包》一节介绍的方法，
+使用 Cabal 文件来构建这个项目：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- ch23/pod.cabal</span>
+<span class="kt">Name:</span> <span class="n">pod</span>
+<span class="kt">Version:</span> <span class="mf">1.0</span><span class="o">.</span><span class="mi">0</span>
+<span class="kt">Build</span><span class="o">-</span><span class="kr">type</span><span class="kt">:</span> <span class="kt">Simple</span>
+<span class="kt">Build</span><span class="o">-</span><span class="kt">Depends:</span> <span class="kt">HTTP</span><span class="p">,</span> <span class="kt">HaXml</span><span class="p">,</span> <span class="n">network</span><span class="p">,</span> <span class="kt">HDBC</span><span class="p">,</span> <span class="kt">HDBC</span><span class="o">-</span><span class="n">sqlite3</span><span class="p">,</span> <span class="n">base</span>
+
+<span class="kt">Executable:</span> <span class="n">pod</span>
+<span class="kt">Main</span><span class="o">-</span><span class="kt">Is:</span> <span class="kt">PodMain</span><span class="o">.</span><span class="n">hs</span>
+<span class="kt">GHC</span><span class="o">-</span><span class="kt">Options:</span> <span class="o">-</span><span class="kt">O2</span>
+</pre></div>
+</div>
+<p>除此之外，
+我们还需要一个简单的 <code class="docutils literal"><span class="pre">Setup.hs</span></code> 文件：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kr">import</span> <span class="nn">Distribution.Simple</span>
+<span class="nf">main</span> <span class="ow">=</span> <span class="n">defaultMain</span>
+</pre></div>
+</div>
+<p>如果你是使用 Cabal 进行构建的话，那么只要运行以下代码即可：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">runghc</span> <span class="kt">Setup</span><span class="o">.</span><span class="n">hs</span> <span class="n">configure</span>
+<span class="nf">runghc</span> <span class="kt">Setup</span><span class="o">.</span><span class="n">hs</span> <span class="n">build</span>
+</pre></div>
+</div>
+<p>程序的输出将被放到一个名为 <code class="docutils literal"><span class="pre">dist</span></code> 的文件及里面。
+要将程序安装到系统里面的话，
+可以运行 <code class="docutils literal"><span class="pre">run</span> <span class="pre">runghc</span> <span class="pre">Setup.hs</span> <span class="pre">install</span></code> 。</p>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="21.html">第二十一章：数据库的使用</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="27.html">第二七章：Socket 和 Syslog</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.1.
+    </div>
+  </body>
+</html>
