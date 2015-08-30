@@ -85,7 +85,7 @@ GHC 的运行时组件并不按特定顺序执行多个线程。所以，上面�
 
 在两个线程之间共享信息最简单的方法是，让它们使用同一个变量。上面文件压缩的例子中， ``main`` 线程与子线程共享了文件名和文件内容。 ``Haskell`` 的数据默认是不可变的，所以这样共享不会有问题，两个线程都无法修改另一个线程中的文件名和文件内容。
 
-线程经常需要和其他线程进行活跃的通信。例如， ``GHC``  没有提供查看其他线程是否还在执行、执行完毕、或者崩溃的方法。可是，其提供了同步变量类型， ``MVar`` ，我们可以通过它自己实现上述功能。
+线程经常需要和其他线程进行活跃的通信。例如， ``GHC``  没有提供查看其他线程是否还在执行、执行完毕、或者崩溃的方法 [54]_ 。可是，其提供了同步变量类型， ``MVar`` ，我们可以通过它自己实现上述功能。
 
 ``MVar`` 的行为类似一个单元素的箱子：其可以为满或空。将一些东西扔进箱子，使其填满，或者从中拿出一些东西，使其变空。
 
@@ -138,7 +138,100 @@ GHC 的运行时组件并不按特定顺序执行多个线程。所以，上面�
     * 对线程间共享的可变数据提供互斥。在数据没有被任何线程使用时，将其放入 ``MVar`` ，某线程需要读取或改变它时，将其临时从中取出。
 
 
-The main thread and waiting for other threads
+主线程等待其他线程
 -----------------
 
+GHC 的运行时系统对主线程的控制与其他线程不同。主线程结束时，运行时系统认为整个程序已经跑完了。其他没有执行完毕的线程，会被强制终止。
 
+所以，如果线程执行时间非常长，且必须不被杀死，必须对主线程做特殊安排，以使得主线程在其他线程完成前都不退出。让我们来开发一个小库实现这一点。
+
+::
+
+   -- file: ch24/NiceFork.hs
+   import Control.Concurrent
+   import Control.Exception (Exception, try)
+   import qualified Data.Map as M
+   
+   data ThreadStatus = Running
+                     | Finished         -- 正常退出
+                     | Threw Exception  -- 被未捕获的异常终结
+                       deriving (Eq, Show)
+   
+   -- | 创建一个新线程管理器
+   newManager :: IO ThreadManager
+   
+   -- | 创建一个被管理的线程
+   forkManaged :: ThreadManager -> IO () -> IO ThreadId
+   
+   -- | 立即返回一个被管理线程的状态
+   getStatus :: ThreadManager -> ThreadId -> IO (Maybe ThreadStatus)
+   
+   -- | 阻塞，直到某个特定的被管理线程终结 
+   waitFor :: ThreadManager -> ThreadId -> IO (Maybe ThreadStatus)
+   
+   -- | 阻塞，直到所有被管理线程终结 
+   waitAll :: ThreadManager -> IO ()
+
+我们使用一个常见的方法来实现 ``ThreadManager`` 的类型抽象：将其包裹进一个 ``newtype`` ，并防止使用者直接创建这个类型的值。在模块的导出声明中，我们列出了一个创建线程管理器的 IO 动作，但是并不直接导出类型构造器。
+
+::
+
+   -- file: ch24/NiceFork.hs
+   module NiceFork
+       (
+         ThreadManager
+       , newManager
+       , forkManaged
+       , getStatus
+       , waitFor
+       , waitAll
+       ) where
+
+``ThreadManager`` 的实现中维护了一个线程 ID 到线程状态的 map 。我们将此作为线程 map 。
+
+::
+
+   -- file: ch24/NiceFork.hs
+   newtype ThreadManager =
+       Mgr (MVar (M.Map ThreadId (MVar ThreadStatus)))
+       deriving (Eq)
+   
+   newManager = Mgr `fmap` newMVar M.empty
+
+此处使用了两层 ``MVar`` 。首先将 ``Map`` 保存在 MVar 中。这将允许通过使用新版本替换来“改变” map 中的值。同样确保了每个使用这个 ``Map`` 的线程可以看到一致的内容。
+
+对每个被管理的线程，都维护一个对应的 ``MVar`` 。这种 ``MVar`` 从空状态开始，表示这个线程正在执行。当线程被杀死或者发生未处理异常导致退出时，我们将此类信息写入这个 ``MVar`` 。
+
+为了创建一个线程并观察它的状态，必须做一点簿记。
+
+::
+
+   -- file: ch24/NiceFork.hs
+   forkManaged (Mgr mgr) body =
+       modifyMVar mgr $ \m -> do
+         state <- newEmptyMVar
+         tid <- forkIO $ do
+           result <- try body
+           putMVar state (either Threw (const Finished) result)
+         return (M.insert tid state m, tid)
+
+
+安全的修改 MVar
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+ ``forkManaged`` 中使用的 ``modifyMVar`` 函数很实用：它将 ``takeMVar`` 和 ``putMVar`` 安全的组合在一起。
+
+::
+
+  ghci> :t modifyMVar
+  modifyMVar :: MVar a -> (a -> IO (a, b)) -> IO b
+
+
+
+
+
+
+
+
+
+.. [54] 在稍后将展示，GHC 的线程异常的轻量。如果运行时提供检查每个线程状态的方法，每个线程的开销将增加，哪怕永远不会用到这些信息。
