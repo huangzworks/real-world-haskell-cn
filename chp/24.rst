@@ -57,14 +57,14 @@ GHC 的运行时组件并不按特定顺序执行多个线程。所以，上面�
    import qualified Data.ByteString.Lazy as L
    import System.Console.Readline (readline)
    
-   -- Provided by the 'zlib' package on http://hackage.haskell.org/
+   -- http://hackage.haskell.org/ 上的 zlib 包提供了压缩功能
    import Codec.Compression.GZip (compress)
    
    main = do
        maybeLine <- readline "Enter a file to compress> "
        case maybeLine of
-         Nothing -> return ()      -- user entered EOF
-         Just "" -> return ()      -- treat no name as "want to quit"
+         Nothing -> return ()      -- 用户输入了 EOF
+         Just "" -> return ()      -- 不输入名字按 “想要退出” 处理
          Just name -> do
               handle
                 (print :: (SomeException->IO ()))
