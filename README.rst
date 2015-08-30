@@ -3,7 +3,7 @@
 
 本文档是 `Real World Haskell <http://book.realworldhaskell.org/>`_ 一书的简体中文翻译版本， 翻译工作正在进行中， 欢迎加入。
 
-在线阅读本文档请访问： http://rwh.readthedocs.org/
+在线阅读本文档请访问： http://cnhaskell.com/
 
 
 翻译进度与译者名单
