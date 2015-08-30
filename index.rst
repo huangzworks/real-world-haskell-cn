@@ -6,6 +6,14 @@
 Real World Haskell 中文版
 ==================================================
 
+.. warning::
+
+    《Real World Haskell》中文版现在可以通过域名 `cnhaskell.com <http://cnhaskell>`_ 快速进行访问，
+    请各位读者使用新域名访问本文档，
+    原有的域名 rwh.rtfd.org 以及 rwh.readthedocs.org 将在一段时间之后被废弃。
+
+    2015 年 8 月 30 宣
+
 .. image:: /image/cover.jpg
    :align: right
    :width: 500px
