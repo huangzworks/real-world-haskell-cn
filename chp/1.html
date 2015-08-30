@@ -207,7 +207,7 @@ prelude)。</p>
     In the definition of `it&#39;: it = True &amp;&amp; 1
 </pre></div>
 </div>
-<p>我们再一次的遇到了很有前瞻性的错误。简单来说，错误信息告诉我们布尔类型，<code class="docutils literal"><span class="pre">Bool</span></code>，不是数字类型，<code class="docutils literal"><span class="pre">Num</span></code>的一个成员。错误信息有些长，这是因为<strong>ghci</strong>会定位出错的具体位置，并且给出了也许能解决问题的修改提示。</p>
+<p>我们再一次看到了很翔实的错误信息。简单来说，错误信息告诉我们布尔类型，<code class="docutils literal"><span class="pre">Bool</span></code>，不是数字类型，<code class="docutils literal"><span class="pre">Num</span></code>的一个成员。错误信息有些长，这是因为<strong>ghci</strong>会定位出错的具体位置，并且给出了也许能解决问题的修改提示。</p>
 <p>错误信息详细分析如下。</p>
 <ul class="simple">
 <li>“No instance for (Num Bool)”
@@ -220,7 +220,7 @@ prelude)。</p>
 <div class="admonition tip">
 <p class="first admonition-title">Tip</p>
 <p>遇到错误信息不要胆怯</p>
-<p>这里我们提到了很重要的一点，而且在本书的前面一些章节中我们会重复提到。如果你碰到一些你从来没遇到过的问题和错误信息，别担心(panic)。刚开始的时候，你所要的做的仅仅是找出足够的信息来帮助解决问题。随着你经验的积累，你会发现错误信息中的一部分其实很容易理解，并不会像刚开始时那么晦涩难懂。</p>
+<p>这里我们提到了很重要的一点，而且在本书的前面一些章节中我们会重复提到。如果你碰到一些你从来没遇到过的问题和错误信息，别慌张(panic)。刚开始的时候，你所要的做的仅仅是找出足够的信息来帮助解决问题。随着你经验的积累，你会发现错误信息中的一部分其实很容易理解，并不会像刚开始时那么晦涩难懂。</p>
 <p class="last">各种错误信息都有一个目的：通过提前的一些调试，帮助我们在真正运行程序之前能书写出正确的代码。如果你曾使用过其它更加宽松(permissive)的语言，这种方式可能会有些震惊(shock).所以，拿出你的耐心来。</p>
 </div>
 <p>Haskell中大多数比较操作符和C语言以及受C语言影响的语言类似。</p>
@@ -293,7 +293,7 @@ prelude)。</p>
 以上“not in the scope”的错误信息看上去有点令人畏惧的。别担心，它所要表达的只是没有用e这个名字定义过变量。
 </pre></div>
 </div>
-<p>使用<strong>ghci</strong>的<code class="docutils literal"><span class="pre">let</span></code>构造器(contruct)，我们可以定义一个临时变量e。</p>
+<p>使用<strong>ghci</strong>的<code class="docutils literal"><span class="pre">let</span></code>构造(contruct)，我们可以定义一个临时变量<code class="docutils literal"><span class="pre">e</span></code>。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">e</span> <span class="ow">=</span> <span class="n">exp</span> <span class="mi">1</span>
 </pre></div>
 </div>
@@ -351,7 +351,7 @@ command</a>提供的。</p>
 <span class="p">[</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;bar&quot;</span><span class="p">,</span><span class="s">&quot;baz&quot;</span><span class="p">,</span><span class="s">&quot;quux&quot;</span><span class="p">,</span><span class="s">&quot;fnord&quot;</span><span class="p">,</span><span class="s">&quot;xyzzy&quot;</span><span class="p">]</span>
 </pre></div>
 </div>
-<p>列表里所有的元素必须是相同类型。下面例子我们违反了这个规则：列表中前面两个是<code class="docutils literal"><span class="pre">Bool</span></code>类型，最后一个是字符类型。</p>
+<p>列表里所有的元素必须是相同类型。在下面的例子中我们违反了这个规则：列表中前面两个是<code class="docutils literal"><span class="pre">Bool</span></code>类型，最后一个是字符类型。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">[</span><span class="kt">True</span><span class="p">,</span> <span class="kt">False</span><span class="p">,</span> <span class="s">&quot;testing&quot;</span><span class="p">]</span>
 
 <span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">14</span><span class="kt">:</span>
@@ -428,7 +428,7 @@ bound)，那么会生成无穷列表。
 </pre></div>
 </div>
 <p>像其他语言一样，那些不显而易见的字符(hard-to-see)需要“转意”(escaping)。Haskell中需要转意的字符以及转意规则绝大大部分是和C语言中的情况一样的。比如
-<code class="docutils literal"><span class="pre">'\n'</span></code>表示换行，<code class="docutils literal"><span class="pre">'\t'</span></code>表示制表符。完整的详细列表可以参照<a class="reference external" href="http://book.realworldhaskell.org/read/characters-strings-and-escaping-rules.html">附录B：字符，字符串和转意规则</a>。</p>
+<code class="docutils literal"><span class="pre">'\n'</span></code>表示换行，<code class="docutils literal"><span class="pre">'\t'</span></code>表示制表符。完整的详细列表可以参照<a class="reference external" href="http://book.realworldhaskell.org/read/characters-strings-and-escaping-rules.html">附录B：字符，字符串和转义规则</a>。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">putStrLn</span> <span class="s">&quot;Here&#39;s a newline --&gt;</span><span class="se">\n</span><span class="s">&lt;-- See?&quot;</span>
 <span class="kt">Here&#39;s</span> <span class="n">a</span> <span class="n">newline</span> <span class="o">--&gt;</span>
 <span class="o">&lt;--</span> <span class="kt">See</span><span class="o">?</span>
@@ -508,9 +508,7 @@ Haskell语言的特性，只是 ghci 的一个辅助功能而已。）</p>
 <span class="nf">it</span> <span class="ow">::</span> <span class="kt">Ratio</span> <span class="kt">Integer</span>
 </pre></div>
 </div>
-<p>这里的 <code class="docutils literal"><span class="pre">:m</span></code> 是 <code class="docutils literal"><span class="pre">:module</span></code> 的缩写，用于载入一个给定模块。Ghci
-还提供了很多这类缩写，方便使用者。</p>
-<p>为了方便起见， ghci 给很多命令都提供了缩写，这里的 <code class="docutils literal"><span class="pre">:m</span></code> 就是 <code class="docutils literal"><span class="pre">:module</span></code>
+<p>为了方便用户， ghci 允许我们对很多命令进行缩写，这里的 <code class="docutils literal"><span class="pre">:m</span></code> 就是 <code class="docutils literal"><span class="pre">:module</span></code>
 的缩写，它用于载入给定的模块。</p>
 <p>注意这个分数的类型信息：在 <code class="docutils literal"><span class="pre">::</span></code> 的右边，有两个单词，分别是 <code class="docutils literal"><span class="pre">Ratio</span></code> 和
 <code class="docutils literal"><span class="pre">Integer</span></code>

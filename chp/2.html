@@ -548,7 +548,7 @@
 <p>我们的第一个任务是，弄清楚 <code class="docutils literal"><span class="pre">isOdd</span> <span class="pre">(1</span> <span class="pre">+</span> <span class="pre">2)</span></code> 的结果是如何求值出的。</p>
 <p>在使用<em>严格</em>求值的语言里，函数的参数总是在应用函数之前被求值。以 <code class="docutils literal"><span class="pre">isOdd</span></code> 为例子：子表达式 <code class="docutils literal"><span class="pre">(1</span> <span class="pre">+</span> <span class="pre">2)</span></code> 会首先被求值，得出结果 <code class="docutils literal"><span class="pre">3</span></code> 。接着，将 <code class="docutils literal"><span class="pre">3</span></code> 绑定到变量 <code class="docutils literal"><span class="pre">n</span></code> ，应用到函数 <code class="docutils literal"><span class="pre">isOdd</span></code> 。最后， <code class="docutils literal"><span class="pre">mod</span> <span class="pre">3</span> <span class="pre">2</span></code> 返回 <code class="docutils literal"><span class="pre">1</span></code> ，而 <code class="docutils literal"><span class="pre">1</span> <span class="pre">==</span> <span class="pre">1</span></code> 返回 <code class="docutils literal"><span class="pre">True</span></code> 。</p>
 <p>Haskell 使用了另外一种求值方式 —— <em>非严格</em>求值。在这种情况下，求值 <code class="docutils literal"><span class="pre">isOdd</span> <span class="pre">(1</span> <span class="pre">+</span> <span class="pre">2)</span></code> <em>并不会</em>即刻使得子表达式 <code class="docutils literal"><span class="pre">1</span> <span class="pre">+</span> <span class="pre">2</span></code> 被求值为 <code class="docutils literal"><span class="pre">3</span></code> ，相反，编译器做出了一个“承诺”，说，“当真正有需要的时候，我有办法计算出 <code class="docutils literal"><span class="pre">isOdd</span> <span class="pre">(1</span> <span class="pre">+</span> <span class="pre">2)</span></code> 的值”。</p>
-<p>用于追踪未求值表达式的记录被称为块（chunk）。这就是事情发生的经过：编译器通过创建块来延迟表达式的求值，直到这个表达式的值真正被需要为止。如果某个表达式的值不被需要，那么从始至终，这个表达式都不会被求值。</p>
+<p>用于追踪未求值表达式的记录被称为块（thunk）。这就是事情发生的经过：编译器通过创建块来延迟表达式的求值，直到这个表达式的值真正被需要为止。如果某个表达式的值不被需要，那么从始至终，这个表达式都不会被求值。</p>
 <p>非严格求值通常也被称为<em>惰性求值</em>。[注：实际上，“非严格”和“惰性”在技术上有些细微的差别，但这里不讨论这些细节。]</p>
 </div>
 <div class="section" id="a-more-involved-example">
@@ -628,7 +628,7 @@
 <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">null</span> <span class="p">(</span><span class="n">tail</span> <span class="s">&quot;bcd&quot;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Bool</span>
 </pre></div>
 </div>
-<p>再次对 <code class="docutils literal"><span class="pre">(||)</span></code> 操作符的右操作对象求值：</p>
+<p>再次对 <code class="docutils literal"><span class="pre">(||)</span></code> 操作符的左操作对象求值：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span>
 <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">::</span> <span class="kt">Bool</span>
 </pre></div>
@@ -646,7 +646,7 @@
 </div>
 <div class="section" id="returning-from-the-recursion">
 <span id="id22"></span><h3>从递归中返回<a class="headerlink" href="#returning-from-the-recursion" title="Permalink to this headline">¶</a></h3>
-<p>请注意，在求值的最后一步，结果表达式 <code class="docutils literal"><span class="pre">tail</span> <span class="pre">&quot;bcd&quot;</span></code> 处于两次对 <code class="docutils literal"><span class="pre">myDrop</span></code> 的递归调用当中。</p>
+<p>请注意，在求值的最后一步，结果表达式 <code class="docutils literal"><span class="pre">tail</span> <span class="pre">&quot;bcd&quot;</span></code> 处于第二次对 <code class="docutils literal"><span class="pre">myDrop</span></code> 的递归调用当中。</p>
 <p>因此，表达式 <code class="docutils literal"><span class="pre">tail</span> <span class="pre">&quot;bcd&quot;</span></code> 作为结果值，被返回给对 <code class="docutils literal"><span class="pre">myDrop</span></code> 的第二次递归调用：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myDrop</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="n">tail</span> <span class="s">&quot;bcd&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="n">tail</span> <span class="s">&quot;bcd&quot;</span>
 <span class="kt">True</span>
@@ -677,7 +677,7 @@
 <p>这一节介绍了三个重要的知识点：</p>
 <ul class="simple">
 <li>可以通过代换（substitution）和重写（rewriting）去了解 Haskell 求值表达式的方式。</li>
-<li>惰性求值可以延迟计算直到真正需要一个值为止，并且在求值时，也只执行可以给出（establish）值的那部分表达式。[译注：比如之前提到的， <code class="docutils literal"><span class="pre">(||)</span></code> 的左操作符的值为 <code class="docutils literal"><span class="pre">True</span></code> 时的情况。]</li>
+<li>惰性求值可以延迟计算直到真正需要一个值为止，并且在求值时，也只执行可以确立出（establish）值的那部分表达式。[译注：比如之前提到的， <code class="docutils literal"><span class="pre">(||)</span></code> 的左操作对象的值为 <code class="docutils literal"><span class="pre">True</span></code> 时，就无需对右操作对象估值的情况。]</li>
 <li>函数的返回值可能是一个块（一个被延迟计算的表达式）。</li>
 </ul>
 </div>
@@ -701,7 +701,7 @@
 <p>这个类型签名可以读作“ <code class="docutils literal"><span class="pre">last</span></code> 接受一个列表，这个列表里的所有元素的类型都为 <code class="docutils literal"><span class="pre">a</span></code> ，并返回一个类型为 <code class="docutils literal"><span class="pre">a</span></code> 的元素作为返回值”，其中 <code class="docutils literal"><span class="pre">a</span></code> 是类型变量。</p>
 <p>如果函数的类型签名里包含类型变量，那么就表示这个函数的某些参数可以是任意类型，我们称这些函数是多态的。</p>
 <p>如果将一个类型为 <code class="docutils literal"><span class="pre">[Char]</span></code> 的列表传给 <code class="docutils literal"><span class="pre">last</span></code> ，那么编译器就会用 <code class="docutils literal"><span class="pre">Char</span></code> 代换 <code class="docutils literal"><span class="pre">last</span></code> 函数类型签名中的所有 <code class="docutils literal"><span class="pre">a</span></code> ，从而得出一个类型为 <code class="docutils literal"><span class="pre">[Char]</span> <span class="pre">-&gt;</span> <span class="pre">Char</span></code> 的 <code class="docutils literal"><span class="pre">last</span></code> 函数。而对于 <code class="docutils literal"><span class="pre">[Int]</span></code> 类型的列表，编译器则产生一个类型为 <code class="docutils literal"><span class="pre">[Int]</span> <span class="pre">-&gt;</span> <span class="pre">Int</span></code> 类型的 <code class="docutils literal"><span class="pre">last</span></code> 函数，诸如此类。</p>
-<p>这种类型的多态被称为<em>参数</em>多态。可以用一个类比来帮助理解这个名字：就像函数的参数可以被其他实际的值绑定一样，Haskell 的类型也可以带有参数，并且这些参数也可以被其他实际的类型绑定。</p>
+<p>这种类型的多态被称为<em>参数</em>多态。可以用一个类比来帮助理解这个名字：就像函数的参数可以被绑定到一个实际的值一样，Haskell 的类型也可以带有参数，并且在稍后可以将这些参数绑定到其它实际的类型上。</p>
 <p>当看见一个参数化类型（parameterized type）时，这表示代码并不在乎实际的类型是什么。另外，我们还可以给出一个更强的陈述：没有办法知道参数化类型的实际类型是什么，也不能操作这种类型的值；不能创建这种类型的值，也不能对这种类型的值进行探查（inspect）。</p>
 <p>参数化类型唯一能做的事，就是作为一个完全抽象的“黑箱”而存在。稍后的内容会解释为什么这个性质对参数化类型来说至关重要。</p>
 <p>参数多态是 Haskell 支持的多态中最明显的一个。Haskell 的参数多态直接影响了 Java 和 C# 等语言的泛型（generic）功能的设计。Java 泛型中的类型变量和 Haskell 的参数化类型非常相似。而 C++ 的模板也和参数多态相去不远。</p>

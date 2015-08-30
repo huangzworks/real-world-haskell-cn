@@ -200,7 +200,7 @@
 <p>[译注：原文这里的代码示例有错，译文已改正。]</p>
 <div class="section" id="id5">
 <h3>什么情况下该用元组，而什么情况下又该用代数数据类型？<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
-<p>元组和自定域代数数据类型有一些相似的地方。比如说，可以使用一个 <code class="docutils literal"><span class="pre">(Int,</span> <span class="pre">String,</span> <span class="pre">[String])</span></code> 类型的元组来代替 <code class="docutils literal"><span class="pre">BookInfo</span></code> 类型：</p>
+<p>元组和自定义代数数据类型有一些相似的地方。比如说，可以使用一个 <code class="docutils literal"><span class="pre">(Int,</span> <span class="pre">String,</span> <span class="pre">[String])</span></code> 类型的元组来代替 <code class="docutils literal"><span class="pre">BookInfo</span></code> 类型：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">Book</span> <span class="mi">2</span> <span class="s">&quot;The Wealth of Networks&quot;</span> <span class="p">[</span><span class="s">&quot;Yochai Benkler&quot;</span><span class="p">]</span>
 <span class="kt">Book</span> <span class="mi">2</span> <span class="s">&quot;The Wealth of Networks&quot;</span> <span class="p">[</span><span class="s">&quot;Yochai Benkler&quot;</span><span class="p">]</span>
 
@@ -911,7 +911,7 @@ data Maybe a = Just a
 <p class="last">另外，上面这个例子中对空白和缩进的使用也值得特别注意。在下一节 “The offside rule and white space in an expression” 中我们会着重讲解其中的奥妙。</p>
 </div>
 <p>在 <code class="docutils literal"><span class="pre">let</span></code> 区块内定义的变量，既可以在定义区内使用，也可以在紧跟着 <code class="docutils literal"><span class="pre">in</span></code> 关键字的表达式中使用。</p>
-<p>一般来说，我们将代码中可以使用一个变量名的地方称作这个变量名的<em>作用域（scope）</em>。如果我们能使用，则说明在* 作用域*内，反之则说明<em>在作用域外</em> 。如果一个变量名在整个源代码的任意处都可以使用，则说明它位于<em>最高层</em>的作用域。</p>
+<p>一般来说，我们将代码中可以使用一个变量名的地方称作这个变量名的<em>作用域（scope）</em>。如果我们能使用，则说明在* 作用域*内，反之则说明<em>在作用域外</em> 。如果一个变量名在整个源代码的任意处都可以使用，则说明它位于<em>最顶层</em>的作用域。</p>
 <div class="section" id="id23">
 <h3>屏蔽<a class="headerlink" href="#id23" title="Permalink to this headline">¶</a></h3>
 <p>我们可以在表达式中使用嵌套的 <code class="docutils literal"><span class="pre">let</span></code> 区块。</p>
