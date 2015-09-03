@@ -64,7 +64,7 @@
 <span class="kc">null</span>
 </pre></div>
 </div>
-<p>JSON 还提供了两种复合类型：<em>数组</em>是值的有序序列，而<em>对象</em>则是“名字/值”对的无序收集器（unordered collection of name/value pairs）。其中对象的名字必须是字符串，而对象和数组的值则可以是任何 JSON 类型。</p>
+<p>JSON 还提供了两种复合类型：<em>数组</em>是值的有序序列，而<em>对象</em>则是“名字/值”对的无序集合（unordered collection of name/value pairs）。其中对象的名字必须是字符串，而对象和数组的值则可以是任何 JSON 类型。</p>
 <div class="highlight-json"><div class="highlight"><pre><span class="p">[</span><span class="mf">-3.14</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="kc">null</span><span class="p">,</span> <span class="s2">&quot;a string&quot;</span><span class="p">]</span>
 
 <span class="p">{</span><span class="nt">&quot;numbers&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">],</span> <span class="nt">&quot;useful&quot;</span><span class="p">:</span> <span class="kc">false</span><span class="p">}</span>
@@ -604,7 +604,9 @@ Failed, modules loaded: none.
 </div>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last">A mathematical moment(to be added)</p>
+<p class="last">来思考下数学
+从数学的角度来看，<code class="docutils literal"><span class="pre">Empty</span></code> 是拼接操作(concatenation)的单位元，因为任何 <code class="docutils literal"><span class="pre">Doc</span></code> 值和 <code class="docutils literal"><span class="pre">Empty</span></code> 拼接后都不变。
+同理，0是加法的单位元，1是乘法的单位元. 从数学的角度来看问题有非常实用的价值，我们在本书后面还会多次看到此类情况。</p>
 </div>
 <p>我们的 <code class="docutils literal"><span class="pre">hcat</span></code> 和 <code class="docutils literal"><span class="pre">fsep</span></code> 函数将 <code class="docutils literal"><span class="pre">Doc</span></code> 列表拼接成一个 <code class="docutils literal"><span class="pre">Doc</span></code> 值。
 在之前的一道题目里（fix link），我们提到了可以用 <code class="docutils literal"><span class="pre">foldr</span></code> 来定义列表拼接。

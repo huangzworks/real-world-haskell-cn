@@ -21,7 +21,7 @@ JSON 支持四种基本类型值：字符串、数字、布尔值和一个特殊
 
     null
 
-JSON 还提供了两种复合类型：\ *数组*\ 是值的有序序列，而\ *对象*\ 则是“名字/值”对的无序收集器（unordered collection of name/value pairs）。其中对象的名字必须是字符串，而对象和数组的值则可以是任何 JSON 类型。
+JSON 还提供了两种复合类型：\ *数组*\ 是值的有序序列，而\ *对象*\ 则是“名字/值”对的无序集合（unordered collection of name/value pairs）。其中对象的名字必须是字符串，而对象和数组的值则可以是任何 JSON 类型。
 
 .. code-block:: json
 
@@ -716,7 +716,9 @@ Haskell 开发诀窍
 
 .. note::
 
-    A mathematical moment(to be added)
+    来思考下数学
+    从数学的角度来看，``Empty`` 是拼接操作(concatenation)的单位元，因为任何 ``Doc`` 值和 ``Empty`` 拼接后都不变。
+    同理，0是加法的单位元，1是乘法的单位元. 从数学的角度来看问题有非常实用的价值，我们在本书后面还会多次看到此类情况。
 
 我们的 ``hcat`` 和 ``fsep`` 函数将 ``Doc`` 列表拼接成一个 ``Doc`` 值。
 在之前的一道题目里（fix link），我们提到了可以用 ``foldr`` 来定义列表拼接。

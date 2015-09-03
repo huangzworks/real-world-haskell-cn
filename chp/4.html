@@ -364,8 +364,8 @@ Ok, modules loaded: Main.
 <p>稍后的章节会介绍如何定义 <code class="docutils literal"><span class="pre">filter</span></code> 。</p>
 </div>
 <div class="section" id="id8">
-<h3>处理收集器并得出结果<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h3>
-<p>将一个收集器（collection）简化（reduce）为一个值也是收集器的常见操作之一。</p>
+<h3>处理集合并得出结果<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h3>
+<p>将一个集合（collection）缩减（reduce）为一个值也是集合的常见操作之一。</p>
 <p>对列表的所有元素求和，就是其中的一个例子：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/mySum.hs</span>
 
@@ -374,7 +374,7 @@ Ok, modules loaded: Main.
           <span class="n">helper</span> <span class="n">acc</span> <span class="kt">[]</span>     <span class="ow">=</span> <span class="n">acc</span>
 </pre></div>
 </div>
-<p><code class="docutils literal"><span class="pre">helper</span></code> 函数通过尾递归进行计算。 <code class="docutils literal"><span class="pre">acc</span></code> 是累积器参数，它记录了当前列表元素的总和。正如我们在 <code class="docutils literal"><span class="pre">asInt</span></code> 函数看到的那样，这种递归计算是纯函数语言里表示 loop 最自然的方式。</p>
+<p><code class="docutils literal"><span class="pre">helper</span></code> 函数通过尾递归进行计算。 <code class="docutils literal"><span class="pre">acc</span></code> 是累积器（accumulator）参数，它记录了当前列表元素的总和。正如我们在 <code class="docutils literal"><span class="pre">asInt</span></code> 函数看到的那样，这种递归计算是纯函数语言里表示 loop 最自然的方式。</p>
 <p>以下是一个稍微复杂一些的例子，它是一个 Adler-32 校验和的 JAVA 实现。Adler-32 是一个流行的校验和算法，它将两个 16 位校验和串联成一个 32 位校验和。第一个校验和是所有输入比特之和，加上一。而第二个校验和则是第一个校验和所有中间值之和。每次计算时，校验和都需要取模 <code class="docutils literal"><span class="pre">65521</span></code> 。（如果你不懂 JAVA ，直接跳过也没关系）：</p>
 <div class="highlight-java"><div class="highlight"><pre><span class="kd">public</span> <span class="kd">class</span> <span class="nc">Adler32</span>
 <span class="o">{</span>
@@ -590,7 +590,7 @@ Ok, modules loaded: Main.
 <span class="o">***</span> <span class="kt">Exception:</span> <span class="n">stack</span> <span class="n">overflow</span>
 </pre></div>
 </div>
-<p>对于小的表达式来说， <code class="docutils literal"><span class="pre">foldl</span></code> 可以给出正确的答案，但是，因为过度的块资源占用，它运行非常缓慢。我们称这种现象为<em>内存泄漏</em>：代码可以正确地执行，但它占用了比实际所需多得多的内存。</p>
+<p>对于小的表达式来说， <code class="docutils literal"><span class="pre">foldl</span></code> 可以给出正确的答案，但是，因为过度的块资源占用，它运行非常缓慢。我们称这种现象为<em>内存泄漏(space leak)</em>：代码可以正确地执行，但它占用了比实际所需多得多的内存。</p>
 <p>对于大的表达式来说，带有内存泄漏的代码会造成运行失败，就像前面例子展示的那样。</p>
 <p>内存泄漏是 Haskell 新手常常会遇到的问题，幸好的是，它非常容易避免。<code class="docutils literal"><span class="pre">Data.List</span></code> 模块定义了一个 <code class="docutils literal"><span class="pre">foldl'</span></code> 函数，它和 <code class="docutils literal"><span class="pre">foldl</span></code> 的作用类似，唯一的区别是， <code class="docutils literal"><span class="pre">foldl'</span></code> 并不创建块。以下的代码直观地展示了它们的区别：</p>
 <div class="highlight-haskell"><div class="highlight"><pre>ghci&gt; foldl  (+) 0 [1..1000000]
@@ -1069,7 +1069,7 @@ Prelude Data.Char&gt; capCount &quot;Hello there, Mon!&quot;
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">chained</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="n">x</span> <span class="p">`</span><span class="n">seq</span><span class="p">`</span> <span class="n">y</span> <span class="p">`</span><span class="n">seq</span><span class="p">`</span> <span class="n">someFunc</span> <span class="n">z</span>
 </pre></div>
 </div>
-<p>一个常见错误是，将 <code class="docutils literal"><span class="pre">seq</span></code> 用在没有关联的连个表达式上面：</p>
+<p>一个常见错误是，将 <code class="docutils literal"><span class="pre">seq</span></code> 用在没有关联的两个表达式上面：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">badExpression</span> <span class="n">step</span> <span class="n">zero</span> <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="ow">=</span>
     <span class="n">seq</span> <span class="p">(</span><span class="n">step</span> <span class="n">zero</span> <span class="n">x</span><span class="p">)</span>
             <span class="p">(</span><span class="n">badExpression</span> <span class="n">step</span> <span class="p">(</span><span class="n">step</span> <span class="n">zero</span> <span class="n">x</span><span class="p">)</span> <span class="n">xs</span><span class="p">)</span>
@@ -1091,7 +1091,7 @@ Prelude Data.Char&gt; capCount &quot;Hello there, Mon!&quot;
 </div>
 <p><code class="docutils literal"><span class="pre">seq</span></code> 的使用并不是无成本的，知道这一点很重要：它需要在运行时检查输入值是否已经被求值。必须谨慎使用 <code class="docutils literal"><span class="pre">seq</span></code> 。比如说，上面定义的 <code class="docutils literal"><span class="pre">strictPair</span></code> ，尽管它能顺利对元组进行强制求值，但它在求值元组所需的计算量上，加上了一次模式匹配、两次 <code class="docutils literal"><span class="pre">seq</span></code> 调用和一次构造新元组的计算量。如果我们检测这个函数的性能的话，就会发现它降低了程序的处理速度。</p>
 <p>即使不考虑性能的问题， <code class="docutils literal"><span class="pre">seq</span></code> 也不是处理内存泄漏的万能药。可以进行非严格求值，但并不意味着非用它不可。对 <code class="docutils literal"><span class="pre">seq</span></code> 的不小心使用可能对内存泄漏并没有帮助，在更糟糕的情况下，它还会造成新的内存泄漏。</p>
-<p>第二十五章会介绍关于性能和优化的内容，到时会说明跟多 <code class="docutils literal"><span class="pre">seq</span></code> 的用法和细节。</p>
+<p>第二十五章会介绍关于性能和优化的内容，到时会说明更多 <code class="docutils literal"><span class="pre">seq</span></code> 的用法和细节。</p>
 </div>
 </div>
 </div>
