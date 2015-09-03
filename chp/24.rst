@@ -219,7 +219,7 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
 安全的修改 MVar
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
- ``forkManaged`` 中使用的 ``modifyMVar`` 函数很实用：它将 ``takeMVar`` 和 ``putMVar`` 安全的组合在一起。
+``forkManaged`` 中使用的 ``modifyMVar`` 函数很实用：它将 ``takeMVar`` 和 ``putMVar`` 安全的组合在一起。
 
 ::
 
@@ -227,8 +227,133 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
   modifyMVar :: MVar a -> (a -> IO (a, b)) -> IO b
 
 
+其从一个 ``MVar`` 中取出一个值，并传入一个函数。这个函数生成一个新的值，且返回一个结果。如果函数抛出一个异常， ``modifyMVar`` 会将初始值重新放回 ``MVar`` ，否则其会写入新值。它还会返回另一个返回值。
 
+使用 ``modifyMVar`` 而非手动使用 ``takeMVar`` 和 ``putMVar`` 管理 ``MVar`` ， 可以避免两类并发场景下的问题。
 
+    * 忘记将一个值放回 ``MVar`` 。有的线程会一直等待 ``MVar`` 中被放回一个值，如果一致没有等到，就将导致死锁。
+    * 没有考虑可能出现的异常，扰乱了某端代码的控制流。这可能导致一个本应执行的 ``putMVar`` 没有执行，进而导致死锁。
+
+因为这些美妙的安全特性，尽可能的使用 ``modifyMVar`` 是明智的选择。
+
+安全资源管理：一个相对简单的好主意。
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``modifyMVar`` 遵循的模式适用很多场景。下面是这些模式：
+
+    1. 获得一份资源。
+    
+    2. 将资源传入一个将处理它函数。
+    
+    3. 始终释放资源，即使函数抛出异常。如果发生异常，重新抛出异常，以便使其被程序捕获。
+
+除了安全性，这个方法还有其他好处：可以是代码更简短且容易理解。正如前面的 ``forkManaged`` ， ``Hakell`` 的简洁语法和匿名函数使得这种风格的代码看起来一点都不刺眼。
+
+下面是 ``modifyMVar`` 的定义，从中可以了解这个模式的细节：
+
+::
+
+   -- file: ch24/ModifyMVar.hs
+   import Control.Concurrent (MVar, putMVar, takeMVar)
+   import Control.Exception (block, catch, throw, unblock)
+   import Prelude hiding (catch) -- use Control.Exception's version
+   
+   modifyMVar :: MVar a -> (a -> IO (a,b)) -> IO b
+   modifyMVar m io = 
+     block $ do
+       a <- takeMVar m
+       (b,r) <- unblock (io a) `catch` \e ->
+                putMVar m a >> throw e
+       putMVar m b
+       return r
+
+这种模式很容易用于你的特定需求，无论是处理网络连接，数据库句柄，或者被 ``C`` 库函数管理的数据。
+
+查看线程状态
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+我们编写的 ``getStatus`` 函数用于获取某个线程的当前状态。若某线程已经不被管理（或者未被管理），它返回 ``Nothing`` 。
+
+::
+
+   -- file: ch24/NiceFork.hs
+   getStatus (Mgr mgr) tid =
+     modifyMVar mgr $ \m ->
+       case M.lookup tid m of
+         Nothing -> return (m, Nothing)
+         Just st -> tryTakeMVar st >>= \mst -> case mst of
+                      Nothing -> return (m, Just Running)
+                      Just sth -> return (M.delete tid m, Just sth)
+   
+若线程仍在运行，它返回 ``Just Running `` 。 否则，它指出将线程为何被终止，并停止管理这个线程。
+
+若 ``tryTakeMVar`` 函数发现 MVar 为空，它将立即返回 ``Nothing`` 而非阻塞等待。
+
+::
+
+   ghci> :t tryTakeMVar
+   tryTakeMVar :: MVar a -> IO (Maybe a)
+
+否则，它将从 MVar 取道一个值。
+
+``waitFor`` 函数的行为较简单，其会阻塞等待给定线程终止，而非立即返回。
+
+::
+
+   -- file: ch24/NiceFork.hs
+   waitFor (Mgr mgr) tid = do
+     maybeDone <- modifyMVar mgr $ \m ->
+       return $ case M.updateLookupWithKey (\_ _ -> Nothing) tid m of
+         (Nothing, _) -> (m, Nothing)
+         (done, m') -> (m', done)
+     case maybeDone of
+       Nothing -> return Nothing
+       Just st -> Just `fmap` takeMVar st
+
+首先读取保存线程状态的 ``MVar`` ，若其存在。 ``Map`` 类型的 ``updateLookupWithKey`` 函数很有用：它将查找某个值与更新或移出组合起来。
+
+::
+
+   ghci> :m +Data.Map
+   ghci> :t updateLookupWithKey
+   updateLookupWithKey :: (Ord k) =>
+                          (k -> a -> Maybe a) -> k -> Map k a -> (Maybe a, Map k a)
+
+在此处，我们希望若保存线程状态的 ``MVar`` 存在，则将其从 Map 中移除，这样线线程管理器将不在管理这个线程。若从其中取到了值，则从中取出线程的退出状态，并将其返回。
+
+我们的最后一个实用函数简单的等待所有当前被管理的线程完成，且忽略他们的退出状态。
+
+::
+
+   -- file: ch24/NiceFork.hs
+   waitAll (Mgr mgr) = modifyMVar mgr elems >>= mapM_ takeMVar
+       where elems m = return (M.empty, M.elems m)
+
+编写更紧凑的代码
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+我们在上面定义的 ``waitFor`` 函数有点不令人满意，因为或多或少执行了重复的模式分析：在 ``modifyMVar`` 内部的回调函数，以及处理其返回值时。
+
+当然，我们可以用一个函数消除这种重复。这是 ``Control.Monad`` 模块中的 join 函数。
+
+::
+
+   ghci> :m +Control.Monad
+   ghci> :t join
+   join :: (Monad m) => m (m a) -> m a
+
+This is an interesting idea: we can create a monadic function or action in pure code, then pass it around until we end up in a monad where we can use it. This can be a nimble way to write code, once we develop an eye for when it makes sense. No comments
+
+这是个有趣的注意：可以创建一个 monadic 函数或纯代码中的 action ，然后将其
+
+::
+
+   -- file: ch24/NiceFork.hs
+   waitFor2 (Mgr mgr) tid =
+     join . modifyMVar mgr $ \m ->
+       return $ case M.updateLookupWithKey (\_ _ -> Nothing) tid m of
+         (Nothing, _) -> (m, return Nothing)
+         (Just st, m') -> (m', Just `fmap` takeMVar st)
+   
 
 
 
