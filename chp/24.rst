@@ -372,6 +372,7 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
      readChan ch >>= print
 
 
+若一个 ``Chan`` 未空， ``readChan`` 将一直阻塞，直到读到一个值。 ``writeChan`` 函数从不阻塞：它会立即将一个值写入 ``Chan`` 。
 
 
 
