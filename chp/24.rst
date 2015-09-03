@@ -7,7 +7,7 @@
 定义并发和并行
 -----------------
 
-一个并发程序需要同时处理多个互不相关的任务。考虑一下游戏服务器的例子：典型做法是将一打组件组合起来，其中的每一个都与外部有复杂交互。可能其中某个组件负责多个用户间聊天；其他一些负责处理玩家的输入，并且将更新后的状态返回给客户端；同时还有其他程序执行物理计算。
+一个并发程序需要同时处理多个互不相关的任务。考虑一下游戏服务器的例子：典型做法是将数十个组件组合起来，其中的每一个都与外部有复杂交互。可能其中某个组件负责多个用户间聊天；另外一些负责处理玩家的输入，并且将更新后的状态返回给客户端；同时还有其他程序执行物理计算。
 
 并发程序的正确运转并不需要多核，尽管多核可以提高执行效率和响应速度。 
 
@@ -374,7 +374,75 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
 
 若一个 ``Chan`` 未空， ``readChan`` 将一直阻塞，直到读到一个值。 ``writeChan`` 函数从不阻塞：它会立即将一个值写入 ``Chan`` 。
 
+注意事项
+-----------------
 
+MVar 和 Chan 是非严格的
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+正如大多数 ``Haskell`` 容器类型， ``MVar`` 和 ``Char`` 都是非严格的：从不对其内容求值。我们提到它，并非因为这是一个问题，而是因为这通常是一个盲点：人们倾向于假设这些类型是严格的，这大概是因为它们被用在 ``IO monad`` 中。
+
+正如其他容器类型，误认为 ``MVar`` 和 ``Chan`` 是严格的会导致空间和性能的泄漏。考虑一下这个很可能发生的情况：
+
+我们分离一个线程以在另一个核上执行一些开销较大的计算
+
+::
+
+   -- file: ch24/Expensive.hs
+   import Control.Concurrent
+   
+   notQuiteRight = do
+     mv <- newEmptyMVar
+     forkIO $ expensiveComputation_stricter mv
+     someOtherActivity
+     result <- takeMVar mv
+     print result
+
+它看上去做了一些事情并将结果存入 ``MVar`` 。
+
+::
+
+   -- file: ch24/Expensive.hs
+   expensiveComputation mv = do
+     let a = "this is "
+         b = "not really "
+         c = "all that expensive"
+     putMVar mv (a ++ b ++ c)
+
+当我们在父线程中从 ``MVar`` 获取结果并尝试用它做些事情时，我们的线程开始疯狂的计算，因为我们从未强制指定在其他线程中的计算真正发生。
+
+照旧，一旦我们知道了有个潜在问题，解决方案就很简单：未分离的线程添加严格性，以确保计算确实发生。这个严格性最好加在一个位置，以避免我们忘记添加过它。
+
+::
+
+   -- file: ch24/ModifyMVarStrict.hs
+   {-# LANGUAGE BangPatterns #-}
+   
+   import Control.Concurrent (MVar, putMVar, takeMVar)
+   import Control.Exception (block, catch, throw, unblock)
+   import Prelude hiding (catch) -- 使用 Control.Exception's 中的 catch 而非 Prelude 中的。
+   
+   modifyMVar_strict :: MVar a -> (a -> IO a) -> IO ()
+   modifyMVar_strict m io = block $ do
+     a <- takeMVar m
+     !b <- unblock (io a) `catch` \e ->
+           putMVar m a >> throw e
+     putMVar m b
+
+
+.. note::
+
+    查看 ``Hackage`` 始终是值得的。
+
+    在 ``Hackage`` 包数据库，你将发现一个库，``strict-concurrency`` ，它提供了严格版本的 ``MVar`` 和 ``Chan`` 类型
+
+
+上面代码中的 ``!`` 模式用起来很简单，但是并不总是足以确保我们的数据已经被求值。更完整的方法，请查看下面的段落“从求值中分离算法”。
+
+Chan 是无限制的
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+因为嗯 ``writeChan`` 总是立即成功，所以在使用 ``Chan`` 时有潜在风险。若对某个 ``Chan`` 的写入多于其读取， ``Chan`` 将用不检查的方法增长：对未读消息的读取将远远落后于其增长。
 
 
 
