@@ -341,9 +341,7 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
    ghci> :t join
    join :: (Monad m) => m (m a) -> m a
 
-This is an interesting idea: we can create a monadic function or action in pure code, then pass it around until we end up in a monad where we can use it. This can be a nimble way to write code, once we develop an eye for when it makes sense. No comments
-
-这是个有趣的注意：可以创建一个 monadic 函数或纯代码中的 action ，然后将其
+这是个有趣的主意：可以创建一个 monadic 函数或纯代码中的 action ，然后一直带着它直到最终某处有个 monad 可以使用它。一旦我们了解这种写法适用的场景，就可以更灵活的编写代码。
 
 ::
 
@@ -353,10 +351,11 @@ This is an interesting idea: we can create a monadic function or action in pure 
        return $ case M.updateLookupWithKey (\_ _ -> Nothing) tid m of
          (Nothing, _) -> (m, return Nothing)
          (Just st, m') -> (m', Just `fmap` takeMVar st)
-   
 
 
 
 
 
-.. [54] 在稍后将展示，GHC 的线程异常的轻量。如果运行时提供检查每个线程状态的方法，每个线程的开销将增加，哪怕永远不会用到这些信息。
+
+
+.. [54] 在稍后将展示，GHC 的线程异常轻量。如果运行时提供检查每个线程状态的方法，每个线程的开销将增加，哪怕永远不会用到这些信息。
