@@ -502,6 +502,29 @@ main = do
 4. 尽管我们已经提到过 Hackage 库中的 ``strict-concurrency`` 包，试着自己开发一个，作为内置 ``MVar`` 类型的包装。按照经典的 ``Haskell`` 实践，使你的库类型安全，让用户不会混淆严格和非严格的 ``MVar`` 。
 
 
+在 GHC 中使用多核
+-----------------
+
+默认情况下， ``GHC`` 生成的程序只使用一个核，甚至在编写并发代码时也是如此。要使用多核，我们必须明确指定。当生成可执行程序时，要在链接阶段指定这一点。
+
+    * “non-threaded” 运行时库在一个操作系统线程中运行所有 ``Haskell`` 线程。这个运行时在创建线程和通过 MVar 传递数据时很高效。
+    
+
+    * “threaded” 库使用多个操作系统线程运行 ``Haskell`` 线程。它在创建线程和使用 ``MVar`` 时具有更高的开销。
+
+若我们在向编译器传递 ``-threadedoption`` 参数，它将使用 ``threaded`` 运行时库链接我们的程序。在编译库和源码文件时无需指定 ``-threaded`` ，只是在最终生成可执行文件时需要指定。
+
+即使为程序指定了 ``threaded`` 运行时，默认情况下它仍将只使用一个核运行。必须明确告诉运行时使用多少个核。
+
+运行时选项
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+We can pass options to GHC's runtime system on the command line of our program. Before handing control to our code, the runtime scans the program's arguments for the special command line option +RTS. It interprets everything that follows, until the special option -RTS, as an option for the runtime system, not our program. It hides all of these options from our code. When we use the System.Environmentmodule's getArgsfunction to obtain our command line arguments, we will not find any runtime options in the list.
+运行程序时可以向 GHC 的运行时系统传递命令行参数。在执行
+
+
+
+
 
 
 
