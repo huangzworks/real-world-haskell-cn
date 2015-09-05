@@ -524,6 +524,32 @@ main = do
 ``threaded`` 运行时接受参数 ``-N`` [55]_ 。 其接受一个参数，指定了 ``GHC`` 的运行时系统将使用的核数。这个选项对输入很挑剔： ``-N`` 和参数之间必须没有空格。 ``-N4`` 可被接受， ``-N 4`` 则不被接受。
 
 
+找出 Haskell 可以使用多少核
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``GHC.Conc`` 模块输出一个变量， ``numCapabilities`` ，它会告诉我们运行时系统被 ``-NRTS`` 选项指定了多少核。
+
+::
+
+   -- file: ch24/NumCapabilities.hs
+   import GHC.Conc (numCapabilities)
+   import System.Environment (getArgs)
+
+   main = do
+       args <- getArgs
+       putStrLn $ "command line arguments: " ++ show args
+       putStrLn $ "number of cores: " ++ show numCapabilitie
+
+若编译上面的程序，我们可以看到运行时系统的选项对于程序来说是不可见的，但是它可以看其运行在多少核上。
+
+::
+
+   $ ghc -c NumCapabilities.hs
+   $ ghc -threaded -o NumCapabilities NumCapabilities.o $ ./NumCapabilities +RTS -N4 -RTS foo
+   command line arguments: ["foo"]
+   number of cores: 4
+
+
 
 
 
