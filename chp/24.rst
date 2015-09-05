@@ -519,9 +519,9 @@ main = do
 运行时选项
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We can pass options to GHC's runtime system on the command line of our program. Before handing control to our code, the runtime scans the program's arguments for the special command line option +RTS. It interprets everything that follows, until the special option -RTS, as an option for the runtime system, not our program. It hides all of these options from our code. When we use the System.Environmentmodule's getArgsfunction to obtain our command line arguments, we will not find any runtime options in the list.
-运行程序时可以向 GHC 的运行时系统传递命令行参数。在执行
+运行程序时可以向 GHC 的运行时系统传递命令行参数。在将控制权交给我们的代码前，运行时扫描程序的参数，看是否有命令行选项 ``+RTS`` 。其后跟随的所有选项都被运行时解释，直到特殊的选项 ``-RTS`` ，这些选项都是提供给运行时系统的，不为我们的程序。运行时会对我们的代码隐藏所有这些选项。当我们使用 ``System.Environment`` 模块的 ``getArgsfunction`` 来获得我们的命令行参数是，我们不会在其中获得运行时选项。
 
+``threaded`` 运行时接受参数 ``-N`` [55]_ 。 其接受一个参数，指定了 ``GHC`` 的运行时系统将使用的核数。这个选项对输入很挑剔： ``-N`` 和参数之间必须没有空格。 ``-N4`` 可被接受， ``-N 4`` 则不被接受。
 
 
 
