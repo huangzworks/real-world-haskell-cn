@@ -439,10 +439,57 @@ MVar 和 Chan 是非严格的
 
 上面代码中的 ``!`` 模式用起来很简单，但是并不总是足以确保我们的数据已经被求值。更完整的方法，请查看下面的段落“从求值中分离算法”。
 
-Chan 是无限制的
+Chan 是无边界的
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-因为嗯 ``writeChan`` 总是立即成功，所以在使用 ``Chan`` 时有潜在风险。若对某个 ``Chan`` 的写入多于其读取， ``Chan`` 将用不检查的方法增长：对未读消息的读取将远远落后于其增长。
+因为 ``writeChan`` 总是立即成功，所以在使用 ``Chan`` 时有潜在风险。若对某个 ``Chan`` 的写入多于其读取， ``Chan`` 将用不检查的方法增长：对未读消息的读取将远远落后于其增长。
+
+
+共享状态的并发仍不容易
+-----------------
+
+尽管 Haskell 拥有与其他语言不同的基础设施用于线程间共享数据，它仍需克服相同的基本问题：编写正确的并发程序极端困难。真的，一些其他语言中的并发编程陷阱也会在 ``Haskell`` 中出现。其中为人熟知的两个是死锁和饥饿。
+
+死锁
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+死锁的情况下，两个或多个线程永远卡在争抢共享资源的访问权上。制造多线程程序死锁的一个经典方法是不按顺序加锁。这种类型的 bug 很常见，它有个名字：锁顺序倒置。 ``Haskell`` 没有提供锁， 但 ``MVar`` 类型可能会有顺序倒置问题。这有一个简单例子：
+
+::
+
+   -- file: ch24/LockHierarchy.hs
+import Control.Concurrent
+
+nestedModification outer inner = do
+    modifyMVar_ outer $ \x -> do
+        yield -- 强制当前线程让出 CPU
+        modifyMVar_ inner $ \y -> return (y + 1)
+        return (x + 1)
+    putStrLn "done"
+
+main = do
+    a <- newMVar 1
+    b <- newMVar 2
+    forkIO $ nestedModification a b
+    forkIO $ nestedModification b a
+
+在 ghci 中运行这段程序，它通常会（但不总是）不打印任何信息，表明两个线程已经卡住了。
+
+容易看出 ``nestedModification`` 函数的问题。在第一个线程中，我们先取出 ``MVar a`` ，接着取出 ``b`` 。在第二个线程中，先取出 ``b`` 然后取出 ``a`` ，若第一个线程成功取出了 ``a`` 然后要取出 ``b`` ，这是两个线程都会阻塞：每个线程都尝试获取一个 ``MVar`` ，而这个 ``MVar`` 已经被另一个线程取空了，所以二者都不能完成整个流程。
+
+无论何种语言，通常解决倒序问题的方法是申请资源时一直遵循一致的顺序。因为这需要人工遵循编码规范，在实践中很容易遗忘。
+
+更麻烦的是，这种倒序问题在实际代码中很难被发现。获取 ``MVar`` 的动作经常跨越不同文件中的不同函数，这使得通过观察源码检查时更加棘手。更糟糕的是，这类问题通常是间歇性的，这使得它们难于重现，更不要说隔离和修复了。
+
+饥饿
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Concurrent software is also prone to starvation, in which one thread “hogs” a shared resource, preventing another from using it. It's easy to imagine how this might occur: one thread calls modifyMVarwith a body that executes for 100 milliseconds, while another calls modifyMVaron the same MVarwith a body that executes for 1 millisecond. The second thread cannot make progress until the first puts a value back into the MVar.
+
+并发软件通常可能会
+
+
+
+
 
 
 
