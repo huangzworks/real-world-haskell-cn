@@ -490,7 +490,16 @@ main = do
 
 没希望了吗？
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-星云的是，我们已经提及的并发 ``API`` 并不是故事的全部。最近加入 Haskell 中的一个设施，软件事务内存，使用起来更加容易和安全。我们将在第 28 章，软件事务内存中介绍。
+幸运的是，我们已经提及的并发 ``API`` 并不是故事的全部。最近加入 Haskell 中的一个设施，软件事务内存，使用起来更加容易和安全。我们将在第 28 章，软件事务内存中介绍。
+
+
+练习
+-----------------
+1. ``Chan`` 类型是使用 ``MVar`` 实现的。使用 ``MVar`` 来开发一个有边界的 ``Chan`` 库。
+2. 你开发的 newBoundedChanfunction 接受一个 ``Int`` 参数，限制单独 ``BoundedChan`` 中的未读消息数量。
+3. 达到限制是， 调用 ``writeBoundedChanfunction`` 要被阻塞，知道某个读取者使用 ``readBoundedChan`` 函数消费掉队列中的一个值。
+4. Although we've already mentioned the existence of the strict-concurrencypackage in the Hackage repository, try developing your own, as a wrapper around the built­in MVartype. Following classic Haskell practice, make your library type safe, so that users cannot accidentally mix uses of strict and non­strict MVars. 1 comment
+4. 尽管我们已经提到过 Hackage 库中的 ``strict-concurrency`` 包，试着自己开发一个，作为内置 ``MVar`` 类型的包装。按照经典的 ``Haskell`` 实践，使你的库类型安全，让用户不会混淆严格和非严格的 ``MVar`` 。
 
 
 
