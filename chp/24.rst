@@ -483,12 +483,14 @@ main = do
 
 饥饿
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Concurrent software is also prone to starvation, in which one thread “hogs” a shared resource, preventing another from using it. It's easy to imagine how this might occur: one thread calls modifyMVarwith a body that executes for 100 milliseconds, while another calls modifyMVaron the same MVarwith a body that executes for 1 millisecond. The second thread cannot make progress until the first puts a value back into the MVar.
 
-并发软件通常可能会
+并发软件通常可能会导致饥饿问题，某个线程霸占了共享资源，阻止其他线程使用。很容易想象这是如何发生的：一个线程调用 ``modifyMVar`` 执行一个 100 毫秒的代码段，稍后另外一个线程对同一个 ``MVar`` 调用 ``modifyMVar`` 执行一个 1 毫秒的代码段。第二个线程在第一个线程完成前将无法执行。
 
+``MVar`` 类型的非严格性质使会导致或恶化饥饿的问题。若我们将一个求值开销很大的 ``thunk`` 写入一个 ``MVar`` ，在一个看上去开销较小的线程中取出并求值，这个线程的执行开销马上会变大。所以我们在 “MVar 和 Chan 是非严格的” 一章中特地给出了一些建议。
 
-
+没希望了吗？
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+星云的是，我们已经提及的并发 ``API`` 并不是故事的全部。最近加入 Haskell 中的一个设施，软件事务内存，使用起来更加容易和安全。我们将在第 28 章，软件事务内存中介绍。
 
 
 
