@@ -57,20 +57,23 @@
 <p>如果你不曾用过类Unix的系统，或者你不是个重度shell用户，那么你很可能从未听说过 <code class="docutils literal"><span class="pre">find</span></code> ，通过给定的一组目录，它递归搜索每个目录并且打印出每个匹配表达式的实体名称。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/RecursiveContents.hs</span>
 <span class="kr">module</span> <span class="nn">RecursiveContents</span> <span class="p">(</span><span class="nf">getRecursiveContents</span><span class="p">)</span> <span class="kr">where</span>
+
 <span class="kr">import</span> <span class="nn">Control.Monad</span> <span class="p">(</span><span class="nf">forM</span><span class="p">)</span>
 <span class="kr">import</span> <span class="nn">System.Directory</span> <span class="p">(</span><span class="nf">doesDirectoryExist</span><span class="p">,</span> <span class="nf">getDirectoryContents</span><span class="p">)</span>
 <span class="kr">import</span> <span class="nn">System.FilePath</span> <span class="p">((</span><span class="o">&lt;/&gt;</span><span class="p">))</span>
+
 <span class="nf">getRecursiveContents</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">FilePath</span><span class="p">]</span>
+
 <span class="nf">getRecursiveContents</span> <span class="n">topdir</span> <span class="ow">=</span> <span class="kr">do</span>
-    <span class="n">names</span> <span class="ow">&lt;-</span> <span class="n">getDirectoryContents</span> <span class="n">topdir</span>
-<span class="kr">let</span> <span class="n">properNames</span> <span class="ow">=</span> <span class="n">filter</span> <span class="p">(`</span><span class="n">notElem</span><span class="p">`</span> <span class="p">[</span><span class="s">&quot;.&quot;</span><span class="p">,</span> <span class="s">&quot;..&quot;</span><span class="p">])</span> <span class="n">names</span>
-    <span class="n">paths</span> <span class="ow">&lt;-</span> <span class="n">forM</span> <span class="n">properNames</span> <span class="o">$</span> <span class="nf">\</span><span class="n">name</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
-<span class="kr">let</span> <span class="n">path</span> <span class="ow">=</span> <span class="n">topdir</span> <span class="o">&lt;/&gt;</span> <span class="n">name</span>
+  <span class="n">names</span> <span class="ow">&lt;-</span> <span class="n">getDirectoryContents</span> <span class="n">topdir</span>
+  <span class="kr">let</span> <span class="n">properNames</span> <span class="ow">=</span> <span class="n">filter</span> <span class="p">(`</span><span class="n">notElem</span><span class="p">`</span> <span class="p">[</span><span class="s">&quot;.&quot;</span><span class="p">,</span> <span class="s">&quot;..&quot;</span><span class="p">])</span> <span class="n">names</span>
+  <span class="n">paths</span> <span class="ow">&lt;-</span> <span class="n">forM</span> <span class="n">properNames</span> <span class="o">$</span> <span class="nf">\</span><span class="n">name</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+    <span class="kr">let</span> <span class="n">path</span> <span class="ow">=</span> <span class="n">topdir</span> <span class="o">&lt;/&gt;</span> <span class="n">name</span>
     <span class="n">isDirectory</span> <span class="ow">&lt;-</span> <span class="n">doesDirectoryExist</span> <span class="n">path</span>
     <span class="kr">if</span> <span class="n">isDirectory</span>
-        <span class="kr">then</span> <span class="n">getRecursiveContents</span> <span class="n">path</span>
-    <span class="kr">else</span> <span class="n">return</span> <span class="p">[</span><span class="n">path</span><span class="p">]</span>
-<span class="nf">return</span> <span class="p">(</span><span class="n">concat</span> <span class="n">paths</span><span class="p">)</span>
+      <span class="kr">then</span> <span class="n">getRecursiveContents</span> <span class="n">path</span>
+      <span class="kr">else</span> <span class="n">return</span> <span class="p">[</span><span class="n">path</span><span class="p">]</span>
+  <span class="n">return</span> <span class="p">(</span><span class="n">concat</span> <span class="n">paths</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>单个表达式可以识别像“符合这个全局模式的名称”，“实体是一个文件”，“当前最后一个被修改的文件”以及其他诸如此类的表达式，通过and或or算子就可以把他们装配起来构成更加复杂的表达式</p>
