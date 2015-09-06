@@ -14,21 +14,24 @@ find命令
 
     -- file: ch09/RecursiveContents.hs
     module RecursiveContents (getRecursiveContents) where
+
     import Control.Monad (forM)
     import System.Directory (doesDirectoryExist, getDirectoryContents)
     import System.FilePath ((</>))
+
     getRecursiveContents :: FilePath -> IO [FilePath]
+
     getRecursiveContents topdir = do
-        names <- getDirectoryContents topdir
-    let properNames = filter (`notElem` [".", ".."]) names
-        paths <- forM properNames $ \name -> do
-    let path = topdir </> name
+      names <- getDirectoryContents topdir
+      let properNames = filter (`notElem` [".", ".."]) names
+      paths <- forM properNames $ \name -> do
+        let path = topdir </> name
         isDirectory <- doesDirectoryExist path
         if isDirectory
-            then getRecursiveContents path
-        else return [path]
-    return (concat paths)
-  
+          then getRecursiveContents path
+          else return [path]
+      return (concat paths)
+
 单个表达式可以识别像“符合这个全局模式的名称”，“实体是一个文件”，“当前最后一个被修改的文件”以及其他诸如此类的表达式，通过and或or算子就可以把他们装配起来构成更加复杂的表达式
 
 简单的开始：递归遍历目录
