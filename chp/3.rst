@@ -1305,8 +1305,71 @@ Case 表达式
 
 如果使用通配符 ``_`` 作为最后一个被匹配的模式，则意味着“如果上面的模式都没有被匹配中，就使用最后这个表达式”。如果所有模式匹配都没中，我们会看到前面章节里出现过的运行时错误。
 
-Common Beginner Mistakes with Patterns
----------------------------------------------------------
+新手在使用模式时常见的问题
+--------------------------
+
+在某些情况下，Haskell 新手会误解或误用模式。下面就是一些错误地使用模式匹配的例子。建议阅读时先自己想一想期望的结果是什么，然后看看实际的结果是否出乎你的意料。
+
+错误地对变量进行匹配
+^^^^^^^^^^^^^^^^^^^^
+
+::
+
+    -- file: ch03/BogusPattern.hs
+    data Fruit = Apple | Orange
+
+    apple = "apple"
+
+    orange = "orange"
+
+    whichFruit :: String -> Fruit
+
+    whichFruit f = case f of
+                     apple  -> Apple
+                     orange -> Orange
+
+随意一瞥，这段代码的意思似乎是要检查 ``f`` 的值是 ``apple`` 还是 ``orange``。
+
+换一种写法可以让错误更加显而易见。（译注：原文的例子太晦涩，换了评论中一个较清楚的例子）
+
+::
+
+    -- file: ch03/BogusPattern.hs
+    whichFruit2 :: String -> Fruit
+    whichFruit2 apple = Apple
+    whichFruit2 orange = Orange
+
+这样写明白了吗？就是这里，显然 ``apple`` 并不是指在上层定义的那个变量名为 ``apple`` 的值，而是当前作用域的一个模式变量。
+
+.. note::
+
+    不可拒绝的模式
+
+    我们把这种永远会成功匹配的模式称作\ *不可拒绝*\ 。普通的变量名和通配符 ``_`` 都属于不可拒绝的模式。
+
+上面那个函数的正确写法应该如此：
+
+::
+
+    -- file: ch03/BogusPattern.hs
+    betterFruit f = case f of
+                      "apple"  -> Apple
+                      "orange" -> Orange
+
+我们针对字符串值 ``"apple"`` 和 ``"orange"`` 进行模式匹配，于是问题得到了解决。
+
+进行了错误的相等比较
+^^^^^^^^^^^^^^^^^^^^
+
+如果我们想比较一个 ``Tree`` 类型的两个节点值，如果相等就返回其中一个应该怎么做？请看下面这个尝试。
+
+::
+
+    -- file: ch03/BadTree.hs
+    bad_nodesAreSame (Node a _ _) (Node a _ _) = Just a
+    bad_nodesAreSame _            _            = Nothing
+
+一个命名在一组模式绑定中只能使用一次。将同一个变量放在多个位置并不意味着“这些变量应该相等”。要解决这类问题，我们需要使用 Haskell 的另一个重要的特性，*守卫*。
 
 Conditional Evaluation with Guards
 ---------------------------------------------------------
