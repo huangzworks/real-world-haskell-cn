@@ -83,12 +83,14 @@ lines函数仅仅在换行符处分离文本，留下回车跟在行的结尾处
 因为到目前为止我们仅仅接触了少量的Haskell代码，所以我们将一步一步地讨论我们用Haskell实现上述支持的细节。
 
 ::
+
 	-- file: ch04/SplitLines.hs
 	splitLines :: String -> [String]
 
 我们的函数类型签名标示它接受一个字符串，可能是具有某些未知的行终止惯例的文件的内容。它返回一个包含字符串的列表，列表的每一项代表文件中的每一行文本。
 
 ::
+
 	-- file: ch04/SplitLines.hs
 	splitLines [] = []
 	splitLines cs =
@@ -106,6 +108,7 @@ lines函数仅仅在换行符处分离文本，留下回车跟在行的结尾处
 Prelude定义了一个叫做break的函数，我们可以用它把一个列表分成两部分。它把一个函数作为它的第一个参数。这个函数必须去检查列表中的元素，并且返回一个Bool值来表示列表是否在那个元素处被一分为二。break函数返回一个对值（译注：即二元组），由一个断言（译注：即一个返回Bool值的函数，下同）返回True（译注：第一次返回True）之前的元素构成的列表（前缀）和剩下的元素构成的列表组成（后缀）。
 
 ::
+
 	ghci> break odd [2,4,5,6,8]
 	([2,4],[5,6,8])
 	ghci> :module +Data.Char
@@ -127,12 +130,14 @@ case表达式中的第一个模式匹配以一个回车紧接着一个换行符�
 让我们从分割一个不包含任何行终止符的字符串开始。
 
 ::
+
 	ghci> splitLines "foo"
 	["foo"]
 
 这里，我们的break没找到一个行终止符，所以它返回的后缀是空的。
 
 ::
+
 	ghci> break isLineTerminator "foo"
 	("foo","")
 
@@ -140,24 +145,28 @@ case表达式中的第一个模式匹配以一个回车紧接着一个换行符�
 再来一点儿更有趣的例子怎么样？
 
 ::
+
 	ghci> splitLines "foo\r\nbar"
 	["foo","bar"]
 
 首先我们的break给我们一个非空的后缀。
 
 ::
+
 	ghci> break isLineTerminator "foo\r\nbar"
 	("foo","\r\nbar")
 
 因为这个后缀以一个回车紧接着一个换行符开始，我们匹配上了case表达式的第一个分支。这个求值结果让我们把pre绑定到“foo”，suf绑定到“bar”。我们递归地应用splitLines，这一次匹配上单独的“bar”。
 
 ::
+
 	ghci> splitLines "bar"
 	["bar"]
 
 结果是我们构造了一个头部的元素是“foo”，尾部的元素是“bar”的列表
 
 ::
+
 	ghci> "foo" : ["bar"]
 	["foo","bar"]
 
@@ -172,6 +181,7 @@ case表达式中的第一个模式匹配以一个回车紧接着一个换行符�
 让我们把我们的splitLines函数和早先我们写的一个小框架联系起来。首先制作一份Interact.hs源文件的拷贝；让我们叫这个新文件FixLines.hs。把splitLines加到新的源码文件中。因为我们的函数必须产出一个单独的字符串，所以我们必须把这个表示行的列表联结起来。Prelude提供一个unlines函数，它把一个字符串组成的列表串联起来，并且在每个字符串元素的末尾加上一个换行符。
 
 ::
+
 	-- file: ch04/SplitLines.hs
 	fixLines :: String -> String
 	fixLines input = unlines (splitLines input)
@@ -179,6 +189,7 @@ case表达式中的第一个模式匹配以一个回车紧接着一个换行符�
 如果我们用fixLines替换这个id函数（译注：是指拷贝自Interact.hs的FixLines.hs中的id函数），我们可以把FixLines.hs编译成一个将文本文件的行终止转换成系统特定的行终止的可执行程序。
 
 ::
+
 	$ ghc --make FixLines
 	[1 of 1] Compiling Main             ( FixLines.hs, FixLines.o )
 	Linking FixLines ...
@@ -188,6 +199,7 @@ case表达式中的第一个模式匹配以一个回车紧接着一个换行符�
 在类Unix的系统上，编辑器隐藏了Windows的行终止符。使得验证FixLines是否消除了它们更加困难。这里有一些命令应该能帮助你。
 
 ::
+
 	$ file gpl-3.0.txt
 	gpl-3.0.txt: ASCII English text
 	$ unix2dos gpl-3.0.txt
@@ -206,6 +218,7 @@ case表达式中的第一个模式匹配以一个回车紧接着一个换行符�
 要用中缀表示法定义或应用一个函数或值构造器，我们用重音符（有时被称为反引号）包围它的名称。这里有简单的中缀函数和中缀类型的定义。
 
 ::
+
 	-- file: ch04/Plus.hs
 	a `plus` b = a + b
 
@@ -219,6 +232,7 @@ case表达式中的第一个模式匹配以一个回车紧接着一个换行符�
 因为中缀表示法纯粹是为了语法上的便利，因此它不会改变函数的行为。
 
 ::
+
     ghci> 1 `plus` 2
     3
     ghci> plus 1 2
@@ -231,18 +245,21 @@ case表达式中的第一个模式匹配以一个回车紧接着一个换行符�
 中缀表示法经常对代码可读性有帮助。比如，Prelude定义了一个elem函数，它标示一个给定的值是否出现在一个列表中。如果我们用前缀表示法来使用elem，它构成的代码相当易读。
 
 ::
+
     ghci> elem 'a' "camogie"
     True
 
 如果我们换用中缀表示法，这段代码甚至会变得更容易理解。它清楚地标示我们正在检查左边的给定值是否出现在右边的列表里。
 
 ::
+
     ghci> 3 `elem` [1,2,4,8]
     False
 
 我们在Data.List模块的一些有用的函数中看到了更明显的改进（译注：这里是指中缀表示法改进了代码可读性）。isPrefixOf函数告诉我们一个列表是否匹配另一个列表的开始部分。
 
 ::
+
     ghci> :module +Data.List
     ghci> "foo" `isPrefixOf` "foobar"
     True
@@ -250,6 +267,7 @@ case表达式中的第一个模式匹配以一个回车紧接着一个换行符�
 相应地，isInfixOf和isSuffixOf函数匹配一个列表的中间和结尾处的任何地方。
 
 ::
+
     ghci> "needle" `isInfixOf` "haystack full of needle thingies"
     True
     ghci> "end" `isSuffixOf` "the end"
@@ -269,6 +287,7 @@ case表达式中的第一个模式匹配以一个回车紧接着一个换行符�
 Data.List模块包含所有的列表函数。Prelude只不过重新导出了这些在Data.List模块中的函数的大部分。还有一些有用的函数并没有被Prelude重新导出。下面学习列表函数的时候，将明确地提到那些只在Data.List中出现的。
 
 ::
+
     ghci> :module +Data.List
 
 因为这些函数没有什么复杂的或者代码量超过三行的，所有我们对它们只做简单的描述。实际上，快速和有用的学习方法是记住它们是如何定义的。
@@ -280,6 +299,7 @@ Data.List模块包含所有的列表函数。Prelude只不过重新导出了这�
 length函数告诉我们一个列表中包含多少个元素。
 
 ::
+
     ghci> :type length
     length :: [a] -> Int
     ghci> length []
@@ -292,6 +312,7 @@ length函数告诉我们一个列表中包含多少个元素。
 如果需要检查列表是不是空的，用null函数。
 
 ::
+
     ghci> :type null
     null :: [a] -> Bool
     ghci> null []
@@ -302,6 +323,7 @@ length函数告诉我们一个列表中包含多少个元素。
 要访问列表的第一个元素，用head函数。
 
 ::
+
     ghci> :type head
     head :: [a] -> a
     ghci> head [1,2,3]
@@ -310,6 +332,7 @@ length函数告诉我们一个列表中包含多少个元素。
 相反，tail函数，返回列表中除了第一个其它所有的元素。
 
 ::
+
     ghci> :type tail
     tail :: [a] -> [a]
     ghci> tail "foo"
@@ -318,6 +341,7 @@ length函数告诉我们一个列表中包含多少个元素。
 还有一个函数，last，返回列表的最后一个元素。
 
 ::
+
     ghci> :type last
     last :: [a] -> a
     ghci> last "bar"
@@ -326,6 +350,7 @@ length函数告诉我们一个列表中包含多少个元素。
 和last相反的是init，它返回列表中除了最后一个其它所有的元素。
 
 ::
+
     ghci> :type init
     init :: [a] -> [a]
     ghci> init "bar"
@@ -334,6 +359,7 @@ length函数告诉我们一个列表中包含多少个元素。
 上面的一些函数应用在空列表上时会报错，因此当不知道一个列表是否为空的时候要小心了。它们会报告什么样的错误呢？
 
 ::
+
     ghci> head []
     *** Exception: Prelude.head: empty list
 
@@ -341,11 +367,12 @@ length函数告诉我们一个列表中包含多少个元素。
 
 
 安全和明智地跟会崩溃的函数打交道
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 当我们想使用一个函数比如head时，如果我们传递一个空列表给它，很可能会破坏我们的工作，有效避免这个问题的方法是在使用head之前，检查传递给它的列表的长度。让我们举一个例子说明。
 
 ::
+
     -- file: ch04/EfficientList.hs
     myDumbExample xs = if length xs > 0
                        then head xs
@@ -360,6 +387,7 @@ length函数告诉我们一个列表中包含多少个元素。
 一个更合适的替代方案是调用null函数，它执行的次数是确定不变的。更好的是，使用null能使我们的代码明确地标示出我们真正关心的列表的属性。下面举两个更好的例子。
 
 ::
+
     -- file: ch04/EfficientList.hs
     mySmartExample xs = if not (null xs)
                         then head xs
@@ -370,11 +398,12 @@ length函数告诉我们一个列表中包含多少个元素。
 
 
 更多简单列表操作
-^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Haskell用(++)表示“追加”函数。
 
 ::
+
     ghci> :type (++)
     (++) :: [a] -> [a] -> [a]
     ghci> "foo" ++ "bar"
@@ -387,6 +416,7 @@ Haskell用(++)表示“追加”函数。
 concat函数取一个包含列表的列表，这些列表中的元素具有相同的类型，它把这些列表连接在一起成为一个单一的列表。
 
 ::
+
     ghci> :type concat
     concat :: [[a]] -> [a]
     ghci> concat [[1,2,3], [4,5,6]]
@@ -395,6 +425,7 @@ concat函数取一个包含列表的列表，这些列表中的元素具有相�
 它会去掉一级的嵌套。（译注：每次调用concat会去除最外一层的方括号）
 
 ::
+
     ghci> concat [[[1,2],[3]], [[4],[5],[6]]]
     [[1,2],[3],[4],[5],[6]]
     ghci> concat (concat [[[1,2],[3]], [[4],[5],[6]]])
@@ -403,6 +434,7 @@ concat函数取一个包含列表的列表，这些列表中的元素具有相�
 reverse函数返回一个元素以相反的顺序排列的新列表。
 
 ::
+
     ghci> :type reverse
     reverse :: [a] -> [a]
     ghci> reverse "foo"
@@ -411,6 +443,7 @@ reverse函数返回一个元素以相反的顺序排列的新列表。
 针对包含Bool值的列表，and和or函数相当于用&&和||遍历这个列表并两两求值
 
 ::
+
     ghci> :type and
     and :: [Bool] -> Bool
     ghci> and [True,False,True]
@@ -427,6 +460,7 @@ reverse函数返回一个元素以相反的顺序排列的新列表。
 还有两个与and和or功能近似的函数，all和any，它们操作任何类型的列表。每一个带着一个断言作为它的第一个参数；如果对列表中的每个元素的断言都成功了，all函数返回True，当对列表中的每个元素的断言至少有一个成功了，any函数返回True。
 
 ::
+
     ghci> :type all
     all :: (a -> Bool) -> [a] -> Bool
     ghci> all odd [1,3,5]
@@ -449,6 +483,7 @@ reverse函数返回一个元素以相反的顺序排列的新列表。
 take函数，在“函数应用”一节遇到过，返回一个由头k个元素组成的子列表。与它相反，drop，丢掉列表开头的k个元素。
 
 ::
+
     ghci> :type take
     take :: Int -> [a] -> [a]
     ghci> take 3 "foobar"
@@ -465,6 +500,7 @@ take函数，在“函数应用”一节遇到过，返回一个由头k个元素
 splitAt函数组合了take和drop的功能，返回由一个列表产生的二元组，两部分是由原来的列表根据给定的索引分割而成。
 
 ::
+
     ghci> :type splitAt
     splitAt :: Int -> [a] -> ([a], [a])
     ghci> splitAt 3 "foobar"
@@ -473,6 +509,7 @@ splitAt函数组合了take和drop的功能，返回由一个列表产生的二�
 takeWhile和dropWhile函数带着断言：takeWhile从开头遍历一个列表，抽取使断言返回True的元素组成一个新列表；dropWhile则是把使断言返回True的元素丢掉。（译注：这里的表述容易引起歧义，实际上两个函数都是走到第一个使断言返回False的元素处就停止操作了，即使这个元素后面还有使断言返回True的元素，两个函数也不再take或drop了）
 
 ::
+
     ghci> :type takeWhile
     takeWhile :: (a -> Bool) -> [a] -> [a]
     ghci> takeWhile odd [1,3,5,6,8,9,11]
@@ -487,6 +524,7 @@ takeWhile和dropWhile函数带着断言：takeWhile从开头遍历一个列表�
 每个函数带着一个断言，break提取列表中使断言失败的元素组成二元组的首项，而span提取列表中使断言成功的元素组成二元组的首项。
 
 ::
+
     ghci> :type span
     span :: (a -> Bool) -> [a] -> ([a], [a])
     ghci> span even [2,4,6,7,9,10,11]
@@ -503,6 +541,7 @@ takeWhile和dropWhile函数带着断言：takeWhile从开头遍历一个列表�
 正如我们已经看到的，elem函数标示一个值是否出现在一个列表中。它有一个伴生的函数，notElem。
 
 ::
+
     ghci> :type elem
     elem :: (Eq a) => a -> [a] -> Bool
     ghci> 2 `elem` [5,3,2,1,1]
@@ -513,6 +552,7 @@ takeWhile和dropWhile函数带着断言：takeWhile从开头遍历一个列表�
 对于更普遍的搜索操作，filter函数带着一个断言，返回列表中使断言成功的每一个元素。
 
 ::
+
     ghci> :type filter
     filter :: (a -> Bool) -> [a] -> [a]
     ghci> filter odd [2,4,1,3,6,8,5,7]
@@ -523,6 +563,7 @@ takeWhile和dropWhile函数带着断言：takeWhile从开头遍历一个列表�
 isPrefixOf函数告诉我们左边的列表是否出现在右边的列表的开始处。
 
 ::
+
     ghci> :module +Data.List
     ghci> :type isPrefixOf
     isPrefixOf :: (Eq a) => [a] -> [a] -> Bool
@@ -534,6 +575,7 @@ isPrefixOf函数告诉我们左边的列表是否出现在右边的列表的开�
 isInfixOf函数标示左边的列表是否是右边的列表的一个子列表。
 
 ::
+
     ghci> :module +Data.List
     ghci> [2,6] `isInfixOf` [3,1,4,1,5,9,2,6,5,3,5,8,9,7,9]
     True
@@ -543,17 +585,19 @@ isInfixOf函数标示左边的列表是否是右边的列表的一个子列表�
 isSuffixOf函数的功能不再赘述。
 
 ::
+
     ghci> :module +Data.List
     ghci> ".c" `isSuffixOf` "crashme.c"
     True
 
 
 一次性处理多个列表
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 zip函数把两个列表压缩成一个单一的由二元组组成的列表。结果列表和被处理的两个列表中较短的那个等长。（译注：言下之意是较长的那个列表中的多出来的元素会被丢弃）
 
 ::
+
     ghci> :type zip
     zip :: [a] -> [b] -> [(a, b)]
     ghci> zip [12,72,93] "zippity"
@@ -562,6 +606,7 @@ zip函数把两个列表压缩成一个单一的由二元组组成的列表。�
 更有用的是zipWith函数，它带两个列表作为参数并为从每个列表中抽取一个元素而组成的二元组提供一个函数，最后生成与较短的那个列表等长的新列表。
 
 ::
+
     ghci> :type zipWith
     zipWith :: (a -> b -> c) -> [a] -> [b] -> [c]
     ghci> zipWith (+) [1,2,3] [4,5,6]
@@ -571,11 +616,12 @@ Haskell的类型系统使编写带有可变数量的参数的函数成为一个�
 
 
 特殊的字符串处理函数
-^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 我们已经在“热身：方便地分离多行文本”一节中遇到过lines函数，它有个对应的函数，unlines。注意unlines总是在它处理的结果（译注：列表中的每个元素）的尾部放一个换行符。
 
 ::
+
     ghci> lines "foo\nbar"
     ["foo","bar"]
     ghci> unlines ["foo", "bar"]
@@ -584,6 +630,7 @@ Haskell的类型系统使编写带有可变数量的参数的函数成为一个�
 words函数利用任何空白字符分割一个字符串，它对应的函数，unwords，用一个空格字符把一个字符串构成的列表连接起来。
 
 ::
+
     ghci> words "the  \r  quick \t  brown\n\n\nfox"
     ["the","quick","brown","fox"]
     ghci> unwords ["jumps", "over", "the", "lazy", "dog"]
@@ -596,6 +643,7 @@ words函数利用任何空白字符分割一个字符串，它对应的函数，
 1. 自己写一些安全的列表函数，确保它们不会出错。下面给一些类型定义的提示。
 
 ::
+
     -- file: ch04/ch04.exercises.hs
     safeHead :: [a] -> Maybe a
     safeTail :: [a] -> Maybe [a]
@@ -605,6 +653,7 @@ words函数利用任何空白字符分割一个字符串，它对应的函数，
 2. 写一个和words功能近似的函数splitWith，要求带一个断言和一个任意类型元素组成的列表，在使断言返回False的元素处分割这个列表。
 
 ::
+
     -- file: ch04/ch04.exercises.hs
     splitWith :: (a -> Bool) -> [a] -> [[a]]
 
@@ -614,13 +663,13 @@ words函数利用任何空白字符分割一个字符串，它对应的函数，
 
 
 循环的表示
--------------
+-------------------
 
 和传统编程语言不同， Haskell 既没有 ``for`` 循环，也没有 ``while`` 循环。那么，如果有一大堆数据要处理，该用什么代替这些循环呢？这一节就会给出这个问题的几种可能的解决办法。
 
 
 显式递归
-^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 通过例子进行比对，可以很直观地认识有 loop 语言和没 loop 语言之间的区别。以下是一个 C 函数，它将字符串表示的数字转换成整数：
 
