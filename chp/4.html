@@ -104,20 +104,482 @@
 </div>
 <p>[译注：原书这里的执行过程少了写入内容到 <code class="docutils literal"><span class="pre">hello-in.txt</span></code> 的一步，导致执行会出错，所以这里加上 <code class="docutils literal"><span class="pre">echo</span> <span class="pre">...</span></code> 这一步。另外原书执行的是 <code class="docutils literal"><span class="pre">Interact</span></code> 过程，也是错误的，正确的执行文件名应该是 <code class="docutils literal"><span class="pre">InteractWith</span></code> 。]</p>
 </div>
-<div class="section" id="warming-up-portably-splitting-lines-of-text">
-<h2>Warming up: portably splitting lines of text<a class="headerlink" href="#warming-up-portably-splitting-lines-of-text" title="Permalink to this headline">¶</a></h2>
-</div>
-<div class="section" id="infix-functions">
-<h2>Infix functions<a class="headerlink" href="#infix-functions" title="Permalink to this headline">¶</a></h2>
-</div>
-<div class="section" id="working-with-lists">
-<h2>Working with lists<a class="headerlink" href="#working-with-lists" title="Permalink to this headline">¶</a></h2>
-</div>
 <div class="section" id="id3">
-<h2>循环的表示<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
-<p>和传统编程语言不同， Haskell 既没有 <code class="docutils literal"><span class="pre">for</span></code> 循环，也没有 <code class="docutils literal"><span class="pre">while</span></code> 循环。那么，如果有一大堆数据要处理，该用什么代替这些循环呢？这一节就会给出这个问题的几种可能的解决办法。</p>
+<h2>热身： 方便地分离多行文本<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<p>Haskell提供一个内建函数，lines，让我们在行边界上分离一段文本字符串。它返回一个忽略了行终止字符的字符串列表。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">lines</span>
+<span class="nf">lines</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">lines</span> <span class="s">&quot;line 1</span><span class="se">\n</span><span class="s">line 2&quot;</span>
+<span class="p">[</span><span class="s">&quot;line 1&quot;</span><span class="p">,</span><span class="s">&quot;line 2&quot;</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">lines</span> <span class="s">&quot;foo</span><span class="se">\n\n</span><span class="s">bar</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="p">[</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;&quot;</span><span class="p">,</span><span class="s">&quot;bar&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>尽管lines看上去有用，但它要工作的话仰赖于我们用“文本模式”去读一个文件。文本模式对于很多编程语言来说是一个很普遍的功能：当我们在Windows系统上读和写文件的时候它提供一个特别的行为。当我们用文本模式读取一个文件的时候，文件I/O库把行终止序列“rn”（回车后跟着一个换行）转换成“n”（单独一个换行），当我们写一个文件的时候，它（译注：文件I/O库）会做相反的事情。而在类Unix系统上，文本模式不会做任何的转换工作。这个不同之处会导致的结果是，如果我们在Windows系统上读取一个在类Unix系统上写入的文件，行终止符很可能会变得乱七八糟。（readFile和writeFile都在文本模式下操作的话）</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">lines</span> <span class="s">&quot;a</span><span class="se">\r\n</span><span class="s">b&quot;</span>
+<span class="p">[</span><span class="s">&quot;a</span><span class="se">\r</span><span class="s">&quot;</span><span class="p">,</span><span class="s">&quot;b&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>lines函数仅仅在换行符处分离文本，留下回车跟在行的结尾处。如果我们在Linux或Unix上读取一个Windows生成的文本文件，我们将在每一行的结尾处得到尾随的回车。</p>
+<p>我们舒适地用了Python提供的“通用换行”支持很长时间了：它透明地为我们处理Unix和Windows的行终止惯例。我们也想要用Haskell提供类似的支持。</p>
+<p>因为到目前为止我们仅仅接触了少量的Haskell代码，所以我们将一步一步地讨论我们用Haskell实现上述支持的细节。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/SplitLines.hs</span>
+<span class="nf">splitLines</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>我们的函数类型签名标示它接受一个字符串，可能是具有某些未知的行终止惯例的文件的内容。它返回一个包含字符串的列表，列表的每一项代表文件中的每一行文本。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/SplitLines.hs</span>
+<span class="nf">splitLines</span> <span class="kt">[]</span> <span class="ow">=</span> <span class="kt">[]</span>
+<span class="nf">splitLines</span> <span class="n">cs</span> <span class="ow">=</span>
+    <span class="kr">let</span> <span class="p">(</span><span class="n">pre</span><span class="p">,</span> <span class="n">suf</span><span class="p">)</span> <span class="ow">=</span> <span class="n">break</span> <span class="n">isLineTerminator</span> <span class="n">cs</span>
+    <span class="kr">in</span>  <span class="n">pre</span> <span class="kt">:</span> <span class="kr">case</span> <span class="n">suf</span> <span class="kr">of</span>
+                <span class="p">(</span><span class="sc">&#39;</span><span class="se">\r</span><span class="sc">&#39;</span><span class="kt">:</span><span class="sc">&#39;</span><span class="se">\n</span><span class="sc">&#39;</span><span class="kt">:</span><span class="n">rest</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">splitLines</span> <span class="n">rest</span>
+                <span class="p">(</span><span class="sc">&#39;</span><span class="se">\r</span><span class="sc">&#39;</span><span class="kt">:</span><span class="n">rest</span><span class="p">)</span>      <span class="ow">-&gt;</span> <span class="n">splitLines</span> <span class="n">rest</span>
+                <span class="p">(</span><span class="sc">&#39;</span><span class="se">\n</span><span class="sc">&#39;</span><span class="kt">:</span><span class="n">rest</span><span class="p">)</span>      <span class="ow">-&gt;</span> <span class="n">splitLines</span> <span class="n">rest</span>
+                <span class="kr">_</span>                <span class="ow">-&gt;</span> <span class="kt">[]</span>
+
+<span class="nf">isLineTerminator</span> <span class="n">c</span> <span class="ow">=</span> <span class="n">c</span> <span class="o">==</span> <span class="sc">&#39;</span><span class="se">\r</span><span class="sc">&#39;</span> <span class="o">||</span> <span class="n">c</span> <span class="o">==</span> <span class="sc">&#39;</span><span class="se">\n</span><span class="sc">&#39;</span>
+</pre></div>
+</div>
+<p>在我们深入细节之前，首先注意我们是怎么组织我们的代码的。我们首先呈现重要的代码片段，而把isLineTerminator函数的定义放在后面。因为我们给了这个辅助函数一个易读的名称，所以即使在我们读它的定义之前我们就能知道它是做什么用的。</p>
+<p>Prelude定义了一个叫做break的函数，我们可以用它把一个列表分成两部分。它把一个函数作为它的第一个参数。这个函数必须去检查列表中的元素，并且返回一个Bool值来表示列表是否在那个元素处被一分为二。break函数返回一个对值（译注：即二元组），由一个断言（译注：即一个返回Bool值的函数，下同）返回True（译注：第一次返回True）之前的元素构成的列表（前缀）和剩下的元素构成的列表组成（后缀）。</p>
+<div class="highlight-haskell"><div class="highlight"><pre>ghci&gt; break odd [2,4,5,6,8]
+([2,4],[5,6,8])
+ghci&gt; :module +Data.Char
+ghci&gt; break isUpper &quot;isUpper&quot;
+(&quot;is&quot;,&quot;Upper&quot;)
+</pre></div>
+</div>
+<p>因为我们一次只需要匹配单个的回车或换行，所以每次检查列表中的一个元素正是我们所需要的。</p>
+<p>splitLines的第一个算式标示如果我们匹配到一个空的字符串，我们就没有进一步的工作可做了。</p>
+<p>在第二个算式中，我们首先对输入的字符串应用break。前缀就是第一个行终止符之前的子字符串，后缀就是整个字符串余下的部分。这个后缀将包含可能存在的行终止符。</p>
+<p>“pre :”表达式告诉我们应该在这个代表文本行的列表的头部加上pre所表示的值。然后我们用一个case表达式去检查后缀，我们来决定下一步做什么。case表达式的结果将被用作(:)函数的的二个参数来构造结果列表。</p>
+<p>case表达式中的第一个模式匹配以一个回车紧接着一个换行符开始的字符串。变量rest被绑定到这个字符串余下的部分。其它的模式是相似的，因此它们应当容易理解。</p>
+<p>以上对Haskell函数的散文式的描述不一定是容易理解的。我们可以借助ghci，观察不同情况下这个函数的行为，以获得更好的理解。</p>
+<p>让我们从分割一个不包含任何行终止符的字符串开始。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">splitLines</span> <span class="s">&quot;foo&quot;</span>
+<span class="p">[</span><span class="s">&quot;foo&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>这里，我们的break没找到一个行终止符，所以它返回的后缀是空的。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">break</span> <span class="n">isLineTerminator</span> <span class="s">&quot;foo&quot;</span>
+<span class="p">(</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>因此在splitLines函数中的case表达式一定是匹配上了第四个分支，然后完成了求值。
+再来一点儿更有趣的例子怎么样？</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">splitLines</span> <span class="s">&quot;foo</span><span class="se">\r\n</span><span class="s">bar&quot;</span>
+<span class="p">[</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;bar&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>首先我们的break给我们一个非空的后缀。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">break</span> <span class="n">isLineTerminator</span> <span class="s">&quot;foo</span><span class="se">\r\n</span><span class="s">bar&quot;</span>
+<span class="p">(</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;</span><span class="se">\r\n</span><span class="s">bar&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>因为这个后缀以一个回车紧接着一个换行符开始，我们匹配上了case表达式的第一个分支。这个求值结果让我们把pre绑定到“foo”，suf绑定到“bar”。我们递归地应用splitLines，这一次匹配上单独的“bar”。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">splitLines</span> <span class="s">&quot;bar&quot;</span>
+<span class="p">[</span><span class="s">&quot;bar&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>结果是我们构造了一个头部的元素是“foo”，尾部的元素是“bar”的列表</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="s">&quot;foo&quot;</span> <span class="kt">:</span> <span class="p">[</span><span class="s">&quot;bar&quot;</span><span class="p">]</span>
+<span class="p">[</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;bar&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>这种在ghci中的实验是一种有效的理解和调试一段代码的行为的方法。它甚至有一个更重要的好处就是非刻意的（译注：不是特别理解这句话在原英文语境中的意思，暂且按照网页中的批注直译过来，原句：It has an even more important benefit that is almost accidental in nature.）。从ghci测试复杂的代码是困难的，所以我们将倾向于写更小的函数。这能更进一步改善我们的代码的可读性。</p>
+<p>这种创建和复用小的、强大的代码片段的方式是函数式编程的基础。</p>
 <div class="section" id="id4">
-<h3>显式递归<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h3>
+<h3>一个行终止转换程序<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h3>
+<p>让我们把我们的splitLines函数和早先我们写的一个小框架联系起来。首先制作一份Interact.hs源文件的拷贝；让我们叫这个新文件FixLines.hs。把splitLines加到新的源码文件中。因为我们的函数必须产出一个单独的字符串，所以我们必须把这个表示行的列表联结起来。Prelude提供一个unlines函数，它把一个字符串组成的列表串联起来，并且在每个字符串元素的末尾加上一个换行符。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/SplitLines.hs</span>
+<span class="nf">fixLines</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">fixLines</span> <span class="n">input</span> <span class="ow">=</span> <span class="n">unlines</span> <span class="p">(</span><span class="n">splitLines</span> <span class="n">input</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>如果我们用fixLines替换这个id函数（译注：是指拷贝自Interact.hs的FixLines.hs中的id函数），我们可以把FixLines.hs编译成一个将文本文件的行终止转换成系统特定的行终止的可执行程序。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="c1">--make FixLines</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">FixLines</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="kt">FixLines</span><span class="o">.</span><span class="n">o</span> <span class="p">)</span>
+<span class="kt">Linking</span> <span class="kt">FixLines</span> <span class="o">...</span>
+</pre></div>
+</div>
+<p>如果你在一个Windows系统上面，找到并下载一个在Unix系统上创建的文本文件（比如 gpl-3.0.txt）。在记事本程序中打开它。里面的文本行应该都跑一起去了，导致它几乎不可读。用刚才你编译得到的FixLines命令处理这个文件，然后在记事本程序中打开此命令输出的文件。现在这个行终止符的问题应该被修正了。</p>
+<p>在类Unix的系统上，编辑器隐藏了Windows的行终止符。使得验证FixLines是否消除了它们更加困难。这里有一些命令应该能帮助你。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">file</span> <span class="n">gpl</span><span class="o">-</span><span class="mf">3.0</span><span class="o">.</span><span class="n">txt</span>
+<span class="nf">gpl</span><span class="o">-</span><span class="mf">3.0</span><span class="o">.</span><span class="n">txt</span><span class="kt">:</span> <span class="kt">ASCII</span> <span class="kt">English</span> <span class="n">text</span>
+<span class="o">$</span> <span class="n">unix2dos</span> <span class="n">gpl</span><span class="o">-</span><span class="mf">3.0</span><span class="o">.</span><span class="n">txt</span>
+<span class="nf">unix2dos</span><span class="kt">:</span> <span class="n">converting</span> <span class="n">file</span> <span class="n">gpl</span><span class="o">-</span><span class="mf">3.0</span><span class="o">.</span><span class="n">txt</span> <span class="n">to</span> <span class="kt">DOS</span> <span class="n">format</span> <span class="o">...</span>
+<span class="o">$</span> <span class="n">file</span> <span class="n">gpl</span><span class="o">-</span><span class="mf">3.0</span><span class="o">.</span><span class="n">txt</span>
+<span class="nf">gpl</span><span class="o">-</span><span class="mf">3.0</span><span class="o">.</span><span class="n">txt</span><span class="kt">:</span> <span class="kt">ASCII</span> <span class="kt">English</span> <span class="n">text</span><span class="p">,</span> <span class="n">with</span> <span class="kt">CRLF</span> <span class="n">line</span> <span class="n">terminators</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="id5">
+<h2>中缀函数<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h2>
+<p>通常，当我们在Haskell中定义和应用一个函数的时候，我们写这个函数的名称，紧接着它的参数。这种表示法作为前缀被提及，因为这个函数的名称位于它的参数前面。</p>
+<p>如果一个函数或构造器带两个或更多的参数，我们可以选择使用中缀形式，即我们把函数（名称）放在它的第一个和第二个参数之间。这允许我们把函数作为中缀操作符来使用。</p>
+<p>要用中缀表示法定义或应用一个函数或值构造器，我们用重音符（有时被称为反引号）包围它的名称。这里有简单的中缀函数和中缀类型的定义。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/Plus.hs</span>
+<span class="nf">a</span> <span class="p">`</span><span class="n">plus</span><span class="p">`</span> <span class="n">b</span> <span class="ow">=</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
+
+<span class="kr">data</span> <span class="n">a</span> <span class="p">`</span><span class="kt">Pair</span><span class="p">`</span> <span class="n">b</span> <span class="ow">=</span> <span class="n">a</span> <span class="p">`</span><span class="kt">Pair</span><span class="p">`</span> <span class="n">b</span>
+                  <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">)</span>
+
+<span class="c1">-- we can use the constructor either prefix or infix</span>
+<span class="nf">foo</span> <span class="ow">=</span> <span class="kt">Pair</span> <span class="mi">1</span> <span class="mi">2</span>
+<span class="nf">bar</span> <span class="ow">=</span> <span class="kt">True</span> <span class="p">`</span><span class="kt">Pair</span><span class="p">`</span> <span class="s">&quot;quux&quot;</span>
+</pre></div>
+</div>
+<p>因为中缀表示法纯粹是为了语法上的便利，因此它不会改变函数的行为。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="mi">1</span> <span class="p">`</span><span class="n">plus</span><span class="p">`</span> <span class="mi">2</span>
+<span class="mi">3</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">plus</span> <span class="mi">1</span> <span class="mi">2</span>
+<span class="mi">3</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">True</span> <span class="p">`</span><span class="kt">Pair</span><span class="p">`</span> <span class="s">&quot;something&quot;</span>
+<span class="kt">True</span> <span class="p">`</span><span class="kt">Pair</span><span class="p">`</span> <span class="s">&quot;something&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">Pair</span> <span class="kt">True</span> <span class="s">&quot;something&quot;</span>
+<span class="kt">True</span> <span class="p">`</span><span class="kt">Pair</span><span class="p">`</span> <span class="s">&quot;something&quot;</span>
+</pre></div>
+</div>
+<p>中缀表示法经常对代码可读性有帮助。比如，Prelude定义了一个elem函数，它标示一个给定的值是否出现在一个列表中。如果我们用前缀表示法来使用elem，它构成的代码相当易读。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">elem</span> <span class="sc">&#39;a&#39;</span> <span class="s">&quot;camogie&quot;</span>
+<span class="kt">True</span>
+</pre></div>
+</div>
+<p>如果我们换用中缀表示法，这段代码甚至会变得更容易理解。它清楚地标示我们正在检查左边的给定值是否出现在右边的列表里。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="mi">3</span> <span class="p">`</span><span class="n">elem</span><span class="p">`</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">8</span><span class="p">]</span>
+<span class="kt">False</span>
+</pre></div>
+</div>
+<p>我们在Data.List模块的一些有用的函数中看到了更明显的改进（译注：这里是指中缀表示法改进了代码可读性）。isPrefixOf函数告诉我们一个列表是否匹配另一个列表的开始部分。</p>
+<div class="highlight-haskell"><div class="highlight"><pre>ghci&gt; :module +Data.List
+ghci&gt; &quot;foo&quot; `isPrefixOf` &quot;foobar&quot;
+True
+</pre></div>
+</div>
+<p>相应地，isInfixOf和isSuffixOf函数匹配一个列表的中间和结尾处的任何地方。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="s">&quot;needle&quot;</span> <span class="p">`</span><span class="n">isInfixOf</span><span class="p">`</span> <span class="s">&quot;haystack full of needle thingies&quot;</span>
+<span class="kt">True</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="s">&quot;end&quot;</span> <span class="p">`</span><span class="n">isSuffixOf</span><span class="p">`</span> <span class="s">&quot;the end&quot;</span>
+<span class="kt">True</span>
+</pre></div>
+</div>
+<p>没有一个硬性的规则指示你什么时候应该用中缀表示法或是前缀表示法，尽管使用前缀表示法要普遍得多。在具体情况下选择使你的代码更可读的那一种表示法就是最好的。</p>
+</div>
+<div class="section" id="id6">
+<h2>和列表打交道<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h2>
+<p>作为函数式编程的基本组件，列表应该得到足够的重视。Prelude定义了很多函数来处理列表。它们当中的许多是不可或缺的工具，所以及早学习它们是很重要的。</p>
+<p>不管怎样，这一节将学习很多函数。为什么要马上展示这么多函数？因为这些函数既容易学而且会经常使用。如果我们不知道有这样的工具箱，那么时间将浪费在编写那些在标准库中已经存在的简单函数上。因此深入学习列表模块中的函数是非常值得的。</p>
+<p>Data.List模块包含所有的列表函数。Prelude只不过重新导出了这些在Data.List模块中的函数的大部分。还有一些有用的函数并没有被Prelude重新导出。下面学习列表函数的时候，将明确地提到那些只在Data.List中出现的。</p>
+<div class="highlight-haskell"><div class="highlight"><pre>ghci&gt; :module +Data.List
+</pre></div>
+</div>
+<p>因为这些函数没有什么复杂的或者代码量超过三行的，所有我们对它们只做简单的描述。实际上，快速和有用的学习方法是记住它们是如何定义的。</p>
+<div class="section" id="id7">
+<h3>基本的列表操作<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h3>
+<p>length函数告诉我们一个列表中包含多少个元素。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">length</span>
+<span class="nf">length</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Int</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">length</span> <span class="kt">[]</span>
+<span class="mi">0</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">length</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+<span class="mi">3</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">length</span> <span class="s">&quot;strings are lists, too&quot;</span>
+<span class="mi">22</span>
+</pre></div>
+</div>
+<p>如果需要检查列表是不是空的，用null函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">null</span>
+<span class="nf">null</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">null</span> <span class="kt">[]</span>
+<span class="kt">True</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">null</span> <span class="s">&quot;plugh&quot;</span>
+<span class="kt">False</span>
+</pre></div>
+</div>
+<p>要访问列表的第一个元素，用head函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">head</span>
+<span class="nf">head</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">head</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+<span class="mi">1</span>
+</pre></div>
+</div>
+<p>相反，tail函数，返回列表中除了第一个其它所有的元素。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">tail</span>
+<span class="nf">tail</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">tail</span> <span class="s">&quot;foo&quot;</span>
+<span class="s">&quot;oo&quot;</span>
+</pre></div>
+</div>
+<p>还有一个函数，last，返回列表的最后一个元素。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">last</span>
+<span class="nf">last</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">last</span> <span class="s">&quot;bar&quot;</span>
+<span class="sc">&#39;r&#39;</span>
+</pre></div>
+</div>
+<p>和last相反的是init，它返回列表中除了最后一个其它所有的元素。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">init</span>
+<span class="nf">init</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">init</span> <span class="s">&quot;bar&quot;</span>
+<span class="s">&quot;ba&quot;</span>
+</pre></div>
+</div>
+<p>上面的一些函数应用在空列表上时会报错，因此当不知道一个列表是否为空的时候要小心了。它们会报告什么样的错误呢？</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">head</span> <span class="kt">[]</span>
+<span class="o">***</span> <span class="kt">Exception:</span> <span class="kt">Prelude</span><span class="o">.</span><span class="n">head</span><span class="kt">:</span> <span class="n">empty</span> <span class="n">list</span>
+</pre></div>
+</div>
+<p>在ghci里试一试上面的每一个函数，看看哪些应用在空列表上时会崩溃？</p>
+</div>
+<div class="section" id="id8">
+<h3>安全和明智地跟会崩溃的函数打交道<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h3>
+<p>当我们想使用一个函数比如head时，如果我们传递一个空列表给它，很可能会破坏我们的工作，有效避免这个问题的方法是在使用head之前，检查传递给它的列表的长度。让我们举一个例子说明。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/EfficientList.hs</span>
+<span class="nf">myDumbExample</span> <span class="n">xs</span> <span class="ow">=</span> <span class="kr">if</span> <span class="n">length</span> <span class="n">xs</span> <span class="o">&gt;</span> <span class="mi">0</span>
+                   <span class="kr">then</span> <span class="n">head</span> <span class="n">xs</span>
+                   <span class="kr">else</span> <span class="sc">&#39;Z&#39;</span>
+</pre></div>
+</div>
+<p>如果用过像Perl或者Python这样的编程语言，这段代码看起来就是一种很自然地编写测试的方式。在底层，Python和Perl中的列表都是数组。所以它们必定能通过调用len(foo)或者是scalar(&#64;foo)得知列表（数组）的长度。但是基于很多别的原因，把这些假设照搬到Haskell中不是一个好主意。</p>
+<p>我们已经看过列表的数据类型定义好多次了，知道一个列表不会明确地存储它本身的长度。因此length函数的工作方式是遍历整个列表。</p>
+<p>所以当我们只关心一个列表是不是为空时，调用length不是一个好的策略。如果我们处理的是一个有限的列表，它潜在地做了比我们想象的更多的事情。因为Haskell很容易创建无限列表，所以不小心使用了length函数可能导致无限循环。</p>
+<p>一个更合适的替代方案是调用null函数，它执行的次数是确定不变的。更好的是，使用null能使我们的代码明确地标示出我们真正关心的列表的属性。下面举两个更好的例子。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/EfficientList.hs</span>
+<span class="nf">mySmartExample</span> <span class="n">xs</span> <span class="ow">=</span> <span class="kr">if</span> <span class="n">not</span> <span class="p">(</span><span class="n">null</span> <span class="n">xs</span><span class="p">)</span>
+                    <span class="kr">then</span> <span class="n">head</span> <span class="n">xs</span>
+                    <span class="kr">else</span> <span class="sc">&#39;Z&#39;</span>
+
+<span class="nf">myOtherExample</span> <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="kr">_</span><span class="p">)</span> <span class="ow">=</span> <span class="n">x</span>
+<span class="nf">myOtherExample</span> <span class="kt">[]</span> <span class="ow">=</span> <span class="sc">&#39;Z&#39;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id9">
+<h3>更多简单列表操作<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h3>
+<p>Haskell用(++)表示“追加”函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="o">++</span><span class="p">)</span>
+<span class="p">(</span><span class="o">++</span><span class="p">)</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="s">&quot;foo&quot;</span> <span class="o">++</span> <span class="s">&quot;bar&quot;</span>
+<span class="s">&quot;foobar&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">[]</span> <span class="o">++</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">[</span><span class="kt">True</span><span class="p">]</span> <span class="o">++</span> <span class="kt">[]</span>
+<span class="p">[</span><span class="kt">True</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>concat函数取一个包含列表的列表，这些列表中的元素具有相同的类型，它把这些列表连接在一起成为一个单一的列表。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">concat</span>
+<span class="nf">concat</span> <span class="ow">::</span> <span class="p">[[</span><span class="n">a</span><span class="p">]]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">concat</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">],</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">]]</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>它会去掉一级的嵌套。（译注：每次调用concat会去除最外一层的方括号）</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">concat</span> <span class="p">[[[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="mi">3</span><span class="p">]],</span> <span class="p">[[</span><span class="mi">4</span><span class="p">],[</span><span class="mi">5</span><span class="p">],[</span><span class="mi">6</span><span class="p">]]]</span>
+<span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="mi">3</span><span class="p">],[</span><span class="mi">4</span><span class="p">],[</span><span class="mi">5</span><span class="p">],[</span><span class="mi">6</span><span class="p">]]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">concat</span> <span class="p">(</span><span class="n">concat</span> <span class="p">[[[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="mi">3</span><span class="p">]],</span> <span class="p">[[</span><span class="mi">4</span><span class="p">],[</span><span class="mi">5</span><span class="p">],[</span><span class="mi">6</span><span class="p">]]])</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>reverse函数返回一个元素以相反的顺序排列的新列表。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">reverse</span>
+<span class="nf">reverse</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">reverse</span> <span class="s">&quot;foo&quot;</span>
+<span class="s">&quot;oof&quot;</span>
+</pre></div>
+</div>
+<p>针对包含Bool值的列表，and和or函数相当于用&amp;&amp;和||遍历这个列表并两两求值</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">and</span>
+<span class="nf">and</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Bool</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">and</span> <span class="p">[</span><span class="kt">True</span><span class="p">,</span><span class="kt">False</span><span class="p">,</span><span class="kt">True</span><span class="p">]</span>
+<span class="kt">False</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">and</span> <span class="kt">[]</span>
+<span class="kt">True</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">or</span>
+<span class="nf">or</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Bool</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">or</span> <span class="p">[</span><span class="kt">False</span><span class="p">,</span><span class="kt">False</span><span class="p">,</span><span class="kt">False</span><span class="p">,</span><span class="kt">True</span><span class="p">,</span><span class="kt">False</span><span class="p">]</span>
+<span class="kt">True</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">or</span> <span class="kt">[]</span>
+<span class="kt">False</span>
+</pre></div>
+</div>
+<p>还有两个与and和or功能近似的函数，all和any，它们操作任何类型的列表。每一个带着一个断言作为它的第一个参数；如果对列表中的每个元素的断言都成功了，all函数返回True，当对列表中的每个元素的断言至少有一个成功了，any函数返回True。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">all</span>
+<span class="nf">all</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">all</span> <span class="n">odd</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">5</span><span class="p">]</span>
+<span class="kt">True</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">all</span> <span class="n">odd</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">5</span><span class="p">]</span>
+<span class="kt">False</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">all</span> <span class="n">odd</span> <span class="kt">[]</span>
+<span class="kt">True</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">any</span>
+<span class="nf">any</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">any</span> <span class="n">even</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">5</span><span class="p">]</span>
+<span class="kt">True</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">any</span> <span class="n">even</span> <span class="kt">[]</span>
+<span class="kt">False</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id10">
+<h3>产生子列表<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
+<p>take函数，在“函数应用”一节遇到过，返回一个由头k个元素组成的子列表。与它相反，drop，丢掉列表开头的k个元素。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">take</span>
+<span class="nf">take</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">take</span> <span class="mi">3</span> <span class="s">&quot;foobar&quot;</span>
+<span class="s">&quot;foo&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">take</span> <span class="mi">2</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">drop</span>
+<span class="nf">drop</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">drop</span> <span class="mi">3</span> <span class="s">&quot;xyzzy&quot;</span>
+<span class="s">&quot;zy&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">drop</span> <span class="mi">1</span> <span class="kt">[]</span>
+<span class="kt">[]</span>
+</pre></div>
+</div>
+<p>splitAt函数组合了take和drop的功能，返回由一个列表产生的二元组，两部分是由原来的列表根据给定的索引分割而成。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">splitAt</span>
+<span class="nf">splitAt</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">([</span><span class="n">a</span><span class="p">],</span> <span class="p">[</span><span class="n">a</span><span class="p">])</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">splitAt</span> <span class="mi">3</span> <span class="s">&quot;foobar&quot;</span>
+<span class="p">(</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;bar&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>takeWhile和dropWhile函数带着断言：takeWhile从开头遍历一个列表，抽取使断言返回True的元素组成一个新列表；dropWhile则是把使断言返回True的元素丢掉。（译注：这里的表述容易引起歧义，实际上两个函数都是走到第一个使断言返回False的元素处就停止操作了，即使这个元素后面还有使断言返回True的元素，两个函数也不再take或drop了）</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">takeWhile</span>
+<span class="nf">takeWhile</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">takeWhile</span> <span class="n">odd</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">8</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">11</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">5</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">dropWhile</span>
+<span class="nf">dropWhile</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">dropWhile</span> <span class="n">even</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">7</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">10</span><span class="p">,</span><span class="mi">12</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">7</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">10</span><span class="p">,</span><span class="mi">12</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>正如splitAt函数利用take和drop的结果组成一个二元组一样，break（已经在“热身：方便地分离多行文本”一节中看到过）和span函数利用takeWhile和dropWhile的结果组成二元组。</p>
+<p>每个函数带着一个断言，break提取列表中使断言失败的元素组成二元组的首项，而span提取列表中使断言成功的元素组成二元组的首项。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">span</span>
+<span class="nf">span</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">([</span><span class="n">a</span><span class="p">],</span> <span class="p">[</span><span class="n">a</span><span class="p">])</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">span</span> <span class="n">even</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">7</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">10</span><span class="p">,</span><span class="mi">11</span><span class="p">]</span>
+<span class="p">([</span><span class="mi">2</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">6</span><span class="p">],[</span><span class="mi">7</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">10</span><span class="p">,</span><span class="mi">11</span><span class="p">])</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">break</span>
+<span class="nf">break</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">([</span><span class="n">a</span><span class="p">],</span> <span class="p">[</span><span class="n">a</span><span class="p">])</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">break</span> <span class="n">even</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">8</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">10</span><span class="p">]</span>
+<span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">5</span><span class="p">],[</span><span class="mi">6</span><span class="p">,</span><span class="mi">8</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">10</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id11">
+<h3>搜索列表<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
+<p>正如我们已经看到的，elem函数标示一个值是否出现在一个列表中。它有一个伴生的函数，notElem。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">elem</span>
+<span class="nf">elem</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="mi">2</span> <span class="p">`</span><span class="n">elem</span><span class="p">`</span> <span class="p">[</span><span class="mi">5</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span>
+<span class="kt">True</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="mi">2</span> <span class="p">`</span><span class="n">notElem</span><span class="p">`</span> <span class="p">[</span><span class="mi">5</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span>
+<span class="kt">False</span>
+</pre></div>
+</div>
+<p>对于更普遍的搜索操作，filter函数带着一个断言，返回列表中使断言成功的每一个元素。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">filter</span>
+<span class="nf">filter</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">filter</span> <span class="n">odd</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">8</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">7</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">7</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>在Data.List模块中，有三个断言方法，isPrefixOf、isInfixOf和isSuffixOf，能让我们测试一下子列表在一个更大的列表中出现的位置。最容易的方式是把它们作为中缀使用。</p>
+<p>isPrefixOf函数告诉我们左边的列表是否出现在右边的列表的开始处。</p>
+<div class="highlight-haskell"><div class="highlight"><pre>ghci&gt; :module +Data.List
+ghci&gt; :type isPrefixOf
+isPrefixOf :: (Eq a) =&gt; [a] -&gt; [a] -&gt; Bool
+ghci&gt; &quot;foo&quot; `isPrefixOf` &quot;foobar&quot;
+True
+ghci&gt; [1,2] `isPrefixOf` []
+False
+</pre></div>
+</div>
+<p>isInfixOf函数标示左边的列表是否是右边的列表的一个子列表。</p>
+<div class="highlight-haskell"><div class="highlight"><pre>ghci&gt; :module +Data.List
+ghci&gt; [2,6] `isInfixOf` [3,1,4,1,5,9,2,6,5,3,5,8,9,7,9]
+True
+ghci&gt; &quot;funk&quot; `isInfixOf` &quot;sonic youth&quot;
+False
+</pre></div>
+</div>
+<p>isSuffixOf函数的功能不再赘述。</p>
+<div class="highlight-haskell"><div class="highlight"><pre>ghci&gt; :module +Data.List
+ghci&gt; &quot;.c&quot; `isSuffixOf` &quot;crashme.c&quot;
+True
+</pre></div>
+</div>
+</div>
+<div class="section" id="id12">
+<h3>一次性处理多个列表<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
+<p>zip函数把两个列表压缩成一个单一的由二元组组成的列表。结果列表和被处理的两个列表中较短的那个等长。（译注：言下之意是较长的那个列表中的多出来的元素会被丢弃）</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">zip</span>
+<span class="nf">zip</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">b</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">zip</span> <span class="p">[</span><span class="mi">12</span><span class="p">,</span><span class="mi">72</span><span class="p">,</span><span class="mi">93</span><span class="p">]</span> <span class="s">&quot;zippity&quot;</span>
+<span class="p">[(</span><span class="mi">12</span><span class="p">,</span><span class="sc">&#39;z&#39;</span><span class="p">),(</span><span class="mi">72</span><span class="p">,</span><span class="sc">&#39;i&#39;</span><span class="p">),(</span><span class="mi">93</span><span class="p">,</span><span class="sc">&#39;p&#39;</span><span class="p">)]</span>
+</pre></div>
+</div>
+<p>更有用的是zipWith函数，它带两个列表作为参数并为从每个列表中抽取一个元素而组成的二元组提供一个函数，最后生成与较短的那个列表等长的新列表。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">zipWith</span>
+<span class="nf">zipWith</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">c</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">b</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">c</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">zipWith</span> <span class="p">(</span><span class="o">+</span><span class="p">)</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">5</span><span class="p">,</span><span class="mi">7</span><span class="p">,</span><span class="mi">9</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Haskell的类型系统使编写带有可变数量的参数的函数成为一个有趣的挑战。（译注：不知道此句和后面的内容有什么联系）。所以如果想把三个列表压缩在一起，要调用zip3或者zipWith3，可以类推到zip7和zipWith7。</p>
+</div>
+<div class="section" id="id13">
+<h3>特殊的字符串处理函数<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h3>
+<p>我们已经在“热身：方便地分离多行文本”一节中遇到过lines函数，它有个对应的函数，unlines。注意unlines总是在它处理的结果（译注：列表中的每个元素）的尾部放一个换行符。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">lines</span> <span class="s">&quot;foo</span><span class="se">\n</span><span class="s">bar&quot;</span>
+<span class="p">[</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;bar&quot;</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">unlines</span> <span class="p">[</span><span class="s">&quot;foo&quot;</span><span class="p">,</span> <span class="s">&quot;bar&quot;</span><span class="p">]</span>
+<span class="s">&quot;foo</span><span class="se">\n</span><span class="s">bar</span><span class="se">\n</span><span class="s">&quot;</span>
+</pre></div>
+</div>
+<p>words函数利用任何空白字符分割一个字符串，它对应的函数，unwords，用一个空格字符把一个字符串构成的列表连接起来。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">words</span> <span class="s">&quot;the  </span><span class="se">\r</span><span class="s">  quick </span><span class="se">\t</span><span class="s">  brown</span><span class="se">\n\n\n</span><span class="s">fox&quot;</span>
+<span class="p">[</span><span class="s">&quot;the&quot;</span><span class="p">,</span><span class="s">&quot;quick&quot;</span><span class="p">,</span><span class="s">&quot;brown&quot;</span><span class="p">,</span><span class="s">&quot;fox&quot;</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">unwords</span> <span class="p">[</span><span class="s">&quot;jumps&quot;</span><span class="p">,</span> <span class="s">&quot;over&quot;</span><span class="p">,</span> <span class="s">&quot;the&quot;</span><span class="p">,</span> <span class="s">&quot;lazy&quot;</span><span class="p">,</span> <span class="s">&quot;dog&quot;</span><span class="p">]</span>
+<span class="s">&quot;jumps over the lazy dog&quot;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id14">
+<h3>练习题<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h3>
+<ol class="arabic simple">
+<li>自己写一些安全的列表函数，确保它们不会出错。下面给一些类型定义的提示。</li>
+</ol>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/ch04.exercises.hs</span>
+<span class="nf">safeHead</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">a</span>
+<span class="nf">safeTail</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">safeLast</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">a</span>
+<span class="nf">safeInit</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li>写一个和words功能近似的函数splitWith，要求带一个断言和一个任意类型元素组成的列表，在使断言返回False的元素处分割这个列表。</li>
+</ol>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/ch04.exercises.hs</span>
+<span class="nf">splitWith</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[[</span><span class="n">a</span><span class="p">]]</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li>利用在“一个简单的命令行框架”一节中创建的命令行框架，编写一个打印输入数据的每一个的第一个单词的程序。</li>
+<li>编写一个转置一个文件中的文本的程序。比如，它应该把“hellonworldn”转换成“hwneonlrnllnodn”。</li>
+</ol>
+</div>
+</div>
+<div class="section" id="id15">
+<h2>循环的表示<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h2>
+<p>和传统编程语言不同， Haskell 既没有 <code class="docutils literal"><span class="pre">for</span></code> 循环，也没有 <code class="docutils literal"><span class="pre">while</span></code> 循环。那么，如果有一大堆数据要处理，该用什么代替这些循环呢？这一节就会给出这个问题的几种可能的解决办法。</p>
+<div class="section" id="id16">
+<h3>显式递归<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h3>
 <p>通过例子进行比对，可以很直观地认识有 loop 语言和没 loop 语言之间的区别。以下是一个 C 函数，它将字符串表示的数字转换成整数：</p>
 <div class="highlight-c"><div class="highlight"><pre><span class="kt">int</span> <span class="nf">as_int</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">str</span><span class="p">)</span>
 <span class="p">{</span>
@@ -197,8 +659,8 @@
 <p>非递归情形（列表为空）被称为“基本情形”（有时也叫终止情形）。当对函数进行递归调用时，计算最终会回到基本情形上。在数学上，这也称为“归纳情形”。</p>
 <p>作为一项有用的技术，结构递归并不仅仅局限于列表，它也适用于其他代数数据类型，稍后就会介绍更多这方面的例子。</p>
 </div>
-<div class="section" id="id5">
-<h3>对列表元素进行转换<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id17">
+<h3>对列表元素进行转换<a class="headerlink" href="#id17" title="Permalink to this headline">¶</a></h3>
 <p>考虑以下 C 函数， <code class="docutils literal"><span class="pre">square</span></code> ，它对数组中的所有元素执行平方计算：</p>
 <div class="highlight-c"><div class="highlight"><pre><span class="kt">void</span> <span class="nf">square</span><span class="p">(</span><span class="kt">double</span> <span class="o">*</span><span class="n">out</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">in</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">length</span><span class="p">)</span>
 <span class="p">{</span>
@@ -284,8 +746,8 @@ Prelude Data.Char&gt; toUpper &#39;*&#39;
 </div>
 <p>以上两个函数遵循了同一种处理列表的公共模式：基本情形处理（base case）空列表输入。而<em>递归情形</em>（recursive case）则处理列表非空时的情况，它对列表的头元素进行某种操作，然后递归地处理列表余下的其他元素。</p>
 </div>
-<div class="section" id="id6">
-<h3>列表映射<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id18">
+<h3>列表映射<a class="headerlink" href="#id18" title="Permalink to this headline">¶</a></h3>
 <p>前面定义的 <code class="docutils literal"><span class="pre">square</span></code> 和 <code class="docutils literal"><span class="pre">upperCase</span></code> 函数，都生成一个和输入列表同等长度的新列表，并且每次只对列表的一个元素进行处理。因为这种用法非常常见，所以 Haskell 的 <code class="docutils literal"><span class="pre">Prelude</span></code> 库定义了 <code class="docutils literal"><span class="pre">map</span></code> 函数来更方便地执行这种操作。 <code class="docutils literal"><span class="pre">map</span></code> 函数接受一个函数和一个列表作为参数，将输入函数应用到输入列表的每个元素上，并构建出一个新的列表。</p>
 <p>以下是使用 <code class="docutils literal"><span class="pre">map</span></code> 重写的 <code class="docutils literal"><span class="pre">square</span></code> 和 <code class="docutils literal"><span class="pre">upperCase</span></code> 函数：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/rewrite_by_map.hs</span>
@@ -329,8 +791,8 @@ Ok, modules loaded: Main.
 </div>
 <p>通过观察代码，并从中提炼出重复的抽象，是复用代码的一种良好方法。尽管对代码进行抽象并不是 Haskell 的“专利”，但高阶函数使得这种抽象变得非常容易。</p>
 </div>
-<div class="section" id="id7">
-<h3>筛选列表元素<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id19">
+<h3>筛选列表元素<a class="headerlink" href="#id19" title="Permalink to this headline">¶</a></h3>
 <p>另一种对列表的常见操作是，对列表元素进行筛选，只保留那些符合条件的元素。</p>
 <p>以下函数接受一个列表作为参数，并返回这个列表里的所有奇数元素。代码的递归情形比之前的 <code class="docutils literal"><span class="pre">map</span></code> 函数要复杂一些，它使用守卫对元素进行条件判断，只有符合条件的元素，才会被加入进结果列表里：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/oddList.hs</span>
@@ -372,8 +834,8 @@ Ok, modules loaded: Main.
 <p>[译注：谓词函数是指那种返回 <code class="docutils literal"><span class="pre">Bool</span></code> 类型值的函数。]</p>
 <p>稍后的章节会介绍如何定义 <code class="docutils literal"><span class="pre">filter</span></code> 。</p>
 </div>
-<div class="section" id="id8">
-<h3>处理集合并得出结果<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id20">
+<h3>处理集合并得出结果<a class="headerlink" href="#id20" title="Permalink to this headline">¶</a></h3>
 <p>将一个集合（collection）缩减（reduce）为一个值也是集合的常见操作之一。</p>
 <p>对列表的所有元素求和，就是其中的一个例子：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/mySum.hs</span>
@@ -424,8 +886,8 @@ Ok, modules loaded: Main.
 <p>和前面抽取出 <code class="docutils literal"><span class="pre">map</span></code> 和 <code class="docutils literal"><span class="pre">filter</span></code> 函数类似，从 <code class="docutils literal"><span class="pre">Adler32</span></code> 函数里面，我们也可以抽取出一种通用的抽象，称之为折叠（fold）：它对一个列表中的所有元素做某种处理，并且一边处理元素，一边更新累积器，最后在处理完整个列表之后，返回累积器的值。</p>
 <p>有两种不同类型的折叠，其中 <code class="docutils literal"><span class="pre">foldl</span></code> 从左边开始进行折叠，而 <code class="docutils literal"><span class="pre">foldr</span></code> 从右边开始进行折叠。</p>
 </div>
-<div class="section" id="id9">
-<h3>左折叠<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id21">
+<h3>左折叠<a class="headerlink" href="#id21" title="Permalink to this headline">¶</a></h3>
 <p>以下是 <code class="docutils literal"><span class="pre">foldl</span></code> 函数的定义：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/foldl.hs</span>
 
@@ -467,8 +929,8 @@ Ok, modules loaded: Main.
 <p>这意味着，即使是一个 Haskell 新手，他/她理解起 <code class="docutils literal"><span class="pre">fold</span></code> 通常都要比理解显式递归要容易。一个 <code class="docutils literal"><span class="pre">fold</span></code> 并不产生任何意外动作，但一个显式递归函数的所做作为，通常并不是那么显而易见的。</p>
 <p>以上观点同样适用于其他高阶函数库，包括前面介绍过的 <code class="docutils literal"><span class="pre">map</span></code> 和 <code class="docutils literal"><span class="pre">filter</span></code> 。因为这些函数都带有定义良好的行为，我们只需要学习怎样使用这些函数一次，以后每次碰到使用这些函数的代码，这些知识都可以加快我们对代码的理解。这种优势同样体现在代码的编写上：一旦我们能熟练使用高阶函数，那么写出更简洁的代码自然就不在话下。</p>
 </div>
-<div class="section" id="id10">
-<h3>从右边开始折叠<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id22">
+<h3>从右边开始折叠<a class="headerlink" href="#id22" title="Permalink to this headline">¶</a></h3>
 <p>和 <code class="docutils literal"><span class="pre">foldl</span></code> 相对应的是 <code class="docutils literal"><span class="pre">foldr</span></code> ，它从一个列表的右边开始进行折叠。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/foldr.hs</span>
 
@@ -574,8 +1036,8 @@ Ok, modules loaded: Main.
 <p><code class="docutils literal"><span class="pre">append</span></code> 函数依然对每个列表元素使用列表构造器，但是，当第一个输入列表为空时，它将第二个输入列表（而不是空列表元素）拼接到第一个输入列表的表尾。</p>
 <p>通过前面这些例子对 <code class="docutils literal"><span class="pre">foldr</span></code> 的介绍，我们应该可以了解到， <code class="docutils literal"><span class="pre">foldr</span></code> 函数和《列表处理》一节所介绍的基本列表操作函数一样重要。由于 <code class="docutils literal"><span class="pre">foldr</span></code> 可以增量地处理和产生列表，所以它对于惰性数据处理也非常有用。</p>
 </div>
-<div class="section" id="id11">
-<h3>左折叠、惰性和内存泄漏<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id23">
+<h3>左折叠、惰性和内存泄漏<a class="headerlink" href="#id23" title="Permalink to this headline">¶</a></h3>
 <p>为了简化讨论，本节的例子通常都使用 <code class="docutils literal"><span class="pre">foldl</span></code> 来进行，这对于普通的测试是没有问题的，但是，千万不要把 <code class="docutils literal"><span class="pre">foldl</span></code> 用在实际使用中。</p>
 <p>这样做是因为， Haskell 使用的是非严格求值。如果我们仔细观察 <code class="docutils literal"><span class="pre">foldl</span> <span class="pre">(+)</span> <span class="pre">[1,</span> <span class="pre">2,</span> <span class="pre">3]</span></code> 的执行过程，就可以会从中看出一些问题：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">foldl</span> <span class="p">(</span><span class="o">+</span><span class="p">)</span> <span class="mi">0</span> <span class="p">(</span><span class="mi">1</span><span class="kt">:</span><span class="mi">2</span><span class="kt">:</span><span class="mi">3</span><span class="kt">:[]</span><span class="p">)</span>
@@ -630,8 +1092,8 @@ Prelude Data.List&gt; foldl&#39; (+) 0 [1..1000000000]
 </div>
 <p>就是这样。]</p>
 </div>
-<div class="section" id="id12">
-<h3>延伸阅读<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id24">
+<h3>延伸阅读<a class="headerlink" href="#id24" title="Permalink to this headline">¶</a></h3>
 <p><a class="reference external" href="http://www.cs.nott.ac.uk/~gmh/fold.pdf">A tutorial on the universality and expressiveness of fold</a> 是一篇关于 fold 的优秀且深入的文章。它使用了很多例子来展示如何通过简单的系统化计算技术，将一些显式递归的函数转换成 fold 。</p>
 </div>
 </div>
@@ -691,8 +1153,8 @@ Prelude Data.List&gt; foldl&#39; (+) 0 [1..1000000000]
 <p>当然，这并不是说 lambda 函数完全没用，只是在使用它们的时候，必须小心谨慎。</p>
 <p>很多时候，部分应用函数可以很好地代替 lambda 函数，避免不必要的函数定义，粘合起不同的函数，并产生更清晰和更可读的代码。下一节就会介绍部分应用函数。</p>
 </div>
-<div class="section" id="id13">
-<h2>部分函数应用和柯里化<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id25">
+<h2>部分函数应用和柯里化<a class="headerlink" href="#id25" title="Permalink to this headline">¶</a></h2>
 <p>类型签名里的 <code class="docutils literal"><span class="pre">-&gt;</span></code> 可能会让人感到奇怪：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">dropWhile</span>
 <span class="nf">dropWhile</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
@@ -708,7 +1170,7 @@ Prelude Data.Char&gt; :type dropWhile isSpace
 dropWhile isSpace :: [Char] -&gt; [Char]
 </pre></div>
 </div>
-<p>表达式 <code class="docutils literal"><span class="pre">dropWhile</span> <span class="pre">isSpace</span></code> 的值是一个函数，这个函数移除一个字符串的所有前置空白。作为一个例子，可以将它应用到一个高阶函数：</p>
+<p>表达式 <code class="docutils literal"><span class="pre">dropWhile</span> <span class="pre">isSpace</span></code> 的值是一个函数，这个函数移除一个字符串的所有前缀空白。作为一个例子，可以将它应用到一个高阶函数：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Char</span><span class="o">&gt;</span> <span class="n">map</span> <span class="p">(</span><span class="n">dropWhile</span> <span class="n">isSpace</span><span class="p">)</span> <span class="p">[</span><span class="s">&quot; a&quot;</span><span class="p">,</span> <span class="s">&quot;f&quot;</span><span class="p">,</span> <span class="s">&quot;    e&quot;</span><span class="p">]</span>
 <span class="p">[</span><span class="s">&quot;a&quot;</span><span class="p">,</span><span class="s">&quot;f&quot;</span><span class="p">,</span><span class="s">&quot;e&quot;</span><span class="p">]</span>
 </pre></div>
@@ -784,7 +1246,7 @@ dropWhile isSpace :: [Char] -&gt; [Char]
 </pre></div>
 </div>
 <div class="section" id="sections">
-<span id="id14"></span><h3>节<a class="headerlink" href="#sections" title="Permalink to this headline">¶</a></h3>
+<span id="id26"></span><h3>节<a class="headerlink" href="#sections" title="Permalink to this headline">¶</a></h3>
 <p>Haskell 提供了一种方便的符号快捷方式，用于对中序函数进行部分应用：使用括号包围一个操作符，通过在括号里面提供左操作对象或者右操作对象，可以产生一个部分应用函数。这种类型的部分函数应用称之为节（section）。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="p">(</span><span class="mi">1</span><span class="o">+</span><span class="p">)</span> <span class="mi">2</span>
 <span class="mi">3</span>
@@ -891,8 +1353,8 @@ dropWhile isSpace :: [Char] -&gt; [Char]
 <p>可以看到，使用 as-模式的定义同时完成了模式匹配和变量绑定两项工作。而不使用 as-模式的定义，则需要在对列表进行结构之后，在函数体里又重新对列表进行组合。</p>
 <p>除了增强可读性之外， as-模式还有其他作用：它可以对输入数据进行共享，而不是复制它。在 <code class="docutils literal"><span class="pre">noAsPattern</span></code> 函数的定义中，当 <code class="docutils literal"><span class="pre">(x:xs)</span></code> 匹配时，在函数体里需要复制一个 <code class="docutils literal"><span class="pre">(x:xs)</span></code> 的副本。这个动作会引起内存分配。虽然这个分配动作可能很廉价，但它并不是免费的。相反，当使用 <code class="docutils literal"><span class="pre">suffixes</span></code> 函数时，我们通过变量 <code class="docutils literal"><span class="pre">xs</span></code> 重用匹配了 as-模式的输入值，因此就避免了内存分配。</p>
 </div>
-<div class="section" id="id15">
-<h2>通过组合函数来进行代码复用<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id27">
+<h2>通过组合函数来进行代码复用<a class="headerlink" href="#id27" title="Permalink to this headline">¶</a></h2>
 <p>前面的 <code class="docutils literal"><span class="pre">suffixes</span></code> 函数实际上有一种更简单的实现方式。</p>
 <p>回忆前面在《使用列表》一节里介绍的 <code class="docutils literal"><span class="pre">init</span></code> 函数，它可以返回一个列表中除了最后一个元素之外的其他元素。而组合使用 <code class="docutils literal"><span class="pre">init</span></code> 和 <code class="docutils literal"><span class="pre">tails</span></code> ，可以给出一个 <code class="docutils literal"><span class="pre">suffixes</span></code> 函数的更简单实现：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/suffixes.hs</span>
@@ -1007,16 +1469,16 @@ Prelude Data.Char&gt; capCount &quot;Hello there, Mon!&quot;
 </div>
 <p>]</p>
 </div>
-<div class="section" id="id16">
-<h2>编写可读代码的提示<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id28">
+<h2>编写可读代码的提示<a class="headerlink" href="#id28" title="Permalink to this headline">¶</a></h2>
 <p>目前为止，我们知道 Haskell 有两个非常诱人的特性：尾递归和匿名函数。但是，这两个特性通常并不被使用。</p>
 <p>对列表的处理操作一般可以通过组合库函数比如 <code class="docutils literal"><span class="pre">map</span></code> 、 <code class="docutils literal"><span class="pre">take</span></code> 和 <code class="docutils literal"><span class="pre">filter</span></code> 来进行。当然，熟悉这些库函数需要一定的时间，不过掌握这些函数之后，就可以使用它们写出更快更好更少 bug 的代码。</p>
 <p>库函数比尾递归更好的原因很简单：尾递归和命令式语言里的 loop 有同样的问题 —— 它们太通用（general）了。在一个尾递归里，你可以同时执行过滤（filtering）、映射（mapping）和其他别的动作。这强迫代码的阅读者（可能是你自己）必须弄懂整个递归函数的定义，才能理解这个函数到底做了些什么。与此相反，<code class="docutils literal"><span class="pre">map</span></code> 和其他很多列表函数，都只专注于做<em>一件</em>事。通过这些函数，我们可以很快理解某段代码到底做了什么，以及整个程序想表达什么意思，而不是将时间浪费在关注细节方面。</p>
 <p>折叠（fold）操作处于（完全通用化的）尾递归和（只做一件事的）列表处理函数之间的中间地带。折叠也很值得我们花时间去好好理解，它的作用跟组合起 <code class="docutils literal"><span class="pre">map</span></code> 和 <code class="docutils literal"><span class="pre">filter</span></code> 函数差不多，但比起显式递归来说，折叠的行为要来得更有规律，而且更可控。一般来说，可以通过组合函数来解决的问题，就不要使用折叠。另一方面，如果问题用组合函数没办法解决，那么使用折叠要比使用显式递归要好。</p>
 <p>另一方面，匿名函数通常会对代码的可读性造成影响。一般来说，匿名函数都可以用 <code class="docutils literal"><span class="pre">let</span></code> 或者 <code class="docutils literal"><span class="pre">where</span></code> 定义的局部函数来代替。而且带名字的局部函数可以达到一箭双雕的效果：它使得代码更具可读性，且函数名本身也达到了文档化的作用。</p>
 </div>
-<div class="section" id="id17">
-<h2>内存泄漏和严格求值<a class="headerlink" href="#id17" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id29">
+<h2>内存泄漏和严格求值<a class="headerlink" href="#id29" title="Permalink to this headline">¶</a></h2>
 <p>前面介绍的 <code class="docutils literal"><span class="pre">foldl</span></code> 函数并不是 Haskell 代码里唯一会造成内存泄漏的地方。</p>
 <p>在这一节，我们使用 <code class="docutils literal"><span class="pre">foldl</span></code> 来展示非严格求值在什么情况下会造成问题，以及如何去解决这些问题。</p>
 <div class="section" id="seq">
@@ -1058,8 +1520,8 @@ Prelude Data.Char&gt; capCount &quot;Hello there, Mon!&quot;
 <p>最终得到结果 <code class="docutils literal"><span class="pre">3</span></code> 。</p>
 <p>因为 <code class="docutils literal"><span class="pre">seq</span></code> 的存在，这个创建过程没有用到任何块。</p>
 </div>
-<div class="section" id="id18">
-<h3>seq 的用法<a class="headerlink" href="#id18" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id30">
+<h3>seq 的用法<a class="headerlink" href="#id30" title="Permalink to this headline">¶</a></h3>
 <p>本节介绍一些更有效地使用 <code class="docutils literal"><span class="pre">seq</span></code> 的指导规则。</p>
 <p>要正确地产生 <code class="docutils literal"><span class="pre">seq</span></code> 的作用，表达式中被求值的第一个必须是 <code class="docutils literal"><span class="pre">seq</span></code> ：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- 错误：因为表达式中第一个被求值的是 someFunc 而不是 seq</span>
