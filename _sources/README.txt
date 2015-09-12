@@ -133,6 +133,8 @@
 
 - `Binshuo Hu <https://github.com/bishophu>`_
 
+- `Tang Weinan <https://github.com/twn39>`_
+
 - 还有更多待添加 ...
 
 
