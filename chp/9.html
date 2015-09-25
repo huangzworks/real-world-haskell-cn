@@ -54,7 +54,7 @@
 <p>给程序员的工具箱里添加类似 <code class="docutils literal"><span class="pre">find</span></code> 这样的功能依旧非常有价值，在本章，我们将通过编写一个Haskell库给我们的 <code class="docutils literal"><span class="pre">find</span></code> 命令添加更多功能，我们将通过一些有着不同的健壮度的方法来完成这个库。</p>
 <div class="section" id="find">
 <h2>find命令<a class="headerlink" href="#find" title="Permalink to this headline">¶</a></h2>
-<p>如果你不曾用过类Unix的系统，或者你不是个重度shell用户，那么你很可能从未听说过 <code class="docutils literal"><span class="pre">find</span></code> ，通过给定的一组目录，它递归搜索每个目录并且打印出每个匹配表达式的实体名称。</p>
+<p>如果你不曾用过类Unix的系统，或者你不是个重度shell用户，那么你很可能从未听说过 <code class="docutils literal"><span class="pre">find</span></code> ，通过给定的一组目录，它递归搜索每个目录并且打印出每个匹配表达式的目录项名称。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/RecursiveContents.hs</span>
 <span class="kr">module</span> <span class="nn">RecursiveContents</span> <span class="p">(</span><span class="nf">getRecursiveContents</span><span class="p">)</span> <span class="kr">where</span>
 
@@ -76,7 +76,7 @@
   <span class="n">return</span> <span class="p">(</span><span class="n">concat</span> <span class="n">paths</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>单个表达式可以识别像“符合这个全局模式的名称”，“实体是一个文件”，“当前最后一个被修改的文件”以及其他诸如此类的表达式，通过and或or算子就可以把他们装配起来构成更加复杂的表达式</p>
+<p>单个表达式可以识别像“符合这个全局模式的名称”，“目录项是一个文件”，“当前最后一个被修改的文件”以及其他诸如此类的表达式，通过and或or算子就可以把他们装配起来构成更加复杂的表达式</p>
 </div>
 <div class="section" id="id1">
 <h2>简单的开始：递归遍历目录<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
@@ -90,7 +90,7 @@
 <span class="nf">forM</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Monad</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="p">[</span><span class="n">b</span><span class="p">]</span>
 </pre></div>
 </div>
-<p>循环体将检查当前实体是否为目录，如果是，则递归调用 <code class="docutils literal"><span class="pre">getrecuresivacontents</span></code> 函数列出这个目录（的内容），如果否，则返回只含有当前实体名称一个元素的列表，不要忘记 <code class="docutils literal"><span class="pre">return</span></code> 函数在 Haskell 中有特殊的含义，他通过monad的类型构造器包装了一个值。</p>
+<p>循环体将检查当前目录项是否为目录，如果是，则递归调用 <code class="docutils literal"><span class="pre">getrecuresivacontents</span></code> 函数列出这个目录（的内容），如果否，则返回只含有当前目录项名字的单元素列表，不要忘记 <code class="docutils literal"><span class="pre">return</span></code> 函数在 Haskell 中有特殊的含义，他通过monad的类型构造器包装了一个值。</p>
 <p>另一个值得注意的地方是变量 <code class="docutils literal"><span class="pre">isDirectory</span></code> 的使用，在命令式语言如 Python 中，我们通常用 <code class="docutils literal"><span class="pre">if</span> <span class="pre">os.path.isdir(path)</span></code> 来表示，然而， <code class="docutils literal"><span class="pre">doesDirectoryExist</span></code> 函数是一个动作，它的返回类型是 <code class="docutils literal"><span class="pre">IO</span> <span class="pre">Bool</span></code> 而非 <code class="docutils literal"><span class="pre">Bool</span></code> ，由于 <code class="docutils literal"><span class="pre">if</span></code> 表达式需要一个操作值为 <code class="docutils literal"><span class="pre">bool</span></code> 的表达式作为条件，我们使用 <code class="docutils literal"><span class="pre">&lt;-</span></code> 来从io包装器上得到这个动作的的 <code class="docutils literal"><span class="pre">bool</span></code> 返回值，这样我们就能在 <code class="docutils literal"><span class="pre">if</span></code> 中使用这个干净的无包装的 <code class="docutils literal"><span class="pre">bool</span></code> 。</p>
 <p>循环体中每一次迭代生成的结果都是名称列表，因此 <code class="docutils literal"><span class="pre">forM</span></code> 的结果是 <code class="docutils literal"><span class="pre">IO</span> <span class="pre">[[FilePath]]</span></code> ，我们通过 <code class="docutils literal"><span class="pre">concat</span></code> 将它转换为一个元素列表(从以列表为元素的列表转换为不含列表元素的列表)</p>
 <div class="section" id="id2">
@@ -140,21 +140,21 @@
 <span class="nf">simpleFind</span> <span class="p">(</span><span class="nf">\</span><span class="n">p</span> <span class="ow">-&gt;</span> <span class="n">takeExtension</span> <span class="n">p</span> <span class="o">==</span> <span class="s">&quot;.c&quot;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">FilePath</span><span class="p">]</span>
 </pre></div>
 </div>
-<p><code class="docutils literal"><span class="pre">simpleFind</span></code> 在工作中有一些非常刺眼的问题，第一个就是谓词并不能准确而完全的表达，他只关注文件夹中的实体名称，而无法做到辨认这是个文件还是个目录此类的事情，——而我们使用 <code class="docutils literal"><span class="pre">simpleFind</span></code> 的尝试就是想列举所文件和有和文件一样拥有 <code class="docutils literal"><span class="pre">.c</span></code> 扩展名的文件夹</p>
+<p><code class="docutils literal"><span class="pre">simpleFind</span></code> 在工作中有一些非常刺眼的问题，第一个就是谓词并不能准确而完全的表达，他只关注文件夹中的目录项名称，而无法做到辨认这是个文件还是个目录此类的事情，——而我们使用 <code class="docutils literal"><span class="pre">simpleFind</span></code> 的尝试就是想列举所文件和有和文件一样拥有 <code class="docutils literal"><span class="pre">.c</span></code> 扩展名的文件夹</p>
 <p>第二个问题是在 <code class="docutils literal"><span class="pre">simpleFind</span></code> 中我们无法控制它遍历文件系统的方式，这是显而易见的，想想在分布式版本控制系统中控制下的树状结构中查找一个源文件的问题吧，所有被控制的目录都含有一个 <code class="docutils literal"><span class="pre">.svn</span></code> 的私有文件夹，每一个包含了许多我们毫不感兴趣的子文件夹和文件，简单的过滤所有包含 <code class="docutils literal"><span class="pre">.svn</span></code> 的路径远比仅仅在读取时避免遍历这些文件夹更加有效。例如，一个分布式源码树包含了45000个文件，30000个分布在1200个不同的.svn文件夹中，避免遍历这1200个文件夹比过滤他们包含的30000个文件代价更低。</p>
-<p>最后。 <code class="docutils literal"><span class="pre">simpleFind</span></code> 是严格的，因为它包含一系列IO元操作执行构成的动作，如果我们有一百万个文件要遍历，我们需要等待很长一段时间才能得到一个包含一百万个名字的巨大的返回值，这对用户体验和资源消耗都是噩梦，我们更需要一个只有当他们获得结果的时才展示的结果流。</p>
+<p>最后。 <code class="docutils literal"><span class="pre">simpleFind</span></code> 是严格的，因为它包含一系列IO Monad操作执行构成的动作，如果我们有一百万个文件要遍历，我们需要等待很长一段时间才能得到一个包含一百万个名字的巨大的返回值，这对用户体验和资源消耗都是噩梦，我们更需要一个只有当他们获得结果的时才展示的结果流。</p>
 <p>在接下来的环节里，我们将解决每个遇到的问题</p>
 </div>
 <div class="section" id="id4">
 <h2>谓词在保持纯粹的同时支持从贫类型到富类型<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
 <p>我们的谓词只关注文件名，这将一系列有趣的操作排除在外，试想下，假如我们希望列出比某个给定值更大的文件呢？</p>
 <p>面对这个问题的第一反应是查找 <code class="docutils literal"><span class="pre">IO</span></code> :我们的谓词是 <code class="docutils literal"><span class="pre">FilePath</span> <span class="pre">-&gt;</span> <span class="pre">Bool</span></code> 类型，为什么不把它变成 <code class="docutils literal"><span class="pre">FilePath</span> <span class="pre">-&gt;</span> <span class="pre">IO</span> <span class="pre">Bool</span></code> 类型？这将使我们所有的IO操作都成为谓词的一部分，但这在显而易见的好处之外引入一个潜在的问题，使用这样一个谓词存在各种可能的后果，比如一个有 <code class="docutils literal"><span class="pre">IO</span> <span class="pre">a</span></code> 类型返回的函数将有能力生成任何它想产生的结果。</p>
-<p>让我们在类型系统中寻找以写出拥有更多谓词，更少bug的代码，我们通过避免污染IO来坚持断言的纯粹，这将确保他们不会产生任何不纯的结果，同时我们给他们提供更多信息，这样他们就可以在不必诱发潜在的危险的情况下获得需要的表达式</p>
+<p>让我们在类型系统中寻找以写出拥有更多谓词，更少bug的代码，我们通过避免污染IO来坚持谓词的纯粹，这将确保他们不会产生任何不纯的结果，同时我们给他们提供更多信息，这样他们就可以在不必诱发潜在的危险的情况下获得需要的表达式</p>
 <p>Haskell 的 <code class="docutils literal"><span class="pre">System.Directory</span></code> 模块提供了一个尽管受限但仍然有用的关于文件元数据的集合</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="o">+</span><span class="kt">System</span><span class="o">.</span><span class="kt">Directory</span>
 </pre></div>
 </div>
-<p>我们可以通过 <code class="docutils literal"><span class="pre">doesFileExist</span></code> 和 <code class="docutils literal"><span class="pre">doesDirectoryExist</span></code> 来判断目录实体是目录还是文件，但暂时还没有更多方式来查找这些年里出现的纷繁复杂的其他文件类型，比如管道，硬链接和软连接。</p>
+<p>我们可以通过 <code class="docutils literal"><span class="pre">doesFileExist</span></code> 和 <code class="docutils literal"><span class="pre">doesDirectoryExist</span></code> 来判断目录项是目录还是文件，但暂时还没有更多方式来查找这些年里出现的纷繁复杂的其他文件类型，比如管道，硬链接和软连接。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">doesFileExist</span>
 <span class="nf">doesFileExist</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">Bool</span>
 <span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">doesFileExist</span> <span class="s">&quot;.&quot;</span>
@@ -191,7 +191,7 @@
 </pre></div>
 </div>
 <p>如果你无法回忆起 <code class="docutils literal"><span class="pre">ghci</span></code> 中变量 <code class="docutils literal"><span class="pre">it</span></code> 的特殊用法，回到第一章复习一下，如果我们的权限能够列出它的内容，那么这个目录就应该是可被搜索的，而文件则永远是不可搜索的</p>
-<p>最后， <code class="docutils literal"><span class="pre">getModificationTime</span></code> 告诉我们实体上次被修改的时间：</p>
+<p>最后， <code class="docutils literal"><span class="pre">getModificationTime</span></code> 告诉我们目录项上次被修改的时间：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">getModificationTime</span>
 <span class="nf">getModificationTime</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">System</span><span class="o">.</span><span class="kt">Time</span><span class="o">.</span><span class="kt">ClockTime</span>
 <span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">getModificationTime</span> <span class="s">&quot;.&quot;</span>
@@ -199,7 +199,7 @@
 </pre></div>
 </div>
 <p>如果我们像标准的Haskell代码一样对可移植性要求严格，这些函数就是我们手头所有的一切(我们同样可以通过黑客手段来获得文件大小)，这些已经足够让我们明白所感兴趣领域中的原则，而非让我们浪费宝贵的时间对着一个例子冥思苦想，如果你需要写满足更多需求的代码， <code class="docutils literal"><span class="pre">System.Posix</span></code> 和 <code class="docutils literal"><span class="pre">System.Win32</span></code> 模块提供关于当代两种计算平台的更多文件元数据的细节。 <code class="docutils literal"><span class="pre">Hackage</span></code> 中同样有一个 <code class="docutils literal"><span class="pre">unix-compat</span></code> 包，提供windows下的类unix的api 。</p>
-<p>新的富类型谓词需要关注的数据段到底有几个？自从我们可以通过 <code class="docutils literal"><span class="pre">Permissions</span></code> 来判断实体是文件还是目录之后，我们就不再需要获得 <code class="docutils literal"><span class="pre">doesFileExist</span></code> 和 <code class="docutils literal"><span class="pre">doesDirectoryExist</span></code> 的结果，因此一个谓词需要关注的输入有四个。</p>
+<p>新的富类型谓词需要关注的数据段到底有几个？自从我们可以通过 <code class="docutils literal"><span class="pre">Permissions</span></code> 来判断目录项是文件还是目录之后，我们就不再需要获得 <code class="docutils literal"><span class="pre">doesFileExist</span></code> 和 <code class="docutils literal"><span class="pre">doesDirectoryExist</span></code> 的结果，因此一个谓词需要关注的输入有四个。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
 <span class="kr">import</span> <span class="nn">Control.Monad</span> <span class="p">(</span><span class="nf">filterM</span><span class="p">)</span>
 <span class="kr">import</span> <span class="nn">System.Directory</span> <span class="p">(</span><span class="kt">Permissions</span><span class="p">(</span><span class="o">..</span><span class="p">),</span> <span class="nf">getModificationTime</span><span class="p">,</span> <span class="nf">getPermissions</span><span class="p">)</span>
@@ -219,7 +219,7 @@
 </pre></div>
 </div>
 <p>这一谓词类型只是一个有四个参数的函数的同义词，他将给我们节省一些键盘工作和屏幕空间。</p>
-<p>注意这一返回值是 <code class="docutils literal"><span class="pre">Bool</span></code> 而非 <code class="docutils literal"><span class="pre">IO</span> <span class="pre">Bool</span></code> ，谓词需要保证纯粹，而且不能表现IO，在拥有这种类型以后，我们的查找函数仍然显得非常空白。</p>
+<p>注意这一返回值是 <code class="docutils literal"><span class="pre">Bool</span></code> 而非 <code class="docutils literal"><span class="pre">IO</span> <span class="pre">Bool</span></code> ，谓词需要保证纯粹，而且不能表现IO，在拥有这种类型以后，我们的查找函数仍然显得非常整洁。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
 <span class="c1">-- soon to be defined</span>
 <span class="nf">getFileSize</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="kt">Integer</span><span class="p">)</span>
@@ -242,7 +242,7 @@
 <span class="nf">filterM</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Monad</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
 </pre></div>
 </div>
-<p><code class="docutils literal"><span class="pre">check</span></code> 谓词是纯谓词 <code class="docutils literal"><span class="pre">p</span></code> 的IO功能包装器，他执行了所有IO发生在 <code class="docutils literal"><span class="pre">p</span></code> 上的可能引起负面效果的任务，因此我们可以使 <code class="docutils literal"><span class="pre">p</span></code> 对负面效果免疫，在收集完元数据后， <code class="docutils literal"><span class="pre">check</span></code> 调用 <code class="docutils literal"><span class="pre">p</span></code> ，通过 <code class="docutils literal"><span class="pre">return</span></code> 语句包装 <code class="docutils literal"><span class="pre">p</span></code> 的IO返回结果</p>
+<p><code class="docutils literal"><span class="pre">check</span></code> 谓词是纯谓词 <code class="docutils literal"><span class="pre">p</span></code> 的IO功能包装器，替 <code class="docutils literal"><span class="pre">p</span></code> 完成了所有IO相关的脏活累活，因此我们可以使 <code class="docutils literal"><span class="pre">p</span></code> 对副作用免疫，在收集完元数据后， <code class="docutils literal"><span class="pre">check</span></code> 调用 <code class="docutils literal"><span class="pre">p</span></code> ，通过 <code class="docutils literal"><span class="pre">return</span></code> 语句包装 <code class="docutils literal"><span class="pre">p</span></code> 的IO返回结果</p>
 </div>
 <div class="section" id="id5">
 <h2>安全的获得一个文件的大小<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h2>
@@ -257,7 +257,7 @@
   <span class="n">return</span> <span class="n">size</span>
 </pre></div>
 </div>
-<p>当这个函数工作时，他还不能完全为我们所用，在 <code class="docutils literal"><span class="pre">betterFind</span></code> 中，我们在目录下的任何实体上调用 <code class="docutils literal"><span class="pre">getFileSize</span></code> ，如果实体不是一个文件或者大小被 <code class="docutils literal"><span class="pre">Just</span></code> 包装起来，他应当返回一个空值，而当实体不是文件或者没有被打开时（可能是由于权限不够），
+<p>当这个函数工作时，他还不能完全为我们所用，在 <code class="docutils literal"><span class="pre">betterFind</span></code> 中，我们在目录下的任何目录项上调用 <code class="docutils literal"><span class="pre">getFileSize</span></code> ，如果目录项不是一个文件或者大小被 <code class="docutils literal"><span class="pre">Just</span></code> 包装起来，他应当返回一个空值，而当目录项不是文件或者没有被打开时（可能是由于权限不够），
 这个函数会抛出一个异常然后返回一个未包装的大小。</p>
 <p>下文是安全的用法：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
@@ -272,7 +272,7 @@
 </div>
 <p>函数体几乎完全一致，除了 <code class="docutils literal"><span class="pre">handle</span></code> 语句。</p>
 <p>我们的异常捕捉在忽略通过的异常的同时返回一个空值，函数体唯一的变化就是允许通过 <code class="docutils literal"><span class="pre">Just</span></code> 包装文件大小</p>
-<p><code class="docutils literal"><span class="pre">saferFileSize</span></code> 函数现在有正确的类型签名，并且不会抛出任何异常，但他扔未能完全的正常工作，存在 <code class="docutils literal"><span class="pre">openFile</span></code> 会成功的目录实体，但 <code class="docutils literal"><span class="pre">hFileSize</span></code> 会抛出异常，这将和被称作命名管道的状况一起发生，这样的异常会被捕捉，但却从未发起调用 <code class="docutils literal"><span class="pre">hClose</span></code> 。</p>
+<p><code class="docutils literal"><span class="pre">saferFileSize</span></code> 函数现在有正确的类型签名，并且不会抛出任何异常，但他扔未能完全的正常工作，存在 <code class="docutils literal"><span class="pre">openFile</span></code> 会成功的目录项，但 <code class="docutils literal"><span class="pre">hFileSize</span></code> 会抛出异常，这将和被称作命名管道的状况一起发生，这样的异常会被捕捉，但却从未发起调用 <code class="docutils literal"><span class="pre">hClose</span></code> 。</p>
 <p>当发现不再使用文件句柄，Haskell会自动关闭它，但这只有在运行垃圾回收时才会执行，如果无法断言，则延迟到下一次垃圾回收。</p>
 <p>文件句柄是稀缺资源，稀缺性是通过操作系统强制保证的，在linux中，一个进程只能同时拥有1024个文件句柄。</p>
 <p>不难想象这种场景，程序调用了一个使用 <code class="docutils literal"><span class="pre">saferFileSize</span></code> 的 <code class="docutils literal"><span class="pre">betterFind</span></code> 函数，在足够的垃圾文件句柄被关闭之前，由于 <code class="docutils literal"><span class="pre">betterFind</span></code> 造成文件句柄数耗尽导致了程序崩溃</p>
@@ -316,7 +316,7 @@
 <span class="nf">myTest</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">False</span>
 </pre></div>
 </div>
-<p>这并不是令人感到愉快的工作，断言需要四个参数，并且总是忽略其中的两个，同时需要定义两个等式，写一些更有意义的谓词代码，我们可以做的更好。</p>
+<p>这并不是令人感到愉快的工作，谓词需要四个参数，并且总是忽略其中的两个，同时需要定义两个等式，写一些更有意义的谓词代码，我们可以做的更好。</p>
 <p>有些时候，这种库被用作嵌入式领域特定语言，我们通过编写代码的过程中通过编程语言的本地特性来优雅的解决一些特定问题</p>
 <p>第一步是写一个返回当前函数的一个参数的函数，这个从参数中抽取路径并传给谓词：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
@@ -341,9 +341,9 @@
 <span class="nf">sizeP</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kt">Nothing</span>     <span class="kr">_</span> <span class="ow">=</span> <span class="o">-</span><span class="mi">1</span>
 </pre></div>
 </div>
-<p>我们在这里做了些小动作，对那些我们无法打开的文件或者不是文件的东西我们返回的实体大小是 <code class="docutils literal"><span class="pre">-1</span></code> 。</p>
+<p>我们在这里做了些小动作，对那些我们无法打开的文件或者不是文件的东西我们返回的目录项大小是 <code class="docutils literal"><span class="pre">-1</span></code> 。</p>
 <p>事实上，浏览中可以看出我们在本章开始处定义谓词类型的和 <code class="docutils literal"><span class="pre">InfoP</span> <span class="pre">Bool</span></code> 一样，因此我们可以合法的放弃谓词类型。</p>
-<p><code class="docutils literal"><span class="pre">pathP</span></code> 和 <code class="docutils literal"><span class="pre">sizeP</span></code> 的用法？通过一些线索，我们发现可以在一个谓词中使用它们（每个名称中的前缀p代表断言），从这开始事情就变得有趣起来：</p>
+<p><code class="docutils literal"><span class="pre">pathP</span></code> 和 <code class="docutils literal"><span class="pre">sizeP</span></code> 的用法？通过一些线索，我们发现可以在一个谓词中使用它们（每个名称中的前缀p代表谓词），从这开始事情就变得有趣起来：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
 <span class="nf">equalP</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">InfoP</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="kt">Bool</span>
 <span class="nf">equalP</span> <span class="n">f</span> <span class="n">k</span> <span class="ow">=</span> <span class="nf">\</span><span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="o">==</span> <span class="n">k</span>
@@ -371,8 +371,8 @@
 </div>
 <p>注意我们并没有直接调用 <code class="docutils literal"><span class="pre">betterFind</span></code> ，我们只是确定我们的表达式进行了类型检查，现在我们需要更多的方法来列出大小为特定值的所有文件，之前的成功给了我们继续下去的勇气。</p>
 <div class="section" id="lifting">
-<h3>多用提升（lifting）少用模板<a class="headerlink" href="#lifting" title="Permalink to this headline">¶</a></h3>
-<p>除了 <code class="docutils literal"><span class="pre">equalP</span></code> ，我们还将能够编写其他二进制函数，我们更希望不去写他们每个的具体实现，因为这看起来只是重复工作：</p>
+<h3>多用提升（lifting）来减少样板代码<a class="headerlink" href="#lifting" title="Permalink to this headline">¶</a></h3>
+<p>除了 <code class="docutils literal"><span class="pre">equalP</span></code> ，我们还将能够编写其他二元函数，我们更希望不去写他们每个的具体实现，因为这看起来只是重复工作：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
 <span class="nf">liftP</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">c</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="n">c</span>
 <span class="nf">liftP</span> <span class="n">q</span> <span class="n">f</span> <span class="n">k</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="n">f</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="p">`</span><span class="n">q</span><span class="p">`</span> <span class="n">k</span>
@@ -382,7 +382,7 @@
 <span class="nf">lesserP</span> <span class="ow">=</span> <span class="n">liftP</span> <span class="p">(</span><span class="o">&lt;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>为了完成这个，让我们使用 Haskell 的抽象功能，定义 <code class="docutils literal"><span class="pre">equalP</span></code> 代替直接调用 <code class="docutils literal"><span class="pre">==</span></code> ，我们就可以把二进制函数作为参数传入我们想调用的函数。</p>
+<p>为了完成这个，让我们使用 Haskell 的抽象功能，定义 <code class="docutils literal"><span class="pre">equalP</span></code> 代替直接调用 <code class="docutils literal"><span class="pre">==</span></code> ，我们就可以把二元函数作为参数传入我们想调用的函数。</p>
 <p>函数动作，比如 <code class="docutils literal"><span class="pre">&gt;</span></code> ，以及将它转换成另一个函数操作另一种上下文，在这里是 <code class="docutils literal"><span class="pre">greaterP</span></code> ，通过提升（lifting）将它引入到上下文，这解释了当前函数名称中lifting出现的原因，提升让我们复用代码并降低模板的使用，在本书的后半部分的内容中，我们将大量使用这一技术</p>
 <p>当我们提升一个函数，我们通常将它转换到原始类型和一个新版本——提升和未提升两个版本</p>
 <p>在这里，将 <code class="docutils literal"><span class="pre">q</span></code> 作为 <code class="docutils literal"><span class="pre">liftP</span></code> 的第一个参数是经过深思熟虑的，这使得我们可能写一个对 <code class="docutils literal"><span class="pre">greaterP</span></code> 和 <code class="docutils literal"><span class="pre">lesserP</span></code> 都有意义的定义，实践中发现，相较其他语言，Haskell 中参数的最佳适配成为api设计中最重要的一部分。语言内部要求参数转换，在Haskell中放错一个参数的位置就将失去程序的所有意义。</p>
@@ -414,7 +414,7 @@
 <span class="nf">orP</span> <span class="ow">=</span> <span class="n">liftP2</span> <span class="p">(</span><span class="o">||</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>注意 <code class="docutils literal"><span class="pre">liftP2</span></code> 非常像我们之前的 <code class="docutils literal"><span class="pre">liftP</span></code> ，事实上，这更加通用，因为我们可以用 <code class="docutils literal"><span class="pre">liftP</span></code> 代替 <code class="docutils literal"><span class="pre">liftP2</span></code> ：</p>
+<p>注意 <code class="docutils literal"><span class="pre">liftP2</span></code> 非常像我们之前的 <code class="docutils literal"><span class="pre">liftP</span></code> 。事实上， <code class="docutils literal"><span class="pre">liftP2</span></code> 更通用，因为我们可以用它来实现 <code class="docutils literal"><span class="pre">liftP</span></code> ：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
 <span class="nf">constP</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="n">a</span>
 <span class="nf">constP</span> <span class="n">k</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">k</span>
@@ -494,7 +494,7 @@
 <span class="nf">getInfo</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">Info</span>
 </pre></div>
 </div>
-<p>记录语法给我们自由控制函数的权限，如 <code class="docutils literal"><span class="pre">infoPath</span></code> ， <code class="docutils literal"><span class="pre">traverse</span></code> 函数中的这种类型是简单地，正如我们之前期望的那样，如果需要一个文件或者目录的信息，就调用 <code class="docutils literal"><span class="pre">getInfo</span></code> 函数：</p>
+<p>记录语法给了我们一些“免费”的访问函数，例如 <code class="docutils literal"><span class="pre">infoPath</span></code> ， <code class="docutils literal"><span class="pre">traverse</span></code> 函数的类型很简单，正如我们上面的提案一样，如果需要一个文件或者目录的信息，就调用 <code class="docutils literal"><span class="pre">getInfo</span></code> 函数：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/ControlledVisit.hs</span>
 <span class="nf">traverse</span> <span class="ow">::</span> <span class="p">([</span><span class="kt">Info</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Info</span><span class="p">])</span> <span class="ow">-&gt;</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">Info</span><span class="p">]</span>
 </pre></div>
@@ -519,10 +519,10 @@
 </pre></div>
 </div>
 <p>现在不再引入新技术，这就是我们遇到的最深奥的函数定义，一行行的深入他，解释它每行为何是这样，不过开始部分的那几行没什么神秘的，它们只是之前看到代码的拷贝。</p>
-<p>观察变量 <code class="docutils literal"><span class="pre">contents</span></code> 的时候情况变得有趣起来，从左到右仔细阅读，已经知道 <code class="docutils literal"><span class="pre">names</span></code> 是目录实体的列表，同时确定当前目录的所有元素都在这个列表中，这时通过 <code class="docutils literal"><span class="pre">mapM</span></code> 将 <code class="docutils literal"><span class="pre">getInfo</span></code> 附加到结果返回的路径上。</p>
-<p>接下来的这一行更深奥，继续从左往右看，我们看到本行的最后一个元素以一个匿名函数的定义开始，并持续到这一段的结尾，给定一个Info值，函数或者递归访问一个目录（有额外的方法保证我们不在访问这个路径），或者返回当前值作为列表唯一元素的列表（来匹配递归的返回类型）。</p>
+<p>观察变量 <code class="docutils literal"><span class="pre">contents</span></code> 的时候情况变得有趣起来，从左到右仔细阅读，已经知道 <code class="docutils literal"><span class="pre">names</span></code> 是一个包含目录项的列表。我们将当前目录的路径拼接到列表中每个元素的前面，再把当前目录路径加到列表里。然后再通过 <code class="docutils literal"><span class="pre">mapM</span></code> 将 <code class="docutils literal"><span class="pre">getInfo</span></code> 函数应用到产生的结果列表上。</p>
+<p>接下来的这一行更深奥，继续从左往右看，我们看到本行的最后一个元素以一个匿名函数的定义开始，并持续到这一段的结尾，给定一个Info值，函数或者递归访问一个目录（有一个额外的判断条件保证我们不会重复访问 <code class="docutils literal"><span class="pre">path</span></code>），或者将当前值作为一个单元素列表返回（来匹配 <code class="docutils literal"><span class="pre">traverse</span></code> 的返回类型）。</p>
 <p>函数通过 <code class="docutils literal"><span class="pre">forM</span></code> 获得 <code class="docutils literal"><span class="pre">order</span></code> 返回 <code class="docutils literal"><span class="pre">info</span></code> 列表中的每个元素， <code class="docutils literal"><span class="pre">forM</span></code> 是使用者提供的递归控制函数。</p>
-<p>本行的新上下文中使用提升技术， <code class="docutils literal"><span class="pre">liftM</span></code> 函数需要一个规则函数， <code class="docutils literal"><span class="pre">concat</span></code> ，并且提升到 <code class="docutils literal"><span class="pre">IO</span></code> 的monad操作，换言之，他需要 <code class="docutils literal"><span class="pre">forM</span></code> 通过 <code class="docutils literal"><span class="pre">IO</span></code> monad 操作的的返回值，并将 <code class="docutils literal"><span class="pre">concat</span></code> 附加其上（获得一个 <code class="docutils literal"><span class="pre">[Info]</span></code> 类型的返回值，这也是我们所需要的）并将结果值返回给 <code class="docutils literal"><span class="pre">IO</span></code> monad 。</p>
+<p>本行的开头，我们在一个新的上下文中使用了提升技术， <code class="docutils literal"><span class="pre">liftM</span></code> 函数将一个普通函数， <code class="docutils literal"><span class="pre">concat</span></code> ，提升到可在 <code class="docutils literal"><span class="pre">IO</span></code> monad 之中使用。换句话讲，<code class="docutils literal"><span class="pre">liftM</span></code> 将 <code class="docutils literal"><span class="pre">forM</span></code> 的结果值（类型为 <code class="docutils literal"><span class="pre">[[Info]]</span></code>）从 <code class="docutils literal"><span class="pre">IO</span></code> monad 中取出，把 <code class="docutils literal"><span class="pre">concat</span></code> 应用在其上（获得一个 <code class="docutils literal"><span class="pre">[Info]</span></code> 类型的返回值，这也是我们所需要的），最后将结果再放进 <code class="docutils literal"><span class="pre">IO</span></code> monad 里。</p>
 <p>最后不要忘记定义 <code class="docutils literal"><span class="pre">getInfo</span></code> 函数：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/ControlledVisit.hs</span>
 <span class="nf">maybeIO</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">a</span><span class="p">)</span>
@@ -539,16 +539,16 @@
 <div class="section" id="id12">
 <h3>练习<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
 <ol class="arabic simple">
-<li>在以代数顺序遍历一个目录树时如何确定需要通过的内容。</li>
-<li>使用 <code class="docutils literal"><span class="pre">id</span></code> 作为控制函数， <code class="docutils literal"><span class="pre">traverse</span> <span class="pre">id</span></code> 扮演一个前序递归树，在子目录之前他返回一个父目录，写一个控制函数让 <code class="docutils literal"><span class="pre">traverse</span></code> 表现为一个后序遍历，返回子目录在父目录之前。</li>
-<li>使得《谓词组合》一节里面的断言和组合字可以处理新的 <code class="docutils literal"><span class="pre">info</span></code> 类型。</li>
-<li>给 <code class="docutils literal"><span class="pre">traverse</span></code> 写一个包装器，让你通过谓词控制递归，并通过谓词过滤返回结果</li>
+<li>如果想要以反字母顺序(reverse alphabetic)遍历一棵目录树，该传给 <code class="docutils literal"><span class="pre">traverse</span></code> 什么参数？</li>
+<li>使用 <code class="docutils literal"><span class="pre">id</span></code> 作为控制函数， <code class="docutils literal"><span class="pre">traverse</span> <span class="pre">id</span></code> 会前序遍历一棵树，即返回值中父目录出现在子目录之前。写一个控制函数让 <code class="docutils literal"><span class="pre">traverse</span></code> 完成后序遍历，即在子目录之后返回父目录。</li>
+<li>使得《谓词组合》一节里面的谓词和组合字可以处理新的 <code class="docutils literal"><span class="pre">info</span></code> 类型。</li>
+<li>给 <code class="docutils literal"><span class="pre">traverse</span></code> 写一个包装器，可以让你通过一个谓词控制遍历，通过另一个谓词来过滤返回结果</li>
 </ol>
 </div>
 </div>
 <div class="section" id="id13">
-<h2>代码深度，可读性和学习过程<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h2>
-<p><code class="docutils literal"><span class="pre">traverse</span></code> 这样深度的代码在Haskell中并不多见，在这种表达方式中里学习的收获是巨大的，同时也并不需要大量的练习才能以这种方式流利的阅读和写作代码：</p>
+<h2>代码密度，可读性和学习过程<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h2>
+<p><code class="docutils literal"><span class="pre">traverse</span></code> 这样密实的代码在Haskell中并不多见，这种代码具有显著的表达力，而且其实只需要相对很少的练习就能够以这种方式流利的阅读和编写代码：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/ControlledVisit.hs</span>
 <span class="nf">traverseVerbose</span> <span class="n">order</span> <span class="n">path</span> <span class="ow">=</span> <span class="kr">do</span>
     <span class="n">names</span> <span class="ow">&lt;-</span> <span class="n">getDirectoryContents</span> <span class="n">path</span>
@@ -567,22 +567,22 @@
 </pre></div>
 </div>
 <p>作为对比，这里有一个不那么复杂的代码，这也许适合一个对Haskell了解不那么深入的程序员</p>
-<p>这里所做的一切都是创建一个新的替代，通过部分应用（partial application）和函数组合（function composition）替代liberally，在 <code class="docutils literal"><span class="pre">where</span></code> 块中我们已经定义了一些本地函数，在 <code class="docutils literal"><span class="pre">maybe</span></code> 组合子中，使用了 <code class="docutils literal"><span class="pre">case</span></code> 表达式，为了替代 <code class="docutils literal"><span class="pre">liftM</span></code> ，我们手动将 <code class="docutils literal"><span class="pre">concat</span></code> 提升。</p>
-<p>并不是说深度是一个不好的特征， <code class="docutils literal"><span class="pre">traverse</span></code> 函数的每一行原始代码都很短，我们引入一个本地变量和本地函数来保证代码干净且足够短，命名注意可读性，同时使用函数组合管道，最长的管道只含有三个元素。</p>
+<p>这里我们只是对部分代码做了下替换。我们在 <code class="docutils literal"><span class="pre">where</span></code> 块中定义了一些局部函数来替换原来使用的部分应用（partial application）和函数组合（function composition）。通过使用 <code class="docutils literal"><span class="pre">case</span></code> 表达式来替代 <code class="docutils literal"><span class="pre">maybe</span></code> 组合子。为了替代 <code class="docutils literal"><span class="pre">liftM</span></code> ，我们手动将 <code class="docutils literal"><span class="pre">concat</span></code> 提升。</p>
+<p>并不是说密实的代码永远都是好的， <code class="docutils literal"><span class="pre">traverse</span></code> 函数的每一行原始代码都很短，我们引入一个局部变量和局部函数来保证代码干净且足够短，使用的名字都很有描述性，同时使用函数组合和管线化，最长的管道只含有三个元素。[译注：好像本书前面都没有介绍过何谓管线化，而且我在本章的代码里也没看到哪里是在使用管线化，姑且先把字面意思翻出来吧。]</p>
 <p>编写可维护的Haskell代码核心是找到深度和可读性的折中，能否做到这点取决于你的实践层次：</p>
 <ul class="simple">
 <li>成为Haskell程序员之前，Andrew并不知道使用标准库的方式，为此付出的代价则是写了一大堆不必要的重复代码。</li>
 <li>Zack是一个有数月编程经验的，并且精通通过( <code class="docutils literal"><span class="pre">.</span></code> )组合长管道的技巧。每当代码需要改动，就需要重构一个管道，他无法更深入的理解已经存在的管道的意义，而这些管道也太脆弱而无法修正。</li>
-<li>Monica有相当时间的编程经验，他对Haskell库和编写整洁的代码非常熟悉，但他避免使用高深度的风格，她的代码可维护，同时她还找到了一种简单地方法来面对快速的需求变更</li>
+<li>Monica有相当时间的编程经验，她对Haskell库和编写整洁的代码非常熟悉，但她避免使用高深度的风格，她的代码可维护，同时她还找到了一种简单地方法来面对快速的需求变更</li>
 </ul>
 </div>
 <div class="section" id="id14">
-<h2>观察迭代函数的另一种方法<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h2>
-<p>相比原始的 <code class="docutils literal"><span class="pre">betterFind</span></code> 函数，迭代函数给我们更多控制权的同时仍存在一个问题，我们可以避免递归目录，但我们不能过滤其他文件名直到我们获得整个名称树，如果递归含有100000个文件的目录的同时只关注其中三个，在获得这三个需要的文件名之前需要给出一个含有10000个元素的表。</p>
-<p>一个可能的方法是提供一个过滤器作为递归的新参数，我们将它应用到生成的名单中，这将允许我们获得一个只包含我们需要元素的列表</p>
-<p>然而，这个方法也存在缺点，假如说我们知道需要比三个多很多的实体组，并且这些实体组是这10000个我们需要遍历实体中的前几个，这种情况下就不需要访问剩下的实体，这并不是个故弄玄虚的问题，举个栗子，邮箱文件夹中存放了包含许多邮件信息的文件夹——就像一个有大量文件的目录，那么代表邮箱的目录含有数千个文件就很正常。</p>
-<p>从另一个角度看，我们尝试定位之前两个遍历函数的弱点：我们如何看待文件系统遍历阶级目录下的一个文件夹？</p>
-<p>相似的文件夹， <code class="docutils literal"><span class="pre">foldr</span></code> 和 <code class="docutils literal"><span class="pre">foldl'</span></code> ，干净的生成遍历并计算出一个结果，很难把这个想法从列表扩展到目录树，但我们仍乐于在 <code class="docutils literal"><span class="pre">fold</span></code> 中加入一个控制元素，我们将这个控制表达为一个代数数据类型：</p>
+<h2>从另一个角度来看遍历<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h2>
+<p>相比原始的 <code class="docutils literal"><span class="pre">betterFind</span></code> 函数，<code class="docutils literal"><span class="pre">traverse</span></code> 函数给我们更多控制权的同时仍存在一个问题，我们可以避免递归目录，但我们不能过滤其他文件名直到我们获得整个名称树，如果递归含有100000个文件的目录的同时只关注其中三个，在获得这三个需要的文件名之前需要给出一个含有10000个元素的表。</p>
+<p>一个可行的方法是提供一个过滤器作为递归的新参数，我们将它应用到生成的名单中，这将允许我们获得一个只包含我们需要元素的列表</p>
+<p>然而，这个方法也存在缺点：假如说我们只需要三个的目录项，并且这些目录项恰巧是这10000个我们需要遍历的元素之中的前几个，这种情况下我们会无谓的去遍历99997个元素，这并不是个故弄玄虚的问题，举个例子，邮箱文件夹中存放了包含许多邮件信息的文件夹——就像一个有大量文件的目录，那么代表邮箱的目录含有数千个文件就很正常。</p>
+<p>我们可以通过从另一个角度思考问题来之前两个遍历函数的弱点：我们将遍历文件系统这件事看做对目录层级结构进行折叠（fold），这样如何？</p>
+<p>我们所熟悉的fold， <code class="docutils literal"><span class="pre">foldr</span></code> 和 <code class="docutils literal"><span class="pre">foldl'</span></code> ，很好地概括了如何在遍历列表的同时累计结果，把这个想法从遍历列表扩展到遍历目录树简直小菜一碟，但我们仍希望在 <code class="docutils literal"><span class="pre">fold</span></code> 中加入一个 <em>控制</em> 的功能，我们将这个控制表达为一个代数数据类型：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/FoldDir.hs</span>
 <span class="kr">data</span> <span class="kt">Iterate</span> <span class="n">seed</span> <span class="ow">=</span> <span class="kt">Done</span>     <span class="p">{</span> <span class="n">unwrap</span> <span class="ow">::</span> <span class="n">seed</span> <span class="p">}</span>
                   <span class="o">|</span> <span class="kt">Skip</span>     <span class="p">{</span> <span class="n">unwrap</span> <span class="ow">::</span> <span class="n">seed</span> <span class="p">}</span>
@@ -592,13 +592,13 @@
 <span class="kr">type</span> <span class="kt">Iterator</span> <span class="n">seed</span> <span class="ow">=</span> <span class="n">seed</span> <span class="ow">-&gt;</span> <span class="kt">Info</span> <span class="ow">-&gt;</span> <span class="kt">Iterate</span> <span class="n">seed</span>
 </pre></div>
 </div>
-<p><code class="docutils literal"><span class="pre">Iterator</span></code> 类型给函数一个便于使用的别名，它需要一个种子和一个 <code class="docutils literal"><span class="pre">info</span></code> 值来表达这个目录实体，并返回一个新种子和一个我们 <code class="docutils literal"><span class="pre">fold</span></code> 函数的说明，这个说明通过 <code class="docutils literal"><span class="pre">Iterate</span></code> 类型的构造器来表达：</p>
+<p><code class="docutils literal"><span class="pre">Iterator</span></code> 类型给函数一个便于使用的别名，它需要一个种子和一个 <code class="docutils literal"><span class="pre">info</span></code> 值来表达一个目录项，并返回一个新种子和一个对我们 <code class="docutils literal"><span class="pre">fold</span></code> 函数的指令，这个说明通过 <code class="docutils literal"><span class="pre">Iterate</span></code> 类型的构造器来表达：</p>
 <ul class="simple">
-<li>如果这个构造器已经完成，遍历将立即释放，被 <code class="docutils literal"><span class="pre">Done</span></code> 包裹的值将作为结果返回。</li>
-<li>如果这个说明被跳过，并且当前 <code class="docutils literal"><span class="pre">info</span></code> 代表一个目录，遍历将不在递归寻找这个目录。</li>
-<li>其他，这个便利仍将继续，使用包裹值作为下一个调用 <code class="docutils literal"><span class="pre">fold</span></code> 函数的参数。</li>
+<li>如果这个构造器已经完成，遍历将立即停止，被 <code class="docutils literal"><span class="pre">Done</span></code> 包裹的值将作为结果返回。</li>
+<li>如果这个说明被 <code class="docutils literal"><span class="pre">Skip</span></code>，并且当前 <code class="docutils literal"><span class="pre">info</span></code> 代表一个目录，遍历将不再递归搜寻这个目录。</li>
+<li>否则，这个遍历仍将继续，使用包裹值作为下一个调用 <code class="docutils literal"><span class="pre">fold</span></code> 函数的参数。</li>
 </ul>
-<p>目录逻辑上是左序的，因为我们开始从我们第一个遇到的实体开始 <code class="docutils literal"><span class="pre">fold</span></code> 操作，而每步中的种子是之前一步的结果。</p>
+<p>我们的 fold 函数逻辑上来看是个左折叠的，因为我们开始从我们第一个遇到的目录项开始 <code class="docutils literal"><span class="pre">fold</span></code> 操作，而每步中的种子是之前一步的结果。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/FoldDir.hs</span>
 <span class="nf">foldTree</span> <span class="ow">::</span> <span class="kt">Iterator</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">a</span>
 
@@ -624,11 +624,11 @@
     <span class="n">walk</span> <span class="n">seed</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">return</span> <span class="p">(</span><span class="kt">Continue</span> <span class="n">seed</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>这部分代码中有意思的部分很少，开始是通过 <code class="docutils literal"><span class="pre">scoping</span></code> 避免通过额外的参数，最高层 <code class="docutils literal"><span class="pre">foldTree</span></code> 函数只是 <code class="docutils literal"><span class="pre">fold</span></code> 的包装器，用来揭开 <code class="docutils literal"><span class="pre">fold</span></code> 的最后结果的生成器。</p>
-<p>由于 <code class="docutils literal"><span class="pre">fold</span></code> 是本地函数，我们不需要通过 <code class="docutils literal"><span class="pre">foldTree</span></code> 的 <code class="docutils literal"><span class="pre">iter</span></code> 变量来进入他，可以从外部进入，相似的， <code class="docutils literal"><span class="pre">walk</span></code> 也可以在外部看到 <code class="docutils literal"><span class="pre">path</span></code> 。</p>
-<p>另一个需要指出的点是 <code class="docutils literal"><span class="pre">walk</span></code> 是一个尾递归，在我们最初的函数中用来替代一个匿名函数调用。通过外部控制，可以在任何需要的时候停止，这使得当 <code class="docutils literal"><span class="pre">iterator</span></code> 返回 <code class="docutils literal"><span class="pre">Done</span></code> 的时候就可以退出。</p>
-<p>即使 <code class="docutils literal"><span class="pre">fold</span></code> 调用 <code class="docutils literal"><span class="pre">walk</span></code> ， <code class="docutils literal"><span class="pre">walk</span></code> 调用 <code class="docutils literal"><span class="pre">fold</span></code> 这样的递归来遍历子目录，每个函数返回一个用 <code class="docutils literal"><span class="pre">Iterate</span></code> 包装起来的种子，当 <code class="docutils literal"><span class="pre">fold</span></code> 被调用，并且返回， <code class="docutils literal"><span class="pre">walk</span></code> 检查返回并观察需要继续还是退出，通过这种方式，一个 <code class="docutils literal"><span class="pre">Done</span></code> 的返回直接终止两个函数中的所有递归调用。</p>
-<p>实践中一个 <code class="docutils literal"><span class="pre">iterator</span></code> 像什么，下面是一个观察三个位图文件（至多）的同时并不逆向递归元数据目录的复杂例子：</p>
+<p>这段代码有些有意思的地方。开始是通过使用作用域来避免通过额外的参数，最高层 <code class="docutils literal"><span class="pre">foldTree</span></code> 函数只是 <code class="docutils literal"><span class="pre">fold</span></code> 的包装器，用来揭开 <code class="docutils literal"><span class="pre">fold</span></code> 的最后结果的生成器。</p>
+<p>由于 <code class="docutils literal"><span class="pre">fold</span></code> 是局部函数，我们不需要把 <code class="docutils literal"><span class="pre">foldTree</span></code> 的 <code class="docutils literal"><span class="pre">iter</span></code> 变量传给它，它可以直接访问外围作用域的变量，相似的， <code class="docutils literal"><span class="pre">walk</span></code> 也可以在它的外围作用域中部看到 <code class="docutils literal"><span class="pre">path</span></code> 。</p>
+<p>另一个需要指出的点是 <code class="docutils literal"><span class="pre">walk</span></code> 是一个尾递归，在我们最初的函数中用来替代一个匿名函数调用。通过自己把控，可以在任何需要的时候停止，这使得当 <code class="docutils literal"><span class="pre">iterator</span></code> 返回 <code class="docutils literal"><span class="pre">Done</span></code> 的时候就可以退出。</p>
+<p>虽然 <code class="docutils literal"><span class="pre">fold</span></code> 调用 <code class="docutils literal"><span class="pre">walk</span></code> ， <code class="docutils literal"><span class="pre">walk</span></code> 递归调用 <code class="docutils literal"><span class="pre">fold</span></code> 来遍历子目录，每个函数返回一个用 <code class="docutils literal"><span class="pre">Iterate</span></code> 包装起来的种子，当 <code class="docutils literal"><span class="pre">fold</span></code> 被调用，并且返回， <code class="docutils literal"><span class="pre">walk</span></code> 检查返回并观察需要继续还是退出。通过这种方式，一个 <code class="docutils literal"><span class="pre">Done</span></code> 的返回直接终止两个函数中的所有递归调用。</p>
+<p>实践中一个 <code class="docutils literal"><span class="pre">iterator</span></code> 像什么，下面这个相对复杂的例子里会查找最多三个位图文件，同时还不会在SVN的元数据目录中进行查找：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/FoldDir.hs</span>
 <span class="nf">atMostThreePictures</span> <span class="ow">::</span> <span class="kt">Iterator</span> <span class="p">[</span><span class="kt">FilePath</span><span class="p">]</span>
 
@@ -658,18 +658,18 @@
 <div class="section" id="id15">
 <h3>练习<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h3>
 <ol class="arabic simple">
-<li>修正 <code class="docutils literal"><span class="pre">foldTree</span></code> 来允许调用改变遍历目录实体的顺序。</li>
+<li>修正 <code class="docutils literal"><span class="pre">foldTree</span></code> 来允许调用改变遍历目录项的顺序。</li>
 <li><code class="docutils literal"><span class="pre">foldTree</span></code> 函数展示了前序遍历，将它修正为允许调用方决定便利顺序。</li>
 <li>写一个组合子的库允许 <code class="docutils literal"><span class="pre">foldTree</span></code> 接收不同类型的 <code class="docutils literal"><span class="pre">iterators</span></code> ，你能写出更简洁的 <code class="docutils literal"><span class="pre">iterators</span></code> 吗？</li>
 </ol>
 </div>
 </div>
 <div class="section" id="id16">
-<h2>代码指南<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h2>
+<h2>编码指南<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h2>
 <p>有许多好的Haskell程序员的习惯来自经验，我们有一些通用的经验给你，这样你可以更快的写出易于阅读的代码。</p>
 <p>正如已经提到的，Haskell中永远使用空格，而不是tab 。</p>
 <p>如果你发现代码里有个片段聪明到炸裂，停下来，然后思考下如果你离开代码一个月是否还能懂这段代码。</p>
-<p>常规命名类型和变量一般是骆驼法，例如 <code class="docutils literal"><span class="pre">myVariableName</span></code> ，这种风格在Haskell中也同样流行，不要去想你的其他命名习惯，如果你遵循一个不标准的惯例，那么你的代码将会对其他人的眼睛造成折磨。</p>
+<p>对类型和变量的命名惯例是使用驼峰命名法，例如 <code class="docutils literal"><span class="pre">myVariableName</span></code> ，这种风格在Haskell中也同样流行，不要去想你的其他命名习惯，如果你遵循一个不标准的惯例，那么你的代码在其他人看来可能会很刺眼。</p>
 <p>即使你已经用了Haskell一段时间，在你写小函数之前花费几分钟的时间查阅库函数，如果标准库并没有提供你需要的函数，你可能需要组合出一个新的函数来获得你想要的结果。</p>
 <p>组合函数的长管道难以阅读，长意味着包含三个以上元素的序列，如果你有这样一个管道，使用 <code class="docutils literal"><span class="pre">let</span></code> 或者 <code class="docutils literal"><span class="pre">where</span></code> 语句块将它分解成若干个小部分，给每个管道元素一个有意义的名字，然后再将他们回填到代码，如果你想不出一个有意义的名字，问下自己 能不能解释这段代码的功能，如果不能，简化你的代码。</p>
 <p>即使在编辑器中很容易格式化长于八十列的代码，宽度仍然是个重要问题，宽行在80行之外的内容通常会被截断，这非常伤害可读性，每一行不超过八十个字符，这样你就可以写入单独的一行，这帮助你保持每一行代码不那么复杂，从而更容易被人读懂。</p>

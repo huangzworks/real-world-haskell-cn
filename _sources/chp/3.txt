@@ -1172,18 +1172,256 @@ where 从句
     -- file: ch03/GlobalVariable.hs
     itemName = "Weighted Companion Cube"
 
+表达式里的缩进规则和空白字符
+----------------------------
 
-The Offside Rule and Whitespace in an Expression
----------------------------------------------------------
+请看 ``lend`` 和 ``lend2`` 的定义表达式，左侧空出了一大块。这并不是随随便便写的，这些空白字符是有意义的。
 
-The Case Expression
----------------------------------------------------------
+Haskell 依据缩进来解析代码块。这种用排版来表达逻辑结构的方式通常被称作\ *缩进规则*\ 。在源码文件开始的那一行，首个顶级声明或者定义可以从该行的任意一列开始，Haskell 编译器或解释器将记住这个缩进级别，并且随后出现的所有顶级声明也必须使用相同的缩进。
 
-Common Beginner Mistakes with Patterns
----------------------------------------------------------
+以下是一个顶级缩进规则的例子。第一个文件 ``GoodIndent.hs`` 执行正常。
 
-Conditional Evaluation with Guards
----------------------------------------------------------
+::
+
+    -- file: ch03/GoodIndent.hs
+    -- 这里是最左侧一列
+
+        -- 顶级声明可以从任一列开始
+        firstGoodIndentation = 1
+
+        -- 只要所有后续声明也这么做！
+        secondGoodIndentation = 2
+
+第二个文件 ``BadIndent.hs`` 没有遵守规则，因此也不能正常执行。
+
+::
+
+    -- file: ch03/BadIndent.hs
+    -- 这里是最左侧一列
+
+        -- 第一个声明从第 4 列开始
+        firstBadIndentation = 1
+
+    -- 第二个声明从第 1 列开始，这样是非法的！
+    secondBadIndentation = 2
+
+如果我们尝试在 **ghci** 里加载这两个文件，结果如下。
+
+::
+
+    ghci> :load GoodIndent.hs
+    [1 of 1] Compiling Main             ( GoodIndent.hs, interpreted )
+    Ok, modules loaded: Main.
+    ghci> :load BadIndent.hs
+    [1 of 1] Compiling Main             ( BadIndent.hs, interpreted )
+
+    BadIndent.hs:8:2: parse error on input `secondBadIndentation'
+    Failed, modules loaded: none.
+
+紧跟着的（译注：一个或多个）空白行将被视作当前行的延续，比当前行缩进更深的紧跟着的行也是如此。
+
+``let`` 表达式和 ``where`` 从句的规则与此类似。一旦 Haskell 编译器或解释器遇到一个 ``let`` 或 ``where`` 关键字，就会记住接下来第一个标记（token）的缩进位置。然后如果紧跟着的行是空白行或向右缩进更深，则被视作是前一行的延续。而如果其缩进和前一行相同，则被视作是同一区块内的新的一行。
+
+::
+
+    -- file: ch03/Indentation.hs
+    foo = let firstDefinition = blah blah
+              -- 只有注释的行被视作空白行
+                      continuation blah
+
+              -- 减少缩进，于是下面这行就变成了一行新定义
+              secondDefinition = yada yada
+
+                      continuation yada
+          in whatever
+
+下面的例子演示了如何嵌套使用 ``let`` 和 ``where``。
+
+::
+
+    -- file: ch03/letwhere.hs
+    bar = let b = 2
+              c = True
+          in let a = b
+             in (a, c)
+
+变量 ``a`` 只在内部那个 ``let`` 表达式中可见。它对外部那个 ``let`` 是不可见的。如果我们在外部使用变量 ``a`` 就会得到一个编译错误。缩进为我们和编译器提供了视觉上的标识，让我们可以一眼就看出来作用域中包含哪些东西。
+
+::
+
+    -- file: ch03/letwhere.hs
+    foo = x
+        where x = y
+                where y = 2
+
+于此类似，第一个 ``where`` 从句的作用域即是定义 ``foo`` 的表达式，而第二个 ``where`` 从句的作用域则是第一个 ``where`` 从句。
+
+在 ``let`` 和 ``where`` 从句中妥善地使用缩进能够更好地展现代码的意图。
+
+对制表符和空格说两句
+^^^^^^^^^^^^^^^^^^^^
+
+在使用诸如 Emacs 这种能够识别 Haskell 代码的编辑器时，通常的默认配置是使用空格来表示缩进。如果你的编辑器不能识别 Haskell，建议您手工设置使用空格来表示缩进。
+
+这么做的好处是可移植性。在一个使用等宽字体的编辑器里，类 Unix 系统和 Windows 系统对制表符的默认显示宽度并不一样，前者相当于 8 个字符宽度，而后者则相当于 4 个。这就意味着无论你自己认为制表符应该显示为多宽，你并不能保证别人的编辑器设置会尊重你的看法。使用制表符来表示缩进一定会在某些人的设置那里看起来一团糟。甚至还有可能导致编译错误，因为 Haskell 语言标准的实现是按照 Unix 风格制表符宽度来的。而使用空格则完全不用担心这个问题。
+
+缩进规则并不是必需
+^^^^^^^^^^^^^^^^^^
+
+我们也可以使用显式的语法结构来代替排版，从而表达代码的意图。例如，我们先写一个左大括号，然后写几个赋值等式，每个等式之间用分号分隔，最后加上一个右大括号。下面这个两个例子所表达的意图是一模一样的。
+
+::
+
+    -- file: ch03/Braces.hs
+    bar = let a = 1
+              b = 2
+              c = 3
+          in a + b + c
+
+    foo = let { a = 1;  b = 2;
+            c = 3 }
+          in a + b + c
+
+当我们使用显式语法结构时，普通的排版不再起作用。就像在第二个例子中那样，我们可以随意的使用缩进而仍然保持正确。
+
+显式语法结构可以用在任何地方替换普通排版。它对 ``where`` 从句乃至顶级声明也是有效的。但是请记住，尽管你可以这样用，但在 Hasekll 编程中几乎没有人会使用显式语法结构。
+
+Case 表达式
+---------------
+
+函数定义并不是唯一我们能使用模式匹配的地方。``case`` 结构使得我们还能在一个表达式内部使用模式匹配。如下面的例子所示，这个函数（定义在 ``Data.Maybe`` 里）能解构一个 ``Maybe`` 值，如果该值为 ``Nothing`` 还可以返回默认值。
+
+::
+
+    -- file: ch03/Guard.hs
+    fromMaybe defval wrapped =
+        case wrapped of
+          Nothing     -> defval
+          Just value  -> value
+
+``case`` 关键字后面可以跟任意表达式，这个表达式的结果即是模式匹配的目标。``of`` 关键字标识着表达式到此结束，以及匹配区块的开始，这个区块将用来定义每种模式及其对应的表达式。
+
+该区块的每一项由三个部分组成：一个模式，接着一个箭头 ``->``，接着一个表达式；如果这个模式匹配中了，则计算并返回这个表达式的结果。这些表达式应当是同一类型的。第一个被匹配中的模式对应的表达式的计算结果即是 ``case`` 表达式的结果。匹配按自上而下的优先级进行。
+
+如果使用通配符 ``_`` 作为最后一个被匹配的模式，则意味着“如果上面的模式都没有被匹配中，就使用最后这个表达式”。如果所有模式匹配都没中，我们会看到前面章节里出现过的运行时错误。
+
+新手在使用模式时常见的问题
+--------------------------
+
+在某些情况下，Haskell 新手会误解或误用模式。下面就是一些错误地使用模式匹配的例子。建议阅读时先自己想一想期望的结果是什么，然后看看实际的结果是否出乎你的意料。
+
+错误地对变量进行匹配
+^^^^^^^^^^^^^^^^^^^^
+
+::
+
+    -- file: ch03/BogusPattern.hs
+    data Fruit = Apple | Orange
+
+    apple = "apple"
+
+    orange = "orange"
+
+    whichFruit :: String -> Fruit
+
+    whichFruit f = case f of
+                     apple  -> Apple
+                     orange -> Orange
+
+随意一瞥，这段代码的意思似乎是要检查 ``f`` 的值是 ``apple`` 还是 ``orange``。
+
+换一种写法可以让错误更加显而易见。（译注：原文的例子太晦涩，换了评论中一个较清楚的例子）
+
+::
+
+    -- file: ch03/BogusPattern.hs
+    whichFruit2 :: String -> Fruit
+    whichFruit2 apple = Apple
+    whichFruit2 orange = Orange
+
+这样写明白了吗？就是这里，显然 ``apple`` 并不是指在上层定义的那个变量名为 ``apple`` 的值，而是当前作用域的一个模式变量。
+
+.. note::
+
+    不可拒绝的模式
+
+    我们把这种永远会成功匹配的模式称作\ *不可拒绝*\ 。普通的变量名和通配符 ``_`` 都属于不可拒绝的模式。
+
+上面那个函数的正确写法应该如此：
+
+::
+
+    -- file: ch03/BogusPattern.hs
+    betterFruit f = case f of
+                      "apple"  -> Apple
+                      "orange" -> Orange
+
+我们针对字符串值 ``"apple"`` 和 ``"orange"`` 进行模式匹配，于是问题得到了解决。
+
+进行了错误的相等比较
+^^^^^^^^^^^^^^^^^^^^
+
+如果我们想比较一个 ``Tree`` 类型的两个节点值，如果相等就返回其中一个应该怎么做？请看下面这个尝试。
+
+::
+
+    -- file: ch03/BadTree.hs
+    bad_nodesAreSame (Node a _ _) (Node a _ _) = Just a
+    bad_nodesAreSame _            _            = Nothing
+
+一个命名在一组模式绑定中只能使用一次。将同一个变量放在多个位置并不意味着“这些变量应该相等”。要解决这类问题，我们需要使用 Haskell 的另一个重要的特性，\ *守卫*\ 。
+
+使用守卫实现条件求值
+--------------------
+
+模式匹配针对的是值长成什么样子，因此有着诸多局限。除此之外，我们常常需要在对函数体求值之前进行各种各样的检查。Haskell 也为此提供了\ *守卫*\ 这个特性。我们将通过改写上面这个用来比较树的两个节点是否相等的这段函数来讲解它的使用方法。
+
+::
+
+    -- file: ch03/BadTree.hs
+    nodesAreSame (Node a _ _) (Node b _ _)
+        | a == b     = Just a
+    nodesAreSame _ _ = Nothing
+
+在上面的例子中，我们首先使用了模式匹配已确保值的形式是对的，然后使用了一个守卫来比较其中的一个部分。
+
+一个模式后面可以跟着 0 个或多个 ``Bool`` 类型的守卫。我们引入了 ``|`` 这个符号来标识守卫的使用。即在它后面写一个守卫表达式，再写一个 ``=`` 符号（如果是 ``case`` 表达式则应该用 ``->``），然后写上在这个守卫表达式的值为真的情况下将被使用的函数体。如果某个模式匹配成功，那么它后面的守卫将按照顺序依次被求值。如果其中的某个守卫值为真，那么使用它所对应的函数体作为结果。如果所有的守卫值都为假，那么模式匹配继续进行，即尝试匹配下一个模式。
+
+当对守卫表达式求值时，它所对应的模式中提到的所有变量都会被绑定，因此能够使用。
+
+下面是一个用守卫重构过的 ``lend`` 方法。
+
+::
+
+    -- file: ch03/Lending.hs
+    lend3 amount balance
+         | amount <= 0            = Nothing
+         | amount > reserve * 0.5 = Nothing
+         | otherwise              = Just newBalance
+        where reserve    = 100
+              newBalance = balance - amount
+
+``otherwise`` 看上去像是守卫表达式的某种特殊语法，但实际上它只是一个被绑定为值 ``True`` 的普通变量，这样写是位了提高可读性。
+
+任何使用模式的地方都可以使用守卫。用模式匹配和守卫把方法写成一组等式会大大提高可读性。还记得我们在\ `条件求值<>_`\ 一节中定义的 ``myDrop`` 方法吗？
+
+::
+
+    -- file: ch02/myDrop.hs
+    myDrop n xs = if n <= 0 || null xs
+                  then xs
+                  else myDrop (n - 1) (tail xs)
+
+下面是用模式和守卫重构过的例子。
+
+::
+
+    -- file: ch02/myDrop.hs
+    niceDrop n xs | n <= 0 = xs
+    niceDrop _ []          = []
+    niceDrop n (_:xs)      = niceDrop (n - 1) xs
+
+这种格式的代码清楚的\ *依次*\ 列举了我们对函数在不同情况下的不同用法的期望。如果使用 ``if`` 表达式，我们的想法很容易就被藏进某个函数里，而代码则会变得不可读。
 
 Exercises
 ---------------------------------------------------------
