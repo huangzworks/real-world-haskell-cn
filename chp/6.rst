@@ -1101,10 +1101,90 @@ data 和 newtype 的区别
 - ``newtype`` 关键字给现有类型定义一个不同的身份（distinct identity）。原类型和新类型不能通用。
 
 
-.. _json-typeclasses-without-overlapping-instances:
+.. _json_typeclasses_without_overlapping_instances:
 
-JSON typeclasses without overlapping instances
---------------------------------------------------------
+不会造成重叠实例的JSON类型类
+--------------------------------------
+开启GHC的重叠实例支持可以方便快速地让我们的JSON代码通过编译。在更复杂的场景中，我们有时会面对这样一种情况：某个类型类有多个相关程度相同实例，重叠实例没法帮我们搞定，我们得靠自己添加几处 ``newtype`` 声明。我们将使用 ``newtype`` 代替重叠实例来重做这个JSON类型类，并以此了解其中的复杂之处。
+
+我们的第一个任务，是帮助GHC区分即用来表示JSON数组的类型 ``[a]`` ；以及用来表示JSON对象的类型 ``[(String, [a])]`` 。这两个类型在我们学会 ``OverlappingInstances`` 以前给我们带来了点小麻烦。我们把列表类型做了包装，所以编译器不会把它看作列表。
+
+.. literalinclude:: /code/ch06/JAry.hs
+
+当我们从自己的模块导出这个类型时，我们会把该类型的所有细节都暴露出来。这个模块的头部看起来会像是这样：
+
+.. literalinclude:: /code/ch06/JSONClassExport.hs
+
+紧跟着``Jary``的“(..)”表示“导出这个类型的所有细节”。
+
+.. note::
+
+    与通常做法的相悖之处
+
+    通常，在导出一个 ``newtype`` 的时候，为了让该类型的细节对外透明，我们 *不会* 导出这个类型的数据构造器，而是定义一个函数来替我们调用数据构造器。
+
+    .. literalinclude:: /code/ch06/JSONClass2.hs
+
+    我们会导出这个类型的类型构造器、解构函数、构造函数，只有数据构造器是不被导出的。
+
+    .. literalinclude:: /code/ch06/JSONClassExport2.hs
+
+    由于我们没有导出数据构造器，所以我们的库的用户们就只能使用我们导出的函数对该类型的值进行构造和结构了。这个特性为我们这些库作者提供了随时改变类型的内部表示形式的自由。
+
+    如果我们导出了数据构造器，用户方就可能编写依赖数据构造器的代码，比方说拿数据构造器做模式识别。如果哪天我们想要修改这个类型的内部构造，就要冒这种风险：可能修改之后，所有涉及数据构造器的代码都被破坏了。
+
+    在当前的场景中，让数组的包装器保持抽象也得不到什么额外的好处，所以我们就干脆把类型的完整定义全数导出了。
+
+我们提供了另一个包装类型，通过它，我们隐藏了JSON对象的内部表示。
+
+.. literalinclude:: /code/ch06/JSONClass3.hs
+
+类型定义完毕，我们来对 ``JValue`` 类型的定义做一些小改动。
+
+.. literalinclude:: /code/ch06/JSONClass4.hs
+
+这个改动不会影响到已经完成的 ``JSON`` 类型类实例，但是我们还是要为新定义的 ``JAry`` 和 ``JObj`` 类型编写实例。
+
+.. literalinclude:: /code/ch06/JSONClass5.hs
+
+我们来单步跟踪将一个 ``JAry a``值转换为 ``JValue``值的过程。假设有一个包含的元素都是 ``JSON`` 类型类实例的列表，把该列表转换为 ``JValue`` 组成的列表的过程很简单。
+
+.. literalinclude:: /code/ch06/listToJValues.hs
+
+将这个值包装为 ``JAry JValue`` 值的过程实际上就是对其应用 ``newtype`` 的类型构造器。
+
+.. literalinclude:: /code/ch06/JSONClass6.hs
+
+(记住，这种做法没有任何性能代价。我们只是要求编译器隐藏“正在操作的对象是一个列表”这个事实。)要把这个值转换为 ``JValue`` 值，我们还得应用另一个类型构造器。
+
+.. literalinclude:: /code/ch06/jaryOfJValuesToJvalue.hs
+
+使用函数组合(function composition)将上面这些代码片段组装到一起，我们就得到了一个可以把值转换为 ``JValue`` 类型的函数，它简洁到只有一行。
+
+.. literalinclude:: /code/ch06/jaryToJValue.hs
+
+要把 ``JValue`` 值转换为 ``JAry a`` 需要做更多的工作，但是我们把它拆分成多个可重用的部分。转换函数的基本骨架一目了然。
+
+.. literalinclude:: /code/ch06/jaryFromJValue.hs
+
+``whenRight`` 函数会检查传给它的参数：如果第二个参数是用 ``Right`` 构造器创建的，以它为参数调用第一个参数指定的函数；如果第二个参数是 ``Left`` 构造器创建的，则将它保持原状返回，其它什么也不做。
+
+.. literalinclude:: /code/ch06/whenRight.hs
+
+``mapEithers``函数要更复杂一些。它的行为就像 ``map`` 函数，但如果它遇到一个 ``Left``值，会直接返回该值，而不会继续积累 ``Right`` 值构成的列表。
+
+.. literalinclude:: /code/ch06/mapEithers.hs
+
+由于隐藏在 ``JObj`` 类型中的列表元素有更细碎的结构，相应的，在它和 ``JValue`` 类型之间互相转换的代码就会有点复杂。万幸的是，我们可以重用刚刚定义过的函数。
+
+.. literalinclude:: /code/ch06/toJValue.hs
+
+练习题
+^^^^^^^^^^^^^^^^
+
+1. 在 **ghci** 中加载 ``Control.Arrow`` 模块，弄清 ``second`` 函数的功能。
+
+2. ``(,)``是什么类型？在 **ghci** 中调用它时，它的行为是什么？ ``(,,)`` 呢？
 
 
 
