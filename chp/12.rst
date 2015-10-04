@@ -1051,8 +1051,6 @@ Just [9,7,8,0,1,3,2,1,1,4,6,7,7]
 
 .. literalinclude:: /code/ch12/withRow.hs
 
-The withRow function takes a row, converts it to monochrome, then calls another function on the run length encoded row data. To get the row data, it calls row.
-
 ``withRow`` 函数接受图像中的一行，将该行转换为黑白图像，然后对游程编码后的行数据调用指定函数。它通过 ``row`` 函数来获取行数据。
 
 ::
