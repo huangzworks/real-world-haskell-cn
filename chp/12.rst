@@ -1,3 +1,33 @@
+.. 翻译约定(*表示认为不需要添加到convention.rst中的条目):
+.. barcode -> 条形码 
+.. number system -> 码制
+.. number authority -> 编码规范机构
+.. parity digit / parity bit -> 校验数字
+.. guard sequence -> 保护序列
+.. constant-time -> 常数时间
+.. bound -> 边界
+.. type synonym -> 类型别名
+.. pivot value -> 枢轴值
+.. run length -> 游程
+.. list comprehension -> 列表推导式
+.. guard -> ??? (list comprehension中提到)
+.. generator expression -> 生成器表达式
+.. local variable -> 本地变量
+.. hash tbale -> 散列表
+.. guard reduce -> ??? (tree的部分中提到)
+.. left biased -> 左偏的
+.. solution map -> ??? (并行求解校验数字部分提到)
+.. checksum -> 校验和
+
+
+.. 1. https://en.wikipedia.org/wiki/International_Article_Number_(EAN)
+.. 2. http://www.barcodeisland.com/ean13.phtml
+.. 3. https://en.wikipedia.org/wiki/Global_Trade_Item_Number
+.. 4. http://www.gs1.org/sites/default/files/docs/barcodes/GS1_General_Specifications.pdf
+.. 5. http://www.gs1.org/about/how-we-got-here
+.. 6. http://www.barcodingfonts.com/pdf/EAN.pdf
+
+
 .. _barcode-recongnition:
 
 第十二章：条形码识别
