@@ -1267,7 +1267,142 @@ N/A</td>
 </div>
 </div>
 <div class="section" id="json-typeclasses-without-overlapping-instances">
-<span id="id15"></span><h2>JSON typeclasses without overlapping instances<a class="headerlink" href="#json-typeclasses-without-overlapping-instances" title="Permalink to this headline">¶</a></h2>
+<span id="id15"></span><h2>不会造成重叠实例的JSON类型类<a class="headerlink" href="#json-typeclasses-without-overlapping-instances" title="Permalink to this headline">¶</a></h2>
+<p>开启GHC的重叠实例支持可以方便快速地让我们的JSON代码通过编译。在更复杂的场景中，我们有时会面对这样一种情况：某个类型类有多个相关程度相同实例，重叠实例没法帮我们搞定，我们得靠自己添加几处 <code class="docutils literal"><span class="pre">newtype</span></code> 声明。我们将使用 <code class="docutils literal"><span class="pre">newtype</span></code> 代替重叠实例来重做这个JSON类型类，并以此了解其中的复杂之处。</p>
+<p>我们的第一个任务，是帮助GHC区分即用来表示JSON数组的类型 <code class="docutils literal"><span class="pre">[a]</span></code> ；以及用来表示JSON对象的类型 <code class="docutils literal"><span class="pre">[(String,</span> <span class="pre">[a])]</span></code> 。这两个类型在我们学会 <code class="docutils literal"><span class="pre">OverlappingInstances</span></code> 以前给我们带来了点小麻烦。我们把列表类型做了包装，所以编译器不会把它看作列表。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/JAry.hs</span>
+<span class="kr">newtype</span> <span class="kt">JAry</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">JAry</span> <span class="p">{</span>
+      <span class="n">fromJAry</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+    <span class="p">}</span> <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>当我们从自己的模块导出这个类型时，我们会把该类型的所有细节都暴露出来。这个模块的头部看起来会像是这样：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/JSONClassExport.hs</span>
+<span class="kr">module</span> <span class="nn">JSONClass</span>
+    <span class="p">(</span>
+      <span class="kt">JAry</span><span class="p">(</span><span class="o">..</span><span class="p">)</span>
+    <span class="p">)</span> <span class="kr">where</span>
+</pre></div>
+</div>
+<p>紧跟着``Jary``的“(..)”表示“导出这个类型的所有细节”。</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>与通常做法的相悖之处</p>
+<p>通常，在导出一个 <code class="docutils literal"><span class="pre">newtype</span></code> 的时候，为了让该类型的细节对外透明，我们 <em>不会</em> 导出这个类型的数据构造器，而是定义一个函数来替我们调用数据构造器。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/JSONClass2.hs</span>
+<span class="nf">jary</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">JAry</span> <span class="n">a</span>
+<span class="nf">jary</span> <span class="ow">=</span> <span class="kt">JAry</span>
+</pre></div>
+</div>
+<p>我们会导出这个类型的类型构造器、解构函数、构造函数，只有数据构造器是不被导出的。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/JSONClassExport2.hs</span>
+<span class="kr">module</span> <span class="nn">JSONClass</span>
+    <span class="p">(</span>
+      <span class="kt">JAry</span><span class="p">(</span><span class="nf">fromJAry</span><span class="p">)</span>
+    <span class="p">,</span> <span class="nf">jary</span>
+    <span class="p">)</span> <span class="kr">where</span>
+</pre></div>
+</div>
+<p>由于我们没有导出数据构造器，所以我们的库的用户们就只能使用我们导出的函数对该类型的值进行构造和结构了。这个特性为我们这些库作者提供了随时改变类型的内部表示形式的自由。</p>
+<p>如果我们导出了数据构造器，用户方就可能编写依赖数据构造器的代码，比方说拿数据构造器做模式识别。如果哪天我们想要修改这个类型的内部构造，就要冒这种风险：可能修改之后，所有涉及数据构造器的代码都被破坏了。</p>
+<p class="last">在当前的场景中，让数组的包装器保持抽象也得不到什么额外的好处，所以我们就干脆把类型的完整定义全数导出了。</p>
+</div>
+<p>我们提供了另一个包装类型，通过它，我们隐藏了JSON对象的内部表示。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/JSONClass3.hs</span>
+<span class="kr">newtype</span> <span class="kt">JObj</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">JObj</span> <span class="p">{</span>
+      <span class="n">fromJObj</span> <span class="ow">::</span> <span class="p">[(</span><span class="kt">String</span><span class="p">,</span> <span class="n">a</span><span class="p">)]</span>
+    <span class="p">}</span> <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>类型定义完毕，我们来对 <code class="docutils literal"><span class="pre">JValue</span></code> 类型的定义做一些小改动。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/JSONClass4.hs</span>
+<span class="kr">data</span> <span class="kt">JValue</span> <span class="ow">=</span> <span class="kt">JString</span> <span class="kt">String</span>
+            <span class="o">|</span> <span class="kt">JNumber</span> <span class="kt">Double</span>
+            <span class="o">|</span> <span class="kt">JBool</span> <span class="kt">Bool</span>
+            <span class="o">|</span> <span class="kt">JNull</span>
+            <span class="o">|</span> <span class="kt">JObject</span> <span class="p">(</span><span class="kt">JObj</span> <span class="kt">JValue</span><span class="p">)</span>   <span class="c1">-- was [(String, JValue)]</span>
+            <span class="o">|</span> <span class="kt">JArray</span> <span class="p">(</span><span class="kt">JAry</span> <span class="kt">JValue</span><span class="p">)</span>    <span class="c1">-- was [JValue]</span>
+              <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>这个改动不会影响到已经完成的 <code class="docutils literal"><span class="pre">JSON</span></code> 类型类实例，但是我们还是要为新定义的 <code class="docutils literal"><span class="pre">JAry</span></code> 和 <code class="docutils literal"><span class="pre">JObj</span></code> 类型编写实例。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/JSONClass5.hs</span>
+<span class="nf">jaryFromJValue</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">JSON</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">JValue</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">JSONError</span> <span class="p">(</span><span class="kt">JAry</span> <span class="n">a</span><span class="p">)</span>
+
+<span class="nf">jaryToJValue</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">JSON</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">JAry</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">JValue</span>
+
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">JSON</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">JSON</span> <span class="p">(</span><span class="kt">JAry</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">toJValue</span> <span class="ow">=</span> <span class="n">jaryToJValue</span>
+    <span class="n">fromJValue</span> <span class="ow">=</span> <span class="n">jaryFromJValue</span>
+</pre></div>
+</div>
+<p>我们来单步跟踪将一个 <code class="docutils literal"><span class="pre">JAry</span> <span class="pre">a``值转换为</span> <span class="pre">``JValue``值的过程。假设有一个包含的元素都是</span> <span class="pre">``JSON</span></code> 类型类实例的列表，把该列表转换为 <code class="docutils literal"><span class="pre">JValue</span></code> 组成的列表的过程很简单。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/listToJValues.hs</span>
+<span class="nf">listToJValues</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">JSON</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">JValue</span><span class="p">]</span>
+<span class="nf">listToJValues</span> <span class="ow">=</span> <span class="n">map</span> <span class="n">toJValue</span>
+</pre></div>
+</div>
+<p>将这个值包装为 <code class="docutils literal"><span class="pre">JAry</span> <span class="pre">JValue</span></code> 值的过程实际上就是对其应用 <code class="docutils literal"><span class="pre">newtype</span></code> 的类型构造器。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/JSONClass6.hs</span>
+<span class="nf">jvaluesToJAry</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">JValue</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">JAry</span> <span class="kt">JValue</span>
+<span class="nf">jvaluesToJAry</span> <span class="ow">=</span> <span class="kt">JAry</span>
+</pre></div>
+</div>
+<p>(记住，这种做法没有任何性能代价。我们只是要求编译器隐藏“正在操作的对象是一个列表”这个事实。)要把这个值转换为 <code class="docutils literal"><span class="pre">JValue</span></code> 值，我们还得应用另一个类型构造器。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/jaryOfJValuesToJValue.hs</span>
+<span class="nf">jaryOfJValuesToJValue</span> <span class="ow">::</span> <span class="kt">JAry</span> <span class="kt">JValue</span> <span class="ow">-&gt;</span> <span class="kt">JValue</span>
+<span class="nf">jaryOfJValuesToJValue</span> <span class="ow">=</span> <span class="kt">JArray</span>
+</pre></div>
+</div>
+<p>使用函数组合(function composition)将上面这些代码片段组装到一起，我们就得到了一个可以把值转换为 <code class="docutils literal"><span class="pre">JValue</span></code> 类型的函数，它简洁到只有一行。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/jaryToJValue.hs</span>
+<span class="nf">jaryToJValue</span> <span class="ow">=</span> <span class="kt">JArray</span> <span class="o">.</span> <span class="kt">JAry</span> <span class="o">.</span> <span class="n">map</span> <span class="n">toJValue</span> <span class="o">.</span> <span class="n">fromJAry</span>
+</pre></div>
+</div>
+<p>要把 <code class="docutils literal"><span class="pre">JValue</span></code> 值转换为 <code class="docutils literal"><span class="pre">JAry</span> <span class="pre">a</span></code> 需要做更多的工作，但是我们把它拆分成多个可重用的部分。转换函数的基本骨架一目了然。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/jaryFromJValue.hs</span>
+<span class="nf">jaryFromJValue</span> <span class="p">(</span><span class="kt">JArray</span> <span class="p">(</span><span class="kt">JAry</span> <span class="n">a</span><span class="p">))</span> <span class="ow">=</span>
+    <span class="n">whenRight</span> <span class="kt">JAry</span> <span class="p">(</span><span class="n">mapEithers</span> <span class="n">fromJValue</span> <span class="n">a</span><span class="p">)</span>
+<span class="nf">jaryFromJValue</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">Left</span> <span class="s">&quot;not a JSON array&quot;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">whenRight</span></code> 函数会检查传给它的参数：如果第二个参数是用 <code class="docutils literal"><span class="pre">Right</span></code> 构造器创建的，以它为参数调用第一个参数指定的函数；如果第二个参数是 <code class="docutils literal"><span class="pre">Left</span></code> 构造器创建的，则将它保持原状返回，其它什么也不做。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/whenRight.hs</span>
+<span class="nf">whenRight</span> <span class="ow">::</span> <span class="p">(</span><span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">c</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="n">a</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="n">a</span> <span class="n">c</span>
+<span class="nf">whenRight</span> <span class="kr">_</span> <span class="p">(</span><span class="kt">Left</span> <span class="n">err</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Left</span> <span class="n">err</span>
+<span class="nf">whenRight</span> <span class="n">f</span> <span class="p">(</span><span class="kt">Right</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Right</span> <span class="p">(</span><span class="n">f</span> <span class="n">a</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">mapEithers``函数要更复杂一些。它的行为就像</span> <span class="pre">``map</span></code> 函数，但如果它遇到一个 <code class="docutils literal"><span class="pre">Left``值，会直接返回该值，而不会继续积累</span> <span class="pre">``Right</span></code> 值构成的列表。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/mapEithers.hs</span>
+<span class="nf">mapEithers</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="n">b</span> <span class="n">c</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="n">b</span> <span class="p">[</span><span class="n">c</span><span class="p">]</span>
+<span class="nf">mapEithers</span> <span class="n">f</span> <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">mapEithers</span> <span class="n">f</span> <span class="n">xs</span> <span class="kr">of</span>
+                        <span class="kt">Left</span> <span class="n">err</span> <span class="ow">-&gt;</span> <span class="kt">Left</span> <span class="n">err</span>
+                        <span class="kt">Right</span> <span class="n">ys</span> <span class="ow">-&gt;</span> <span class="kr">case</span> <span class="n">f</span> <span class="n">x</span> <span class="kr">of</span>
+                                      <span class="kt">Left</span> <span class="n">err</span> <span class="ow">-&gt;</span> <span class="kt">Left</span> <span class="n">err</span>
+                                      <span class="kt">Right</span> <span class="n">y</span> <span class="ow">-&gt;</span> <span class="kt">Right</span> <span class="p">(</span><span class="n">y</span><span class="kt">:</span><span class="n">ys</span><span class="p">)</span>
+<span class="nf">mapEithers</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">Right</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+<p>由于隐藏在 <code class="docutils literal"><span class="pre">JObj</span></code> 类型中的列表元素有更细碎的结构，相应的，在它和 <code class="docutils literal"><span class="pre">JValue</span></code> 类型之间互相转换的代码就会有点复杂。万幸的是，我们可以重用刚刚定义过的函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/toJValue.hs</span>
+<span class="kr">import</span> <span class="nn">Control.Arrow</span> <span class="p">(</span><span class="nf">second</span><span class="p">)</span>
+
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">JSON</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">JSON</span> <span class="p">(</span><span class="kt">JObj</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">toJValue</span> <span class="ow">=</span> <span class="kt">JObject</span> <span class="o">.</span> <span class="kt">JObj</span> <span class="o">.</span> <span class="n">map</span> <span class="p">(</span><span class="n">second</span> <span class="n">toJValue</span><span class="p">)</span> <span class="o">.</span> <span class="n">fromJObj</span>
+
+    <span class="n">fromJValue</span> <span class="p">(</span><span class="kt">JObject</span> <span class="p">(</span><span class="kt">JObj</span> <span class="n">o</span><span class="p">))</span> <span class="ow">=</span> <span class="n">whenRight</span> <span class="kt">JObj</span> <span class="p">(</span><span class="n">mapEithers</span> <span class="n">unwrap</span> <span class="n">o</span><span class="p">)</span>
+      <span class="kr">where</span> <span class="n">unwrap</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="n">v</span><span class="p">)</span> <span class="ow">=</span> <span class="n">whenRight</span> <span class="p">((,)</span> <span class="n">k</span><span class="p">)</span> <span class="p">(</span><span class="n">fromJValue</span> <span class="n">v</span><span class="p">)</span>
+    <span class="n">fromJValue</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">Left</span> <span class="s">&quot;not a JSON object&quot;</span>
+</pre></div>
+</div>
+<div class="section" id="id16">
+<h3>练习题<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h3>
+<ol class="arabic simple">
+<li>在 <strong>ghci</strong> 中加载 <code class="docutils literal"><span class="pre">Control.Arrow</span></code> 模块，弄清 <code class="docutils literal"><span class="pre">second</span></code> 函数的功能。</li>
+<li><code class="docutils literal"><span class="pre">(,)``是什么类型？在</span> <span class="pre">**ghci**</span> <span class="pre">中调用它时，它的行为是什么？</span> <span class="pre">``(,,)</span></code> 呢？</li>
+</ol>
+</div>
 </div>
 <div class="section" id="monomorphism-restriction">
 <span id="the-dreaded-monomorphism-restriction"></span><h2>可怕的单一同态限定（monomorphism restriction）<a class="headerlink" href="#monomorphism-restriction" title="Permalink to this headline">¶</a></h2>
@@ -1328,7 +1463,7 @@ Haskell 有时会强制使某些声明不像我们预想的那么多态。</p>
 识别不了这个扩展，但用另外两种方法就可以解决问题。如果这种可移植性对你不是问题，那么请务必打开这个扩展。</p>
 </div>
 <div class="section" id="conclusion">
-<span id="id16"></span><h2>结论<a class="headerlink" href="#conclusion" title="Permalink to this headline">¶</a></h2>
+<span id="id17"></span><h2>结论<a class="headerlink" href="#conclusion" title="Permalink to this headline">¶</a></h2>
 <p>在这章，你学到了类型类有什么用以及怎么用它们。我们讨论了如何定义自己的类型类，然后又讨论了一些 Haskell 库里定义的类型类。
 最后，我们展示了怎么让 Haskell 编译器给你的类型自动派生出某些类型类实例。</p>
 </div>
