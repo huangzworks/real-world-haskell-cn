@@ -137,7 +137,7 @@ parser。
 ``cells``
 去解析它们。如果我们没有发现逗号，说明这一行中再没有剩余的单元格，就返回一个空列表。
 
-最后，我们需要定义换行符，我们将换行符设定为字符'',这个设定到目前来讲已经够用了。
+最后，我们需要定义换行符，我们将换行符设定为字符'\\n',这个设定到目前来讲已经够用了。
 
 在整个程序的最后，我们定义函数 ``parseCSV``\ ，它接受一个 ``String``
 类型的参数，并将其作为 CSV 文件进行解析。这个函数只是对 Parsec 中
@@ -198,7 +198,7 @@ sepBy 与 endBy 组合子
 
 第二个工具是 ``endBy``, 它与
 ``sepBy``\ 相似，不过它期望它的最后一个有效内容之后，还跟着一个分隔符（译注，就是
-parse "a"这种，而 ``sepBy`` 是 parse "a,b,c"
+parse "a\\nb\\nc\\n"这种，而 ``sepBy`` 是 parse "a,b,c"
 这种）。也就是说，它将一直进行 parse，直到它无法继续消耗任何输入。
 
 于是，我们可以用 ``endBy``
@@ -225,24 +225,24 @@ parser 有多么简单：
 -  一个 CSV 文件包含0行或者更多行，每一行都是以换行符结尾。
 -  一行包含一个或者多个单元格（\ **译者注, sepBy应该是允许0个单元格的**)
 -  一个单元格包含0个或者更多个字符，这些字符不能是逗号或者换行符
--  换行符是''
+-  换行符是'\\n'
 
 选择与错误处理
 --------------
 
 不同操作系统采用不同的字符来表示换行，例如，Unix/Linux 系统中，以及
-Windows 的 text mode 中，简单地用 "" 来表示。DOS 以及 Windows 系统，使用
-""，而 Mac 一直采用 ""。我们还可以添加对 ""
+Windows 的 text mode 中，简单地用 "\\n" 来表示。DOS 以及 Windows
+系统，使用 "\\r\\n"，而 Mac 一直采用 "\\r"。我们还可以添加对 "\\n\\r"
 的支持，因为有些人可能会需要。
 
 我们可以很容易地修改下上面的代码来适应这些不同的换行符。我们只需要做两处改动，修改下
 ``eol`` 的定义，使它识别不同的换行符，修改下 ``cell`` 函数中的
-``noneOf`` 的匹配模式，让它忽略 ""。
+``noneOf`` 的匹配模式，让它忽略 "\\r"。
 
 这事做起来得小心些，之前 ``eol`` 的定义就是简单的
 ``char '\n'``\ ，而现在我们使用另一个内置的 parser 函数叫做
 ``string``\ ，它可以匹配一个给定的字符串，我们来考虑下如何用这个函数来增加对
-"" 的支持。
+"\\n\\r" 的支持。
 
 我们的初次尝试，就像这样：
 
@@ -253,8 +253,9 @@ Windows 的 text mode 中，简单地用 "" 来表示。DOS 以及 Windows 系�
     eol = string "\n" <|> string "\n\r"
 
 然而上面的例子并不正确，\ ``<|>`` 操作符总是首先尝试左边的 parser，即
-``string "\n"``\ ， 但是对于 "" 和 "" 这两种换行符， ``string "\n"``
-都会匹配成功，这可不是我们想要的，不妨在 ``ghci`` 中尝试一下：
+``string "\n"``\ ， 但是对于 "\\n" 和 "\\n\\r" 这两种换行符，
+``string "\n"`` 都会匹配成功，这可不是我们想要的，不妨在 ``ghci``
+中尝试一下：
 
 .. code:: haskell
 
@@ -281,7 +282,7 @@ parser
     ghci> parse (eol >> eof) "" "\n"
     Right ()
 
-正如预期的那样，当解析 ""
+正如预期的那样，当解析 "\\n\\r"
 换行符时出现了错误，所以接下来我们可能会想这样尝试：
 
 .. code:: haskell
@@ -292,8 +293,9 @@ parser
 
 这也是不对的。回想一下，\ ``<|>``
 仅在左侧的选项没有消耗输入时，才会尝试在右边的
-parser。但是，当我们去看在 "" 后面是不是有一个 ""
-的时候，我们早就已经消耗掉了一个 ""，我们会在 parse "" 时遇到错误：
+parser。但是，当我们去看在 "\\n" 后面是不是有一个 "\\r"
+的时候，我们早就已经消耗掉了一个 "\\n"，我们会在 parse "\\n"
+时遇到错误：
 
 .. code:: haskell
 
@@ -312,12 +314,12 @@ writing parsers, it's often very convenient to be able to "look ahead"
 at the data that's coming in. Parsec supports this, but before showing
 you how to use it, let's see how you would have to write this to get
 along without it. You'd have to manually expand all the options after
-the like this:
+the \\n like this:
 
 我们在超前查看的问题上栽了跟头，看起来，在写 parser
 的时候，能够在数据到来时 “超前查看” 是很有用的。Parsec
 是支持这一特性的，不过在我们展示这一特性的时候，先来看看怎样能够不利用超前查看特性完成这个任务。你必须要自己去考虑
-"" 之后的所有可能：
+"\\n" 之后的所有可能：
 
 .. code:: haskell
 
@@ -326,11 +328,12 @@ the like this:
         do char '\n'
            char '\r' <|> return '\n'
 
-这个函数首先寻找 ""，如果找到了，就去寻找 ""，如果找到了 ""，就消耗掉
-""。既然 ``char '\r'`` 的返回类型是 ``Char``\ ，那么没有找到 ''
-时的行为就是简单的返回一个 'Char' 而不试图 parse 任何输入。Parsec
-有一个内置函数 ``option`` 可以将这种情况表达为
-``option '\n' (char '\r')``\ 。我们在 ``ghci`` 中试一下：
+这个函数首先寻找 "\\n"，如果找到了，就去寻找 "\\r"，如果找到了
+"\\r"，就消耗掉 "\\r"。既然 ``char '\r'`` 的返回类型是
+``Char``\ ，那么没有找到 '\\r' 时的行为就是简单的返回一个 'Char'
+而不试图 parse 任何输入。Parsec 有一个内置函数 ``option``
+可以将这种情况表达为 ``option '\n' (char '\r')``\ 。我们在 ``ghci``
+中试一下：
 
 .. code:: haskell
 
@@ -1076,7 +1079,7 @@ Parse 一个字符串也不困难，不过需要处理一些细节。
         where decode c r = r <$ char c
 
 最后，JSON 允许我们在字符串中使用 Unicode
-字符：""后面跟着四个十六进制数字:
+字符："\\u"后面跟着四个十六进制数字:
 
 .. code:: haskell
 
@@ -1213,18 +1216,18 @@ HTTP 请求的第一行之后，是零到多个 header，一个 header
 练习
 ----
 
-1. 我们的 HTTP 请求 parser
+#. 我们的 HTTP 请求 parser
    过于简化了，没法在部署在实际应用中。它缺少重要的功能，并且无法组织最基本的拒绝服务攻击(DOS,
-   denial of service attack) 让我们的 parser 关注 Content-Length 这个
-   field,如果它存在的话
-2. 针对不设防的 web server 的 一个很流行的 DOS
+   denial of service attack)
+    让我们的 parser 关注 Content-Length 这个 field,如果它存在的话
+#. 针对不设防的 web server 的 一个很流行的 DOS
    攻击方式，是向它发送特别长的 header，一个 header
-   可能包含几百兆的垃圾信息，从而耗光服务器的内存。 重构 header 的
-   parser，当一行超过 4096 个字符时 parse
+   可能包含几百兆的垃圾信息，从而耗光服务器的内存。
+    重构 header 的 parser，当一行超过 4096 个字符时 parse
    失败。它必须在超过长度时立刻失败，而不是等到处理完一行之后。
-3. 关注 Transfer-Encoding 这个
+#. 关注 Transfer-Encoding 这个
    field，如果它存在的话，关于它的细节，可以查看 RFC 2616 的第 3.6.1 节
-4. 另一个流行的攻击方式是开启一个链接之后，放置不管或者以十分慢的速度发送数据。使用
+#. 另一个流行的攻击方式是开启一个链接之后，放置不管或者以十分慢的速度发送数据。使用
    ``IO`` monad 来封装 parser，如果没有在30秒内完成 parse，就使用
    ``System.Timeout`` 这个模块关闭链接。
 
