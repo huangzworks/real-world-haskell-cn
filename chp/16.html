@@ -1,0 +1,1141 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>第16章：使用Parsec &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
+    <link rel="next" title="第十八章： Monad变换器" href="18.html" />
+    <link rel="prev" title="第十三章：数据结构" href="13.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="13.html">第十三章：数据结构</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="18.html">第十八章： Monad变换器</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="parsec">
+<h1>第16章：使用Parsec<a class="headerlink" href="#parsec" title="Permalink to this headline">¶</a></h1>
+<p>为一个文本文件或者不同类型的数据做语法分析(parsing)，对程序员来说是个很常见的任务，在本书第198页“使用正则表达式”一节中，我们已经学习了
+Haskell 对正则表达式的支持。对很多这样的任务，正则表达式都很好用。</p>
+<p>不过，当处理复杂的数据格式时，正则表达式很快就会变得不实用、甚至完全不可用。比如说，对于多数编程语言来说，我们没法（只）用正则表达式去
+parse 其源代码。</p>
+<p>Parsec 是一个很有用的 <a class="reference external" href="https://en.wikipedia.org/wiki/Parser_combinator">parser
+combinator</a> 库，使用
+Parsec，我们可以将一些小的、简单的 parser 组合成更复杂的 parser。Parsec
+提供了一些简单的 parser，以及一些用于将这些 parser
+组合在一起的组合子。毫不意外，这个为 Haskell 设计的 parser
+库是函数式的。</p>
+<p>将 Parsec 同其他语言的 parse
+工具做下对比是很有帮助的，语法分析有时会被分为两个阶段：词法分析（这方面的工具比如
+<code class="docutils literal"><span class="pre">flex</span></code> ）和语法分析（比如 <code class="docutils literal"><span class="pre">bison</span></code> ). Parsec
+可以同时处理词法分析和语法分析。
+(译注：词法分析将输入的字符串序列转化为一个个的
+token，而语法分析进一步接受这些 token 作为输入生成语法树）</p>
+<div class="section" id="parsec-csv-parser">
+<h2>Parsec 初步：简单的 CSV parser<a class="headerlink" href="#parsec-csv-parser" title="Permalink to this headline">¶</a></h2>
+<p>让我们来写一个解析 CSV 文件的代码。CSV
+是纯文本文件，常被用来表示表格或者数据库。每行是一个记录，一个记录中的字段用逗号分隔。至于包含逗号的字段，有特殊的处理方法，不过在这一节我们暂时不考虑这种情况。</p>
+<p>下面的代码比实际需要的代码要长一些，不过接下来，我们很快就会介绍一些
+Parsec 的特性，应用这些特性，整个 parser 只需要四行。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/csv1.hs</span>
+<span class="kr">import</span> <span class="nn">Text.ParserCombinators.Parsec</span>
+
+<span class="cm">{- A CSV file contains 0 or more lines, each of which is terminated</span>
+<span class="cm">   by the end-of-line character (eol). -}</span>
+<span class="nf">csvFile</span> <span class="ow">::</span> <span class="kt">GenParser</span> <span class="kt">Char</span> <span class="n">st</span> <span class="p">[[</span><span class="kt">String</span><span class="p">]]</span>
+<span class="nf">csvFile</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">result</span> <span class="ow">&lt;-</span> <span class="n">many</span> <span class="n">line</span>
+       <span class="n">eof</span>
+       <span class="n">return</span> <span class="n">result</span>
+
+<span class="c1">-- Each line contains 1 or more cells, separated by a comma</span>
+<span class="nf">line</span> <span class="ow">::</span> <span class="kt">GenParser</span> <span class="kt">Char</span> <span class="n">st</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+<span class="nf">line</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">result</span> <span class="ow">&lt;-</span> <span class="n">cells</span>
+       <span class="n">eol</span>                       <span class="c1">-- end of line</span>
+       <span class="n">return</span> <span class="n">result</span>
+
+<span class="c1">-- Build up a list of cells.  Try to parse the first cell, then figure out</span>
+<span class="c1">-- what ends the cell.</span>
+<span class="nf">cells</span> <span class="ow">::</span> <span class="kt">GenParser</span> <span class="kt">Char</span> <span class="n">st</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+<span class="nf">cells</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">first</span> <span class="ow">&lt;-</span> <span class="n">cellContent</span>
+       <span class="n">next</span> <span class="ow">&lt;-</span> <span class="n">remainingCells</span>
+       <span class="n">return</span> <span class="p">(</span><span class="n">first</span> <span class="kt">:</span> <span class="n">next</span><span class="p">)</span>
+
+<span class="c1">-- The cell either ends with a comma, indicating that 1 or more cells follow,</span>
+<span class="c1">-- or it doesn&#39;t, indicating that we&#39;re at the end of the cells for this line</span>
+<span class="nf">remainingCells</span> <span class="ow">::</span> <span class="kt">GenParser</span> <span class="kt">Char</span> <span class="n">st</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+<span class="nf">remainingCells</span> <span class="ow">=</span>
+    <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;,&#39;</span> <span class="o">&gt;&gt;</span> <span class="n">cells</span><span class="p">)</span>            <span class="c1">-- Found comma?  More cells coming</span>
+    <span class="o">&lt;|&gt;</span> <span class="p">(</span><span class="n">return</span> <span class="kt">[]</span><span class="p">)</span>                <span class="c1">-- No comma?  Return [], no more cells</span>
+
+<span class="c1">-- Each cell contains 0 or more characters, which must not be a comma or</span>
+<span class="c1">-- EOL</span>
+<span class="nf">cellContent</span> <span class="ow">::</span> <span class="kt">GenParser</span> <span class="kt">Char</span> <span class="n">st</span> <span class="kt">String</span>
+<span class="nf">cellContent</span> <span class="ow">=</span>
+    <span class="n">many</span> <span class="p">(</span><span class="n">noneOf</span> <span class="s">&quot;,</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">)</span>
+
+
+<span class="c1">-- The end of line character is \n</span>
+<span class="nf">eol</span> <span class="ow">::</span> <span class="kt">GenParser</span> <span class="kt">Char</span> <span class="n">st</span> <span class="kt">Char</span>
+<span class="nf">eol</span> <span class="ow">=</span> <span class="n">char</span> <span class="sc">&#39;</span><span class="se">\n</span><span class="sc">&#39;</span>
+
+<span class="nf">parseCSV</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">ParseError</span> <span class="p">[[</span><span class="kt">String</span><span class="p">]]</span>
+<span class="nf">parseCSV</span> <span class="n">input</span> <span class="ow">=</span> <span class="n">parse</span> <span class="n">csvFile</span> <span class="s">&quot;(unknown)&quot;</span> <span class="n">input</span>
+</pre></div>
+</div>
+<p>我们来讲解下这段代码，在这段代码中，我们并没有使用 Parsec
+的特性，因此要记住这段代码还能写得更简洁！</p>
+<p>我们自顶向下的构建了一个 CSV 的 parser，第一个函数是
+<code class="docutils literal"><span class="pre">csvFile</span></code>。它的类型是 <code class="docutils literal"><span class="pre">GenParser</span> <span class="pre">Char</span> <span class="pre">st</span> <span class="pre">[[String]]</span></code>，
+这表示这个函数的输入是字符序列，也就是 Haskell 中的字符串，因为
+<code class="docutils literal"><span class="pre">String</span></code> 不过是 <code class="docutils literal"><span class="pre">[Char]</span></code> 的别名，而这个函数的返回类型是
+<code class="docutils literal"><span class="pre">[[String]]</span></code> ： 一个字符串列表的列表。至于 <code class="docutils literal"><span class="pre">st</span></code> ，我们暂时忽略它</p>
+<p>Parsec
+程序员经常会写一些小函数，因此他们常常懒得写函数的类型签名。Haskell
+的类型推导系统能够自动识别函数类型。而在上面第一个例子中，我们写出了所有函数的类型，方便你了解函数到底在干什么。另外你可以在
+<code class="docutils literal"><span class="pre">ghci</span></code> 中使用 <code class="docutils literal"><span class="pre">:t</span></code> 来查看函数的类型。</p>
+<p><code class="docutils literal"><span class="pre">csvFile</span></code> 函数使用了 <code class="docutils literal"><span class="pre">do</span></code> 语句，如其所示，Parsec 库是 monadic
+的，它定义了用于语法分析的[1][ref1]：<code class="docutils literal"><span class="pre">Genparser</span></code> monad。</p>
+<p><code class="docutils literal"><span class="pre">csvFile</span></code> 函数首先运行的是
+<code class="docutils literal"><span class="pre">many</span> <span class="pre">line</span></code>，<code class="docutils literal"><span class="pre">many</span></code>是一个高阶函数，它接受一个 parser
+函数作为参数，不断对输入应用这个 parser，并把每次 parse
+的结果组成一个列表返回。在 <code class="docutils literal"><span class="pre">csvFile</span></code> 中，我们把对 csv
+文件中所有行的解析结果存储到 <code class="docutils literal"><span class="pre">result</span></code>中，然后，当我们遇到文件终结符
+EOF 时，就返回 <code class="docutils literal"><span class="pre">result</span></code>。也就是说：一个 CSV 文件有好多行组成，以 EOF
+结尾。Parsec 写成的函数如此简洁，我们常常能够像这样直接用语言来解释。</p>
+<p>上一段说，一个 CSV
+文件由许多行组成，现在，我们需要说明，什么是“一行”，为此，我们定义了
+<code class="docutils literal"><span class="pre">line</span></code> 函数来解析 CSV
+文件中的一行，通过阅读函数代码，我们可以发现，CSV
+文件中的一行，包括许多“单元格”，最后跟着一个换行符。</p>
+<p>那么，什么是“许多单元格”呢，我们通过 <code class="docutils literal"><span class="pre">cells</span></code>
+函数来解析一行中的所有单元格。一行中的所有单元格，包括一个到多个单元格。因此，我们首先解析第一个单元格的内容，然后，解析剩下的单元格，返回剩下的单元格内容组成的列表，最后，<code class="docutils literal"><span class="pre">cells</span></code>
+把第一个单元格与剩余单元格列表组成一个新的单元格列表返回。</p>
+<p>我们先跳过 <code class="docutils literal"><span class="pre">remainingCells</span></code> 函数，去看
+<code class="docutils literal"><span class="pre">cellContent</span></code>函数，<code class="docutils literal"><span class="pre">cellContent</span></code>
+解析一个单元格的内容。一个单元格可以包含任意数量的字符，但每一个字符都不能是逗号或者换行符（译注：实际可以包含逗号，不过我们目前不考虑这种情况），我们使用
+<code class="docutils literal"><span class="pre">noneOf</span></code>
+函数来匹配这两个特殊字符，来确保我们遇到的不是这样的字符，于是，<code class="docutils literal"><span class="pre">many</span> <span class="pre">noneOf</span> <span class="pre">&quot;,\n&quot;</span></code>定义了一个单元格。</p>
+<p>然后再来看 <code class="docutils literal"><span class="pre">remainingCells</span></code>
+函数，这个函数用来在解析完一行中第一个单元格之后，解析该行中剩余的单元格。在这个函数中，我们初次使用了
+Parsec 中的选择操作，选择操作符是
+<code class="docutils literal"><span class="pre">&lt;|&gt;</span></code>。这个操作符是这样定义的：它会首先尝试操作符左边的 parser
+函数，如果这个parser没能成功消耗任何输入字符（译注：没有消耗任何输入，即是说，从输入字符串的第一个字符，就可以判定无法成功解析，例如，我们希望解析&#8221;html&#8221;这个字符串，遇到的却是&#8221;php&#8221;，那从&#8221;php&#8221;的第一个字符&#8217;p&#8217;，就可以判定不会解析成功。而如果遇到的是&#8221;http&#8221;，那么我们需要消耗掉&#8221;ht&#8221;这两个字符之后，才判定匹配失败，此时，即使已经匹配失败，&#8221;ht&#8221;这两个字符仍然是被消耗掉了），那么，就尝试操作符右边的
+parser。</p>
+<p>在函数 <code class="docutils literal"><span class="pre">remainingCells</span></code>
+中，我们的任务是去解析第一个单元格之后的所有单元格，<code class="docutils literal"><span class="pre">cellContent</span></code>
+函数使用了 <code class="docutils literal"><span class="pre">noneOf</span> <span class="pre">&quot;,\n&quot;</span></code>，所以逗号和换行符不会被 <code class="docutils literal"><span class="pre">cellContent</span></code>
+消耗掉，因此，如果我们在解析完一个单元格之后，见到了一个逗号，这说明这一行不止一个单元格。所以，<code class="docutils literal"><span class="pre">remainingCells</span></code>
+选择操作中的第一个选择的开始是一个 <code class="docutils literal"><span class="pre">char</span> <span class="pre">','</span></code>
+来判断是否还有剩余单元格，<code class="docutils literal"><span class="pre">char</span></code> 这个 parser
+简单的匹配输入中传入的字符，如果我们发现一个逗号，我们希望这个去继续解析剩余的单元格，这个时候，“剩下的单元格”看上去跟一行中的所有单元格在格式上一致。所以，我们递归地调用
+<code class="docutils literal"><span class="pre">cells</span></code>
+去解析它们。如果我们没有发现逗号，说明这一行中再没有剩余的单元格，就返回一个空列表。</p>
+<p>最后，我们需要定义换行符，我们将换行符设定为字符&#8217;\n&#8217;,这个设定到目前来讲已经够用了。</p>
+<p>在整个程序的最后，我们定义函数 <code class="docutils literal"><span class="pre">parseCSV</span></code>，它接受一个 <code class="docutils literal"><span class="pre">String</span></code>
+类型的参数，并将其作为 CSV 文件进行解析。这个函数只是对 Parsec 中
+<code class="docutils literal"><span class="pre">parse</span></code> 函数的简单封装，<code class="docutils literal"><span class="pre">parse</span></code> 函数返回
+<code class="docutils literal"><span class="pre">Either</span> <span class="pre">ParseError</span> <span class="pre">[[String]]</span></code>类型，
+如果输入格式有错误，则返回的是用 <code class="docutils literal"><span class="pre">Left</span></code> 标记的错误信息，否则，返回用
+<code class="docutils literal"><span class="pre">Right</span></code> 标记的解析生成的数据类型。</p>
+<p>理解了上面的代码之后，我们试着在 <code class="docutils literal"><span class="pre">ghci</span></code> 中运行一下来看下它：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="n">csv1</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">csv1</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseCSV</span> <span class="s">&quot;&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">parsec</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Right</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+<p>结果倒是合情合理， parse 一个空字符串，返回一个空列表。接下来，我们去
+parse 一个单元格：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseCSV</span> <span class="s">&quot;hi&quot;</span>
+<span class="kt">Left</span> <span class="s">&quot;(unknown)&quot;</span> <span class="p">(</span><span class="n">line</span> <span class="mi">1</span><span class="p">,</span> <span class="n">column</span> <span class="mi">3</span><span class="p">)</span><span class="kt">:</span>
+<span class="nf">unexpected</span> <span class="n">end</span> <span class="kr">of</span> <span class="n">input</span>
+<span class="nf">expecting</span> <span class="s">&quot;,&quot;</span> <span class="n">or</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+</pre></div>
+</div>
+<p>看下上面的报错信息，我们定义“一行”必须以一个换行符结尾，而在上面的输入中，我们并没有给出换行符。Parsec
+的报错信息给出了错误的行号和列号，甚至告诉了我们它期望得到的输入。我们对上面的输入给出换行符，并且继续尝试新的输入：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseCSV</span> <span class="s">&quot;hi</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="p">[[</span><span class="s">&quot;hi&quot;</span><span class="p">]]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseCSV</span> <span class="s">&quot;line1</span><span class="se">\n</span><span class="s">line2</span><span class="se">\n</span><span class="s">line3</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="p">[[</span><span class="s">&quot;line1&quot;</span><span class="p">],[</span><span class="s">&quot;line2&quot;</span><span class="p">],[</span><span class="s">&quot;line3&quot;</span><span class="p">]]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseCSV</span> <span class="s">&quot;cell1,cell2,cell3</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="p">[[</span><span class="s">&quot;cell1&quot;</span><span class="p">,</span><span class="s">&quot;cell2&quot;</span><span class="p">,</span><span class="s">&quot;cell3&quot;</span><span class="p">]]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseCSV</span> <span class="s">&quot;l1c1,l1c2</span><span class="se">\n</span><span class="s">l2c1,l2c2</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="p">[[</span><span class="s">&quot;l1c1&quot;</span><span class="p">,</span><span class="s">&quot;l1c2&quot;</span><span class="p">],[</span><span class="s">&quot;l2c1&quot;</span><span class="p">,</span><span class="s">&quot;l2c2&quot;</span><span class="p">]]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseCSV</span> <span class="s">&quot;Hi,</span><span class="se">\n\n</span><span class="s">,Hello</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="p">[[</span><span class="s">&quot;Hi&quot;</span><span class="p">,</span><span class="s">&quot;&quot;</span><span class="p">],[</span><span class="s">&quot;&quot;</span><span class="p">],[</span><span class="s">&quot;&quot;</span><span class="p">,</span><span class="s">&quot;Hello&quot;</span><span class="p">]]</span>
+</pre></div>
+</div>
+<p>可以看出，<code class="docutils literal"><span class="pre">parseCSV</span></code>
+的行为与预期一致，甚至空单元格与空行它也能正确处理。</p>
+</div>
+<div class="section" id="sepby-endby">
+<h2>sepBy 与 endBy 组合子<a class="headerlink" href="#sepby-endby" title="Permalink to this headline">¶</a></h2>
+<p>我们早先向您承诺过，上一节中的 CSV parser
+可以通过几个辅助函数大大简化。有两个函数可以大幅度简化上一节中的代码。</p>
+<p>第一个工具是 <code class="docutils literal"><span class="pre">sepBy</span></code> 函数，这个函数接受两个 parser
+函数作为参数。第一个函数解析有效内容，第二个函数解析一个分隔符。<code class="docutils literal"><span class="pre">sepBy</span></code>
+首先尝试解析有效内容，然后去解析分隔符，然后有效内容与分隔符依次交替解析，直到解析完有效内容之后无法继续解析到分隔符为止。它返回有效内容的列表。</p>
+<p>第二个工具是 <code class="docutils literal"><span class="pre">endBy</span></code>, 它与
+<code class="docutils literal"><span class="pre">sepBy</span></code>相似，不过它期望它的最后一个有效内容之后，还跟着一个分隔符（译注，就是
+parse &#8220;a\nb\nc\n&#8221;这种，而 <code class="docutils literal"><span class="pre">sepBy</span></code> 是 parse &#8220;a,b,c&#8221;
+这种）。也就是说，它将一直进行 parse，直到它无法继续消耗任何输入。</p>
+<p>于是，我们可以用 <code class="docutils literal"><span class="pre">endBy</span></code>
+来解析行，因为每一行必定是以一个换行字符结尾。 我们可以用 <code class="docutils literal"><span class="pre">sepBy</span></code>
+来解析一行中的所有单元格，因为一行中的单元格以逗号分割，而最后一个单元格后面并不跟着逗号。我们来看下现在的
+parser 有多么简单：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/csv2.hs</span>
+<span class="kr">import</span> <span class="nn">Text.ParserCombinators.Parsec</span>
+
+<span class="nf">csvFile</span> <span class="ow">=</span> <span class="n">endBy</span> <span class="n">line</span> <span class="n">eol</span>
+<span class="nf">line</span>    <span class="ow">=</span> <span class="n">sepBy</span> <span class="n">cell</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;,&#39;</span><span class="p">)</span>
+<span class="nf">cell</span>    <span class="ow">=</span> <span class="n">many</span> <span class="p">(</span><span class="n">noneOf</span> <span class="s">&quot;,</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">)</span>
+<span class="nf">eol</span>     <span class="ow">=</span> <span class="n">char</span> <span class="sc">&#39;</span><span class="se">\n</span><span class="sc">&#39;</span>
+
+<span class="nf">parseCSV</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">ParseError</span> <span class="p">[[</span><span class="kt">String</span><span class="p">]]</span>
+<span class="nf">parseCSV</span> <span class="n">input</span> <span class="ow">=</span> <span class="n">parse</span> <span class="n">csvFile</span> <span class="s">&quot;(unknown)&quot;</span> <span class="n">input</span>
+</pre></div>
+</div>
+<p>这个程序的行为同上一节中的一样，我们可以通过使用 <code class="docutils literal"><span class="pre">ghci</span></code>
+重新运行上一节中的测试用例来验证，我们会得到完全相同的结果。然而现在的程序更短、可读性更好。你不用花太多时间就能把这段代码翻译成中文描述，当你阅读这段代码时，你将看到：</p>
+<ul class="simple">
+<li>一个 CSV 文件包含0行或者更多行，每一行都是以换行符结尾。</li>
+<li>一行包含一个或者多个单元格（<strong>译者注, sepBy应该是允许0个单元格的</strong>)</li>
+<li>一个单元格包含0个或者更多个字符，这些字符不能是逗号或者换行符</li>
+<li>换行符是&#8217;\n&#8217;</li>
+</ul>
+</div>
+<div class="section" id="id1">
+<h2>选择与错误处理<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>不同操作系统采用不同的字符来表示换行，例如，Unix/Linux 系统中，以及
+Windows 的 text mode 中，简单地用 &#8220;\n&#8221; 来表示。DOS 以及 Windows
+系统，使用 &#8220;\r\n&#8221;，而 Mac 一直采用 &#8220;\r&#8221;。我们还可以添加对 &#8220;\n\r&#8221;
+的支持，因为有些人可能会需要。</p>
+<p>我们可以很容易地修改下上面的代码来适应这些不同的换行符。我们只需要做两处改动，修改下
+<code class="docutils literal"><span class="pre">eol</span></code> 的定义，使它识别不同的换行符，修改下 <code class="docutils literal"><span class="pre">cell</span></code> 函数中的
+<code class="docutils literal"><span class="pre">noneOf</span></code> 的匹配模式，让它忽略 &#8220;\r&#8221;。</p>
+<p>这事做起来得小心些，之前 <code class="docutils literal"><span class="pre">eol</span></code> 的定义就是简单的
+<code class="docutils literal"><span class="pre">char</span> <span class="pre">'\n'</span></code>，而现在我们使用另一个内置的 parser 函数叫做
+<code class="docutils literal"><span class="pre">string</span></code>，它可以匹配一个给定的字符串，我们来考虑下如何用这个函数来增加对
+&#8220;\n\r&#8221; 的支持。</p>
+<p>我们的初次尝试，就像这样：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/csv3.hs</span>
+<span class="c1">-- This function is not correct!</span>
+<span class="nf">eol</span> <span class="ow">=</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;|&gt;</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span>
+</pre></div>
+</div>
+<p>然而上面的例子并不正确，<code class="docutils literal"><span class="pre">&lt;|&gt;</span></code> 操作符总是首先尝试左边的 parser，即
+<code class="docutils literal"><span class="pre">string</span> <span class="pre">&quot;\n&quot;</span></code>， 但是对于 &#8220;\n&#8221; 和 &#8220;\n\r&#8221; 这两种换行符，
+<code class="docutils literal"><span class="pre">string</span> <span class="pre">&quot;\n&quot;</span></code> 都会匹配成功，这可不是我们想要的，不妨在 <code class="docutils literal"><span class="pre">ghci</span></code>
+中尝试一下：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">ParserCombinators</span><span class="o">.</span><span class="kt">Parsec</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">eol</span> <span class="ow">=</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;|&gt;</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">parsec</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="n">eol</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="n">eol</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+</pre></div>
+</div>
+<p>看上去这个 parser
+对与两种换行符都能够正常工作，不过，仅凭上面的结果我们并不能确认这一点。如果
+parser
+留下了一些没有解析的部分，我们也无从知晓，因为我们解析完换行符后没有再试图去消耗剩余输入。所以让我们在换行符后面加一个文件终止符
+<code class="docutils literal"><span class="pre">eof</span></code>，表示我们期望在解析完换行符之后，没有剩余的带解析输入了：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">eol</span> <span class="o">&gt;&gt;</span> <span class="n">eof</span><span class="p">)</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span>
+<span class="kt">Left</span> <span class="p">(</span><span class="n">line</span> <span class="mi">2</span><span class="p">,</span> <span class="n">column</span> <span class="mi">1</span><span class="p">)</span><span class="kt">:</span>
+<span class="nf">unexpected</span> <span class="s">&quot;</span><span class="se">\r</span><span class="s">&quot;</span>
+<span class="nf">expecting</span> <span class="n">end</span> <span class="kr">of</span> <span class="n">input</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">eol</span> <span class="o">&gt;&gt;</span> <span class="n">eof</span><span class="p">)</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>正如预期的那样，当解析 &#8220;\n\r&#8221;
+换行符时出现了错误，所以接下来我们可能会想这样尝试：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/csv4.hs</span>
+<span class="c1">-- This function is not correct!</span>
+<span class="nf">eol</span> <span class="ow">=</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span> <span class="o">&lt;|&gt;</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="n">haskell</span>
+</pre></div>
+</div>
+<p>这也是不对的。回想一下，<code class="docutils literal"><span class="pre">&lt;|&gt;</span></code>
+仅在左侧的选项没有消耗输入时，才会尝试在右边的
+parser。但是，当我们去看在 &#8220;\n&#8221; 后面是不是有一个 &#8220;\r&#8221;
+的时候，我们早就已经消耗掉了一个 &#8220;\n&#8221;，我们会在 parse &#8220;\n&#8221;
+时遇到错误：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">ParserCombinators</span><span class="o">.</span><span class="kt">Parsec</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">eol</span> <span class="ow">=</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span> <span class="o">&lt;|&gt;</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">parsec</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">eol</span> <span class="o">&gt;&gt;</span> <span class="n">eof</span><span class="p">)</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="nb">()</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">eol</span> <span class="o">&gt;&gt;</span> <span class="n">eof</span><span class="p">)</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="kt">Left</span> <span class="p">(</span><span class="n">line</span> <span class="mi">1</span><span class="p">,</span> <span class="n">column</span> <span class="mi">1</span><span class="p">)</span><span class="kt">:</span>
+<span class="nf">unexpected</span> <span class="n">end</span> <span class="kr">of</span> <span class="n">input</span>
+<span class="nf">expecting</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span>
+</pre></div>
+</div>
+<p>We&#8217;ve stumbled upon the lookahead problem. It turns out that, when
+writing parsers, it&#8217;s often very convenient to be able to &#8220;look ahead&#8221;
+at the data that&#8217;s coming in. Parsec supports this, but before showing
+you how to use it, let&#8217;s see how you would have to write this to get
+along without it. You&#8217;d have to manually expand all the options after
+the \n like this:</p>
+<p>我们在超前查看的问题上栽了跟头，看起来，在写 parser
+的时候，能够在数据到来时 “超前查看” 是很有用的。Parsec
+是支持这一特性的，不过在我们展示这一特性的时候，先来看看怎样能够不利用超前查看特性完成这个任务。你必须要自己去考虑
+&#8220;\n&#8221; 之后的所有可能：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/csv5.hs</span>
+<span class="nf">eol</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">char</span> <span class="sc">&#39;</span><span class="se">\n</span><span class="sc">&#39;</span>
+       <span class="n">char</span> <span class="sc">&#39;</span><span class="se">\r</span><span class="sc">&#39;</span> <span class="o">&lt;|&gt;</span> <span class="n">return</span> <span class="sc">&#39;</span><span class="se">\n</span><span class="sc">&#39;</span>
+</pre></div>
+</div>
+<p>这个函数首先寻找 &#8220;\n&#8221;，如果找到了，就去寻找 &#8220;\r&#8221;，如果找到了
+&#8220;\r&#8221;，就消耗掉 &#8220;\r&#8221;。既然 <code class="docutils literal"><span class="pre">char</span> <span class="pre">'\r'</span></code> 的返回类型是
+<code class="docutils literal"><span class="pre">Char</span></code>，那么没有找到 &#8216;\r&#8217; 时的行为就是简单的返回一个 &#8216;Char&#8217;
+而不试图 parse 任何输入。Parsec 有一个内置函数 <code class="docutils literal"><span class="pre">option</span></code>
+可以将这种情况表达为 <code class="docutils literal"><span class="pre">option</span> <span class="pre">'\n'</span> <span class="pre">(char</span> <span class="pre">'\r')</span></code>。我们在 <code class="docutils literal"><span class="pre">ghci</span></code>
+中试一下：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="n">csv5</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">csv5</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">eol</span> <span class="o">&gt;&gt;</span> <span class="n">eof</span><span class="p">)</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">parsec</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Right</span> <span class="nb">()</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">eol</span> <span class="o">&gt;&gt;</span> <span class="n">eof</span><span class="p">)</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>这次结果是对的！不过，利用 Parsec 对 lookahead
+的支持，代码可以更加简洁。</p>
+<div class="section" id="id2">
+<h3>超前查看<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<p>Parsec 有一个内置函数叫做 <code class="docutils literal"><span class="pre">try</span></code> 用来支持超前查看，<code class="docutils literal"><span class="pre">try</span></code> 接受一个
+parser 函数，将它应用到输入。如果这个 parser 没有成功，那么 <code class="docutils literal"><span class="pre">try</span></code>
+表现地就像它不曾消耗任何输入。所以，如果你在 <code class="docutils literal"><span class="pre">&lt;|&gt;</span></code> 的左侧应用
+<code class="docutils literal"><span class="pre">try</span></code>，那么，即使左侧 parser 在失败时会消耗掉一些输入， Parsec
+仍然会去尝试右侧的 parser。<code class="docutils literal"><span class="pre">try</span></code> 只有在 <code class="docutils literal"><span class="pre">&lt;|&gt;</span></code>
+左侧时才会有效。不过，许多函数会在内部使用 <code class="docutils literal"><span class="pre">&lt;|&gt;</span></code>。让我们来用 <code class="docutils literal"><span class="pre">try</span></code>
+扩展对换行符的支持：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/csv6.hs</span>
+<span class="kr">import</span> <span class="nn">Text.ParserCombinators.Parsec</span>
+
+<span class="nf">csvFile</span> <span class="ow">=</span> <span class="n">endBy</span> <span class="n">line</span> <span class="n">eol</span>
+<span class="nf">line</span> <span class="ow">=</span> <span class="n">sepBy</span> <span class="n">cell</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;,&#39;</span><span class="p">)</span>
+<span class="nf">cell</span> <span class="ow">=</span> <span class="n">many</span> <span class="p">(</span><span class="n">noneOf</span> <span class="s">&quot;,</span><span class="se">\n\r</span><span class="s">&quot;</span><span class="p">)</span>
+
+<span class="nf">eol</span> <span class="ow">=</span>   <span class="n">try</span> <span class="p">(</span><span class="n">string</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span><span class="p">)</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">try</span> <span class="p">(</span><span class="n">string</span> <span class="s">&quot;</span><span class="se">\r\n</span><span class="s">&quot;</span><span class="p">)</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\r</span><span class="s">&quot;</span>
+
+<span class="nf">parseCSV</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">ParseError</span> <span class="p">[[</span><span class="kt">String</span><span class="p">]]</span>
+<span class="nf">parseCSV</span> <span class="n">input</span> <span class="ow">=</span> <span class="n">parse</span> <span class="n">csvFile</span> <span class="s">&quot;(unknown)&quot;</span> <span class="n">input</span>
+</pre></div>
+</div>
+<p>这里，我们把两个包含两个字符的换行符放在开头，并且用 <code class="docutils literal"><span class="pre">try</span></code>
+去检查它们。这两个换行符的 parser 都出现在 <code class="docutils literal"><span class="pre">&lt;|&gt;</span></code>
+的左侧，因此不会有什么问题。我们也可以把 <code class="docutils literal"><span class="pre">string</span> <span class="pre">&quot;\n&quot;</span></code> 放到 <code class="docutils literal"><span class="pre">try</span></code>
+中，不过这其实没什么必要，因为它只用检验一个字符，因此当解析失败时不会消耗输入，我们把代码加载进
+<code class="docutils literal"><span class="pre">ghci</span></code> 去看下运行结果：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="n">csv6</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">csv6</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">eol</span> <span class="o">&gt;&gt;</span> <span class="n">eof</span><span class="p">)</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">parsec</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Right</span> <span class="nb">()</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">eol</span> <span class="o">&gt;&gt;</span> <span class="n">eof</span><span class="p">)</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="nb">()</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">eol</span> <span class="o">&gt;&gt;</span> <span class="n">eof</span><span class="p">)</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;</span><span class="se">\r\n</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="nb">()</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parse</span> <span class="p">(</span><span class="n">eol</span> <span class="o">&gt;&gt;</span> <span class="n">eof</span><span class="p">)</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;</span><span class="se">\r</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>四种换行符都能正确的处理，你也可以用不同的换行符来测试完整的 CSV
+parser，就像这样：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseCSV</span> <span class="s">&quot;line1</span><span class="se">\r\n</span><span class="s">line2</span><span class="se">\n</span><span class="s">line3</span><span class="se">\n\r</span><span class="s">line4</span><span class="se">\r</span><span class="s">line5</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="kt">Right</span> <span class="p">[[</span><span class="s">&quot;line1&quot;</span><span class="p">],[</span><span class="s">&quot;line2&quot;</span><span class="p">],[</span><span class="s">&quot;line3&quot;</span><span class="p">],[</span><span class="s">&quot;line4&quot;</span><span class="p">],[</span><span class="s">&quot;line5&quot;</span><span class="p">]]</span>
+</pre></div>
+</div>
+<p>如你所见，现在我们的 parser 支持在单个文件中使用多种换行符啦。</p>
+</div>
+<div class="section" id="id3">
+<h3>错误处理<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h3>
+<p>本章开头，我们已经看到 Parsec
+的报错信息能够列出错误的具体位置以及它期望的输入。可是，当 parser
+变得更加复杂的时候，Parsec 的期望输入列表会变得很复杂。不过 Parsec
+也提供了一套机制让你来在解析失败时自定义出错信息。</p>
+<p>我们来看下现在的 CSV parser 在遇到错误时给出的错误信息：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseCSV</span> <span class="s">&quot;line1&quot;</span>
+<span class="kt">Left</span> <span class="s">&quot;(unknown)&quot;</span> <span class="p">(</span><span class="n">line</span> <span class="mi">1</span><span class="p">,</span> <span class="n">column</span> <span class="mi">6</span><span class="p">)</span><span class="kt">:</span>
+<span class="nf">unexpected</span> <span class="n">end</span> <span class="kr">of</span> <span class="n">input</span>
+<span class="nf">expecting</span> <span class="s">&quot;,&quot;</span><span class="p">,</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span><span class="p">,</span> <span class="s">&quot;</span><span class="se">\r\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span> <span class="n">or</span> <span class="s">&quot;</span><span class="se">\r</span><span class="s"></span>
+</pre></div>
+</div>
+<p>这个报错信息有点长，并且包含了太多的技术细节。我们可以试着用 Monad 中的
+<code class="docutils literal"><span class="pre">fail</span></code> 函数来改善以下：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/csv7.hs</span>
+<span class="nf">eol</span> <span class="ow">=</span>   <span class="n">try</span> <span class="p">(</span><span class="n">string</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span><span class="p">)</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">try</span> <span class="p">(</span><span class="n">string</span> <span class="s">&quot;</span><span class="se">\r\n</span><span class="s">&quot;</span><span class="p">)</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\r</span><span class="s">&quot;</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">fail</span> <span class="s">&quot;Couldn&#39;t find EOL&quot;</span>
+</pre></div>
+</div>
+<p>在 <code class="docutils literal"><span class="pre">ghci</span></code> 中测试，结果如下：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="n">csv7</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">csv7</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseCSV</span> <span class="s">&quot;line1&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">parsec</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Left</span> <span class="s">&quot;(unknown)&quot;</span> <span class="p">(</span><span class="n">line</span> <span class="mi">1</span><span class="p">,</span> <span class="n">column</span> <span class="mi">6</span><span class="p">)</span><span class="kt">:</span>
+<span class="nf">unexpected</span> <span class="n">end</span> <span class="kr">of</span> <span class="n">input</span>
+<span class="nf">expecting</span> <span class="s">&quot;,&quot;</span><span class="p">,</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span><span class="p">,</span> <span class="s">&quot;</span><span class="se">\r\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span> <span class="n">or</span> <span class="s">&quot;</span><span class="se">\r</span><span class="s">&quot;</span>
+<span class="kt">Couldn&#39;t</span> <span class="n">find</span> <span class="kt">EOL</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">fail</span></code> 函数把 &#8220;Couldn&#8217;t find EOL&#8221;
+追加到了原有的错误信息后面，而不是替换掉了原有的错误信息。Parsec
+有一个内置的 <code class="docutils literal"><span class="pre">&lt;?&gt;</span></code> 操作符专门针对后一种需求。它跟 <code class="docutils literal"><span class="pre">&lt;|&gt;</span></code>
+操作符很像，首先尝试操作符左边的 parser，
+不过，左边解析失败时并不是去尝试另一个
+parser，而是呈现一段错误信息。下面是它的使用方法：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/csv8.hs</span>
+<span class="nf">eol</span> <span class="ow">=</span>   <span class="n">try</span> <span class="p">(</span><span class="n">string</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span><span class="p">)</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">try</span> <span class="p">(</span><span class="n">string</span> <span class="s">&quot;</span><span class="se">\r\n</span><span class="s">&quot;</span><span class="p">)</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\r</span><span class="s">&quot;</span>
+    <span class="o">&lt;?&gt;</span> <span class="s">&quot;end of line&quot;</span>
+</pre></div>
+</div>
+<p>现在，当你 parse 失败时，你会得到更有用的错误信息：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="n">csv8</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">csv8</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseCSV</span> <span class="s">&quot;line1&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">parsec</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Left</span> <span class="s">&quot;(unknown)&quot;</span> <span class="p">(</span><span class="n">line</span> <span class="mi">1</span><span class="p">,</span> <span class="n">column</span> <span class="mi">6</span><span class="p">)</span><span class="kt">:</span>
+<span class="nf">unexpected</span> <span class="n">end</span> <span class="kr">of</span> <span class="n">input</span>
+<span class="nf">expecting</span> <span class="s">&quot;,&quot;</span> <span class="n">or</span> <span class="n">end</span> <span class="kr">of</span> <span class="n">line</span>
+</pre></div>
+</div>
+<p>现在报错信息很有用！通常来说，你需要在 <code class="docutils literal"><span class="pre">&lt;?&gt;</span></code>
+右侧放上可读性较好的报错信息。</p>
+</div>
+</div>
+<div class="section" id="csv-parser">
+<h2>完整的 CSV parser<a class="headerlink" href="#csv-parser" title="Permalink to this headline">¶</a></h2>
+<p>上面的 CSV parser
+的例子有一个很严重的问题：它无法处理单元格中包含逗号的情况。CSV
+生成程序通常会把包含逗号的单元格用引号引起。但这又产生了新问题：如果单元格中同时包含引号和逗号怎么办？在这种情况下，用两个引号来表示单元格中的一个引号。</p>
+<p>下面是一个完整的 CSV parser，你可以在 <code class="docutils literal"><span class="pre">ghci</span></code>
+中使用它，或者把它编译成独立的程序，它会解析从标准输入读取的 CSV
+文件内容， 并把它转化成另一格式的输出。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/csv9.hs</span>
+<span class="kr">import</span> <span class="nn">Text.ParserCombinators.Parsec</span>
+
+<span class="nf">csvFile</span> <span class="ow">=</span> <span class="n">endBy</span> <span class="n">line</span> <span class="n">eol</span>
+<span class="nf">line</span> <span class="ow">=</span> <span class="n">sepBy</span> <span class="n">cell</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;,&#39;</span><span class="p">)</span>
+<span class="nf">cell</span> <span class="ow">=</span> <span class="n">quotedCell</span> <span class="o">&lt;|&gt;</span> <span class="n">many</span> <span class="p">(</span><span class="n">noneOf</span> <span class="s">&quot;,</span><span class="se">\n\r</span><span class="s">&quot;</span><span class="p">)</span>
+
+<span class="nf">quotedCell</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">char</span> <span class="sc">&#39;&quot;&#39;</span>
+       <span class="n">content</span> <span class="ow">&lt;-</span> <span class="n">many</span> <span class="n">quotedChar</span>
+       <span class="n">char</span> <span class="sc">&#39;&quot;&#39;</span> <span class="o">&lt;?&gt;</span> <span class="s">&quot;quote at end of cell&quot;</span>
+       <span class="n">return</span> <span class="n">content</span>
+
+<span class="nf">quotedChar</span> <span class="ow">=</span>
+        <span class="n">noneOf</span> <span class="s">&quot;</span><span class="se">\&quot;</span><span class="s">&quot;</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">try</span> <span class="p">(</span><span class="n">string</span> <span class="s">&quot;</span><span class="se">\&quot;\&quot;</span><span class="s">&quot;</span> <span class="o">&gt;&gt;</span> <span class="n">return</span> <span class="sc">&#39;&quot;&#39;</span><span class="p">)</span>
+
+<span class="nf">eol</span> <span class="ow">=</span>   <span class="n">try</span> <span class="p">(</span><span class="n">string</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span><span class="p">)</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">try</span> <span class="p">(</span><span class="n">string</span> <span class="s">&quot;</span><span class="se">\r\n</span><span class="s">&quot;</span><span class="p">)</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+    <span class="o">&lt;|&gt;</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\r</span><span class="s">&quot;</span>
+    <span class="o">&lt;?&gt;</span> <span class="s">&quot;end of line&quot;</span>
+
+<span class="nf">parseCSV</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">ParseError</span> <span class="p">[[</span><span class="kt">String</span><span class="p">]]</span>
+<span class="nf">parseCSV</span> <span class="n">input</span> <span class="ow">=</span> <span class="n">parse</span> <span class="n">csvFile</span> <span class="s">&quot;(unknown)&quot;</span> <span class="n">input</span>
+
+<span class="nf">main</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">c</span> <span class="ow">&lt;-</span> <span class="n">getContents</span>
+       <span class="kr">case</span> <span class="n">parse</span> <span class="n">csvFile</span> <span class="s">&quot;(stdin)&quot;</span> <span class="n">c</span> <span class="kr">of</span>
+            <span class="kt">Left</span> <span class="n">e</span> <span class="ow">-&gt;</span> <span class="kr">do</span> <span class="n">putStrLn</span> <span class="s">&quot;Error parsing input:&quot;</span>
+                         <span class="n">print</span> <span class="n">e</span>
+            <span class="kt">Right</span> <span class="n">r</span> <span class="ow">-&gt;</span> <span class="n">mapM_</span> <span class="n">print</span> <span class="n">r</span>
+</pre></div>
+</div>
+<p>这是一个完整的 CSV parser，parser 部分只有21行代码，外加10行代码用来写
+<code class="docutils literal"><span class="pre">parseCSV</span></code> 和 <code class="docutils literal"><span class="pre">main</span></code> 这两个函数。</p>
+<p>我们来分析以下这个程序跟上一版本的区别。首先，一个单元格可能是一个普通的单元格或者是一个“引用”的单元格。在这两个选项中，我们首先用
+<code class="docutils literal"><span class="pre">quotedCell</span></code>
+来检查单元格是否是引用单元格，因为这可以通过检查单元格第一个字符是否是引号来实现。（译注：这样可以通过第一个字符判定单元格类型，从而避免使用
+<code class="docutils literal"><span class="pre">try</span></code>）。</p>
+<p><code class="docutils literal"><span class="pre">quotedCell</span></code>
+由引用标志双引号开始和结束，其中包含零到多个字符。不过我们不能直接获取这些字符，因为其中可能包含嵌在单元格内容之中的双引号，此时是用两个双引号表示一个嵌入双引号。所以我们定义函数
+<code class="docutils literal"><span class="pre">quotedChar</span></code> 来处理 <code class="docutils literal"><span class="pre">quotedCell</span></code> 中的内容。</p>
+<p>当我们处理一个引用单元格内的字符时，我们先考虑
+<code class="docutils literal"><span class="pre">noneOf</span> <span class="pre">&quot;\&quot;&quot;</span></code>，这将会匹配并返回所有的非引号字符。而如果我们遇到了引号，我们就检查它是不是两个连续的引号，如果是，就返回一个双引号，否则报错。</p>
+<p>注意到在 <code class="docutils literal"><span class="pre">quotedChar</span></code> 中，<code class="docutils literal"><span class="pre">try</span></code> 是出现在 <code class="docutils literal"><span class="pre">&lt;|&gt;</span></code>
+的右侧的。而我们之前提过，<code class="docutils literal"><span class="pre">try</span></code> 只有当它出现再 <code class="docutils literal"><span class="pre">&lt;|&gt;</span></code>
+的左侧时才会有效。事实上，这个 <code class="docutils literal"><span class="pre">try</span></code> 确实是出现在 <code class="docutils literal"><span class="pre">&lt;|&gt;</span></code>
+的左侧的，不过是出现在 <code class="docutils literal"><span class="pre">many</span></code> 的实现中包含的
+<code class="docutils literal"><span class="pre">&lt;|&gt;</span></code>的左侧。（译注：虽然在 <code class="docutils literal"><span class="pre">quotedChar</span></code> 中，<code class="docutils literal"><span class="pre">try</span></code> 出现在
+<code class="docutils literal"><span class="pre">&lt;|&gt;</span></code> 的右侧，但是当使用 <code class="docutils literal"><span class="pre">many</span> <span class="pre">quotedChar</span></code> 时，<code class="docutils literal"><span class="pre">many</span></code> 的实现使得
+<code class="docutils literal"><span class="pre">try</span></code> 会出现在其内部的 <code class="docutils literal"><span class="pre">&lt;|&gt;</span></code> 的左侧。）</p>
+<p><code class="docutils literal"><span class="pre">try</span></code>
+的使用在这里是很重要的。假如我们在解析一个引用单元格，并且这个单元格快要解析完了，在这个单元格后面还有下一个单元格。那么，在当前单元格的结尾，我们会看到一个引号，接着是一个逗号。当
+parse 到单元格结尾时，调用 <code class="docutils literal"><span class="pre">quotedChar</span></code> 时，首先，<code class="docutils literal"><span class="pre">noneOf</span></code>
+的测试会失败，接着会进行寻找两个连续引号的测试，这个测试也会失败，因为我们看到的是一个引号和一个逗号。如果我们不使用
+<code class="docutils literal"><span class="pre">try</span></code>，parser
+会在看到一个引号之后，期望下一个引号，而且此时第一个引号已经被 parser
+给消耗掉了。如果我们使用了
+<code class="docutils literal"><span class="pre">try</span></code>，那么这种情况就会被正确的识别为不是单元格的内容，所以
+<code class="docutils literal"><span class="pre">many</span> <span class="pre">quotedChar</span></code> 就会终止。于是,
+超前查看又一次被证明是十分有用的，并且因为它用起来十分简单，它已经成为
+Parsec 中十分引人注目的工具。</p>
+<p>我们可以在 <code class="docutils literal"><span class="pre">ghci</span></code> 中用引用单元格来测试这个程序：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="n">csv9</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">csv9</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseCSV</span> <span class="s">&quot;</span><span class="se">\&quot;</span><span class="s">This, is, one, big, cell</span><span class="se">\&quot;\n</span><span class="s">&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">parsec</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Right</span> <span class="p">[[</span><span class="s">&quot;This, is, one, big, cell&quot;</span><span class="p">]]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseCSV</span> <span class="s">&quot;</span><span class="se">\&quot;</span><span class="s">Cell without an end</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="kt">Left</span> <span class="s">&quot;(unknown)&quot;</span> <span class="p">(</span><span class="n">line</span> <span class="mi">2</span><span class="p">,</span> <span class="n">column</span> <span class="mi">1</span><span class="p">)</span><span class="kt">:</span>
+<span class="nf">unexpected</span> <span class="n">end</span> <span class="kr">of</span> <span class="n">input</span>
+<span class="nf">expecting</span> <span class="s">&quot;</span><span class="se">\&quot;\&quot;</span><span class="s">&quot;</span> <span class="n">or</span> <span class="n">quote</span> <span class="n">at</span> <span class="n">end</span> <span class="kr">of</span> <span class="n">cell</span>
+</pre></div>
+</div>
+<p>我们来试一下真正的 CSV 文件，下面是一个电子表格程序生成的文件内容：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="s">&quot;Product&quot;</span><span class="p">,</span><span class="s">&quot;Price&quot;</span>
+<span class="s">&quot;O&#39;Reilly Socks&quot;</span><span class="p">,</span><span class="mi">10</span>
+<span class="s">&quot;Shirt with &quot;&quot;Haskell&quot;&quot; text&quot;</span><span class="p">,</span><span class="mi">20</span>
+<span class="s">&quot;Shirt, &quot;&quot;O&#39;Reilly&quot;&quot; version&quot;</span><span class="p">,</span><span class="mi">20</span>
+<span class="s">&quot;Haskell Caps&quot;</span><span class="p">,</span><span class="mi">15</span>
+</pre></div>
+</div>
+<p>现在，我们用这个文件来测试下我们的程序：</p>
+<div class="code bash highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">runhaskell</span> <span class="n">csv9</span><span class="o">.</span><span class="n">hs</span> <span class="o">&lt;</span> <span class="n">test</span><span class="o">.</span><span class="n">csv</span>
+<span class="p">[</span><span class="s">&quot;Product&quot;</span><span class="p">,</span><span class="s">&quot;Price&quot;</span><span class="p">]</span>
+<span class="p">[</span><span class="s">&quot;O&#39;Reilly Socks&quot;</span><span class="p">,</span><span class="s">&quot;10&quot;</span><span class="p">]</span>
+<span class="p">[</span><span class="s">&quot;Shirt with </span><span class="se">\&quot;</span><span class="s">Haskell</span><span class="se">\&quot;</span><span class="s"> text&quot;</span><span class="p">,</span><span class="s">&quot;20&quot;</span><span class="p">]</span>
+<span class="p">[</span><span class="s">&quot;Shirt, </span><span class="se">\&quot;</span><span class="s">O&#39;Reilly</span><span class="se">\&quot;</span><span class="s"> version&quot;</span><span class="p">,</span><span class="s">&quot;20&quot;</span><span class="p">]</span>
+<span class="p">[</span><span class="s">&quot;Haskell Caps&quot;</span><span class="p">,</span><span class="s">&quot;15&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="parsec-monadplus">
+<h2>Parsec 与 MonadPlus<a class="headerlink" href="#parsec-monadplus" title="Permalink to this headline">¶</a></h2>
+<p>我们在 <a class="reference external" href="http://book.realworldhaskell.org/read/programming-with-monads.html#monadcase.monadplus">&#8220;Looking for
+alternatives&#8221;</a>
+一节介绍过 <code class="docutils literal"><span class="pre">MonadPlus</span></code>，Parsec 的 <code class="docutils literal"><span class="pre">Genparser</span></code> moand 是
+<code class="docutils literal"><span class="pre">MonadPlus</span></code> 类型类的一个实例。<code class="docutils literal"><span class="pre">mzero</span></code> 代表 parse 失败，而
+<code class="docutils literal"><span class="pre">mplus</span></code> 则使用 <code class="docutils literal"><span class="pre">(&lt;|&gt;)</span></code> 把两个 parser 组合成一个。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/ParsecPlus.hs</span>
+<span class="kr">instance</span> <span class="kt">MonadPlus</span> <span class="p">(</span><span class="kt">GenParser</span> <span class="n">tok</span> <span class="n">st</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">mzero</span> <span class="ow">=</span> <span class="n">fail</span> <span class="s">&quot;mzero&quot;</span>
+    <span class="n">mplus</span> <span class="ow">=</span> <span class="p">(</span><span class="o">&lt;|&gt;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="url">
+<h2>解析 URL 编码查询字符串<a class="headerlink" href="#url" title="Permalink to this headline">¶</a></h2>
+<p>当我们在 <a class="reference external" href="http://book.realworldhaskell.org/read/programming-with-monads.html#monadcase.urlencoded">&#8220;Golfing practice: association
+lists&#8221;</a>
+一节提到 <code class="docutils literal"><span class="pre">application/x-www-form-urlencoded</span></code>
+文本时，我们曾说过之后会为它写一个 parser，现在，我们可以用 Parsec
+轻易的实现。</p>
+<p>每个键-值对由 <code class="docutils literal"><span class="pre">&amp;</span></code> 字符分隔。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/FormParse.hs</span>
+<span class="nf">p_query</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="p">[(</span><span class="kt">String</span><span class="p">,</span> <span class="kt">Maybe</span> <span class="kt">String</span><span class="p">)]</span>
+<span class="nf">p_query</span> <span class="ow">=</span> <span class="n">p_pair</span> <span class="p">`</span><span class="n">sepBy</span><span class="p">`</span> <span class="n">char</span> <span class="sc">&#39;&amp;&#39;</span>
+</pre></div>
+</div>
+<p>注意上面函数的类型签名，我们使用 <code class="docutils literal"><span class="pre">Maybe</span></code> 来表示一个值：因为 HTTP
+标准中并没有规定一个键必定有一个与之对应的值。我们希望能够区分“没有值”和“空值”。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/FormParse.hs</span>
+<span class="nf">p_pair</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">String</span><span class="p">,</span> <span class="kt">Maybe</span> <span class="kt">String</span><span class="p">)</span>
+<span class="nf">p_pair</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">name</span> <span class="ow">&lt;-</span> <span class="n">many1</span> <span class="n">p_char</span>
+  <span class="n">value</span> <span class="ow">&lt;-</span> <span class="n">optionMaybe</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;=&#39;</span> <span class="o">&gt;&gt;</span> <span class="n">many</span> <span class="n">p_char</span><span class="p">)</span>
+  <span class="n">return</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">many1</span></code> 的功能类似与 <code class="docutils literal"><span class="pre">many</span></code>：它反复应用一个 parser，返回 parse
+的结果列表。不过，当 parser 从未成功时，<code class="docutils literal"><span class="pre">many</span></code> 会返回空列表，而
+<code class="docutils literal"><span class="pre">many1</span></code> 则会失败，也就是说， <code class="docutils literal"><span class="pre">many1</span></code> 会返回至少包含一个元素的列表。</p>
+<p><code class="docutils literal"><span class="pre">optionMaybe</span></code> 函数接受一个 parser 作为参数，并修改它的行为，当该
+parser 解析失败时， <code class="docutils literal"><span class="pre">optionMaybe</span></code> 返回 <code class="docutils literal"><span class="pre">Nothing</span></code>，成功时，则把
+parser 的返回结果用 <code class="docutils literal"><span class="pre">Just</span></code> 封装。这就让我们能够区分“没有值”和“空值”。</p>
+<p>译注：，对于 <code class="docutils literal"><span class="pre">optionMaybe</span></code>，parser 失败时并不一定是返回
+<code class="docutils literal"><span class="pre">Nothing</span></code>，跟 <code class="docutils literal"><span class="pre">(&lt;|&gt;)</span></code> 类似，只有当 <code class="docutils literal"><span class="pre">optionMaybe</span></code> 的 parser parse
+失败，并且没有消耗任何输入时，才会返回
+<code class="docutils literal"><span class="pre">Nothing</span></code>，否则，仍然是失败，如下列代码所示：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">ParserCombinators</span><span class="o">.</span><span class="kt">Parsec</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">p</span> <span class="ow">=</span> <span class="n">string</span> <span class="s">&quot;html&quot;</span> <span class="ow">::</span> <span class="kt">Parser</span> <span class="kt">String</span>
+<span class="kt">Prelude</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">ParserCombinators</span><span class="o">.</span><span class="kt">Parsec</span><span class="o">&gt;</span> <span class="n">parseTest</span> <span class="n">p</span> <span class="s">&quot;html&quot;</span>
+<span class="s">&quot;html&quot;</span>
+<span class="kt">Prelude</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">ParserCombinators</span><span class="o">.</span><span class="kt">Parsec</span><span class="o">&gt;</span> <span class="n">parseTest</span> <span class="n">p</span> <span class="s">&quot;http&quot;</span>
+<span class="nf">parse</span> <span class="ne">error</span> <span class="n">at</span> <span class="p">(</span><span class="n">line</span> <span class="mi">1</span><span class="p">,</span> <span class="n">column</span> <span class="mi">1</span><span class="p">)</span><span class="kt">:</span>
+<span class="nf">unexpected</span> <span class="s">&quot;t&quot;</span>
+<span class="nf">expecting</span> <span class="s">&quot;html&quot;</span>
+<span class="kt">Prelude</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">ParserCombinators</span><span class="o">.</span><span class="kt">Parsec</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">f</span> <span class="ow">=</span> <span class="n">optionMaybe</span> <span class="n">p</span>
+<span class="kt">Prelude</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">ParserCombinators</span><span class="o">.</span><span class="kt">Parsec</span><span class="o">&gt;</span> <span class="n">parseTest</span> <span class="n">f</span> <span class="s">&quot;http&quot;</span>
+<span class="nf">parse</span> <span class="ne">error</span> <span class="n">at</span> <span class="p">(</span><span class="n">line</span> <span class="mi">1</span><span class="p">,</span> <span class="n">column</span> <span class="mi">1</span><span class="p">)</span><span class="kt">:</span>
+<span class="nf">unexpected</span> <span class="s">&quot;t&quot;</span>
+<span class="nf">expecting</span> <span class="s">&quot;html&quot;</span>
+<span class="kt">Prelude</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">ParserCombinators</span><span class="o">.</span><span class="kt">Parsec</span><span class="o">&gt;</span> <span class="n">parseTest</span> <span class="n">f</span> <span class="s">&quot;php&quot;</span>
+<span class="kt">Nothing</span>
+<span class="kt">Prelude</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">ParserCombinators</span><span class="o">.</span><span class="kt">Parsec</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>单独的字符可以以如下集中方式编码</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/FormParse.hs</span>
+<span class="kr">import</span> <span class="nn">Numeric</span>
+<span class="nf">p_char</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="kt">Char</span>
+<span class="nf">p_char</span> <span class="ow">=</span> <span class="n">oneOf</span> <span class="n">urlBaseChars</span>
+     <span class="o">&lt;|&gt;</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;+&#39;</span> <span class="o">&gt;&gt;</span> <span class="n">return</span> <span class="sc">&#39; &#39;</span><span class="p">)</span>
+     <span class="o">&lt;|&gt;</span> <span class="n">p_hex</span>
+
+<span class="nf">urlBaseChars</span> <span class="ow">=</span> <span class="p">[</span><span class="sc">&#39;a&#39;</span><span class="o">..</span><span class="sc">&#39;z&#39;</span><span class="p">]</span><span class="o">++</span><span class="p">[</span><span class="sc">&#39;A&#39;</span><span class="o">..</span><span class="sc">&#39;Z&#39;</span><span class="p">]</span><span class="o">++</span><span class="p">[</span><span class="sc">&#39;0&#39;</span><span class="o">..</span><span class="sc">&#39;9&#39;</span><span class="p">]</span><span class="o">++</span><span class="s">&quot;$-_.!*&#39;(),&quot;</span>
+
+<span class="nf">p_hex</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="kt">Char</span>
+<span class="nf">p_hex</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">char</span> <span class="sc">&#39;%&#39;</span>
+  <span class="n">a</span> <span class="ow">&lt;-</span> <span class="n">hexDigit</span>
+  <span class="n">b</span> <span class="ow">&lt;-</span> <span class="n">hexDigit</span>
+  <span class="kr">let</span> <span class="p">((</span><span class="n">d</span><span class="p">,</span> <span class="kr">_</span><span class="p">)</span><span class="kt">:</span><span class="kr">_</span><span class="p">)</span> <span class="ow">=</span> <span class="n">readHex</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">]</span>
+  <span class="n">return</span> <span class="o">.</span> <span class="n">toEnum</span> <span class="o">$</span> <span class="n">d</span>
+</pre></div>
+</div>
+<p>有些字符可以直接表示。空格需要单独表示，空格用字符 <code class="docutils literal"><span class="pre">+</span></code>
+来表示，其他字符则用一个 <code class="docutils literal"><span class="pre">%</span></code> 外加两个16进制数字来表示，<code class="docutils literal"><span class="pre">Numeric</span></code>
+模块中的 <code class="docutils literal"><span class="pre">readHex</span></code> 函数可以把一个16进制字符串解析为一个数字。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseTest</span> <span class="n">p_query</span> <span class="s">&quot;foo=bar&amp;a%21=b+c&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">parsec</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="p">[(</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="kt">Just</span> <span class="s">&quot;bar&quot;</span><span class="p">),(</span><span class="s">&quot;a!&quot;</span><span class="p">,</span><span class="kt">Just</span> <span class="s">&quot;b c&quot;</span><span class="p">)]</span>
+</pre></div>
+</div>
+<p>As appealing and readable as this parser is, we can profit from stepping
+back and taking another look at some of our building blocks.</p>
+</div>
+<div class="section" id="parsec-parse">
+<h2>用 Parsec 代替正则表达式来进行临时的 parse<a class="headerlink" href="#parsec-parse" title="Permalink to this headline">¶</a></h2>
+<p>在很多流行的语言中，程序员喜欢用正则表达式来进行“临时的”解析工作，不过，正则表达式既难写，又难调试，如果代码写完后几个月不管，就几乎无法理解，并且失败时没有报错信息。</p>
+<p>如果我们用 Parsec 编写紧凑的
+parser，我们的代码将拥有可读性、表现力以及有用的报错信息。虽然用 Parsec
+编写的代码可能会比正则表达式更长，不过也不会长太多，大抵能够抵消正则表达式的许多诱惑了。</p>
+</div>
+<div class="section" id="id4">
+<h2>解析时不用变量<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
+<p>上面的一些 parser 使用了 <code class="docutils literal"><span class="pre">do</span></code>
+标记语法，把一些中间的解析结果绑定到变量，以便过后使用，比如说，
+<code class="docutils literal"><span class="pre">p_pair</span></code>。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/FormParse.hs</span>
+<span class="nf">p_pair</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">String</span><span class="p">,</span> <span class="kt">Maybe</span> <span class="kt">String</span><span class="p">)</span>
+<span class="nf">p_pair</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">name</span> <span class="ow">&lt;-</span> <span class="n">many1</span> <span class="n">p_char</span>
+  <span class="n">value</span> <span class="ow">&lt;-</span> <span class="n">optionMaybe</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;=&#39;</span> <span class="o">&gt;&gt;</span> <span class="n">many</span> <span class="n">p_char</span><span class="p">)</span>
+  <span class="n">return</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>我们可以使用 <code class="docutils literal"><span class="pre">Control.Monad</span></code> 模块中的 <code class="docutils literal"><span class="pre">liftM2</span></code>
+函数，不使用变量来完成上面的工作：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/FormParse.hs</span>
+<span class="nf">p_pair_app1</span> <span class="ow">=</span>
+    <span class="n">liftM2</span> <span class="p">(,)</span> <span class="p">(</span><span class="n">many1</span> <span class="n">p_char</span><span class="p">)</span> <span class="p">(</span><span class="n">optionMaybe</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;=&#39;</span> <span class="o">&gt;&gt;</span> <span class="n">many</span> <span class="n">p_char</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>这个函数跟 <code class="docutils literal"><span class="pre">p_pair</span></code>
+有相同的类型与行为，不过它只有一行。在这里，我们不使用“过程式”的风格来写
+parser，而是更加强调应用 parser 以及 parser 的组合。</p>
+<p>这种（无变量的）风格称为 applicative 风格，我们可以在编写 applicative
+风格 parser
+的路上走的更远一些。大多数情况下，除了刚开始要理解这种风格需要一点最初的努力之外，applicative
+风格带来的代码紧凑型并不会牺牲代码的可读性。</p>
+</div>
+<div class="section" id="applicative-functor-parse">
+<h2>使用 Applicative Functor 进行 parse<a class="headerlink" href="#applicative-functor-parse" title="Permalink to this headline">¶</a></h2>
+<p>Haskell 标准库中包含一个叫做 <code class="docutils literal"><span class="pre">Control.Applicative</span></code> 的模块，我们已经在
+<a class="reference external" href="http://book.realworldhaskell.org/read/code-case-study-parsing-a-binary-data-format.html#binary.fmap">&#8220;Infix use of
+fmap&#8221;</a>
+一节见识过了。这个模块定义了一个叫做 <code class="docutils literal"><span class="pre">Applicative</span></code>
+的类型类，它表示一个 <em>Applicative Functor</em>，Applicative Functor
+在结构化方面比 <code class="docutils literal"><span class="pre">Functor</span></code> 更强，不过比 <code class="docutils literal"><span class="pre">Monad</span></code>
+稍弱。<code class="docutils literal"><span class="pre">Control.Applicative</span></code> 模块也定义了 <code class="docutils literal"><span class="pre">Alternative</span></code>
+类型类，它跟 <code class="docutils literal"><span class="pre">MonadPlus</span></code> 很相似。</p>
+<p>像往常一样，我们认为理解 Applicative Functor
+的最好的方式通过使用它们来讲解。从理论上讲，每个 Monad 都是一个
+Applicative functor，但不是每一个 Applicative Functor 都是一个
+Monad。由于 Applicative Functor 是在 Monad
+之后很久才加入标准库，我们常常不能免费获得一个 <code class="docutils literal"><span class="pre">Applicative</span></code>
+实例，我们常常需要自己把正在使用的 Monad 声明为 <code class="docutils literal"><span class="pre">Applicative</span></code>。</p>
+<p>译注： 至少在我用的 GHC 7.8.1/GHC 7.10 里，<code class="docutils literal"><span class="pre">Parser</span></code> 已经是
+<code class="docutils literal"><span class="pre">Applicative</span></code>了。不需要自己实现。而且，在 GHC 7.10 中，每一个
+<code class="docutils literal"><span class="pre">Monad</span></code> 都会强制要求声明为 <code class="docutils literal"><span class="pre">Applicative</span></code>，不过又据说 GHC 7.12
+可能会取消这一限制。</p>
+<p>要在 Parsec 中做到这一点，我们将写一个小模块来将 Parsec 实现为
+<code class="docutils literal"><span class="pre">Applicative</span></code>，然后我们导入这个模块，而不是通常的 Parsec 模块。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/ApplicativeParsec.hs</span>
+<span class="kr">module</span> <span class="nn">ApplicativeParsec</span>
+    <span class="p">(</span>
+      <span class="nf">module</span> <span class="kt">Control</span><span class="o">.</span><span class="kt">Applicative</span>
+    <span class="p">,</span> <span class="nf">module</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">ParserCombinators</span><span class="o">.</span><span class="kt">Parsec</span>
+    <span class="p">)</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">Control.Applicative</span>
+<span class="kr">import</span> <span class="nn">Control.Monad</span> <span class="p">(</span><span class="kt">MonadPlus</span><span class="p">(</span><span class="o">..</span><span class="p">),</span> <span class="nf">ap</span><span class="p">)</span>
+<span class="c1">-- Hide a few names that are provided by Applicative.</span>
+<span class="kr">import</span> <span class="nn">Text.ParserCombinators.Parsec</span> <span class="k">hiding</span> <span class="p">(</span><span class="nf">many</span><span class="p">,</span> <span class="nf">optional</span><span class="p">,</span> <span class="p">(</span><span class="o">&lt;|&gt;</span><span class="p">))</span>
+
+<span class="c1">-- The Applicative instance for every Monad looks like this.</span>
+<span class="kr">instance</span> <span class="kt">Applicative</span> <span class="p">(</span><span class="kt">GenParser</span> <span class="n">s</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">pure</span>  <span class="ow">=</span> <span class="n">return</span>
+    <span class="p">(</span><span class="o">&lt;*&gt;</span><span class="p">)</span> <span class="ow">=</span> <span class="n">ap</span>
+
+<span class="c1">-- The Alternative instance for every MonadPlus looks like this.</span>
+<span class="kr">instance</span> <span class="kt">Alternative</span> <span class="p">(</span><span class="kt">GenParser</span> <span class="n">s</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">empty</span> <span class="ow">=</span> <span class="n">mzero</span>
+    <span class="p">(</span><span class="o">&lt;|&gt;</span><span class="p">)</span> <span class="ow">=</span> <span class="n">mplus</span>
+</pre></div>
+</div>
+<p>为了方便起见，我们自己的模块导出了我们从 <code class="docutils literal"><span class="pre">Applicative</span></code> 和 <code class="docutils literal"><span class="pre">Parsec</span></code>
+模块中导入的所有变量与函数名。因为我们隐藏了 Parsec 的
+<code class="docutils literal"><span class="pre">(&lt;|&gt;)</span></code>，我们导入这个自己定义的模块后，使用的 <code class="docutils literal"><span class="pre">(&lt;|&gt;)</span></code> 将会是从
+<code class="docutils literal"><span class="pre">Control.Applicative</span></code> 模块中导入的。</p>
+</div>
+<div class="section" id="applicative-parse">
+<h2>举例：使用 Applicative 进行 parse<a class="headerlink" href="#applicative-parse" title="Permalink to this headline">¶</a></h2>
+<p>我们将自底向上的改写上面的表单 parser，首先从 <code class="docutils literal"><span class="pre">p_hex</span></code>
+开始，<code class="docutils literal"><span class="pre">p_hex</span></code> 解析一个16进制转义字符序列。下面是使用 do-notation
+风格的代码：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/FormApp.hs</span>
+<span class="nf">p_hex</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="kt">Char</span>
+<span class="nf">p_hex</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">char</span> <span class="sc">&#39;%&#39;</span>
+  <span class="n">a</span> <span class="ow">&lt;-</span> <span class="n">hexDigit</span>
+  <span class="n">b</span> <span class="ow">&lt;-</span> <span class="n">hexDigit</span>
+  <span class="kr">let</span> <span class="p">((</span><span class="n">d</span><span class="p">,</span> <span class="kr">_</span><span class="p">)</span><span class="kt">:</span><span class="kr">_</span><span class="p">)</span> <span class="ow">=</span> <span class="n">readHex</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">]</span>
+  <span class="n">return</span> <span class="o">.</span> <span class="n">toEnum</span> <span class="o">$</span> <span class="n">d</span>
+</pre></div>
+</div>
+<p>而下面是 applicative 风格的代码：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/FormApp.hs</span>
+<span class="nf">a_hex</span> <span class="ow">=</span> <span class="n">hexify</span> <span class="o">&lt;$&gt;</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;%&#39;</span> <span class="o">*&gt;</span> <span class="n">hexDigit</span><span class="p">)</span> <span class="o">&lt;*&gt;</span> <span class="n">hexDigit</span>
+    <span class="kr">where</span> <span class="n">hexify</span> <span class="n">a</span> <span class="n">b</span> <span class="ow">=</span> <span class="n">toEnum</span> <span class="o">.</span> <span class="n">fst</span> <span class="o">.</span> <span class="n">head</span> <span class="o">.</span> <span class="n">readHex</span> <span class="o">$</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>虽然单独的 parser 并没有改变，仍然是 <code class="docutils literal"><span class="pre">char</span> <span class="pre">'%'</span></code> 与两个
+<code class="docutils literal"><span class="pre">hexDigit</span></code>，把它们组合在一起的组合子却发生了变化。其中，目前我们唯一熟悉的一个就是
+<code class="docutils literal"><span class="pre">(&lt;$&gt;)</span></code>，我们已经知道，它不过是 <code class="docutils literal"><span class="pre">fmap</span></code> 的同义词。</p>
+<p>从我们对 <code class="docutils literal"><span class="pre">GenParser</span></code> 的 <code class="docutils literal"><span class="pre">Applicative</span></code> 实例的实现中，我们知道
+<code class="docutils literal"><span class="pre">(&lt;*&gt;)</span></code> 就是 <code class="docutils literal"><span class="pre">ap</span></code></p>
+<p>剩下的我们不熟悉的组合子是 <code class="docutils literal"><span class="pre">(*&gt;)</span></code>，它接受两个 parser
+作为参数，首先应用第一个
+parser，但是忽略其返回结果，而只用作消耗输入，然后应用第二个
+parser，并返回其结果。换句话说，它很像 <code class="docutils literal"><span class="pre">(&gt;&gt;)</span></code>。</p>
+<blockquote>
+<div><p>关于尖括号的一个小提示（此处应该是 Real World Haskell 中的 Notes）</p>
+<p>我们继续之前，记住这些从 <code class="docutils literal"><span class="pre">Control.Applicative</span></code>
+中导入的尖括号表示的组合子是在干什么是很有用的：如果一个尖括号指向某个方向，那么它就是返回这个方向的参数的结果。</p>
+<p>例如，<code class="docutils literal"><span class="pre">(*&gt;)</span></code> 返回其右侧参数的结果； <code class="docutils literal"><span class="pre">(&lt;*&gt;)</span></code>
+返回两侧参数的结果，<code class="docutils literal"><span class="pre">(&lt;*)</span></code>，这个组合子我们目前还没过用到，它返回其左侧参数的结果。</p>
+</div></blockquote>
+<p>虽然这里涉及的多数概念在之前 Functor 和 Monad
+的章节中我们已经了解过了，我们还是过一遍这下函数来解释下发生了什么。首先，为了解函数的类型，我们把
+<code class="docutils literal"><span class="pre">hexify</span></code> 函数提升为全局函数，并且手动写类型签名。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/FormApp.hs</span>
+<span class="nf">hexify</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Char</span>
+<span class="nf">hexify</span> <span class="n">a</span> <span class="n">b</span> <span class="ow">=</span> <span class="n">toEnum</span> <span class="o">.</span> <span class="n">fst</span> <span class="o">.</span> <span class="n">head</span> <span class="o">.</span> <span class="n">readHex</span> <span class="o">$</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Parsec 的 <code class="docutils literal"><span class="pre">hexDigit</span></code> parser
+会解析一个十六进制数字（译注：是0-F的数字，而不是十六进制数）</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">hexDigit</span>
+<span class="nf">hexDigit</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="n">st</span> <span class="kt">Char</span>
+</pre></div>
+</div>
+<p>因此， <code class="docutils literal"><span class="pre">char</span> <span class="pre">'%'</span> <span class="pre">*&gt;</span> <span class="pre">hexDigit</span></code> 的类型跟 <code class="docutils literal"><span class="pre">hexDigit</span></code> 相同， 而 <code class="docutils literal"><span class="pre">(*&gt;)</span></code>
+返回它右侧的结果。(<code class="docutils literal"><span class="pre">CharParser</span></code> 类型不过是 <code class="docutils literal"><span class="pre">GenParser</span> <span class="pre">Char</span></code>
+的同义词）。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">char</span> <span class="sc">&#39;%&#39;</span> <span class="o">*&gt;</span> <span class="n">hexDigit</span>
+<span class="nf">char</span> <span class="sc">&#39;%&#39;</span> <span class="o">*&gt;</span> <span class="n">hexDigit</span> <span class="ow">::</span> <span class="kt">GenParser</span> <span class="kt">Char</span> <span class="n">st</span> <span class="kt">Char</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">hexify</span> <span class="pre">&lt;$&gt;</span> <span class="pre">(char</span> <span class="pre">'%'</span> <span class="pre">*&gt;</span> <span class="pre">hexDigit)</span></code> 这个表达式是这样一个
+parser，它匹配一个 &#8220;%&#8221;
+字符，紧接着匹配一个十六进制数字字符，而其结果是一个函数。(译注：,
+hexify这个函数在这里被部分应用了）</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">hexify</span> <span class="o">&lt;$&gt;</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;%&#39;</span> <span class="o">*&gt;</span> <span class="n">hexDigit</span><span class="p">)</span>
+<span class="nf">hexify</span> <span class="o">&lt;$&gt;</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;%&#39;</span> <span class="o">*&gt;</span> <span class="n">hexDigit</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">GenParser</span> <span class="kt">Char</span> <span class="n">st</span> <span class="p">(</span><span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Char</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>最后， <code class="docutils literal"><span class="pre">(&lt;*&gt;)</span></code> 首先应用左边的 parser，再应用右边的
+parser，然后应用把右边 parser 产生的值应用到左边 parser 产生的函数上。</p>
+<p>如果你已经能够理解下面这句话，那么你就能理解 <code class="docutils literal"><span class="pre">(&lt;*&gt;)</span></code> 和 <code class="docutils literal"><span class="pre">ap</span></code>
+这两个组合子：<code class="docutils literal"><span class="pre">(&lt;*&gt;)</span></code> 就是原来的 <code class="docutils literal"><span class="pre">($)</span></code> 被提升到 Applicative
+Functor，而 <code class="docutils literal"><span class="pre">ap</span></code> 则是 <code class="docutils literal"><span class="pre">($)</span></code> 被提升到 Monad。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="o">$</span><span class="p">)</span>
+<span class="p">(</span><span class="o">$</span><span class="p">)</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="o">&lt;*&gt;</span><span class="p">)</span>
+<span class="p">(</span><span class="o">&lt;*&gt;</span><span class="p">)</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Applicative</span> <span class="n">f</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">f</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">ap</span>
+<span class="nf">ap</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Monad</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">m</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>接下来，我们考虑 <code class="docutils literal"><span class="pre">p_char</span></code> 这个 parser，原来的代码是这样子的：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/FormApp.hs</span>
+<span class="nf">p_char</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="kt">Char</span>
+<span class="nf">p_char</span> <span class="ow">=</span> <span class="n">oneOf</span> <span class="n">urlBaseChars</span>
+     <span class="o">&lt;|&gt;</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;+&#39;</span> <span class="o">&gt;&gt;</span> <span class="n">return</span> <span class="sc">&#39; &#39;</span><span class="p">)</span>
+     <span class="o">&lt;|&gt;</span> <span class="n">p_hex</span>
+
+<span class="nf">urlBaseChars</span> <span class="ow">=</span> <span class="p">[</span><span class="sc">&#39;a&#39;</span><span class="o">..</span><span class="sc">&#39;z&#39;</span><span class="p">]</span><span class="o">++</span><span class="p">[</span><span class="sc">&#39;A&#39;</span><span class="o">..</span><span class="sc">&#39;Z&#39;</span><span class="p">]</span><span class="o">++</span><span class="p">[</span><span class="sc">&#39;0&#39;</span><span class="o">..</span><span class="sc">&#39;9&#39;</span><span class="p">]</span><span class="o">++</span><span class="s">&quot;$-_.!*&#39;(),&quot;</span>
+</pre></div>
+</div>
+<p>使用 Applicative
+风格的代码跟上面的代码几乎一样，不过使用了更方便的记号。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/FormApp.hs</span>
+<span class="nf">a_char</span> <span class="ow">=</span> <span class="n">oneOf</span> <span class="n">urlBaseChars</span>
+     <span class="o">&lt;|&gt;</span> <span class="p">(</span><span class="sc">&#39; &#39;</span> <span class="o">&lt;$</span> <span class="n">char</span> <span class="sc">&#39;+&#39;</span><span class="p">)</span>
+     <span class="o">&lt;|&gt;</span> <span class="n">a_hex</span>
+</pre></div>
+</div>
+<p>这里，<code class="docutils literal"><span class="pre">(&lt;$)</span></code> 组合子会在右边的 parser 成功时，返回左边参数的值。</p>
+<p>最后，等价的 <code class="docutils literal"><span class="pre">p_pair_app1</span></code> 也几乎跟原来的版本相同，下面是原来的版本：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/FormParse.hs</span>
+<span class="nf">p_pair_app1</span> <span class="ow">=</span>
+    <span class="n">liftM2</span> <span class="p">(,)</span> <span class="p">(</span><span class="n">many1</span> <span class="n">p_char</span><span class="p">)</span> <span class="p">(</span><span class="n">optionMaybe</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;=&#39;</span> <span class="o">&gt;&gt;</span> <span class="n">many</span> <span class="n">p_char</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>我们改变的只有用来做提升的组合子： <code class="docutils literal"><span class="pre">liftA</span></code> 函数在这里的效果同
+<code class="docutils literal"><span class="pre">liftM</span></code> 是一样的。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/FormApp.hs</span>
+<span class="nf">a_pair</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">String</span><span class="p">,</span> <span class="kt">Maybe</span> <span class="kt">String</span><span class="p">)</span>
+<span class="nf">a_pair</span> <span class="ow">=</span> <span class="n">liftA2</span> <span class="p">(,)</span> <span class="p">(</span><span class="n">many1</span> <span class="n">a_char</span><span class="p">)</span> <span class="p">(</span><span class="n">optionMaybe</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;=&#39;</span> <span class="o">*&gt;</span> <span class="n">many</span> <span class="n">a_char</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="parse-json">
+<h2>Parse JSON 数据<a class="headerlink" href="#parse-json" title="Permalink to this headline">¶</a></h2>
+<p>为了更好的理解 Applicative Functor，并且进一步探索
+Parsec，让我们来写一个满足 RFC 4627 定义的 JSON parser</p>
+<p>在顶层，一个 JSON 值要么是一个对象，要么是一个数组。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/JSONParsec.hs</span>
+<span class="nf">p_text</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="kt">JValue</span>
+<span class="nf">p_text</span> <span class="ow">=</span> <span class="n">spaces</span> <span class="o">*&gt;</span> <span class="n">text</span>
+     <span class="o">&lt;?&gt;</span> <span class="s">&quot;JSON text&quot;</span>
+    <span class="kr">where</span> <span class="n">text</span> <span class="ow">=</span> <span class="kt">JObject</span> <span class="o">&lt;$&gt;</span> <span class="n">p_object</span>
+             <span class="o">&lt;|&gt;</span> <span class="kt">JArray</span> <span class="o">&lt;$&gt;</span> <span class="n">p_array</span>
+</pre></div>
+</div>
+<p>译注：这一节作者并没有给出 <code class="docutils literal"><span class="pre">JSON</span></code> 类型的定义，可以参考第六章。</p>
+<p>数组和对象在结构上很类似，一个字符（对数组是
+“[”，对对象是“{”）用作做括号，内部是用逗号分隔的数据，由另一个字符（对数组是“]”，对对象是“}”）作为右括号终结。我们可以抓住这种相似性，写一个小的辅助函数。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/JSONParsec.hs</span>
+<span class="nf">p_series</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">p_series</span> <span class="n">left</span> <span class="n">parser</span> <span class="n">right</span> <span class="ow">=</span>
+    <span class="n">between</span> <span class="p">(</span><span class="n">char</span> <span class="n">left</span> <span class="o">&lt;*</span> <span class="n">spaces</span><span class="p">)</span> <span class="p">(</span><span class="n">char</span> <span class="n">right</span><span class="p">)</span> <span class="o">$</span>
+            <span class="p">(</span><span class="n">parser</span> <span class="o">&lt;*</span> <span class="n">spaces</span><span class="p">)</span> <span class="p">`</span><span class="n">sepBy</span><span class="p">`</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;,&#39;</span> <span class="o">&lt;*</span> <span class="n">spaces</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>译注：其实可以用 Parsec 内置的 <code class="docutils literal"><span class="pre">between</span></code> 函数。</p>
+<p>在这里，我们终于用到了 <code class="docutils literal"><span class="pre">(&lt;*)</span></code>
+这个我们之前介绍过的组合子。我们用它来略过一些 token 之前的空格。使用
+<code class="docutils literal"><span class="pre">p_series</span></code> 函数， 解析一个数组会很简单。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/JSONParsec.hs</span>
+<span class="nf">p_array</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">JAry</span> <span class="kt">JValue</span><span class="p">)</span>
+<span class="nf">p_array</span> <span class="ow">=</span> <span class="kt">JAry</span> <span class="o">&lt;$&gt;</span> <span class="n">p_series</span> <span class="sc">&#39;[&#39;</span> <span class="n">p_value</span> <span class="sc">&#39;]&#39;</span>
+</pre></div>
+</div>
+<p>处理 JSON 的对象要复杂一点，需要一点额外的努力来为每个 object 的 field
+产生一个 name-value 对。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/JSONParsec.hs</span>
+<span class="nf">p_object</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">JObj</span> <span class="kt">JValue</span><span class="p">)</span>
+<span class="nf">p_object</span> <span class="ow">=</span> <span class="kt">JObj</span> <span class="o">&lt;$&gt;</span> <span class="n">p_series</span> <span class="sc">&#39;{&#39;</span> <span class="n">p_field</span> <span class="sc">&#39;}&#39;</span>
+    <span class="kr">where</span> <span class="n">p_field</span> <span class="ow">=</span> <span class="p">(,)</span> <span class="o">&lt;$&gt;</span> <span class="p">(</span><span class="n">p_string</span> <span class="o">&lt;*</span> <span class="n">char</span> <span class="sc">&#39;:&#39;</span> <span class="o">&lt;*</span> <span class="n">spaces</span><span class="p">)</span> <span class="o">&lt;*&gt;</span> <span class="n">p_value</span>
+</pre></div>
+</div>
+<p>解析一个单独的值是就是调用一个现有的 Parser，然后把它的结果用相应的
+<code class="docutils literal"><span class="pre">JValue</span></code> 构造器封装：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/JSONParsec.hs</span>
+<span class="nf">p_value</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="kt">JValue</span>
+<span class="nf">p_value</span> <span class="ow">=</span> <span class="n">value</span> <span class="o">&lt;*</span> <span class="n">spaces</span>
+  <span class="kr">where</span> <span class="n">value</span> <span class="ow">=</span> <span class="kt">JString</span> <span class="o">&lt;$&gt;</span> <span class="n">p_string</span>
+            <span class="o">&lt;|&gt;</span> <span class="kt">JNumber</span> <span class="o">&lt;$&gt;</span> <span class="n">p_number</span>
+            <span class="o">&lt;|&gt;</span> <span class="kt">JObject</span> <span class="o">&lt;$&gt;</span> <span class="n">p_object</span>
+            <span class="o">&lt;|&gt;</span> <span class="kt">JArray</span>  <span class="o">&lt;$&gt;</span> <span class="n">p_array</span>
+            <span class="o">&lt;|&gt;</span> <span class="kt">JBool</span>   <span class="o">&lt;$&gt;</span> <span class="n">p_bool</span>
+            <span class="o">&lt;|&gt;</span> <span class="kt">JNull</span>   <span class="o">&lt;$</span> <span class="n">string</span> <span class="s">&quot;null&quot;</span>
+            <span class="o">&lt;?&gt;</span> <span class="s">&quot;JSON value&quot;</span>
+
+<span class="nf">p_bool</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="kt">Bool</span>
+<span class="nf">p_bool</span> <span class="ow">=</span> <span class="kt">True</span> <span class="o">&lt;$</span> <span class="n">string</span> <span class="s">&quot;true&quot;</span>
+     <span class="o">&lt;|&gt;</span> <span class="kt">False</span> <span class="o">&lt;$</span> <span class="n">string</span> <span class="s">&quot;false&quot;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">choice</span></code>
+组合子允许我们把这种很有很多选项的情况用一个列表来表示，它返回 parser
+列表中第一个 parse 成功的 parser 的结果。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/JSONParsec.hs</span>
+<span class="nf">p_value_choice</span> <span class="ow">=</span> <span class="n">value</span> <span class="o">&lt;*</span> <span class="n">spaces</span>
+  <span class="kr">where</span> <span class="n">value</span> <span class="ow">=</span> <span class="n">choice</span> <span class="p">[</span> <span class="kt">JString</span> <span class="o">&lt;$&gt;</span> <span class="n">p_string</span>
+                       <span class="p">,</span> <span class="kt">JNumber</span> <span class="o">&lt;$&gt;</span> <span class="n">p_number</span>
+                       <span class="p">,</span> <span class="kt">JObject</span> <span class="o">&lt;$&gt;</span> <span class="n">p_object</span>
+                       <span class="p">,</span> <span class="kt">JArray</span>  <span class="o">&lt;$&gt;</span> <span class="n">p_array</span>
+                       <span class="p">,</span> <span class="kt">JBool</span>   <span class="o">&lt;$&gt;</span> <span class="n">p_bool</span>
+                       <span class="p">,</span> <span class="kt">JNull</span>   <span class="o">&lt;$</span> <span class="n">string</span> <span class="s">&quot;null&quot;</span>
+                       <span class="p">]</span>
+                <span class="o">&lt;?&gt;</span> <span class="s">&quot;JSON value&quot;</span>
+</pre></div>
+</div>
+<p>下面是最有意思的两个 parser：数字、字符串</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/JSONParsec.hs</span>
+<span class="nf">p_number</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="kt">Double</span>
+<span class="nf">p_number</span> <span class="ow">=</span> <span class="kr">do</span> <span class="n">s</span> <span class="ow">&lt;-</span> <span class="n">getInput</span>
+              <span class="kr">case</span> <span class="n">readSigned</span> <span class="n">readFloat</span> <span class="n">s</span> <span class="kr">of</span>
+                <span class="p">[(</span><span class="n">n</span><span class="p">,</span> <span class="n">s&#39;</span><span class="p">)]</span> <span class="ow">-&gt;</span> <span class="n">n</span> <span class="o">&lt;$</span> <span class="n">setInput</span> <span class="n">s&#39;</span>
+                <span class="kr">_</span>         <span class="ow">-&gt;</span> <span class="n">empty</span>
+</pre></div>
+</div>
+<p>我们的诀窍是利用 Haskell 标准库中的数字 parser 库函数，它们定义在
+<code class="docutils literal"><span class="pre">Numeric</span></code> 库中，<code class="docutils literal"><span class="pre">readFloat</span></code> 函数解析一个无符号浮点数，而
+<code class="docutils literal"><span class="pre">readSigned</span></code> 函数接受一个无符号数的 parser
+作为参数，并将其转换为有符号数的 parser。</p>
+<p>上面的那些函数都不是 Parsec 中的库函数，所以需要一点特殊处理。Parsec 的
+<code class="docutils literal"><span class="pre">getInput</span></code> 函数可以让我们直接访问 Parsec
+还不曾消耗的输入流，对这些输入流，如果
+<code class="docutils literal"><span class="pre">readSigned</span> <span class="pre">readFloat</span></code>解析成功，那么就返回解析成功的数字以及剩下的输入。这些还没有处理的输入，我们用
+<code class="docutils literal"><span class="pre">setInput</span></code> 将他们还给 Parsec 作为新的未消耗的输入流。</p>
+<p>Parse 一个字符串也不困难，不过需要处理一些细节。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/JSONParsec.hs</span>
+<span class="nf">p_string</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="kt">String</span>
+<span class="nf">p_string</span> <span class="ow">=</span> <span class="n">between</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;</span><span class="se">\&quot;</span><span class="sc">&#39;</span><span class="p">)</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;</span><span class="se">\&quot;</span><span class="sc">&#39;</span><span class="p">)</span> <span class="p">(</span><span class="n">many</span> <span class="n">jchar</span><span class="p">)</span>
+    <span class="kr">where</span> <span class="n">jchar</span> <span class="ow">=</span> <span class="n">char</span> <span class="sc">&#39;</span><span class="se">\\</span><span class="sc">&#39;</span> <span class="o">*&gt;</span> <span class="p">(</span><span class="n">p_escape</span> <span class="o">&lt;|&gt;</span> <span class="n">p_unicode</span><span class="p">)</span>
+              <span class="o">&lt;|&gt;</span> <span class="n">satisfy</span> <span class="p">(`</span><span class="n">notElem</span><span class="p">`</span> <span class="s">&quot;</span><span class="se">\&quot;\\</span><span class="s">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>我们可以使用刚刚介绍过的 <code class="docutils literal"><span class="pre">choice</span></code> 组合子来解析转义字符序列。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/JSONParsec.hs</span>
+<span class="nf">p_escape</span> <span class="ow">=</span> <span class="n">choice</span> <span class="p">(</span><span class="n">zipWith</span> <span class="n">decode</span> <span class="s">&quot;bnfrt</span><span class="se">\\\&quot;</span><span class="s">/&quot;</span> <span class="s">&quot;</span><span class="se">\b\n\f\r\t\\\&quot;</span><span class="s">/&quot;</span><span class="p">)</span>
+    <span class="kr">where</span> <span class="n">decode</span> <span class="n">c</span> <span class="n">r</span> <span class="ow">=</span> <span class="n">r</span> <span class="o">&lt;$</span> <span class="n">char</span> <span class="n">c</span>
+</pre></div>
+</div>
+<p>最后，JSON 允许我们在字符串中使用 Unicode
+字符：&#8221;\u&#8221;后面跟着四个十六进制数字:</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/JSONParsec.hs</span>
+<span class="nf">p_unicode</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="kt">Char</span>
+<span class="nf">p_unicode</span> <span class="ow">=</span> <span class="n">char</span> <span class="sc">&#39;u&#39;</span> <span class="o">*&gt;</span> <span class="p">(</span><span class="n">decode</span> <span class="o">&lt;$&gt;</span> <span class="n">count</span> <span class="mi">4</span> <span class="n">hexDigit</span><span class="p">)</span>
+    <span class="kr">where</span> <span class="n">decode</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">toEnum</span> <span class="n">code</span>
+              <span class="kr">where</span> <span class="p">((</span><span class="n">code</span><span class="p">,</span><span class="kr">_</span><span class="p">)</span><span class="kt">:</span><span class="kr">_</span><span class="p">)</span> <span class="ow">=</span> <span class="n">readHex</span> <span class="n">x</span>
+</pre></div>
+</div>
+<p>相比 Monad，Applicative
+Functor唯一缺少的能力，就是把一个值绑定到一个变量，而当我们需要验证我们解析的结果时，我们就需要这种能力。</p>
+<p>基本上只有当我们需要把值绑定到变量时，我们才会需要写 Monadic
+的函数，对于更复杂的 parser 也是这样的：我们不太会用到 Monad
+提供的额外的力量。</p>
+<p>我们写这本书的时候， Applicative Functor 对于 Haskell
+社区还是很新的概念，人们仍然在探索它在 parser 领域之外应用的可能。</p>
+</div>
+<div class="section" id="parse-http">
+<h2>Parse HTTP 请求<a class="headerlink" href="#parse-http" title="Permalink to this headline">¶</a></h2>
+<p>这一节我们来写一个基本的 HTTP 请求的 parser， 来作为 Applicative Parsing
+的例子。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="kr">module</span> <span class="nn">HttpRequestParser</span>
+    <span class="p">(</span>
+      <span class="kt">HttpRequest</span><span class="p">(</span><span class="o">..</span><span class="p">)</span>
+    <span class="p">,</span> <span class="kt">Method</span><span class="p">(</span><span class="o">..</span><span class="p">)</span>
+    <span class="p">,</span> <span class="nf">p_request</span>
+    <span class="p">,</span> <span class="nf">p_query</span>
+    <span class="p">)</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">ApplicativeParsec</span>
+<span class="kr">import</span> <span class="nn">Numeric</span> <span class="p">(</span><span class="nf">readHex</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Control.Monad</span> <span class="p">(</span><span class="nf">liftM4</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.IO</span> <span class="p">(</span><span class="kt">Handle</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>一个 HTTP 请求包含一个 method，一个 identifier，一些
+header，以及一个可选的 body。为了简单起见，我们只关注 HTTP 1.1
+标准的六种 method 中的两种，<code class="docutils literal"><span class="pre">POST</span></code> method 包含一个 body，<code class="docutils literal"><span class="pre">GET</span></code>
+method 没有 body.</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/HttpRequestParser.hs</span>
+<span class="kr">data</span> <span class="kt">Method</span> <span class="ow">=</span> <span class="kt">Get</span> <span class="o">|</span> <span class="kt">Post</span>
+          <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+
+<span class="kr">data</span> <span class="kt">HttpRequest</span> <span class="ow">=</span> <span class="kt">HttpRequest</span> <span class="p">{</span>
+      <span class="n">reqMethod</span> <span class="ow">::</span> <span class="kt">Method</span>
+    <span class="p">,</span> <span class="n">reqURL</span> <span class="ow">::</span> <span class="kt">String</span>
+    <span class="p">,</span> <span class="n">reqHeaders</span> <span class="ow">::</span> <span class="p">[(</span><span class="kt">String</span><span class="p">,</span> <span class="kt">String</span><span class="p">)]</span>
+    <span class="p">,</span> <span class="n">reqBody</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">String</span>
+    <span class="p">}</span> <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>因为我们采用 application style, 我们的 parser
+简洁而易读。当然，可读性好，是说你得习惯 applicative style。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/HttpRequestParser.hs</span>
+<span class="nf">p_request</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="kt">HttpRequest</span>
+<span class="nf">p_request</span> <span class="ow">=</span> <span class="n">q</span> <span class="s">&quot;GET&quot;</span> <span class="kt">Get</span> <span class="p">(</span><span class="n">pure</span> <span class="kt">Nothing</span><span class="p">)</span>
+        <span class="o">&lt;|&gt;</span> <span class="n">q</span> <span class="s">&quot;POST&quot;</span> <span class="kt">Post</span> <span class="p">(</span><span class="kt">Just</span> <span class="o">&lt;$&gt;</span> <span class="n">many</span> <span class="n">anyChar</span><span class="p">)</span>
+  <span class="kr">where</span> <span class="n">q</span> <span class="n">name</span> <span class="n">ctor</span> <span class="n">body</span> <span class="ow">=</span> <span class="n">liftM4</span> <span class="kt">HttpRequest</span> <span class="n">req</span> <span class="n">url</span> <span class="n">p_headers</span> <span class="n">body</span>
+            <span class="kr">where</span> <span class="n">req</span> <span class="ow">=</span> <span class="n">ctor</span> <span class="o">&lt;$</span> <span class="n">string</span> <span class="n">name</span> <span class="o">&lt;*</span> <span class="n">char</span> <span class="sc">&#39; &#39;</span>
+        <span class="n">url</span> <span class="ow">=</span> <span class="n">optional</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;/&#39;</span><span class="p">)</span> <span class="o">*&gt;</span>
+              <span class="n">manyTill</span> <span class="n">notEOL</span> <span class="p">(</span><span class="n">try</span> <span class="o">$</span> <span class="n">string</span> <span class="s">&quot; HTTP/1.&quot;</span> <span class="o">&lt;*</span> <span class="n">oneOf</span> <span class="s">&quot;01&quot;</span><span class="p">)</span>
+              <span class="o">&lt;*</span> <span class="n">crlf</span>
+</pre></div>
+</div>
+<p>简单地说，<code class="docutils literal"><span class="pre">q</span></code> 辅助函数接受一个 method
+名，一个值构造器，一个对请求的可选 body 的 parser。而 <code class="docutils literal"><span class="pre">url</span></code>
+辅助函数并不试图去验证一个 URL，因为 HTTP 规范没有规定 URL
+能够包含哪些字符，这个函数只是消耗遇到的输入直到行尾或者遇到 HTTP 版本
+identifier。</p>
+<div class="section" id="id5">
+<h3>避免使用回溯<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
+<p><code class="docutils literal"><span class="pre">try</span></code> 组合子必须记住它遇到的输入，因为要在 parse
+失败时恢复消耗的输入，以便下一个 parser 使用。这被称为回溯。因为 <code class="docutils literal"><span class="pre">try</span></code>
+必须保存输入，它的开销很昂贵。滥用 <code class="docutils literal"><span class="pre">try</span></code> 会拖慢 parser
+的速度，甚至使性能慢到不可接受。</p>
+<p>为了避免使用回溯，标准的做法是重构我们的 parser，手动提取 <code class="docutils literal"><span class="pre">(&lt;|&gt;)</span></code> 两侧
+parser 的公共左因子，使我们只用一个 token 就能判断 parse
+成功还是失败。在这种情况下，两个 parser
+消耗相同的初始输入，最终组合为一个 parser</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">parser</span> <span class="ow">=</span> <span class="p">(</span><span class="o">++</span><span class="p">)</span> <span class="o">&lt;$&gt;</span> <span class="n">string</span> <span class="s">&quot;HT&quot;</span> <span class="o">&lt;*&gt;</span> <span class="p">(</span><span class="n">string</span> <span class="s">&quot;TP&quot;</span> <span class="o">&lt;|&gt;</span> <span class="n">string</span> <span class="s">&quot;ML&quot;</span><span class="p">)</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseTest</span> <span class="n">parser</span> <span class="s">&quot;HTTP&quot;</span>
+<span class="s">&quot;HTTP&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseTest</span> <span class="n">parser</span> <span class="s">&quot;HTML&quot;</span>
+<span class="s">&quot;HTML&quot;</span>
+</pre></div>
+</div>
+<p>更妙的是，使用这种写法，当输入无法匹配时，Parsec 给出的错误信息更好：</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">parseTest</span> <span class="n">parser</span> <span class="s">&quot;HTXY&quot;</span>
+<span class="nf">parse</span> <span class="ne">error</span> <span class="n">at</span> <span class="p">(</span><span class="n">line</span> <span class="mi">1</span><span class="p">,</span> <span class="n">column</span> <span class="mi">3</span><span class="p">)</span><span class="kt">:</span>
+<span class="nf">unexpected</span> <span class="s">&quot;X&quot;</span>
+<span class="nf">expecting</span> <span class="s">&quot;TP&quot;</span> <span class="n">or</span> <span class="s">&quot;ML&quot;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="parse-http-header">
+<h3>Parse HTTP Header<a class="headerlink" href="#parse-http-header" title="Permalink to this headline">¶</a></h3>
+<p>HTTP 请求的第一行之后，是零到多个 header，一个 header
+以一个字段名开头，跟着是一个冒号，然后是内容。如果一行以空格开头，它被认为是上一行的延续。</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/HttpRequestParser.hs</span>
+<span class="nf">p_headers</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="n">st</span> <span class="p">[(</span><span class="kt">String</span><span class="p">,</span> <span class="kt">String</span><span class="p">)]</span>
+<span class="nf">p_headers</span> <span class="ow">=</span> <span class="n">header</span> <span class="p">`</span><span class="n">manyTill</span><span class="p">`</span> <span class="n">crlf</span>
+  <span class="kr">where</span> <span class="n">header</span> <span class="ow">=</span> <span class="n">liftA2</span> <span class="p">(,)</span> <span class="n">fieldName</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;:&#39;</span> <span class="o">*&gt;</span> <span class="n">spaces</span> <span class="o">*&gt;</span> <span class="n">contents</span><span class="p">)</span>
+        <span class="n">contents</span> <span class="ow">=</span> <span class="n">liftA2</span> <span class="p">(</span><span class="o">++</span><span class="p">)</span> <span class="p">(</span><span class="n">many1</span> <span class="n">notEOL</span> <span class="o">&lt;*</span> <span class="n">crlf</span><span class="p">)</span>
+                               <span class="p">(</span><span class="n">continuation</span> <span class="o">&lt;|&gt;</span> <span class="n">pure</span> <span class="kt">[]</span><span class="p">)</span>
+        <span class="n">continuation</span> <span class="ow">=</span> <span class="n">liftA2</span> <span class="p">(</span><span class="kt">:</span><span class="p">)</span> <span class="p">(</span><span class="sc">&#39; &#39;</span> <span class="o">&lt;$</span> <span class="n">many1</span> <span class="p">(</span><span class="n">oneOf</span> <span class="s">&quot; </span><span class="se">\t</span><span class="s">&quot;</span><span class="p">))</span> <span class="n">contents</span>
+        <span class="n">fieldName</span> <span class="ow">=</span> <span class="p">(</span><span class="kt">:</span><span class="p">)</span> <span class="o">&lt;$&gt;</span> <span class="n">letter</span> <span class="o">&lt;*&gt;</span> <span class="n">many</span> <span class="n">fieldChar</span>
+        <span class="n">fieldChar</span> <span class="ow">=</span> <span class="n">letter</span> <span class="o">&lt;|&gt;</span> <span class="n">digit</span> <span class="o">&lt;|&gt;</span> <span class="n">oneOf</span> <span class="s">&quot;-_&quot;</span>
+
+<span class="nf">crlf</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="n">st</span> <span class="nb">()</span>
+<span class="nf">crlf</span> <span class="ow">=</span> <span class="p">(</span><span class="nb">()</span> <span class="o">&lt;$</span> <span class="n">string</span> <span class="s">&quot;</span><span class="se">\r\n</span><span class="s">&quot;</span><span class="p">)</span> <span class="o">&lt;|&gt;</span> <span class="p">(</span><span class="nb">()</span> <span class="o">&lt;$</span> <span class="n">newline</span><span class="p">)</span>
+
+<span class="nf">notEOL</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="n">st</span> <span class="kt">Char</span>
+<span class="nf">notEOL</span> <span class="ow">=</span> <span class="n">noneOf</span> <span class="s">&quot;</span><span class="se">\r\n</span><span class="s">&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="id6">
+<h2>练习<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h2>
+<ol class="arabic simple">
+<li>我们的 HTTP 请求 parser
+过于简化了，没法在部署在实际应用中。它缺少重要的功能，并且无法组织最基本的拒绝服务攻击(DOS,
+denial of service attack)
+让我们的 parser 关注 Content-Length 这个 field,如果它存在的话</li>
+<li>针对不设防的 web server 的 一个很流行的 DOS
+攻击方式，是向它发送特别长的 header，一个 header
+可能包含几百兆的垃圾信息，从而耗光服务器的内存。
+重构 header 的 parser，当一行超过 4096 个字符时 parse
+失败。它必须在超过长度时立刻失败，而不是等到处理完一行之后。</li>
+<li>关注 Transfer-Encoding 这个
+field，如果它存在的话，关于它的细节，可以查看 RFC 2616 的第 3.6.1 节</li>
+<li>另一个流行的攻击方式是开启一个链接之后，放置不管或者以十分慢的速度发送数据。使用
+<code class="docutils literal"><span class="pre">IO</span></code> monad 来封装 parser，如果没有在30秒内完成 parse，就使用
+<code class="docutils literal"><span class="pre">System.Timeout</span></code> 这个模块关闭链接。</li>
+</ol>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="13.html">第十三章：数据结构</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="18.html">第十八章： Monad变换器</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.1.
+    </div>
+  </body>
+</html>
