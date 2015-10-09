@@ -1,4 +1,4 @@
-第三章：Defining Types, Streamlining Functions
+第 3 章：Defining Types, Streamlining Functions
 =================================================
 
 定义新的数据类型
