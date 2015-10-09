@@ -7,7 +7,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>第三章：Defining Types, Streamlining Functions &mdash; Real World Haskell 中文版</title>
+    <title>第 3 章：定义类型并简化函数 &mdash; Real World Haskell 中文版</title>
     
     <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -27,8 +27,8 @@
     <script type="text/javascript" src="../_static/doctools.js"></script>
     <script type="text/javascript" src="../_static/theme_extras.js"></script>
     <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
-    <link rel="next" title="第四章：函数式编程" href="4.html" />
-    <link rel="prev" title="第二章：类型和函数" href="2.html" /> 
+    <link rel="next" title="第 4 章：函数式编程" href="4.html" />
+    <link rel="prev" title="第 2 章：类型和函数" href="2.html" /> 
   </head>
   <body role="document">
       <div class="header"><h1 class="heading"><a href="../index.html">
@@ -37,21 +37,21 @@
       <div class="topnav">
       
         <p>
-        «&#160;&#160;<a href="2.html">第二章：类型和函数</a>
+        «&#160;&#160;<a href="2.html">第 2 章：类型和函数</a>
         &#160;&#160;::&#160;&#160;
         <a class="uplink" href="../index.html">Contents</a>
         &#160;&#160;::&#160;&#160;
-        <a href="4.html">第四章：函数式编程</a>&#160;&#160;»
+        <a href="4.html">第 4 章：函数式编程</a>&#160;&#160;»
         </p>
 
       </div>
       <div class="content">
         
         
-  <div class="section" id="defining-types-streamlining-functions">
-<h1>第三章：Defining Types, Streamlining Functions<a class="headerlink" href="#defining-types-streamlining-functions" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="id1">
-<h2>定义新的数据类型<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+  <div class="section" id="id1">
+<h1>第 3 章：定义类型并简化函数<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="id2">
+<h2>定义新的数据类型<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
 <p>尽管列表和元组都非常有用，但是，定义新的数据类型也是一种常见的需求，这种能力使得我们可以为程序中的值添加结构。</p>
 <p>而且比起使用元组，对一簇相关的值赋予一个名字和一个独一无二的类型显得更有用一些。</p>
 <p>定义新的数据类型也提升了代码的安全性：Haskell 不会允许我们混用两个结构相同但类型不同的值。</p>
@@ -116,8 +116,8 @@
 <span class="kt">Book</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">BookInfo</span>
 </pre></div>
 </div>
-<div class="section" id="id2">
-<h3>类型构造器和值构造器的命名<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id3">
+<h3>类型构造器和值构造器的命名<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h3>
 <p>在前面介绍 <code class="docutils literal"><span class="pre">BookInfo</span></code> 类型的时候，我们专门为类型构造器和值构造器设置了不同的名字（ <code class="docutils literal"><span class="pre">BookInfo</span></code> 和 <code class="docutils literal"><span class="pre">Book</span></code> ），这样区分起来比较容易。</p>
 <p>在 Haskell 里，类型的名字（类型构造器）和值构造器的名字是相互独立的。类型构造器只能出现在类型的定义，或者类型签名当中。而值构造器只能出现在实际的代码中。因为存在这种差别，给类型构造器和值构造器赋予一个相同的名字实际上并不会产生任何问题。</p>
 <p>以下是这种用法的一个例子：</p>
@@ -130,8 +130,8 @@
 <p>以上代码定义了一个 <code class="docutils literal"><span class="pre">BookReview</span></code> 类型，并且它的值构造器的名字也同样是 <code class="docutils literal"><span class="pre">BookReview</span></code> 。</p>
 </div>
 </div>
-<div class="section" id="id3">
-<h2>类型别名<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id4">
+<h2>类型别名<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
 <p>可以使用<em>类型别名</em>，来为一个已存在的类型设置一个更具描述性的名字。</p>
 <p>比如说，在前面 <code class="docutils literal"><span class="pre">BookReview</span></code> 类型的定义里，并没有说明 <code class="docutils literal"><span class="pre">String</span></code> 成分是干什么用的，通过类型别名，可以解决这个问题：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/BookStore.hs</span>
@@ -149,8 +149,8 @@
 </div>
 <p>需要注意的是，类型别名只是为已有类型提供了一个新名字，创建值的工作还是由原来类型的值构造器进行。[注：如果你熟悉 C 或者 C++ ，可以将 Haskell 的类型别名看作是 <code class="docutils literal"><span class="pre">typedef</span></code> 。]</p>
 </div>
-<div class="section" id="id4">
-<h2>代数数据类型<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id5">
+<h2>代数数据类型<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h2>
 <p><code class="docutils literal"><span class="pre">Bool</span></code> 类型是<em>代数数据类型</em>（algebraic data type）的最简单也是最常见的例子。一个代数类型可以有多于一个值构造器：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/Bool.hs</span>
 <span class="kr">data</span> <span class="kt">Bool</span> <span class="ow">=</span> <span class="kt">False</span> <span class="o">|</span> <span class="kt">True</span>
@@ -198,8 +198,8 @@
 </div>
 <p>ghci 抱怨我们没有给 <code class="docutils literal"><span class="pre">Invoice</span></code> 值构造器足够的参数。</p>
 <p>[译注：原文这里的代码示例有错，译文已改正。]</p>
-<div class="section" id="id5">
-<h3>什么情况下该用元组，而什么情况下又该用代数数据类型？<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id6">
+<h3>什么情况下该用元组，而什么情况下又该用代数数据类型？<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h3>
 <p>元组和自定义代数数据类型有一些相似的地方。比如说，可以使用一个 <code class="docutils literal"><span class="pre">(Int,</span> <span class="pre">String,</span> <span class="pre">[String])</span></code> 类型的元组来代替 <code class="docutils literal"><span class="pre">BookInfo</span></code> 类型：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">Book</span> <span class="mi">2</span> <span class="s">&quot;The Wealth of Networks&quot;</span> <span class="p">[</span><span class="s">&quot;Yochai Benkler&quot;</span><span class="p">]</span>
 <span class="kt">Book</span> <span class="mi">2</span> <span class="s">&quot;The Wealth of Networks&quot;</span> <span class="p">[</span><span class="s">&quot;Yochai Benkler&quot;</span><span class="p">]</span>
@@ -287,12 +287,12 @@ In the expression:
 <p>类型系统不会察觉到，我们正错误地对比两种不同表示方式的值，因为对两个类型相同的元组进行对比是完全合法的！</p>
 <p>关于该使用元组还是该使用代数数据类型，没有一劳永逸的办法。但是，有一个经验法则可以参考：如果程序大量使用复合数据，那么使用 <code class="docutils literal"><span class="pre">data</span></code> 进行类型自定义对于类型安全和可读性都有好处。而对于小规模的内部应用，那么通常使用元组就足够了。</p>
 </div>
-<div class="section" id="id6">
-<h3>其他语言里类似代数数据类型的东西<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id7">
+<h3>其他语言里类似代数数据类型的东西<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h3>
 <p>代数数据类型为描述数据类型提供了一种单一且强大的方式。很多其他语言，要达到相当于代数数据类型的表达能力，需要同时使用多种特性。</p>
 <p>以下是一些 C 和 C++ 方面的例子，说明怎样在这些语言里，怎么样实现类似于代数数据类型的功能。</p>
-<div class="section" id="id7">
-<h4>结构<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="id8">
+<h4>结构<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h4>
 <p>当只有一个值构造器时，代数数据类型和元组很相似：它将一系列相关的值打包成一个复合值。这种做法相当于 C 和 C++ 里的 <code class="docutils literal"><span class="pre">struct</span></code> ，而代数数据类型的成分则相当于 <code class="docutils literal"><span class="pre">struct</span></code> 里的域。</p>
 <p>以下是一个 C 结构，它等同于我们前面定义的 <code class="docutils literal"><span class="pre">BookInfo</span></code> 类型：</p>
 <div class="highlight-c"><div class="highlight"><pre><span class="k">struct</span> <span class="n">book_info</span> <span class="p">{</span>
@@ -311,8 +311,8 @@ In the expression:
 <p>按位置排序指的是，对成分的访问是通过位置来实行的，而不是像 C 那样，通过名字：比如 <code class="docutils literal"><span class="pre">book_info-&gt;id</span></code> 。</p>
 <p>稍后的“模式匹配”小节会介绍如何访代数数据类型里的成分。在“记录”一节会介绍定义数据的新语法，通过这种语法，可以像 C 结构那样，使用名字来访问相应的成分。</p>
 </div>
-<div class="section" id="id8">
-<h4>枚举<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="id9">
+<h4>枚举<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h4>
 <p>C 和 C++ 里的 <code class="docutils literal"><span class="pre">enum</span></code> 通常用于表示一系列符号值排列。代数数据类型里面也有相似的东西，一般称之为<em>枚举类型</em>。</p>
 <p>以下是一个 <code class="docutils literal"><span class="pre">enum</span></code> 例子：</p>
 <div class="highlight-c"><div class="highlight"><pre><span class="k">enum</span> <span class="n">roygbiv</span> <span class="p">{</span>
@@ -371,8 +371,8 @@ In the expression:
 </pre></div>
 </div>
 </div>
-<div class="section" id="id9">
-<h4>联合<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="id10">
+<h4>联合<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h4>
 <p>如果一个代数数据类型有多个备选，那么可以将它看作是 C 或 C++ 里的 <code class="docutils literal"><span class="pre">union</span></code> 。</p>
 <p>以上两者的一个主要区别是， <code class="docutils literal"><span class="pre">union</span></code> 并不告诉用户，当前使用的是哪一个备选， <code class="docutils literal"><span class="pre">union</span></code> 的使用者必须自己记录这方面的信息（通常使用一个额外的域来保存），这意味着，如果搞错了备选的信息，那么对 <code class="docutils literal"><span class="pre">union</span></code> 的使用就会出错。</p>
 <p>以下是一个 <code class="docutils literal"><span class="pre">union</span></code> 例子：</p>
@@ -417,8 +417,8 @@ In the expression:
 </div>
 </div>
 </div>
-<div class="section" id="id10">
-<h2>模式匹配<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id11">
+<h2>模式匹配<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h2>
 <p>前面的章节介绍了代数数据类型的定义方法，本节将说明怎样去处理这些类型的值。</p>
 <p>对于某个类型的值来说，应该可以做到以下两点：</p>
 <ul class="simple">
@@ -470,8 +470,8 @@ In the expression:
 <span class="mi">3</span>
 </pre></div>
 </div>
-<div class="section" id="id11">
-<h3>组成和解构<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id12">
+<h3>组成和解构<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
 <p>让我们稍微慢下探索新特性的脚步，花些时间，了解构造一个值、和对这个值进行模式匹配之间的关系。</p>
 <p>我们通过应用值构造器来构建值：表达式 <code class="docutils literal"><span class="pre">Book</span> <span class="pre">9</span> <span class="pre">&quot;Close</span> <span class="pre">Calls&quot;</span> <span class="pre">[&quot;John</span> <span class="pre">Long&quot;]</span></code> 应用 <code class="docutils literal"><span class="pre">Book</span></code> 构造器到值 <code class="docutils literal"><span class="pre">9</span></code> 、 <code class="docutils literal"><span class="pre">&quot;Close</span> <span class="pre">Calls&quot;</span></code> 和 <code class="docutils literal"><span class="pre">[&quot;John</span> <span class="pre">Long&quot;]</span></code> 上面，从而产生一个新的 <code class="docutils literal"><span class="pre">BookInfo</span></code> 类型的值。</p>
 <p>另一方面，当对 <code class="docutils literal"><span class="pre">Book</span></code> 构造器进行模式匹配时，我们<em>逆转</em>（reverse）它的构造过程：首先，检查这个值是否由 <code class="docutils literal"><span class="pre">Book</span></code> 构造器生成 —— 如果是的话，那么就对这个值进行探查（inspect），并取出创建这个值时，提供给构造器的各个值。</p>
@@ -486,8 +486,8 @@ In the expression:
 <p>[译注：上一节的《联合》小节里提到， Haskell 有办法分辨同一类型由不同值构造器创建的值，说的就是模式匹配。</p>
 <p>比如 <code class="docutils literal"><span class="pre">Circle</span> <span class="pre">...</span></code> 和 <code class="docutils literal"><span class="pre">Poly</span> <span class="pre">...</span></code> 两个表达式创建的都是 <code class="docutils literal"><span class="pre">Shape</span></code> 类型的值，但第一个表达式只有在匹配 <code class="docutils literal"><span class="pre">(Circle</span> <span class="pre">vector</span> <span class="pre">double)</span></code> 模式时才会成功，而第二个表达式只有在 <code class="docutils literal"><span class="pre">(Poly</span> <span class="pre">vectors)</span></code> 时才会成功。这就是它们不会被混淆的原因。]</p>
 </div>
-<div class="section" id="id12">
-<h3>更进一步<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id13">
+<h3>更进一步<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h3>
 <p>对元组进行模式匹配的语法，和构造元组的语法很相似。</p>
 <p>以下是一个可以返回三元组中最后一个元素的函数：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/third.hs</span>
@@ -551,12 +551,12 @@ In the expression:
 </div>
 <p>字面值的比对规则对于列表和值构造器的匹配也适用： <code class="docutils literal"><span class="pre">(3:xs)</span></code> 模式只匹配那些不为空，并且第一个元素为 <code class="docutils literal"><span class="pre">3</span></code> 的列表；而 <code class="docutils literal"><span class="pre">(Book</span> <span class="pre">3</span> <span class="pre">title</span> <span class="pre">authors)</span></code> 只匹配 ID 值为 <code class="docutils literal"><span class="pre">3</span></code> 的那本书。</p>
 </div>
-<div class="section" id="id13">
-<h3>模式匹配中的变量名命名<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id14">
+<h3>模式匹配中的变量名命名<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h3>
 <p>当你阅读那些进行模式匹配的函数时，经常会发现像是 <code class="docutils literal"><span class="pre">(x:xs)</span></code> 或是 <code class="docutils literal"><span class="pre">(d:ds)</span></code> 这种类型的名字。这是一个流行的命名规则，其中的 <code class="docutils literal"><span class="pre">s</span></code> 表示“元素的复数”。以 <code class="docutils literal"><span class="pre">(x:xs)</span></code> 来说，它用 <code class="docutils literal"><span class="pre">x</span></code> 来表示列表的第一个元素，剩余的列表元素则用 <code class="docutils literal"><span class="pre">xs</span></code> 表示。</p>
 </div>
-<div class="section" id="id14">
-<h3>通配符模式匹配<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id15">
+<h3>通配符模式匹配<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h3>
 <p>如果在匹配模式中我们不在乎某个值的类型，那么可以用下划线字符 “_” 作为符号来进行标识，它也叫做*通配符*。它的用法如下。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/BookStore.hs</span>
 <span class="nf">nicerID</span>      <span class="p">(</span><span class="kt">Book</span> <span class="n">id</span> <span class="kr">_</span>     <span class="kr">_</span>      <span class="p">)</span> <span class="ow">=</span> <span class="n">id</span>
@@ -568,8 +568,8 @@ In the expression:
 <p>在模式匹配里，通配符的作用和变量类似，但是它并不会绑定成一个新的变量。就像上面的例子展示的那样，在一个模式匹配里可以使用一个或多个通配符。</p>
 <p>使用通配符还有另一个好处。如果我们在一个匹配模式中引入了一个变量，但没有在函数体中用到它的话，Haskell 编译器会发出一个警告。定义一个变量但忘了使用通常意味着存在潜在的 bug，因此这是个有用的功能。假如我们不准备使用一个变量，那就不要用变量，而是用通配符，这样编译器就不会报错。</p>
 </div>
-<div class="section" id="id15">
-<h3>穷举匹配模式和通配符<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id16">
+<h3>穷举匹配模式和通配符<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h3>
 <p>在给一个类型写一组匹配模式时，很重要的一点就是一定要涵盖构造器的所有可能情况。例如，如果我们需要探查一个列表，就应该写一个匹配非空构造器 (:) 的方程和一个匹配空构造器 [] 的方程。</p>
 <p>假如我们没有涵盖所有情况会发生什么呢。下面，我们故意漏写对 [] 构造器的检查。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/BadPattern.hs</span>
@@ -597,8 +597,8 @@ In the expression:
 </div>
 </div>
 </div>
-<div class="section" id="id16">
-<h2>记录语法<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id17">
+<h2>记录语法<a class="headerlink" href="#id17" title="Permalink to this headline">¶</a></h2>
 <p>给一个数据类型的每个成分写访问器函数是令人感觉重复而且乏味的事情。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/BookStore.hs</span>
 <span class="nf">nicerID</span>      <span class="p">(</span><span class="kt">Book</span> <span class="n">id</span> <span class="kr">_</span>     <span class="kr">_</span>      <span class="p">)</span> <span class="ow">=</span> <span class="n">id</span>
@@ -688,8 +688,8 @@ In the expression:
 </div>
 <p>假如没有记录语法，从一个如此复杂的类型中抽取某个字段将是一件非常痛苦的事情。这种标识法使我们在使用大型结构的过程中更方便了。</p>
 </div>
-<div class="section" id="id17">
-<h2>参数化类型<a class="headerlink" href="#id17" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id18">
+<h2>参数化类型<a class="headerlink" href="#id18" title="Permalink to this headline">¶</a></h2>
 <p>我们曾不止一次地提到列表类型是多态的：列表中的元素可以是任何类型。我们也可以给自定义的类型添加多态性。只要在类型定义中使用类型变量就可以做到这一点。Prelude 中定义了一种叫做 <code class="docutils literal"><span class="pre">Maybe</span></code> 的类型：它用来表示这样一种值——既可以有值也可能空缺，比如数据库中某行的某字段就可能为空。</p>
 <div class="highlight-haskell"><div class="highlight"><pre>-- file: ch03/Nullable.hs
 data Maybe a = Just a
@@ -721,8 +721,8 @@ data Maybe a = Just a
 </div>
 <p>再补充说明一下，如果和其它更常见的语言做个类比，参数化类型就相当于 C++ 中的模板（template），和 Java 中的泛型（generics）。请注意这仅仅是个大概的比喻。这些语言都是在被发明之后很久再加上模板和泛型的，因此在使用时会感到有些别扭。Haskell 则是从诞生之日起就有了参数化类型，因此更简单易用。</p>
 </div>
-<div class="section" id="id18">
-<h2>递归类型<a class="headerlink" href="#id18" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id19">
+<h2>递归类型<a class="headerlink" href="#id19" title="Permalink to this headline">¶</a></h2>
 <p>列表这种常见的类型就是<em>递归</em>的：即它用自己来定义自己。为了深入了解其中的含义，让我们自己来设计一个与列表相仿的类型。我们将用 <code class="docutils literal"><span class="pre">Cons</span></code> 替换 <code class="docutils literal"><span class="pre">(:)</span></code> 构造器，用 <code class="docutils literal"><span class="pre">Nil</span></code> 替换 <code class="docutils literal"><span class="pre">[]</span></code> 构造器。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/ListADT.hs</span>
 <span class="kr">data</span> <span class="kt">List</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Cons</span> <span class="n">a</span> <span class="p">(</span><span class="kt">List</span> <span class="n">a</span><span class="p">)</span>
@@ -811,16 +811,16 @@ data Maybe a = Just a
                            <span class="p">(</span><span class="kt">Node</span> <span class="s">&quot;right child&quot;</span> <span class="kt">Empty</span> <span class="kt">Empty</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="section" id="id19">
-<h3>练习<a class="headerlink" href="#id19" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id20">
+<h3>练习<a class="headerlink" href="#id20" title="Permalink to this headline">¶</a></h3>
 <ol class="arabic simple">
 <li>请给 <code class="docutils literal"><span class="pre">List</span></code> 类型写一个与 <code class="docutils literal"><span class="pre">fromList</span></code> 作用相反的函数：传入一个 <code class="docutils literal"><span class="pre">List</span> <span class="pre">a</span></code> 类型的值，返回一个 <code class="docutils literal"><span class="pre">[a]</span></code>。</li>
 <li>请仿造 Java 示例，定义一种只需要一个构造器的树类型。不要使用 <code class="docutils literal"><span class="pre">Empty</span></code> 构造器，而是用 <code class="docutils literal"><span class="pre">Maybe</span></code> 表示节点的子节点。</li>
 </ol>
 </div>
 </div>
-<div class="section" id="id20">
-<h2>报告错误<a class="headerlink" href="#id20" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id21">
+<h2>报告错误<a class="headerlink" href="#id21" title="Permalink to this headline">¶</a></h2>
 <p>当我们的代码中出现严重错误时可以调用 Haskell 提供的标准函数 <code class="docutils literal"><span class="pre">error</span> <span class="pre">::</span> <span class="pre">String</span> <span class="pre">-&gt;</span> <span class="pre">a</span></code>。我们将希望打印出来的错误信息作为一个字符串参数传入。而该函数的类型签名看上去有些特别：它是怎么做到仅从一个字符串类型的值就生成任意类型 <code class="docutils literal"><span class="pre">a</span></code> 的返回值的呢？</p>
 <p>由于它的结果是返回类型 <code class="docutils literal"><span class="pre">a</span></code>，因此无论我们在哪里调用它都能得到正确类型的返回值。然而，它并不像普通函数那样返回一个值，而是立即中止求值过程，并将我们提供的错误信息打印出来。</p>
 <p><code class="docutils literal"><span class="pre">mySecond</span></code> 函数返回输入列表参数的第二个元素，假如输入列表长度不够则失败。</p>
@@ -847,8 +847,8 @@ data Maybe a = Just a
 <span class="o">***</span> <span class="kt">Exception:</span> <span class="kt">Prelude</span><span class="o">.</span><span class="n">tail</span><span class="kt">:</span> <span class="n">empty</span> <span class="n">list</span>
 </pre></div>
 </div>
-<div class="section" id="id21">
-<h3>让过程更可控的方法<a class="headerlink" href="#id21" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id22">
+<h3>让过程更可控的方法<a class="headerlink" href="#id22" title="Permalink to this headline">¶</a></h3>
 <p>我们可以使用 <code class="docutils literal"><span class="pre">Maybe</span></code> 类型来表示有可能出现错误的情况。</p>
 <p>如果我们想指出某个操作可能会失败，可以使用 <code class="docutils literal"><span class="pre">Nothing</span></code> 构造器。反之则使用 <code class="docutils literal"><span class="pre">Just</span></code> 构造器将值包裹起来。</p>
 <p>让我们看看如果返回 <code class="docutils literal"><span class="pre">Maybe</span></code> 类型的值而不是调用 <code class="docutils literal"><span class="pre">error</span></code>，这样会给 <code class="docutils literal"><span class="pre">mySecond</span></code> 函数带来怎样的变化。</p>
@@ -891,8 +891,8 @@ data Maybe a = Just a
 <p>第一个模式仅仅匹配那些至少有两个元素的列表（因为它有两个列表构造器），并将列表的第二个元素的值绑定给 变量 <code class="docutils literal"><span class="pre">x</span></code>。如果第一个模式匹配失败了，则匹配第二个模式。</p>
 </div>
 </div>
-<div class="section" id="id22">
-<h2>引入局部变量<a class="headerlink" href="#id22" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id23">
+<h2>引入局部变量<a class="headerlink" href="#id23" title="Permalink to this headline">¶</a></h2>
 <p>在函数体内部，我们可以在任何地方使用 <code class="docutils literal"><span class="pre">let</span></code> 表达式引入新的局部变量。请看下面这个简单的函数，它用来检查我们是否可以向顾客出借现金。我们需要确保剩余的保证金不少于 100 元的情况下，才能出借现金，并返回减去出借金额后的余额。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/Lending.hs</span>
 <span class="nf">lend</span> <span class="n">amount</span> <span class="n">balance</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">reserve</span>    <span class="ow">=</span> <span class="mi">100</span>
@@ -912,8 +912,8 @@ data Maybe a = Just a
 </div>
 <p>在 <code class="docutils literal"><span class="pre">let</span></code> 区块内定义的变量，既可以在定义区内使用，也可以在紧跟着 <code class="docutils literal"><span class="pre">in</span></code> 关键字的表达式中使用。</p>
 <p>一般来说，我们将代码中可以使用一个变量名的地方称作这个变量名的<em>作用域（scope）</em>。如果我们能使用，则说明在* 作用域*内，反之则说明<em>在作用域外</em> 。如果一个变量名在整个源代码的任意处都可以使用，则说明它位于<em>最顶层</em>的作用域。</p>
-<div class="section" id="id23">
-<h3>屏蔽<a class="headerlink" href="#id23" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id24">
+<h3>屏蔽<a class="headerlink" href="#id24" title="Permalink to this headline">¶</a></h3>
 <p>我们可以在表达式中使用嵌套的 <code class="docutils literal"><span class="pre">let</span></code> 区块。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/NestedLets.hs</span>
 <span class="nf">foo</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">a</span> <span class="ow">=</span> <span class="mi">1</span>
@@ -963,8 +963,8 @@ data Maybe a = Just a
 <p>尽管刚开始使用 <code class="docutils literal"><span class="pre">where</span></code> 从句通常会有异样的感觉，但它对于提升可读性有着巨大的帮助。它使得读者的注意力首先能集中在表达式的一些重要的细节上，而之后再补上支持性的定义。经过一段时间以后，如果再用回那些没有 <code class="docutils literal"><span class="pre">where</span></code> 从句的语言，你就会怀念它的存在了。</p>
 <p>与 <code class="docutils literal"><span class="pre">let</span></code> 表达式一样，<code class="docutils literal"><span class="pre">where</span></code> 从句中的空白和缩进也十分重要。 在下一节 “The offside rule and white space in an expression” 中我们会着重讲解其中的奥妙。</p>
 </div>
-<div class="section" id="id24">
-<h3>局部函数与全局变量<a class="headerlink" href="#id24" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id25">
+<h3>局部函数与全局变量<a class="headerlink" href="#id25" title="Permalink to this headline">¶</a></h3>
 <p>你可能已经注意到了，在 Haskell 的语法里，定义变量和定义函数的方式非常相似。这种相似性也存在于 <code class="docutils literal"><span class="pre">let</span></code> 和 <code class="docutils literal"><span class="pre">where</span></code> 区块里：定义局部<em>函数</em>就像定义局部<em>变量</em>那样简单。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/LocalFunction.hs</span>
 <span class="nf">pluralise</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Int</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
@@ -982,8 +982,8 @@ data Maybe a = Just a
 </div>
 </div>
 </div>
-<div class="section" id="id25">
-<h2>表达式里的缩进规则和空白字符<a class="headerlink" href="#id25" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id26">
+<h2>表达式里的缩进规则和空白字符<a class="headerlink" href="#id26" title="Permalink to this headline">¶</a></h2>
 <p>请看 <code class="docutils literal"><span class="pre">lend</span></code> 和 <code class="docutils literal"><span class="pre">lend2</span></code> 的定义表达式，左侧空出了一大块。这并不是随随便便写的，这些空白字符是有意义的。</p>
 <p>Haskell 依据缩进来解析代码块。这种用排版来表达逻辑结构的方式通常被称作<em>缩进规则</em>。在源码文件开始的那一行，首个顶级声明或者定义可以从该行的任意一列开始，Haskell 编译器或解释器将记住这个缩进级别，并且随后出现的所有顶级声明也必须使用相同的缩进。</p>
 <p>以下是一个顶级缩进规则的例子。第一个文件 <code class="docutils literal"><span class="pre">GoodIndent.hs</span></code> 执行正常。</p>
@@ -1050,13 +1050,13 @@ data Maybe a = Just a
 </div>
 <p>于此类似，第一个 <code class="docutils literal"><span class="pre">where</span></code> 从句的作用域即是定义 <code class="docutils literal"><span class="pre">foo</span></code> 的表达式，而第二个 <code class="docutils literal"><span class="pre">where</span></code> 从句的作用域则是第一个 <code class="docutils literal"><span class="pre">where</span></code> 从句。</p>
 <p>在 <code class="docutils literal"><span class="pre">let</span></code> 和 <code class="docutils literal"><span class="pre">where</span></code> 从句中妥善地使用缩进能够更好地展现代码的意图。</p>
-<div class="section" id="id26">
-<h3>对制表符和空格说两句<a class="headerlink" href="#id26" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id27">
+<h3>对制表符和空格说两句<a class="headerlink" href="#id27" title="Permalink to this headline">¶</a></h3>
 <p>在使用诸如 Emacs 这种能够识别 Haskell 代码的编辑器时，通常的默认配置是使用空格来表示缩进。如果你的编辑器不能识别 Haskell，建议您手工设置使用空格来表示缩进。</p>
 <p>这么做的好处是可移植性。在一个使用等宽字体的编辑器里，类 Unix 系统和 Windows 系统对制表符的默认显示宽度并不一样，前者相当于 8 个字符宽度，而后者则相当于 4 个。这就意味着无论你自己认为制表符应该显示为多宽，你并不能保证别人的编辑器设置会尊重你的看法。使用制表符来表示缩进一定会在某些人的设置那里看起来一团糟。甚至还有可能导致编译错误，因为 Haskell 语言标准的实现是按照 Unix 风格制表符宽度来的。而使用空格则完全不用担心这个问题。</p>
 </div>
-<div class="section" id="id27">
-<h3>缩进规则并不是必需<a class="headerlink" href="#id27" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id28">
+<h3>缩进规则并不是必需<a class="headerlink" href="#id28" title="Permalink to this headline">¶</a></h3>
 <p>我们也可以使用显式的语法结构来代替排版，从而表达代码的意图。例如，我们先写一个左大括号，然后写几个赋值等式，每个等式之间用分号分隔，最后加上一个右大括号。下面这个两个例子所表达的意图是一模一样的。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/Braces.hs</span>
 <span class="nf">bar</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">a</span> <span class="ow">=</span> <span class="mi">1</span>
@@ -1087,11 +1087,11 @@ data Maybe a = Just a
 <p>该区块的每一项由三个部分组成：一个模式，接着一个箭头 <code class="docutils literal"><span class="pre">-&gt;</span></code>，接着一个表达式；如果这个模式匹配中了，则计算并返回这个表达式的结果。这些表达式应当是同一类型的。第一个被匹配中的模式对应的表达式的计算结果即是 <code class="docutils literal"><span class="pre">case</span></code> 表达式的结果。匹配按自上而下的优先级进行。</p>
 <p>如果使用通配符 <code class="docutils literal"><span class="pre">_</span></code> 作为最后一个被匹配的模式，则意味着“如果上面的模式都没有被匹配中，就使用最后这个表达式”。如果所有模式匹配都没中，我们会看到前面章节里出现过的运行时错误。</p>
 </div>
-<div class="section" id="id28">
-<h2>新手在使用模式时常见的问题<a class="headerlink" href="#id28" title="Permalink to this headline">¶</a></h2>
-<p>在某些情况下，Haskell 新手会误解或误用模式。下面就是一些错误地使用模式匹配的例子。建议阅读时先自己想一想期望的结果是什么，然后看看实际的结果是否出乎你的意料。</p>
 <div class="section" id="id29">
-<h3>错误地对变量进行匹配<a class="headerlink" href="#id29" title="Permalink to this headline">¶</a></h3>
+<h2>新手在使用模式时常见的问题<a class="headerlink" href="#id29" title="Permalink to this headline">¶</a></h2>
+<p>在某些情况下，Haskell 新手会误解或误用模式。下面就是一些错误地使用模式匹配的例子。建议阅读时先自己想一想期望的结果是什么，然后看看实际的结果是否出乎你的意料。</p>
+<div class="section" id="id30">
+<h3>错误地对变量进行匹配<a class="headerlink" href="#id30" title="Permalink to this headline">¶</a></h3>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/BogusPattern.hs</span>
 <span class="kr">data</span> <span class="kt">Fruit</span> <span class="ow">=</span> <span class="kt">Apple</span> <span class="o">|</span> <span class="kt">Orange</span>
 
@@ -1129,8 +1129,8 @@ data Maybe a = Just a
 </div>
 <p>我们针对字符串值 <code class="docutils literal"><span class="pre">&quot;apple&quot;</span></code> 和 <code class="docutils literal"><span class="pre">&quot;orange&quot;</span></code> 进行模式匹配，于是问题得到了解决。</p>
 </div>
-<div class="section" id="id30">
-<h3>进行了错误的相等比较<a class="headerlink" href="#id30" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id31">
+<h3>进行了错误的相等比较<a class="headerlink" href="#id31" title="Permalink to this headline">¶</a></h3>
 <p>如果我们想比较一个 <code class="docutils literal"><span class="pre">Tree</span></code> 类型的两个节点值，如果相等就返回其中一个应该怎么做？请看下面这个尝试。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/BadTree.hs</span>
 <span class="nf">bad_nodesAreSame</span> <span class="p">(</span><span class="kt">Node</span> <span class="n">a</span> <span class="kr">_</span> <span class="kr">_</span><span class="p">)</span> <span class="p">(</span><span class="kt">Node</span> <span class="n">a</span> <span class="kr">_</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="n">a</span>
@@ -1140,8 +1140,8 @@ data Maybe a = Just a
 <p>一个命名在一组模式绑定中只能使用一次。将同一个变量放在多个位置并不意味着“这些变量应该相等”。要解决这类问题，我们需要使用 Haskell 的另一个重要的特性，<em>守卫</em>。</p>
 </div>
 </div>
-<div class="section" id="id31">
-<h2>使用守卫实现条件求值<a class="headerlink" href="#id31" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id32">
+<h2>使用守卫实现条件求值<a class="headerlink" href="#id32" title="Permalink to this headline">¶</a></h2>
 <p>模式匹配针对的是值长成什么样子，因此有着诸多局限。除此之外，我们常常需要在对函数体求值之前进行各种各样的检查。Haskell 也为此提供了<em>守卫</em>这个特性。我们将通过改写上面这个用来比较树的两个节点是否相等的这段函数来讲解它的使用方法。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/BadTree.hs</span>
 <span class="nf">nodesAreSame</span> <span class="p">(</span><span class="kt">Node</span> <span class="n">a</span> <span class="kr">_</span> <span class="kr">_</span><span class="p">)</span> <span class="p">(</span><span class="kt">Node</span> <span class="n">b</span> <span class="kr">_</span> <span class="kr">_</span><span class="p">)</span>
@@ -1209,11 +1209,11 @@ data Maybe a = Just a
       <div class="bottomnav">
       
         <p>
-        «&#160;&#160;<a href="2.html">第二章：类型和函数</a>
+        «&#160;&#160;<a href="2.html">第 2 章：类型和函数</a>
         &#160;&#160;::&#160;&#160;
         <a class="uplink" href="../index.html">Contents</a>
         &#160;&#160;::&#160;&#160;
-        <a href="4.html">第四章：函数式编程</a>&#160;&#160;»
+        <a href="4.html">第 4 章：函数式编程</a>&#160;&#160;»
         </p>
 
       </div>
