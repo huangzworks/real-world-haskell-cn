@@ -33,6 +33,7 @@ Real World Haskell 中文版
    chp/11
    chp/12
    chp/13
+   chp/16
    chp/18
    chp/19
    chp/20
