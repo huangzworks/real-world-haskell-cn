@@ -581,7 +581,7 @@ Parsec 中十分引人注目的工具。
 
 我们来试一下真正的 CSV 文件，下面是一个电子表格程序生成的文件内容：
 
-.. code:: csv
+::
 
     "Product","Price"
     "O'Reilly Socks",10
@@ -1216,18 +1216,20 @@ HTTP 请求的第一行之后，是零到多个 header，一个 header
 练习
 ----
 
-#. 我们的 HTTP 请求 parser
+1. 我们的 HTTP 请求 parser
    过于简化了，没法在部署在实际应用中。它缺少重要的功能，并且无法组织最基本的拒绝服务攻击(DOS,
    denial of service attack)
-    让我们的 parser 关注 Content-Length 这个 field,如果它存在的话
-#. 针对不设防的 web server 的 一个很流行的 DOS
+   让我们的 parser 关注 Content-Length 这个 field,如果它存在的话
+
+2. 针对不设防的 web server 的 一个很流行的 DOS
    攻击方式，是向它发送特别长的 header，一个 header
    可能包含几百兆的垃圾信息，从而耗光服务器的内存。
-    重构 header 的 parser，当一行超过 4096 个字符时 parse
+   重构 header 的 parser，当一行超过 4096 个字符时 parse
    失败。它必须在超过长度时立刻失败，而不是等到处理完一行之后。
-#. 关注 Transfer-Encoding 这个
+
+3. 关注 Transfer-Encoding 这个
    field，如果它存在的话，关于它的细节，可以查看 RFC 2616 的第 3.6.1 节
-#. 另一个流行的攻击方式是开启一个链接之后，放置不管或者以十分慢的速度发送数据。使用
+
+4. 另一个流行的攻击方式是开启一个链接之后，放置不管或者以十分慢的速度发送数据。使用
    ``IO`` monad 来封装 parser，如果没有在30秒内完成 parse，就使用
    ``System.Timeout`` 这个模块关闭链接。
-
