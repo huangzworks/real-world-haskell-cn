@@ -313,12 +313,6 @@ parser。但是，当我们去看在 &#8220;\n&#8221; 后面是不是有一个 &
 <span class="nf">expecting</span> <span class="s">&quot;</span><span class="se">\n\r</span><span class="s">&quot;</span>
 </pre></div>
 </div>
-<p>We&#8217;ve stumbled upon the lookahead problem. It turns out that, when
-writing parsers, it&#8217;s often very convenient to be able to &#8220;look ahead&#8221;
-at the data that&#8217;s coming in. Parsec supports this, but before showing
-you how to use it, let&#8217;s see how you would have to write this to get
-along without it. You&#8217;d have to manually expand all the options after
-the \n like this:</p>
 <p>我们在超前查看的问题上栽了跟头，看起来，在写 parser
 的时候，能够在数据到来时 “超前查看” 是很有用的。Parsec
 是支持这一特性的，不过在我们展示这一特性的时候，先来看看怎样能够不利用超前查看特性完成这个任务。你必须要自己去考虑
@@ -869,7 +863,24 @@ Parsec，让我们来写一个满足 RFC 4627 定义的 JSON parser</p>
              <span class="o">&lt;|&gt;</span> <span class="kt">JArray</span> <span class="o">&lt;$&gt;</span> <span class="n">p_array</span>
 </pre></div>
 </div>
-<p>译注：这一节作者并没有给出 <code class="docutils literal"><span class="pre">JSON</span></code> 类型的定义，可以参考第六章。</p>
+<p>译注：这一节作者并没有给出 <code class="docutils literal"><span class="pre">JSON</span></code> 类型的定义，可以参考第六章。而且第六章的 <code class="docutils literal"><span class="pre">JSON</span></code> 定义也跟这里的 parser 不太一致，可以参考 Real World Haskell 网站这一节中 Alexey 的 comment:</p>
+<div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- 译注：Real World Haskell 网站这一节中 Alexey 的 comment</span>
+<span class="kr">data</span> <span class="kt">JValue</span> <span class="ow">=</span> <span class="kt">JString</span> <span class="kt">String</span>
+            <span class="o">|</span> <span class="kt">JNumber</span> <span class="kt">Double</span>
+            <span class="o">|</span> <span class="kt">JBool</span> <span class="kt">Bool</span>
+            <span class="o">|</span> <span class="kt">JNull</span>
+            <span class="o">|</span> <span class="kt">JObject</span> <span class="p">(</span><span class="kt">JObj</span> <span class="kt">JValue</span><span class="p">)</span>
+            <span class="o">|</span> <span class="kt">JArray</span> <span class="p">(</span><span class="kt">JAry</span> <span class="kt">JValue</span><span class="p">)</span>
+            <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+<span class="kr">newtype</span> <span class="kt">JAry</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">JAry</span> <span class="p">{</span>
+    <span class="n">fromJAry</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+    <span class="p">}</span> <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+
+<span class="kr">newtype</span> <span class="kt">JObj</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">JObj</span> <span class="p">{</span>
+    <span class="n">fromJObj</span> <span class="ow">::</span> <span class="p">[(</span><span class="kt">String</span><span class="p">,</span> <span class="n">a</span><span class="p">)]</span>
+    <span class="p">}</span> <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+</pre></div>
+</div>
 <p>数组和对象在结构上很类似，一个字符（对数组是
 “[”，对对象是“{”）用作做括号，内部是用逗号分隔的数据，由另一个字符（对数组是“]”，对对象是“}”）作为右括号终结。我们可以抓住这种相似性，写一个小的辅助函数。</p>
 <div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/JSONParsec.hs</span>
@@ -879,7 +890,6 @@ Parsec，让我们来写一个满足 RFC 4627 定义的 JSON parser</p>
             <span class="p">(</span><span class="n">parser</span> <span class="o">&lt;*</span> <span class="n">spaces</span><span class="p">)</span> <span class="p">`</span><span class="n">sepBy</span><span class="p">`</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;,&#39;</span> <span class="o">&lt;*</span> <span class="n">spaces</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>译注：其实可以用 Parsec 内置的 <code class="docutils literal"><span class="pre">between</span></code> 函数。</p>
 <p>在这里，我们终于用到了 <code class="docutils literal"><span class="pre">(&lt;*)</span></code>
 这个我们之前介绍过的组合子。我们用它来略过一些 token 之前的空格。使用
 <code class="docutils literal"><span class="pre">p_series</span></code> 函数， 解析一个数组会很简单。</p>
@@ -957,8 +967,10 @@ Parsec，让我们来写一个满足 RFC 4627 定义的 JSON parser</p>
 </div>
 <p>我们可以使用刚刚介绍过的 <code class="docutils literal"><span class="pre">choice</span></code> 组合子来解析转义字符序列。</p>
 <div class="code haskell highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch16/JSONParsec.hs</span>
+<span class="nf">p_escape</span> <span class="ow">::</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="kt">Char</span>
 <span class="nf">p_escape</span> <span class="ow">=</span> <span class="n">choice</span> <span class="p">(</span><span class="n">zipWith</span> <span class="n">decode</span> <span class="s">&quot;bnfrt</span><span class="se">\\\&quot;</span><span class="s">/&quot;</span> <span class="s">&quot;</span><span class="se">\b\n\f\r\t\\\&quot;</span><span class="s">/&quot;</span><span class="p">)</span>
-    <span class="kr">where</span> <span class="n">decode</span> <span class="n">c</span> <span class="n">r</span> <span class="ow">=</span> <span class="n">r</span> <span class="o">&lt;$</span> <span class="n">char</span> <span class="n">c</span>
+    <span class="kr">where</span> <span class="n">decode</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">CharParser</span> <span class="nb">()</span> <span class="kt">Char</span>
+          <span class="n">decode</span> <span class="n">c</span> <span class="n">r</span> <span class="ow">=</span> <span class="n">r</span> <span class="o">&lt;$</span> <span class="n">char</span> <span class="n">c</span>
 </pre></div>
 </div>
 <p>最后，JSON 允许我们在字符串中使用 Unicode
