@@ -309,12 +309,6 @@ parser。但是，当我们去看在 "\\n" 后面是不是有一个 "\\r"
     unexpected end of input
     expecting "\n\r"
 
-We've stumbled upon the lookahead problem. It turns out that, when
-writing parsers, it's often very convenient to be able to "look ahead"
-at the data that's coming in. Parsec supports this, but before showing
-you how to use it, let's see how you would have to write this to get
-along without it. You'd have to manually expand all the options after
-the \\n like this:
 
 我们在超前查看的问题上栽了跟头，看起来，在写 parser
 的时候，能够在数据到来时 “超前查看” 是很有用的。Parsec
