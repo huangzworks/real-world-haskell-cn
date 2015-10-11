@@ -979,11 +979,6 @@ Parsec，让我们来写一个满足 RFC 4627 定义的 JSON parser
     newtype JObj a = JObj {
         fromJObj :: [(String, a)]
         } deriving (Eq, Ord, Show)
-        p_text :: CharParser () JValue
-        p_text = spaces *> text
-             <?> "JSON text"
-            where text = JObject <$> p_object
-                     <|> JArray <$> p_array
 
 
 数组和对象在结构上很类似，一个字符（对数组是
