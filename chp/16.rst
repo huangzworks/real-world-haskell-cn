@@ -309,12 +309,6 @@ parser。但是，当我们去看在 "\\n" 后面是不是有一个 "\\r"
     unexpected end of input
     expecting "\n\r"
 
-We've stumbled upon the lookahead problem. It turns out that, when
-writing parsers, it's often very convenient to be able to "look ahead"
-at the data that's coming in. Parsec supports this, but before showing
-you how to use it, let's see how you would have to write this to get
-along without it. You'd have to manually expand all the options after
-the \\n like this:
 
 我们在超前查看的问题上栽了跟头，看起来，在写 parser
 的时候，能够在数据到来时 “超前查看” 是很有用的。Parsec
@@ -966,7 +960,26 @@ Parsec，让我们来写一个满足 RFC 4627 定义的 JSON parser
         where text = JObject <$> p_object
                  <|> JArray <$> p_array
 
-译注：这一节作者并没有给出 ``JSON`` 类型的定义，可以参考第六章。
+译注：这一节作者并没有给出 ``JSON`` 类型的定义，可以参考第六章。而且第六章的 ``JSON`` 定义也跟这里的 parser 不太一致，可以参考 Real World Haskell 网站这一节中 Alexey 的 comment:
+
+.. code:: haskell
+
+    -- 译注：Real World Haskell 网站这一节中 Alexey 的 comment
+    data JValue = JString String
+                | JNumber Double
+                | JBool Bool
+                | JNull
+                | JObject (JObj JValue)
+                | JArray (JAry JValue)
+                deriving (Eq, Ord, Show)
+    newtype JAry a = JAry {
+        fromJAry :: [a]
+        } deriving (Eq, Ord, Show)
+
+    newtype JObj a = JObj {
+        fromJObj :: [(String, a)]
+        } deriving (Eq, Ord, Show)
+
 
 数组和对象在结构上很类似，一个字符（对数组是
 “[”，对对象是“{”）用作做括号，内部是用逗号分隔的数据，由另一个字符（对数组是“]”，对对象是“}”）作为右括号终结。我们可以抓住这种相似性，写一个小的辅助函数。
@@ -979,7 +992,6 @@ Parsec，让我们来写一个满足 RFC 4627 定义的 JSON parser
         between (char left <* spaces) (char right) $
                 (parser <* spaces) `sepBy` (char ',' <* spaces)
 
-译注：其实可以用 Parsec 内置的 ``between`` 函数。
 
 在这里，我们终于用到了 ``(<*)``
 这个我们之前介绍过的组合子。我们用它来略过一些 token 之前的空格。使用
@@ -1075,8 +1087,10 @@ Parse 一个字符串也不困难，不过需要处理一些细节。
 .. code:: haskell
 
     -- file: ch16/JSONParsec.hs
+    p_escape :: CharParser () Char
     p_escape = choice (zipWith decode "bnfrt\\\"/" "\b\n\f\r\t\\\"/")
-        where decode c r = r <$ char c
+        where decode :: Char -> Char -> CharParser () Char
+              decode c r = r <$ char c
 
 最后，JSON 允许我们在字符串中使用 Unicode
 字符："\\u"后面跟着四个十六进制数字:
