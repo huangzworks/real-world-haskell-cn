@@ -1,4 +1,4 @@
--- file: ch12/best.hs
+-- file: ch12/Barcode.hs
 type Digit = Word8
 
 bestLeft :: [Run] -> [Parity (Score, Digit)]

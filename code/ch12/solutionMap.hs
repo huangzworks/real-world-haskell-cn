@@ -1,2 +1,2 @@
--- file: ch12/solutionMap.hs
+-- file: ch12/Barcode.hs
 type Map a = M.Map Digit [a]

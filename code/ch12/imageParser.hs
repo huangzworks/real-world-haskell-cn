@@ -1,4 +1,4 @@
--- file: ch12/imageParser.hs
+-- file: ch12/Barcode.hs
 parseRawPPM :: Parse Pixmap
 parseRawPPM =
     parseWhileWith w2c (/= '\n') ==> \header -> skipSpaces ==>&

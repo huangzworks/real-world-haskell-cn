@@ -1,4 +1,4 @@
--- file: ch12/addFirstDigit.hs
+-- file: ch12/Barcode.hs
 addFirstDigit :: ParityMap -> DigitMap
 addFirstDigit = M.foldWithKey updateFirst M.empty
 
