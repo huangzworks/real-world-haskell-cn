@@ -1,5 +1,6 @@
--- file: ch12/buildMap.hs
+-- file: ch12/Barcode.hs
 buildMap :: [[Parity Digit]] -> DigitMap
-buildMap = M.mapKeys (10 -)
+buildMap = M.mapKeys (realCheckDigit)
          . addFirstDigit
          . finalDigits
+         	where realCheckDigit c = (10 - c) `mod` 10 

@@ -1,4 +1,4 @@
--- file: ch12/runLength.hs
+-- file: ch12/Barcode.hs
 type Run = Int
 type RunLength a = [(Run, a)]
 

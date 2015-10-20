@@ -1,4 +1,4 @@
--- file: ch12/listComprehension.hs
+-- file: ch12/Barcode.hs
 -- our original
 zip [distance d (scaleToOne ps) | d <- srl] digits
 

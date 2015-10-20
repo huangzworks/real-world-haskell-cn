@@ -1,4 +1,4 @@
--- file: ch12/firstDigit.hs
+-- file: ch12/Barcode.hs
 firstDigit :: [Parity a] -> Digit
 firstDigit = snd
            . head

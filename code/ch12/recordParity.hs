@@ -1,4 +1,4 @@
--- file: ch12/recordParity.hs
+-- file: ch12/Barcode.hs
 data AltParity a = AltEven {fromAltParity :: a}
              	| AltOdd  {fromAltParity :: a}
              	| AltNone {fromAltParity :: a}

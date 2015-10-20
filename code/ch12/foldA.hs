@@ -1,4 +1,4 @@
--- file: ch12/foldA.hs
+-- file: ch12/Barcode.hs
 -- | Strict left fold, similar to foldl' on lists.
 foldA :: Ix k => (a -> b -> a) -> a -> Array k b -> a
 foldA f s a = go s (indices a)

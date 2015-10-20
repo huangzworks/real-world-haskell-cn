@@ -1,4 +1,4 @@
--- file: ch12/updateMap.hs
+-- file: ch12/Barcode.hs
 updateMap :: Parity Digit       -- ^ new digit
           -> Digit              -- ^ existing key
           -> [Parity Digit]     -- ^ existing digit sequence

@@ -1,4 +1,4 @@
--- file: ch12/main.hs
+-- file: ch12/Barcode.hs
 main :: IO ()
 main = do
   args <- getArgs

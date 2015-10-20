@@ -1,3 +1,4 @@
+-- file: ch12/Barcode.hs
 candidateDigits rle
     | any null match = []
     | otherwise      = map (map (fmap snd)) match

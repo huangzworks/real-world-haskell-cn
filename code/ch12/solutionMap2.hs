@@ -1,3 +1,3 @@
--- file: ch12/solutionMap2.hs
+-- file: ch12/Barcode.hs
 type DigitMap = Map Digit
 type ParityMap = Map (Parity Digit)

@@ -1,4 +1,4 @@
--- file: ch12/chunk.hs
+-- file: ch12/Barcode.hs
 chunkWith :: ([a] -> ([a], [a])) -> [a] -> [[a]]
 chunkWith _ [] = []
 chunkWith f xs = let (h, t) = f xs

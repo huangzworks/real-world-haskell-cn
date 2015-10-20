@@ -1,4 +1,4 @@
--- file: ch12/solve.hs
+-- file: ch12/Barcode.hs
 solve :: [[Parity Digit]] -> [[Digit]]
 solve [] = []
 solve xs = catMaybes $ map (addCheckDigit m) checkDigits

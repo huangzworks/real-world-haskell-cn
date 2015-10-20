@@ -1,4 +1,4 @@
--- file: ch12/greyMap.hs
+-- file: ch12/Barcode.hs
 type Greymap = Array (Int,Int) Pixel
 
 pixmapToGreymap :: Pixmap -> Greymap
