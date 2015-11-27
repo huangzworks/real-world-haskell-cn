@@ -62,7 +62,7 @@
 ::
 
     *Main> myInfo
-    Book 494539463 "Algebra of Programming" ["Richard Bird","Oege de Moor"]
+    Book 9780135072455 "Algebra of Programming" ["Richard Bird","Oege de Moor"]
 
 在 ghci 里面当然也可以创建新的 ``BookInfo`` 值：
 
