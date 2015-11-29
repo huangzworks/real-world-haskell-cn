@@ -1317,6 +1317,7 @@ Case 表达式
 
     -- file: ch03/BogusPattern.hs
     data Fruit = Apple | Orange
+                 deriving (Show)
 
     apple = "apple"
 
