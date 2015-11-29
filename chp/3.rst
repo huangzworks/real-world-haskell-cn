@@ -62,7 +62,7 @@
 ::
 
     *Main> myInfo
-    Book 494539463 "Algebra of Programming" ["Richard Bird","Oege de Moor"]
+    Book 9780135072455 "Algebra of Programming" ["Richard Bird","Oege de Moor"]
 
 在 ghci 里面当然也可以创建新的 ``BookInfo`` 值：
 
@@ -1317,6 +1317,7 @@ Case 表达式
 
     -- file: ch03/BogusPattern.hs
     data Fruit = Apple | Orange
+                 deriving (Show)
 
     apple = "apple"
 
@@ -1401,7 +1402,7 @@ Case 表达式
         where reserve    = 100
               newBalance = balance - amount
 
-``otherwise`` 看上去像是守卫表达式的某种特殊语法，但实际上它只是一个被绑定为值 ``True`` 的普通变量，这样写是位了提高可读性。
+``otherwise`` 看上去像是守卫表达式的某种特殊语法，但实际上它只是一个被绑定为值 ``True`` 的普通变量，这样写是为了提高可读性。
 
 任何使用模式的地方都可以使用守卫。用模式匹配和守卫把方法写成一组等式会大大提高可读性。还记得我们在\ `条件求值<>_`\ 一节中定义的 ``myDrop`` 方法吗？
 
