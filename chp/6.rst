@@ -1,132 +1,165 @@
 .. _using-typeclasses:
 
 
-第 6 章：类型类
-================
+=====================
+ 第 6 章：使用类型类
+=====================
 
-类型类（typeclass）跻身于 ``Haskell`` 最强大功能之列：它用于定义通用接口，为各种不同的类型提供一组公共特性集。
-
-类型类是某些基本语言特性的核心，比如相等性测试和数值操作符。
-
-在讨论如何使用类型类之前，先来看看它能做什么。
+类型类（typeclass）跻身于 ``Haskell`` 最强大功能之列：它们（typeclasses）允许你定义通用接口，其（这些接口）为各种不同的类型（type）提供一组公共特性集。
+类型类是某些基本语言特性的核心，比如相等性测试（equality testing）和数值操作符（numeric operators）。
+在讨论到底类型类是什么之前，我想解释下他们的作用（the need for them）．
 
 
 .. _the-need-for-typeclasses:
 
 类型类的作用
-----------------
+============
 
-假设这样一个场景：我们想对 ``Color`` 类型的值进行对比，但 Haskell 的语言设计者却没有实现 ``==`` 操作。
-
-要解决这个问题，必须亲自实现一个相等性测试函数：
-
-.. literalinclude:: /code/ch06/colorEq.hs
-
-在 ghci 里测试：
+让我们想象一下某个高深莫测（无厘头）的原因， ``Haskell`` 语言的设计者拒绝实现相等性测试 ``==``.一旦你听到这个噩耗，你决定山寨一套自己的相等性测试 ``==``.
+你的应用由一个简单的 ``Color`` 类型组成．首先你尝试了一下，像这样：［sancao2译注:很naive（幼稚）的版本,看文件名字,囧］
 
 ::
+   
+   -- file: ch06/naiveeq.hs
+   data Color = Red | Green | Blue
+   
+   colorEq :: Color -> Color -> Bool
+   colorEq Red   Red   = True
+   colorEq Green Green = True
+   colorEq Blue  Blue  = True
+   colorEq _     _     = False
 
-    Prelude> :load colorEq.hs
-    [1 of 1] Compiling Main             ( colorEq.hs, interpreted )
+让我们在 ghci 里测试一下：
+
+::
+   
+    Prelude> :l naiveeq.hs
+    [1 of 1] Compiling Main             ( naiveeq.hs, interpreted )
     Ok, modules loaded: Main.
-
     *Main> colorEq Green Green
     True
-
-    *Main> colorEq Blue Red
+    *Main> colorEq Red Red
+    True
+    *Main> colorEq Red Green
     False
 
-过了一会，程序又添加了一个新类型 —— 职位：它对公司中的各个员工进行分类。
-
-在执行像是工资计算这类任务是，又需要用到相等性测试，所以又需要再次为职位类型定义相等性测试函数：
-
-.. literalinclude:: /code/ch06/roleEq.hs
-
-测试：
+现在，假设你想要添加 ``String`` 的相等性测试(equality testing)．因为一个 ``Haskell`` 的 ``String`` 其实是字符们（characters）的列表(即[char])，
+所以我们可以写一个小函数来运行那个测试(相等性测试)．为了简单（偷懒）起见，我们作弊一下：使用 ``==`` 操作符．
 
 ::
+   
+   -- file: ch06/naiveeq.hs
+   stringEq :: [Char] -> [Char] -> Bool
 
-    Prelude> :load roleEq.hs
-    [1 of 1] Compiling Main             ( roleEq.hs, interpreted )
-    Ok, modules loaded: Main.
+   -- Match if both are empty
+   stringEq [] [] = True
 
-    *Main> roleEq Boss Boss
-    True
+   -- If both start with the same char, check the rest
+   stringEq (x:xs) (y:ys) = x == y && stringEq xs ys
 
-    *Main> roleEq Boss Employee
-    False
+   -- Everything else doesn't match
+   stringEq _ _ = False
 
-``colorEq`` 和 ``roleEq`` 的定义揭示了一个问题：对于每个不同的类型，我们都需要为它们专门定义一个对比函数。
+让我们运行一下：
 
-这种做法非常低效，而且烦人。如果同一个对比函数（比如 ``==`` ）可以用于对比任何类型的值，这样就会方便得多。
+::
+   
+   Prelude> :l naiveeq.hs
+   [1 of 1] Compiling Main             ( naiveeq.hs, interpreted )
+   Ok, modules loaded: Main.
+   
+   *Main> stringEq "" ""
+   True
+   
+   *Main> stringEq "" []
+   True
+   
+   *Main> stringEq "" [""]
+   <interactive>:5:14:
+   Couldn't match expected type `Char' with actual type `[Char]'
+   In the expression: ""
+   In the second argument of `stringEq', namely `[""]'
+   In the expression: stringEq "" [""]
+   
+［sancao2译注:囧，报错了，无所谓了，意思到了就可以了．示意（illustrate）一下，你懂的？继续］
 
-另一方面，一般来说，如果定义了相等测试函数（比如 ``==`` ），那么不等测试函数（比如 ``/=`` ）的值就可以直接对相等测试函数取反（使用 ``not`` ）来计算得出。因此，如果可以通过相等测试函数来定义不等测试函数，那么会更方便。
+你现在应该能看出一个问题了吧：我们不得不为各个不同类型（type）实现一坨带有不同名字的函数（function），以便我们有能力用其进行比较．
+这种做法非常低效，而且烦人。如果我们能用 ``==`` 对比任何类型的值，就再方便不过了．
 
-通用函数还可以让代码变得更通用：如果同一段代码可以用于不同类型的输入值，那么程序的代码量将大大减少。
+同时，我们能定义一些通用（generic）函数，比如基于 ``==`` 的 ``/=``, 其能对几乎所有的东西（anything）合法．
+通过写一个通用函数其能比较所有的东西，也能使我们的代码一般化（generic）：如果一段代码仅需要比较（compare）一些东西，
+然后他应该能够接受任何数据类型，对其（这些类型）编译器是知道如何比较的．
 
-还有很重要的一点是，如果在之后添加通用函数对新类型的支持，那么原来的代码应该不需要进行修改。
-
-Haskell 的类型类可以满足以上提到的所有要求。
+而且更进一步，如果以后新类型被添加进来，现有的代码不应该被修改。Haskell 的类型类（typeclass）就是被设计成处理上面的这些破事的．
 
 
 .. _what-are-typeclasses:
 
 什么是类型类？
------------------
+==============
 
-类型类定义了一系列函数，这些函数对于不同类型的值使用不同的函数实现。它和其他语言的接口和多态方法有些类似。
+类型类定义了一系列函数，这些函数对于不同类型的值使用不同的函数实现。它和面向对象（object-oriented）语言的对象（objects）有些类似，但是他们是完全不同的．
 
-[译注：这里原文是将“面向对象编程中的对象”和 Haskell 的类型类进行类比，但实际上这种类比并不太恰当，类比成接口和多态方法更适合一点。]
+[huangz，labyrlnth，YenvY等译者注：这里原文是将“面向对象编程中的对象”和 Haskell 的类型类进行类比，但实际上这种类比并不太恰当，类比成接口和多态方法更适合一点。
+sancao2译注:我觉得作者不是不知道类型类应该与接口和多态方法类比,他这么说的原因是下面他自己的注释"When is a class not a class?"里面说的,
+因为类型类的关键词是class,传统面向对象编程里面的关键词也是class,囧rz.]
 
-我们定义一个类型类来解决前面提到的相等性测试问题：
+让我们使用类型类来解决我们章节前面相等性测试的困境．首先，我们定义类型类本身．我们需要一个函数，其接受两个参数．
+每个参数拥有相同的类型，然后返回一个 ``Bool`` 类型以指示他们是否相等．我们不关心这些类型到底是什么，但是我需要的是同一个类型的两项(item)．
+
+下面是我们的类型的初定义：
 
 ::
-    -- file: ch06/BasicEq_1.hs
+   
+    -- file: ch06/eqclasses.hs
     class BasicEq a where
         isEqual :: a -> a -> Bool
 
-类型类使用 ``class`` 关键字来定义，跟在 ``class`` 之后的 ``BasicEq`` 是这个类型类的名字，之后的 ``a`` 是这个类型类的实例类型（instance type）。
+这个定义说，我们申明（使用 ``class`` 关键字）了一个类型类（typeclass）,其名字叫 ``BasicEq``.
+接着我们将引用实例类型（instance types）,带着字母 ``a`` 作名字．一个类型类的实例类型可以是任何类型，其（实例类型）只要实现了类型类中定义的函数．
+这个类型类定义了一个函数(``isEqual``)．这个函数接受两个参数，其（这俩参数）对应于实例类型即 ``a``,　并且返回一个 ``Bool`` 型．
 
-``BasicEq`` 使用类型变量 ``a`` 来表示实例类型，说明它并不将这个类型类限定于某个类型：任何一个类型，只要它实现了这个类型类中定义的函数，那么它就是这个类型类的实例类型。
+［作者注释：什么时候一个类（class，指的是关键词）不是一个类（OOP中的class）？原句：When is a class not a class?
+Haskell中用于定义一个类型类的关键词是 ``class``.不幸的是，这可能会使那些来自面向对象背景的家伙感到困惑，因为我们说得不是一个东西．鸡同鸭讲，233.］
 
-实例类型所使用的名字可以随意选择，但是它和类型类中定义函数签名时所使用的名字应该保持一致。比如说，我们使用 ``a`` 来表示实例类型，那么函数签名中也必须使用 ``a`` 来代表这个实例类型。
+在定义的第一行，参数（实例类型）的名字是任选的．就是说，我们能使用任意名字．关键之处在于，当我们列出函数的类型，我们必须使用相同的名字引用这些实例类型（instance types）．
+比如说，我们使用 ``a`` 来表示实例类型，那么函数签名中也必须使用 ``a`` 来代表这个实例类型。
 
-``BasicEq`` 类型类只定义了 ``isEqual`` 一个函数 —— 它接受两个参数作为输入，并且这两个参数都指向同一种实例类型：
+让我们在 ``ghci`` 看一下 ``isEqual`` 的类型．回想一下，在 ``ghci`` 我们能用 ``:type`` （简写 ``:t`` ）来查看某些东西的类型．
 
 ::
 
-    Prelude> :load BasicEq_1.hs
-    [1 of 1] Compiling Main             ( BasicEq_1.hs, interpreted )
+    Prelude> :load eqclasses.hs
+    [1 of 1] Compiling Main             ( eqclasses.hs, interpreted )
     Ok, modules loaded: Main.
 
     *Main> :type isEqual
-    isEqual :: BasicEq a => a -> a -> Bool
+    isEqual :: (BasicEq a) => a -> a -> Bool
 
-作为演示，以下代码将 ``Bool`` 类型作为 ``BasicEq`` 的实例类型，实现了 ``isEqual`` 函数：
+这种方式让我们读出：＂对于所有的类型 ``a``,只要 ``a`` 是 ``BasicEq`` 的一个实例， ``isEqual`` 就能接受两个类型为 ``a`` 的参数，返回一个 ``Bool``.＂
+[sancao2译注:这句话为什么原文加引号,其实是帮助读者解读编译器输出"(BasicEq a) => a -> a -> Bool".]
+让我们快速地浏览一遍为某个特定类型定义的 ``isEqual`` 吧．
+[sancao2译注,注意(定义类型类实例的手法)关键词变成了 ``instance``,然后 ``a`` 被替换成 ``Bool`` 类型,然后才是类型类须实现的函数的定义.]
 
 ::
-    -- file: ch06/BasicEq_1.hs
+    -- file: ch06/eqclasses.hs
     instance BasicEq Bool where
         isEqual True  True  = True
         isEqual False False = True
         isEqual _     _     = False
 
-在 ghci 里验证这个程序：
+你能用 ``ghci`` 来验证我们基于 ``Bool`` 类的 ``isEqual``, 而不是基于其他实例类型的．
 
 ::
 
     *Main> isEqual True True
     True
-
+    
     *Main> isEqual False True
     False
-
-如果试图将不是 ``BasicEq`` 实例类型的值作为输入调用 ``isEqual`` 函数，那么就会引发错误：
-
-::
-
+   
     *Main> isEqual "hello" "moto"
-
+   
     <interactive>:5:1:
         No instance for (BasicEq [Char])
               arising from a use of `isEqual'
@@ -134,42 +167,55 @@ Haskell 的类型类可以满足以上提到的所有要求。
         In the expression: isEqual "hello" "moto"
         In an equation for `it': it = isEqual "hello" "moto"
 
-错误信息提醒我们， ``[Char]`` 并不是 ``BasicEq`` 的实例类型。
+注意,当我们试图比较两个字符串,ghci抱怨到，我们没有提供基于 ``String`` 实例类型的 ``BasicEq``. 所以他不知道如何去比较 ``String``.
+[sancao2译注:作者给我们解读编译器"No instance for (BasicEq [Char])"的报警/抱怨.学会看编译器的输出是非常重要的,作者真是用心良苦.]
+并且建议到我们可以通过定义基于 ``[Char]`` (等价于 ``String``) 实例类型的 ``BasicEq``.
+[sancao2译注:编译器"Possible fix: add an instance declaration for (BasicEq [Char])"的解读.]
 
-稍后的一节会介绍更多关于类型类实例的定义方式，这里先继续前面的例子。这一次，除了 ``isEqual`` 之外，我们还想定义不等测试函数 ``isNotEqual`` ：
-
-::
-    -- file: ch06/BasicEq_3.hs
-    class BasicEq a where
-        isEqual    :: a -> a -> Bool
-        isNotEqual :: a -> a -> Bool
-
-同时定义 ``isEqual`` 和 ``isNotEqual`` 两个函数产生了一些不必要的工作：从逻辑上讲，对于任何类型，只要知道 ``isEqual`` 或 ``isNotEqual`` 的任意一个，就可以计算出另外一个。因此，一种更省事的办法是，为 ``isEqual`` 和 ``isNotEqual`` 两个函数提供默认值，这样 ``BasicEq`` 的实例类型只要实现这两个函数中的一个，就可以顺利使用这两个函数：
+稍后的一节我们将会详细介绍定义实例类型（instances）．不过，首先让我们继续看看定义类型类(typeclass)。
+在这个例子中，一个＂不相等＂（not-equal-to）函数可能很有用．这里我们可以做的是，定义一个带两个函数的类型类（typeclass）：
 
 ::
-    -- file: ch06/BasicEq_3.hs
-    class BasicEq a where
-        isEqual :: a -> a -> Bool
-        isEqual x y = not (isNotEqual x y)
+   
+    -- file: ch06/eqclasses.hs
+    class BasicEq2 a where
+        isEqual2    :: a -> a -> Bool
+        isNotEqual2 :: a -> a -> Bool
 
-        isNotEqual :: a -> a -> Bool
-        isNotEqual x y = not (isEqual x y)
-
-以下是将 ``Bool`` 作为 ``BasicEq`` 实例类型的例子：
-
-::
-    -- file: ch06/BasicEq_3.hs
-    instance BasicEq Bool where
-        isEqual False False = True
-        isEqual True  True  = True
-        isEqual _     _     = False
-
-我们只要定义 ``isEqual`` 函数，就可以“免费”得到 ``isNotEqual`` ：
+如果有人要提供一个 ``BasicEq2`` 的实例（instance），他将要定义两个函数： ``isEqual2`` 和 ``isNotEqual2``.
+当我们定义好以上的 ``BasicEq2``, 看起来我们为自己制造了额外的工作．从逻辑上讲，如果我们知道 ``isEqual2`` 或 ``isNotEqual2`` 返回的是什么，那么我们就可以知道另外一个函数的返回值，对于所有类型来说。
+为了避免让类型类的用户为所有类型都定义两个函数，我们可以提供他们（两个函数）的默认实现.然后，用户只要自己实现其中一个就可以了．这里的例子展示了如何实现这种做法．
 
 ::
+   
+    -- file: ch06/eqclasses.hs
+    class BasicEq3 a where
+        isEqual3 :: a -> a -> Bool
+        isEqual3 x y = not (isNotEqual3 x y)
 
-    Prelude> :load BasicEq_3.hs
-    [1 of 1] Compiling Main             ( BasicEq_3.hs, interpreted )
+        isNotEqual3 :: a -> a -> Bool
+        isNotEqual3 x y = not (isEqual3 x y)
+
+人们实现这个类型类必须提供至少一个函数的实现．当然他们可以实现两个，如果他们乐意，但是他们不必被强制（这么做）．
+虽然我们提供两个函数的默认实现，每个函数取决于另外一个来计算答案．如果我们不指定至少一个，所产生的代码将是一个无尽循环．
+［saocao2译注:翻译成＂死循环＂好,还是字面翻译(endless loop)无尽循环好？］
+因此，至少得有一个函数总是要被实现．
+
+[huangz，labyrlnth，YenvY等译者提供的实例类型的例子,赞．以下是将 ``Bool`` 作为 ``BasicEq3`` 实例类型的例子.
+
+::
+    -- file: ch06/eqclasses.hs
+    instance BasicEq3 Bool where
+        isEqual3 False False = True
+        isEqual3 True  True  = True
+        isEqual3 _     _     = False
+
+我们只要定义 ``isEqual3`` 函数，就可以“免费”得到 ``isNotEqual3`` ：
+
+::
+
+    Prelude> :load eqclasses.hs
+    [1 of 1] Compiling Main             ( eqclasses.hs, interpreted )
     Ok, modules loaded: Main.
 
     *Main> isEqual True True
@@ -180,63 +226,54 @@ Haskell 的类型类可以满足以上提到的所有要求。
 
     *Main> isNotEqual False True
     True
+]
 
-当然，如果闲着没事，你仍然可以自己亲手定义这两个函数。但是，你至少要定义两个函数中的一个，否则两个默认的函数就会互相调用，直到程序崩溃。
+用 ``BasicEq3``, 我们提供了一个类型类(class)，其行为类似于 ``Haskell`` 原生 ``==`` 和 ``/=`` 操作符.
+事实上,这些操作符本来就是被一个类型类定义的,其看起来几乎等价于 ``BasicEq3``.
+"Haskell 98 Report"定义了一个类型类,它实现了相等性比较(equality comparison).
+这是内建类型类 ``Eq`` 的代码.注意到他和我们的 ``BasicEq3`` 类型类多么相似呀.[废话,你抄他的呀,233.]
+::
+   class  Eq a  where
+    (==), (/=) :: a -> a -> Bool
 
+       -- Minimal complete definition:
+       --     (==) or (/=)
+    x /= y     =  not (x == y)
+    x == y     =  not (x /= y)
 
 .. _declaring-typeclass-instances:
 
 定义类型类实例
-----------------
+==============
 
-定义一个类型为某个类型类的实例，指的就是，为某个类型实现给定类型类所声明的全部函数。
+现在你知道了怎么定义一个类型类,是时候学习一下怎么定义某个类型类的实例(instance).
+回忆一下那些用于创造某个特定类型类的实例的类型(types),他们是通过实现对那个类型类必须的函数来实现的.
+回忆一下我们位于章节前面的企图(attemp),针对 ``Color`` 类型创造的相等性测试. 
+[saocao2译注,这句话本来我想调整从句的位置,更加符合汉语的习惯.但是,转念一想,其实英语的顺序代表了作者想强调的东西,或者说作者想强调的东西会放在前面.
+所以我这里尽量保持作者的语序.]
 
-比如在前面， ``BasicEq`` 类型类定义了两个函数 ``isEqual`` 和 ``isNotEqual`` ：
-
-::
-    -- file: ch06/BasicEq_3.hs
-    class BasicEq a where
-        isEqual :: a -> a -> Bool
-        isEqual x y = not (isNotEqual x y)
-
-        isNotEqual :: a -> a -> Bool
-        isNotEqual x y = not (isEqual x y)
-
-在前一节，我们成功将 ``Bool`` 类型实现为 ``BasicEq`` 的实例类型，要使 ``Color`` 类型也成为 ``BasicEq`` 类型类的实例，就需要另外为 ``Color`` 类型实现 ``isEqual`` 和 ``isNotEqual`` ：
+那么让我们看看我们要怎样创造同样的 ``Color`` 类型,作为 ``BasicEq3`` 类型类的一员.
 
 ::
-    -- file: ch06/colorEq.hs
-    instance BasicEq Color where
-        isEqual Red Red = True
-        isEqual Blue Blue = True
-        isEqual Green Green = True
-        isEqual _ _ = True
+    -- file: ch06/naiveeq.hs
+    instance BasicEq3 Color where
+        isEqual3 Red Red = True
+        isEqual3 Blue Blue = True
+        isEqual3 Green Green = True
+        isEqual3 _ _ = False
 
-注意，这里的函数定义和之前的 ``colorEq`` 函数定义实际上没有什么不同，唯一的区别是，它使得 ``isEqual`` 不仅可以对 ``Bool`` 类型进行对比测试，还可以对 ``Color`` 类型进行对比测试。
+注意，这里的函数定义和之前 "类型类的作用" 章节的 ``colorEq`` 函数定义实际上没有什么不同. 事实上,它的实现就是等价的.
+然而,在本例中,我们能将 ``isEqual3`` 使用于\*任何*\类型上,只要其(该类型)声明成 ``BasicEq3`` 的一个实例(instance), 而不仅仅限于 ``Color`` 一类.
+我们能定义相等性测试,针对任何东西,从数字到图形,通过采用相同的基本模式(basic pattern)的方式.
+事实上,我们将会在 "相等性，有序和对比" 章节中看到,这就是你能使Haskell的 ``==`` 操作符作用于你自己的类型的方式.
 
-更一般地说，只要为相应的类型实现 ``BasicEq`` 类型类中的定义，那么 ``isEqual`` 就可以用于对比\ *任何*\ 我们想对比的类型。
-
-不过在实际中，通常并不使用 ``BasicEq`` 类型类，而是使用 Haskell Report 中定义的 ``Eq`` 类型类：它定义了 ``==`` 和 ``/=`` 操作符，这两个操作符才是 Haskell 中最常用的测试函数。
-
-以下是 ``Eq`` 类型类的定义：
-
-::
-
-    class  Eq a  where
-        (==), (/=) :: a -> a -> Bool
-
-    -- Minimal complete definition:
-    --     (==) or (/=)
-    x /= y     =  not (x == y)
-    x == y     =  not (x /= y)
-
-稍后会介绍更多使用 ``Eq`` 类型类的信息。
-
+还要注意到,虽然 ``BasicEq3`` 类型类定义了两个函数 ``isEqual`` 和 ``isNotEqual``, 但是我们只实现了其中的一个,在 ``Color`` 的例子中.
+那得归功于包含于 ``BasicEq3`` 中的默认实现. 即使我们没有显式地定义 ``isNotEqual3``, 编译器也会自动地使用 ``BasicEq3`` 声明中的默认实现.
 
 .. _important-built-in-typeclasses:
 
 几个重要的内置类型类
-----------------------
+====================
 
 前面两节分别介绍了类型类的定义，以及如何让某个类型成为给定类型类的实例类型。
 
@@ -246,7 +283,7 @@ Haskell 的类型类可以满足以上提到的所有要求。
 
 
 Show
-^^^^^^^^
+----
 
 ``Show`` 类型类用于将值转换为字符串，它最重要的函数是 ``show`` 。
 
@@ -326,7 +363,7 @@ Ghci 输出一个值，实际上就是对这个值调用 ``putStrLn`` 和 ``show
 
 
 Read
-^^^^^^^
+----
 
 ``Read`` 和 ``Show`` 类型类的作用正好相反，它将字符串转换为值。
 
@@ -370,7 +407,7 @@ Read
 
 
 使用 ``Read`` 和 ``Show`` 进行序列化
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+------------------------------------
 
 很多时候，程序需要将内存中的数据保存为文件，又或者，反过来，需要将文件中的数据转换为内存中的数据实体。这种转换过程称为\ *序列化*\ 和\ *反序列化*\  .
 
@@ -413,7 +450,7 @@ Read
 .. _numeric-types:
 
 数字类型
-^^^^^^^^^^^^^
+--------
 
 Haskell 有一集非常强大的数字类型：从速度飞快的 32 位或 64 位整数，到任意精度的有理数，包罗万有。
 
@@ -532,7 +569,7 @@ Word64                     X    X                               X        X    X
 
 
 相等性，有序和对比
-^^^^^^^^^^^^^^^^^^^^^
+------------------
 
 除了前面介绍的通用算术符号之外，相等测试、不等测试、大于和小于等对比操作也是非常常见的。
 
@@ -546,7 +583,7 @@ Word64                     X    X                               X        X    X
 
 
 自动派生
--------------
+========
 
 对于简单的数据类型， Haskell 编译器可以自动将类型派生（derivation）为 ``Read`` 、 ``Show`` 、 ``Bounded`` 、 ``Enum`` 、 ``Eq`` 和 ``Ord`` 的实例。
 
@@ -639,7 +676,7 @@ Ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， 
 
 
 类型类实战：让 JSON 更好用
---------------------------------------------------------
+==========================
 
 我们在 :ref:`representing-json-data-in-haskell` 一节介绍的 ``JValue`` 用起来还不够简便。这里是一段由搜索引擎返回的实际 JSON 数据。删除重整之后：
 
@@ -709,7 +746,7 @@ Haskell 的类型类提供了一个诱人的解决方案：
 .. _more-helpful-errors:
 
 让错误信息更有用
-^^^^^^^^^^^^^^^^^^^^^^
+----------------
 
 ``fromJValue`` 函数的返回类型为 ``Either``。跟 ``Maybe`` 一样，这个类型是预定义的。我们经常用它来表示可能会失败的计算。
 
@@ -743,7 +780,7 @@ Haskell 的类型类提供了一个诱人的解决方案：
 .. _making-an-instance-with-a-type-synonym:
 
 使用类型别名创建实例
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+--------------------
 
 Haskell 98标准不允许我们用下面的形式声明实例，尽管它看起来没什么问题：
 
@@ -777,7 +814,7 @@ Haskell 98标准不允许我们用下面的形式声明实例，尽管它看起�
 .. _living-in-an-open-world:
 
 生活在开放世界
---------------------------------------------------------
+==============
 
 Haskell 的设计允许我们任意创建类型类实例。
 
@@ -824,7 +861,7 @@ Haskell 的设计允许我们任意创建类型类实例。
 .. _when-do-overlapping-instances-cause-problems:
 
 什么时候重叠实例（Overlapping instances）会出问题？
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------------------------------
 
 如果我们把这些定义放进文件中并在 **ghci** 里载入，初看起来没什么问题。
 
@@ -885,7 +922,7 @@ Haskell 的设计允许我们任意创建类型类实例。
 .. _relaxing-some-restrictions-on-typeclasses:
 
 取消类型类的一些限制
-^^^^^^^^^^^^^^^^^^^^^^^^
+--------------------
 
 通常，我们不能给多态类型（polymorphic type）的特化版本（specialized version）写类型类实例。
 ``[Char]`` 类型就是多态类型 ``[a]`` 特化成 ``Char`` 的结果。因此我们禁止声明 ``[Char]`` 为某个类型类的实例。
@@ -929,7 +966,7 @@ GHC 支持另外一个有用的语言扩展，``OverlappingInstances``，它解�
 .. _how-does-show-work-for-strings:
 
 字符串的 show 是如何工作的？
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------------
 
 ``OverlappingInstances`` 和 ``TypeSynonymInstances`` 语言扩展是 GHC 特有的，Haskell 98 并不支持。
 然而，Haskell 98 中的 ``Show`` 类型类在转化 ``Char`` 列表和 ``Int`` 列表时却用了不同的方法。它用了一个聪明但简单的小技巧。
@@ -947,7 +984,7 @@ GHC 支持另外一个有用的语言扩展，``OverlappingInstances``，它解�
 .. _how-to-give-a-type-a-new-identity:
 
 如何给类型定义新身份（Identity）
---------------------------------------------------------
+================================
 
 除了熟悉的 ``data`` 关键字外，Haskell 还允许我们用 ``newtype`` 关键字来创建新类型。
 
@@ -1009,7 +1046,7 @@ GHC 支持另外一个有用的语言扩展，``OverlappingInstances``，它解�
 .. _data-and-newtype:
 
 data 和 newtype 的区别
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------
 
 ``newtype`` 关键字给现有类型一个不同的身份，相比起 ``data``，它使用时的限制更多。具体来讲，``newtype`` 只能有一个值构造器，
 并且这个构造器只能有一个字段。
@@ -1090,7 +1127,7 @@ data 和 newtype 的区别
 .. _summary-the-three-ways-of-naming-types:
 
 命名类型的三种方式
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+------------------
 
 这里简要回顾一下 haskell 引入新类型名的三种方式。
 
@@ -1104,7 +1141,7 @@ data 和 newtype 的区别
 .. _json_typeclasses_without_overlapping_instances:
 
 不会造成重叠实例的JSON类型类
---------------------------------------
+============================
 开启GHC的重叠实例支持可以方便快速地让我们的JSON代码通过编译。在更复杂的场景中，我们有时会面对这样一种情况：某个类型类有多个相关程度相同实例，重叠实例没法帮我们搞定，我们得靠自己添加几处 ``newtype`` 声明。我们将使用 ``newtype`` 代替重叠实例来重做这个JSON类型类，并以此了解其中的复杂之处。
 
 我们的第一个任务，是帮助GHC区分即用来表示JSON数组的类型 ``[a]`` ；以及用来表示JSON对象的类型 ``[(String, [a])]`` 。这两个类型在我们学会 ``OverlappingInstances`` 以前给我们带来了点小麻烦。我们把列表类型做了包装，所以编译器不会把它看作列表。
@@ -1180,7 +1217,7 @@ data 和 newtype 的区别
 .. literalinclude:: /code/ch06/toJValue.hs
 
 练习题
-^^^^^^^^^^^^^^^^
+------
 
 1. 在 **ghci** 中加载 ``Control.Arrow`` 模块，弄清 ``second`` 函数的功能。
 
@@ -1191,7 +1228,7 @@ data 和 newtype 的区别
 .. _the_dreaded_monomorphism_restriction:
 
 可怕的单一同态限定（monomorphism restriction）
---------------------------------------------------------
+==============================================
 
 Haskell 98 有一个微妙的特性可能会在某些意想不到的情况下“咬”到我们。下面这个简单的函数展示了这个问题。
 
@@ -1263,7 +1300,7 @@ Haskell 有时会强制使某些声明不像我们预想的那么多态。
 .. _conclusion:
 
 结论
---------------------------------------------------------
+====
 
 在这章，你学到了类型类有什么用以及怎么用它们。我们讨论了如何定义自己的类型类，然后又讨论了一些 Haskell 库里定义的类型类。
 最后，我们展示了怎么让 Haskell 编译器给你的类型自动派生出某些类型类实例。
