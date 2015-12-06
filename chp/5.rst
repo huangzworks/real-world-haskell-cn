@@ -112,6 +112,9 @@ JSON 还提供了两种复合类型：\ *数组*\ 是值的有序序列，而\ *
     getInt (JNumber n) = Just (truncate n)
     getInt _           = Nothing
 
+    getDouble (JNumber n) = Just n
+    getDouble _           = Nothing
+    
     getBool (JBool b) = Just b
     getBool _         = Nothing
 
@@ -151,6 +154,7 @@ Haskell 模块
             JValue(..)
         ,   getString
         ,   getInt
+        ,   getDouble
         ,   getBool
         ,   getObject
         ,   getArray
