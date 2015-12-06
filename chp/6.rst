@@ -4,7 +4,7 @@
 第 6 章：类型类
 ================
 
-类型类（typeclass）是 Haskell 最强大的功能之一：它用于定义通用接口，为各种不同的类型提供一组公共特性集。
+类型类（typeclass）跻身于 ``Haskell`` 最强大功能之列：它用于定义通用接口，为各种不同的类型提供一组公共特性集。
 
 类型类是某些基本语言特性的核心，比如相等性测试和数值操作符。
 
@@ -81,7 +81,7 @@ Haskell 的类型类可以满足以上提到的所有要求。
 我们定义一个类型类来解决前面提到的相等性测试问题：
 
 ::
-
+    -- file: ch06/BasicEq_1.hs
     class BasicEq a where
         isEqual :: a -> a -> Bool
 
@@ -105,7 +105,7 @@ Haskell 的类型类可以满足以上提到的所有要求。
 作为演示，以下代码将 ``Bool`` 类型作为 ``BasicEq`` 的实例类型，实现了 ``isEqual`` 函数：
 
 ::
-
+    -- file: ch06/BasicEq_1.hs
     instance BasicEq Bool where
         isEqual True  True  = True
         isEqual False False = True
@@ -139,7 +139,7 @@ Haskell 的类型类可以满足以上提到的所有要求。
 稍后的一节会介绍更多关于类型类实例的定义方式，这里先继续前面的例子。这一次，除了 ``isEqual`` 之外，我们还想定义不等测试函数 ``isNotEqual`` ：
 
 ::
-
+    -- file: ch06/BasicEq_3.hs
     class BasicEq a where
         isEqual    :: a -> a -> Bool
         isNotEqual :: a -> a -> Bool
@@ -147,7 +147,7 @@ Haskell 的类型类可以满足以上提到的所有要求。
 同时定义 ``isEqual`` 和 ``isNotEqual`` 两个函数产生了一些不必要的工作：从逻辑上讲，对于任何类型，只要知道 ``isEqual`` 或 ``isNotEqual`` 的任意一个，就可以计算出另外一个。因此，一种更省事的办法是，为 ``isEqual`` 和 ``isNotEqual`` 两个函数提供默认值，这样 ``BasicEq`` 的实例类型只要实现这两个函数中的一个，就可以顺利使用这两个函数：
 
 ::
-
+    -- file: ch06/BasicEq_3.hs
     class BasicEq a where
         isEqual :: a -> a -> Bool
         isEqual x y = not (isNotEqual x y)
@@ -158,7 +158,7 @@ Haskell 的类型类可以满足以上提到的所有要求。
 以下是将 ``Bool`` 作为 ``BasicEq`` 实例类型的例子：
 
 ::
-
+    -- file: ch06/BasicEq_3.hs
     instance BasicEq Bool where
         isEqual False False = True
         isEqual True  True  = True
@@ -194,7 +194,7 @@ Haskell 的类型类可以满足以上提到的所有要求。
 比如在前面， ``BasicEq`` 类型类定义了两个函数 ``isEqual`` 和 ``isNotEqual`` ：
 
 ::
-
+    -- file: ch06/BasicEq_3.hs
     class BasicEq a where
         isEqual :: a -> a -> Bool
         isEqual x y = not (isNotEqual x y)
@@ -205,7 +205,7 @@ Haskell 的类型类可以满足以上提到的所有要求。
 在前一节，我们成功将 ``Bool`` 类型实现为 ``BasicEq`` 的实例类型，要使 ``Color`` 类型也成为 ``BasicEq`` 类型类的实例，就需要另外为 ``Color`` 类型实现 ``isEqual`` 和 ``isNotEqual`` ：
 
 ::
-
+    -- file: ch06/colorEq.hs
     instance BasicEq Color where
         isEqual Red Red = True
         isEqual Blue Blue = True
