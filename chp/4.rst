@@ -657,9 +657,9 @@ words函数利用任何空白字符分割一个字符串，它对应的函数，
     -- file: ch04/ch04.exercises.hs
     splitWith :: (a -> Bool) -> [a] -> [[a]]
 
-3. 利用在“一个简单的命令行框架”一节中创建的命令行框架，编写一个打印输入数据的每一个的第一个单词的程序。
+3. 利用在“一个简单的命令行框架”一节中创建的命令行框架，编写一个打印输入数据的每一行的第一个单词的程序。
 
-4. 编写一个转置一个文件中的文本的程序。比如，它应该把“hello\nworld\n”转换成“hw\neo\nlr\nll\nod\n”。
+4. 编写一个转置一个文件中的文本的程序。比如，它应该把“hello\\nworld\\n”转换成“hw\\neo\\nlr\\nll\\nod\\n”。
 
 
 循环的表示
@@ -1065,6 +1065,12 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 
 可以通过观察括号的包围方式，以及累积器初始化值摆放的位置，来区分 ``foldl`` 和 ``foldr`` ：\ ``foldl`` 将处初始化值放在左边，括号也是从左边开始包围。另一方面，\ ``foldr`` 将初始化值放在右边，而括号也是从右边开始包围。
 
+这里有一种可爱的凭直觉性的关于foldr如何工作的解释: 他用zero初始值替代了空列表，并且调用step函数替代列表的每个值构造器．
+::
+    1 : (2 : (3 : []))
+    1 + (2 + (3 + 0 ))
+
+乍一看,比起foldl，foldr似乎不那么有用：一个从右边折叠的函数有什么用呢？
 还记得当年大明湖畔的 ``filter`` 函数吗？它可以用显式递归来定义：
 
 .. literalinclude:: /code/ch04/filter.hs
@@ -1148,7 +1154,7 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 
 除非被显式地要求，否则最后的表达式不会被求值为 ``6`` 。在表达式被求值之前，它会被保存在块里面。保存一个块比保存单独一个数字要昂贵得多，而被块保存的表达式越复杂，这个块占用的空间就越多。对于数值计算这样的廉价操作来说，块保存这种表达式所需的计算量，比直接求值这个表达式所需的计算量还多。最终，我们既浪费了时间，又浪费了金钱。
 
-在 GHC 中，对块中表达式的求值在一个内部栈中进行。因为块中的表达式可能是无限大的，而 GHC 为栈设置了有限大的的容量，多得这个限制，我们可以在 ghci 里尝试求值一个大的块，而不必担心消耗掉全部内存。
+在 GHC 中，对块中表达式的求值在一个内部栈中进行。因为块中的表达式可能是无限大的，而 GHC 为栈设置了有限大的的容量，多亏这个限制，我们可以在 ghci 里尝试求值一个大的块，而不必担心消耗掉全部内存。
 
 [译注：使用栈来执行一些可能无限大的操作，是一种常见优化和保护技术。这种用法减少了操作系统显式的上下文切换，而且就算计算量超出栈可以容纳的范围，那么最坏的结果就是栈崩溃，而如果直接使用系统内存，一旦请求超出内存可以容纳的范围，可能会造成整个程序崩溃，甚至影响系统的稳定性。]
 
@@ -1208,6 +1214,84 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
     500000000500000000
 
 就是这样。]
+[我(github:sancao2)的电脑上面行为还是"Exception: stack overflow".
+::
+   ➜  ch04  uname -a
+   Linux centos 3.10.0-229.20.1.el7.x86_64 #1 SMP Tue Nov 3 19:10:07 UTC 2015 x86_64 x86_64 x86_64 GNU/Linux
+   ➜  ch04  ghci
+   GHCi, version 7.6.3: http://www.haskell.org/ghc/  :? for help
+   Loading package ghc-prim ... linking ... done.
+   Loading package integer-gmp ... linking ... done.
+   Loading package base ... linking ... done.
+   Prelude> foldl (+) 0 [1..100000000]
+   *** Exception: stack overflow
+]
+
+练习
+1.运用 ``fold`` （运用合适的fold将会是你的代码更简单）重写并扩展位于＂显式递归＂章节的 ``asInt`` 函数．
+::
+   -- file: ch04/ch04.exercises.hs
+   asInt_fold :: String -> Int
+   
+你函数的效果应该是这样的．
+::
+   ghci> asInt_fold "101"
+   101
+   ghci> asInt_fold "-31337"
+   -31337
+   ghci> asInt_fold "1798"
+   1798
+   
+扩展你的函数以处理下面当调用错误时候出现的异常的情况．
+::
+   ghci> asInt_fold ""
+   0
+   ghci> asInt_fold "-"
+   0
+   ghci> asInt_fold "-3"
+   -3
+   ghci> asInt_fold "2.7"
+   *** Exception: Char.digitToInt: not a digit '.'
+   ghci> asInt_fold "314159265358979323846"
+   564616105916946374
+   
+2. ``asInt_fold`` 函数使用 ``error``, 因而调用者不能处理这些错误．重写他来修复这个问题．
+::
+   -- file: ch04/ch04.exercises.hs
+   type ErrorMessage = String
+   asInt_either :: String -> Either ErrorMessage Int
+   ghci> asInt_either "33"
+   Right 33
+   ghci> asInt_either "foo"
+   Left "non-digit 'o'"
+   
+3.Prelude下面的函数 ``concat`` 将一个列表的列表连接成一个单独的列表．他的函数签名如下．
+::
+   --file: ch04/ch04.exercises.hs
+   concat :: [[a]] -> [a]
+   
+用foldr写出你自己山寨的concat．
+
+4.写出你自己山寨的 ``takeWhile`` 函数，首先用显式递归的手法，然后改成 ``foldr`` 形式．
+
+5. ``Data.List`` 模块定义了一个函数, ``groupBy``.其拥有如下签名．
+::
+   -- file: ch04/ch04.exercises.hs
+   groupBy :: (a -> a -> Bool) -> [a] -> [[a]]
+
+运用 ``ghci`` 加载 ``Data.List`` 模块以理解 ``groupBy`` 的行为，然后写出你自己山寨的 ``fold`` 实现．
+
+6. 下面Prelude函数能用 ``fold`` 系列函数重写的函数有多少？
+::
+   any
+
+   cycle
+
+   words
+
+   unlines
+
+这些函数你能用 ``foldl`` 或者 ``foldr`` 重写，请问那种情况更合适？
 
 
 延伸阅读
@@ -1474,7 +1558,7 @@ As-模式
 ::
 
     Prelude Data.List> tails ""
-    [""]
+    [[]]
 
 如果想要一个行为和 ``tails`` 类似，但是并不包含空列表后缀的函数，可以自己写一个：
 
