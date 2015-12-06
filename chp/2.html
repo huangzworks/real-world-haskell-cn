@@ -744,8 +744,14 @@
 </pre></div>
 </div>
 </div>
+<div class="section" id="id28">
+<h2>练习<a class="headerlink" href="#id28" title="Permalink to this headline">¶</a></h2>
+<p>1.Haskell 提供了一个标准函数, last :: [a] -&gt; a, 其返回一个列表的最后一个元素．单就从他的类型看, 这个函数拥有的合理行为是怎样的(忽略崩溃和无限循环)？ 有哪些少数的事情这个函数显然不能做到?</p>
+<p>2.写一个函数 lastButOne, 返回列表倒数第二个元素.</p>
+<p>3.加载 lastButOne 函数到 ghci, 并且尝试在不同长度的列表上测试. 当你传入的函数过短时候，发生了什么?</p>
+</div>
 <div class="section" id="why-the-fuss-over-purity">
-<span id="id28"></span><h2>为什么要对纯度斤斤计较？<a class="headerlink" href="#why-the-fuss-over-purity" title="Permalink to this headline">¶</a></h2>
+<span id="id29"></span><h2>为什么要对纯度斤斤计较？<a class="headerlink" href="#why-the-fuss-over-purity" title="Permalink to this headline">¶</a></h2>
 <p>很少有语言像 Haskell 那样，默认使用纯函数。这个选择不仅意义深远，而且至关重要。</p>
 <p>因为纯函数的值只取决于输入的参数，所以通常只要看看函数的名字，还有它的类型签名，就能大概知道函数是干什么用的。</p>
 <p>以 <code class="docutils literal"><span class="pre">not</span></code> 函数为例子：</p>
@@ -766,7 +772,7 @@
 <p>通过这种将不纯函数隔离、并尽可能简单化的编程风格，程序的漏洞将变得非常少。</p>
 </div>
 <div class="section" id="conculsion">
-<span id="id29"></span><h2>回顾<a class="headerlink" href="#conculsion" title="Permalink to this headline">¶</a></h2>
+<span id="id30"></span><h2>回顾<a class="headerlink" href="#conculsion" title="Permalink to this headline">¶</a></h2>
 <p>这一章对 Haskell 的类型系统以及类型语法进行了快速的概览，了解了基本类型，并学习了如何去编写简单的函数。这章还介绍了多态、条件表达式、纯度和惰性求值。</p>
 <p>这些知识必须被充分理解。在第三章，我们就会在这些基本知识的基础上，进一步加深对 Haskell 的理解。</p>
 </div>
@@ -808,7 +814,7 @@
 
     <div class="footer" role="contentinfo">
         &copy; Copyright 2012, huangz1990.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.1.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.3.
     </div>
   </body>
 </html>

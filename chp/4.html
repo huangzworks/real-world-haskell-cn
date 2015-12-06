@@ -570,8 +570,8 @@ True
 </pre></div>
 </div>
 <ol class="arabic simple" start="3">
-<li>利用在“一个简单的命令行框架”一节中创建的命令行框架，编写一个打印输入数据的每一个的第一个单词的程序。</li>
-<li>编写一个转置一个文件中的文本的程序。比如，它应该把“hellonworldn”转换成“hwneonlrnllnodn”。</li>
+<li>利用在“一个简单的命令行框架”一节中创建的命令行框架，编写一个打印输入数据的每一行的第一个单词的程序。</li>
+<li>编写一个转置一个文件中的文本的程序。比如，它应该把“hello\nworld\n”转换成“hw\neo\nlr\nll\nod\n”。</li>
 </ol>
 </div>
 </div>
@@ -958,7 +958,13 @@ Ok, modules loaded: Main.
 </pre></div>
 </div>
 <p>可以通过观察括号的包围方式，以及累积器初始化值摆放的位置，来区分 <code class="docutils literal"><span class="pre">foldl</span></code> 和 <code class="docutils literal"><span class="pre">foldr</span></code> ：<code class="docutils literal"><span class="pre">foldl</span></code> 将处初始化值放在左边，括号也是从左边开始包围。另一方面，<code class="docutils literal"><span class="pre">foldr</span></code> 将初始化值放在右边，而括号也是从右边开始包围。</p>
-<p>还记得当年大明湖畔的 <code class="docutils literal"><span class="pre">filter</span></code> 函数吗？它可以用显式递归来定义：</p>
+<p>这里有一种可爱的凭直觉性的关于foldr如何工作的解释: 他用zero初始值替代了空列表，并且调用step函数替代列表的每个值构造器．</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="mi">1</span> <span class="kt">:</span> <span class="p">(</span><span class="mi">2</span> <span class="kt">:</span> <span class="p">(</span><span class="mi">3</span> <span class="kt">:</span> <span class="kt">[]</span><span class="p">))</span>
+<span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="mi">2</span> <span class="o">+</span> <span class="p">(</span><span class="mi">3</span> <span class="o">+</span> <span class="mi">0</span> <span class="p">))</span>
+</pre></div>
+</div>
+<p>乍一看,比起foldl，foldr似乎不那么有用：一个从右边折叠的函数有什么用呢？
+还记得当年大明湖畔的 <code class="docutils literal"><span class="pre">filter</span></code> 函数吗？它可以用显式递归来定义：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/filter.hs</span>
 
 <span class="nf">filter</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
@@ -1048,7 +1054,7 @@ Ok, modules loaded: Main.
 </pre></div>
 </div>
 <p>除非被显式地要求，否则最后的表达式不会被求值为 <code class="docutils literal"><span class="pre">6</span></code> 。在表达式被求值之前，它会被保存在块里面。保存一个块比保存单独一个数字要昂贵得多，而被块保存的表达式越复杂，这个块占用的空间就越多。对于数值计算这样的廉价操作来说，块保存这种表达式所需的计算量，比直接求值这个表达式所需的计算量还多。最终，我们既浪费了时间，又浪费了金钱。</p>
-<p>在 GHC 中，对块中表达式的求值在一个内部栈中进行。因为块中的表达式可能是无限大的，而 GHC 为栈设置了有限大的的容量，多得这个限制，我们可以在 ghci 里尝试求值一个大的块，而不必担心消耗掉全部内存。</p>
+<p>在 GHC 中，对块中表达式的求值在一个内部栈中进行。因为块中的表达式可能是无限大的，而 GHC 为栈设置了有限大的的容量，多亏这个限制，我们可以在 ghci 里尝试求值一个大的块，而不必担心消耗掉全部内存。</p>
 <p>[译注：使用栈来执行一些可能无限大的操作，是一种常见优化和保护技术。这种用法减少了操作系统显式的上下文切换，而且就算计算量超出栈可以容纳的范围，那么最坏的结果就是栈崩溃，而如果直接使用系统内存，一旦请求超出内存可以容纳的范围，可能会造成整个程序崩溃，甚至影响系统的稳定性。]</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">foldl</span> <span class="p">(</span><span class="o">+</span><span class="p">)</span> <span class="mi">0</span> <span class="p">[</span><span class="mi">1</span><span class="o">..</span><span class="mi">1000</span><span class="p">]</span>
 <span class="mi">500500</span>
@@ -1090,7 +1096,82 @@ Prelude Data.List&gt; foldl&#39; (+) 0 [1..1000000000]
 500000000500000000
 </pre></div>
 </div>
-<p>就是这样。]</p>
+<p>就是这样。]
+[我(github:sancao2)的电脑上面行为还是&#8221;Exception: stack overflow&#8221;.</p>
+<div class="highlight-haskell"><div class="highlight"><pre>➜  ch04  uname -a
+Linux centos 3.10.0-229.20.1.el7.x86_64 #1 SMP Tue Nov 3 19:10:07 UTC 2015 x86_64 x86_64 x86_64 GNU/Linux
+➜  ch04  ghci
+GHCi, version 7.6.3: http://www.haskell.org/ghc/  :? for help
+Loading package ghc-prim ... linking ... done.
+Loading package integer-gmp ... linking ... done.
+Loading package base ... linking ... done.
+Prelude&gt; foldl (+) 0 [1..100000000]
+*** Exception: stack overflow
+</pre></div>
+</div>
+<p>]</p>
+<p>练习
+1.运用 <code class="docutils literal"><span class="pre">fold</span></code> （运用合适的fold将会是你的代码更简单）重写并扩展位于＂显式递归＂章节的 <code class="docutils literal"><span class="pre">asInt</span></code> 函数．</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/ch04.exercises.hs</span>
+<span class="nf">asInt_fold</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Int</span>
+</pre></div>
+</div>
+<p>你函数的效果应该是这样的．</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">asInt_fold</span> <span class="s">&quot;101&quot;</span>
+<span class="mi">101</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">asInt_fold</span> <span class="s">&quot;-31337&quot;</span>
+<span class="o">-</span><span class="mi">31337</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">asInt_fold</span> <span class="s">&quot;1798&quot;</span>
+<span class="mi">1798</span>
+</pre></div>
+</div>
+<p>扩展你的函数以处理下面当调用错误时候出现的异常的情况．</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">asInt_fold</span> <span class="s">&quot;&quot;</span>
+<span class="mi">0</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">asInt_fold</span> <span class="s">&quot;-&quot;</span>
+<span class="mi">0</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">asInt_fold</span> <span class="s">&quot;-3&quot;</span>
+<span class="o">-</span><span class="mi">3</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">asInt_fold</span> <span class="s">&quot;2.7&quot;</span>
+<span class="o">***</span> <span class="kt">Exception:</span> <span class="kt">Char</span><span class="o">.</span><span class="n">digitToInt</span><span class="kt">:</span> <span class="n">not</span> <span class="n">a</span> <span class="n">digit</span> <span class="sc">&#39;.&#39;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">asInt_fold</span> <span class="s">&quot;314159265358979323846&quot;</span>
+<span class="mi">564616105916946374</span>
+</pre></div>
+</div>
+<p>2. <code class="docutils literal"><span class="pre">asInt_fold</span></code> 函数使用 <code class="docutils literal"><span class="pre">error</span></code>, 因而调用者不能处理这些错误．重写他来修复这个问题．</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/ch04.exercises.hs</span>
+<span class="kr">type</span> <span class="kt">ErrorMessage</span> <span class="ow">=</span> <span class="kt">String</span>
+<span class="nf">asInt_either</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">ErrorMessage</span> <span class="kt">Int</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">asInt_either</span> <span class="s">&quot;33&quot;</span>
+<span class="kt">Right</span> <span class="mi">33</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">asInt_either</span> <span class="s">&quot;foo&quot;</span>
+<span class="kt">Left</span> <span class="s">&quot;non-digit &#39;o&#39;&quot;</span>
+</pre></div>
+</div>
+<p>3.Prelude下面的函数 <code class="docutils literal"><span class="pre">concat</span></code> 将一个列表的列表连接成一个单独的列表．他的函数签名如下．</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">--file: ch04/ch04.exercises.hs</span>
+<span class="nf">concat</span> <span class="ow">::</span> <span class="p">[[</span><span class="n">a</span><span class="p">]]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>用foldr写出你自己山寨的concat．</p>
+<p>4.写出你自己山寨的 <code class="docutils literal"><span class="pre">takeWhile</span></code> 函数，首先用显式递归的手法，然后改成 <code class="docutils literal"><span class="pre">foldr</span></code> 形式．</p>
+<p>5. <code class="docutils literal"><span class="pre">Data.List</span></code> 模块定义了一个函数, <code class="docutils literal"><span class="pre">groupBy</span></code>.其拥有如下签名．</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/ch04.exercises.hs</span>
+<span class="nf">groupBy</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[[</span><span class="n">a</span><span class="p">]]</span>
+</pre></div>
+</div>
+<p>运用 <code class="docutils literal"><span class="pre">ghci</span></code> 加载 <code class="docutils literal"><span class="pre">Data.List</span></code> 模块以理解 <code class="docutils literal"><span class="pre">groupBy</span></code> 的行为，然后写出你自己山寨的 <code class="docutils literal"><span class="pre">fold</span></code> 实现．</p>
+<p>6. 下面Prelude函数能用 <code class="docutils literal"><span class="pre">fold</span></code> 系列函数重写的函数有多少？</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">any</span>
+
+<span class="nf">cycle</span>
+
+<span class="nf">words</span>
+
+<span class="nf">unlines</span>
+</pre></div>
+</div>
+<p>这些函数你能用 <code class="docutils literal"><span class="pre">foldl</span></code> 或者 <code class="docutils literal"><span class="pre">foldr</span></code> 重写，请问那种情况更合适？</p>
 </div>
 <div class="section" id="id24">
 <h3>延伸阅读<a class="headerlink" href="#id24" title="Permalink to this headline">¶</a></h3>
@@ -1321,7 +1402,7 @@ dropWhile isSpace :: [Char] -&gt; [Char]
 </div>
 <p><code class="docutils literal"><span class="pre">tails</span></code> 返回一个包含字符串的列表，这个列表保存了输入字符串的所有后缀，以及一个额外的空列表（放在结果列表的最后）。<code class="docutils literal"><span class="pre">tails</span></code> 的返回值总是带有额外的空列表，即使它的输入为空时：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">List</span><span class="o">&gt;</span> <span class="n">tails</span> <span class="s">&quot;&quot;</span>
-<span class="p">[</span><span class="s">&quot;&quot;</span><span class="p">]</span>
+<span class="p">[</span><span class="kt">[]</span><span class="p">]</span>
 </pre></div>
 </div>
 <p>如果想要一个行为和 <code class="docutils literal"><span class="pre">tails</span></code> 类似，但是并不包含空列表后缀的函数，可以自己写一个：</p>
@@ -1603,7 +1684,7 @@ Prelude Data.Char&gt; capCount &quot;Hello there, Mon!&quot;
 
     <div class="footer" role="contentinfo">
         &copy; Copyright 2012, huangz1990.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.1.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.3.
     </div>
   </body>
 </html>

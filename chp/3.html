@@ -87,7 +87,7 @@
 </div>
 <p>再看看前面在文件里定义的 <code class="docutils literal"><span class="pre">myInfo</span></code> 变量：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myInfo</span>
-<span class="kt">Book</span> <span class="mi">494539463</span> <span class="s">&quot;Algebra of Programming&quot;</span> <span class="p">[</span><span class="s">&quot;Richard Bird&quot;</span><span class="p">,</span><span class="s">&quot;Oege de Moor&quot;</span><span class="p">]</span>
+<span class="kt">Book</span> <span class="mi">9780135072455</span> <span class="s">&quot;Algebra of Programming&quot;</span> <span class="p">[</span><span class="s">&quot;Richard Bird&quot;</span><span class="p">,</span><span class="s">&quot;Oege de Moor&quot;</span><span class="p">]</span>
 </pre></div>
 </div>
 <p>在 ghci 里面当然也可以创建新的 <code class="docutils literal"><span class="pre">BookInfo</span></code> 值：</p>
@@ -427,7 +427,7 @@ In the expression:
 </ul>
 <p>对于以上两个问题， Haskell 有一个简单且有效的解决方式，那就是<em>类型匹配</em>。</p>
 <p>模式匹配允许我们查看值的内部，并将值所包含的数据绑定到变量上。以下是一个对 <code class="docutils literal"><span class="pre">Bool</span></code> 类型值进行模式匹配的例子，它的作用和 <code class="docutils literal"><span class="pre">not</span></code> 函数一样：</p>
-<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: myNot.hs</span>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/myNot.hs</span>
 <span class="nf">myNot</span> <span class="kt">True</span> <span class="ow">=</span> <span class="kt">False</span>
 <span class="nf">myNot</span> <span class="kt">False</span> <span class="ow">=</span> <span class="kt">True</span>
 </pre></div>
@@ -1094,6 +1094,7 @@ data Maybe a = Just a
 <h3>错误地对变量进行匹配<a class="headerlink" href="#id30" title="Permalink to this headline">¶</a></h3>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/BogusPattern.hs</span>
 <span class="kr">data</span> <span class="kt">Fruit</span> <span class="ow">=</span> <span class="kt">Apple</span> <span class="o">|</span> <span class="kt">Orange</span>
+             <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">)</span>
 
 <span class="nf">apple</span> <span class="ow">=</span> <span class="s">&quot;apple&quot;</span>
 
@@ -1162,7 +1163,7 @@ data Maybe a = Just a
           <span class="n">newBalance</span> <span class="ow">=</span> <span class="n">balance</span> <span class="o">-</span> <span class="n">amount</span>
 </pre></div>
 </div>
-<p><code class="docutils literal"><span class="pre">otherwise</span></code> 看上去像是守卫表达式的某种特殊语法，但实际上它只是一个被绑定为值 <code class="docutils literal"><span class="pre">True</span></code> 的普通变量，这样写是位了提高可读性。</p>
+<p><code class="docutils literal"><span class="pre">otherwise</span></code> 看上去像是守卫表达式的某种特殊语法，但实际上它只是一个被绑定为值 <code class="docutils literal"><span class="pre">True</span></code> 的普通变量，这样写是为了提高可读性。</p>
 <p>任何使用模式的地方都可以使用守卫。用模式匹配和守卫把方法写成一组等式会大大提高可读性。还记得我们在<cite>条件求值&lt;&gt;_</cite>一节中定义的 <code class="docutils literal"><span class="pre">myDrop</span></code> 方法吗？</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch02/myDrop.hs</span>
 <span class="nf">myDrop</span> <span class="n">n</span> <span class="n">xs</span> <span class="ow">=</span> <span class="kr">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">null</span> <span class="n">xs</span>
@@ -1180,7 +1181,35 @@ data Maybe a = Just a
 <p>这种格式的代码清楚的<em>依次</em>列举了我们对函数在不同情况下的不同用法的期望。如果使用 <code class="docutils literal"><span class="pre">if</span></code> 表达式，我们的想法很容易就被藏进某个函数里，而代码则会变得不可读。</p>
 </div>
 <div class="section" id="exercises">
-<h2>Exercises<a class="headerlink" href="#exercises" title="Permalink to this headline">¶</a></h2>
+<span id="id33"></span><h2>练习<a class="headerlink" href="#exercises" title="Permalink to this headline">¶</a></h2>
+<p>1.写一个函数，用来计算一个列表元素的个数．出于测试要求，保证其输出的结果和标准函数 length 保持一致．</p>
+<p>2.添加函数的类型签名于你的源文件．出于测试要求，再次加载源文件到ghci．</p>
+<p>3.写一个函数，用来计算列表的平均值，即，列表元素的总和除以列表的长度．(你可能需要用到 fromIntegral 函数将列表长度变量从 integer 类型到 float 类型进行转换．)</p>
+<p>4.将一个列表变成回文序列，即，他应该读起来完全一样，不管是从前往后还是从后往前．举个例子，考虑一个列表 [1,2,3]，你的函数应该返回 [1,2,3,3,2,1]．</p>
+<p>5.写一个函数，用来确定他的输入是否是一个回文序列．</p>
+<p>6.创造一个函数，用于排序一个包含许多列表的列表，其排序规则基于他的子列表的长度．（你可能要看看 Data.List 模块的 sortBy 函数．）</p>
+<p>7.定义一个函数，其用一个分隔符将一个包含许多列表的列表连接在一起．函数类型定义如下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/Intersperse.hs</span>
+<span class="nf">intersperse</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[[</span><span class="n">a</span><span class="p">]]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>这个分割应该出现于列表的元素之间，除了最后一个元素末尾之外．你的函数需运行得如下所示：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">Intersperse</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">Intersperse</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">intersperse</span> <span class="sc">&#39;,&#39;</span> <span class="kt">[]</span>
+<span class="s">&quot;&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">intersperse</span> <span class="sc">&#39;,&#39;</span> <span class="p">[</span><span class="s">&quot;foo&quot;</span><span class="p">]</span>
+<span class="s">&quot;foo&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">intersperse</span> <span class="sc">&#39;,&#39;</span> <span class="p">[</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;bar&quot;</span><span class="p">,</span><span class="s">&quot;baz&quot;</span><span class="p">,</span><span class="s">&quot;quux&quot;</span><span class="p">]</span>
+<span class="s">&quot;foo,bar,baz,quux&quot;</span>
+</pre></div>
+</div>
+<p>8.使用我们在前面章节中定义的二叉树类型，写一个函数用于确定一棵二叉树的高度．高度的定义是从根节点到叶子节点经过的最大节点数．举个例子，Empty 这棵树的高度是0; Node &#8220;x&#8221; Empty Empty树的高度是1; Node &#8220;x&#8221; Empty (Node &#8220;y&#8221; Empty Empty)树的高度是2;依此类推．</p>
+<p>9.考虑三个二位的点 a, b，和c．如果我们观察一个由线段ＡＢ（由a,b节点组成）和线段ＢＣ（由b,c节点组成），他或者转向（turn）左边，或者转向右边，或者组成一条直线．定义一个 Direction（方向）的数据类型反映这些可能的情况．</p>
+<p>10.写一个函数，用于计算三个二维坐标点组成的转向（turn），并且返回其 Direction（方向）．</p>
+<p>11.定义一个函数，输入二维坐标点的序列并计算其每个连续三个的（方向）Direction．考虑一个点的序列 [a,b,c,d,e]，他应该开始计算 [a,b,c]的转向(turn), 接着计算 [b,c,d]的转向，再是[c,d,e]的．你的函数应该返回一个Dirction（方向）的序列．</p>
+<p>12.运用前面三个练习的代码，实现 Graham 扫描算法，用于扫描由二维点集构成的凸包．你能从Wikipedia上找到＂什么是凸包＂，以及＂Graham扫描算法是如何工作＂的完整解释．</p>
 </div>
 </div>
 
@@ -1220,7 +1249,7 @@ data Maybe a = Just a
 
     <div class="footer" role="contentinfo">
         &copy; Copyright 2012, huangz1990.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.1.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.3.
     </div>
   </body>
 </html>
