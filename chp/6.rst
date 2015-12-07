@@ -937,7 +937,7 @@ ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， 
 类型类实战：让 JSON 更好用
 ==========================
 
-我们在 :ref:`representing-json-data-in-haskell` 一节介绍的 ``JValue`` 用起来还不够简便。这里是一段由搜索引擎返回的实际 JSON 数据。删除重整之后：
+我们在 :ref:`representing-json-data-in-haskell` 一节介绍的 ``JValue`` 用起来还不够简便。这里是一段由的经过截断(truncate)和整齐化(tidy)之后的实际 JSON 数据,由一个知名搜索引擎生成.
 
 .. code-block:: json
 
@@ -958,7 +958,7 @@ ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， 
         }]
     }
 
-进一步简化之，并用 Haskell 表示：
+这是进一步缩减片段的数据，并用 Haskell 表示：
 
 ::
 
@@ -979,13 +979,12 @@ ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， 
         ]
 
 由于 Haskell 不原生支持包含不同类型值的列表，我们不能直接表示包含不同类型值的 JSON 对象。
-我们需要把每个值都用 JValue 构造器包装起来。但这样我们的灵活性就受到了限制：如果我们想把数字 ``3920`` 转换成字符串 ``"3,920"``，
-我们就必须把 ``JNumber`` 构造器换成 ``JString`` 构造器。
+我们需要把每个值都用 JValue 构造器包装起来。但这样我们的灵活性就受到了限制：如果我们想把数字 ``3920`` 转换成字符串 ``"3,920"``,
+我们就必须改变构造器,即我们使用它(JValue构造器)从 ``JNumber`` 构造器到 ``JString`` 构造器包装(wrap)数据.
 
-Haskell 的类型类提供了一个诱人的解决方案：
+Haskell 的类型类对这个问题提供了一个诱人的解决方案：
 
 ::
-
     -- file: ch06/JSONClass.hs
     type JSONError = String
 
@@ -998,9 +997,9 @@ Haskell 的类型类提供了一个诱人的解决方案：
         fromJValue = Right
 
 现在，我们无需再用 ``JNumber`` 等构造器去包装值了，直接使用 ``toJValue`` 函数即可。
-如果我们更改值的类型，编译器会自动选择相应的 ``toJValue`` 实现。
+如果我们更改值的类型，编译器会自动选择合适的 ``toJValue`` 实现以使用他。
 
-我们也提供了 ``fromJValue`` 函数，它把 ``JValue`` 值转换成我们希望的类型。
+我们也提供了 ``fromJValue`` 函数.它试图把 ``JValue`` 值转换成我们希望的类型。
 
 .. _more-helpful-errors:
 
