@@ -804,12 +804,13 @@ Word64                     X    X                               X        X    X
 自动派生
 ========
 
-对于简单的数据类型， Haskell 编译器可以自动将类型派生（derivation）为 ``Read`` 、 ``Show`` 、 ``Bounded`` 、 ``Enum`` 、 ``Eq`` 和 ``Ord`` 的实例。
+对于许多简单的数据类型， Haskell 编译器可以自动将类型派生（derivation）为 ``Read`` 、 ``Show`` 、 ``Bounded`` 、 ``Enum`` 、 ``Eq`` 和 ``Ord`` 的实例。这节省了我们大量的精力用于手动写代码进行比较或者显示他们的类型.
+
 
 以下代码将 ``Color`` 类型派生为 ``Read`` 、 ``Show`` 、 ``Eq`` 和 ``Ord`` 的实例：
 
 ::
-    
+    -- file: ch06/colorderived.hs
     data Color = Red | Green | Blue
         deriving (Read, Show, Eq, Ord)
 
@@ -835,25 +836,65 @@ Word64                     X    X                               X        X    X
     *Main> Red < Blue
     True
 
-注意 ``Color`` 类型的排序位置由定义类型时值构造器的排序决定。
+[作者注释:什么类型(types)能被自动派生?
+Haskell标准要求编译器能自动派生这些制定类型类的实例.[sancao2译注:哪些??估计就是上面这坨].他们的自动对其他类型类无效.]
 
-自动派生并不总是可用的。比如说，如果定义类型 ``data MyType = MyType (Int -> Bool)`` ，那么编译器就没办法派生 ``MyType`` 为 ``Show`` 的实例，因为它不知道该怎么将 ``MyType`` 函数的输出转换成字符串，这会造成编译错误。
+注意 ``Color`` 类型的排序位置由定义类型时值构造器的排序决定,即对应上面例子就是 ``Red | Green | Blue`` 的顺序。
 
-除此之外，当使用自动推导将某个类型设置为给定类型类的实例时，定义这个类型时所使用的其他类型，也必须是给定类型类的实例（通过自动推导或手动添加的都可以）。
+自动派生并不总是可用的。比如说，如果定义类型 ``data MyType = MyType (Int -> Bool)`` ，那么编译器就没办法派生 ``MyType`` 为 ``Show`` 的实例，因为它不知道该怎么渲染(render)一个函数.我们会得到一个造成编译错误在上面这种情况下。
 
-举个例子，以下代码不能使用自动推导：
+当我们自动派生某个类型类的一个实例时，在我们利用 ``data`` 关键词声明参考这个实例的类型，也必须是给定类型类的实例（手动或自动地）。
+
+[sancao2译注:原书的例子有问题.
+::
+   -- file: ch06/AutomaticDerivation.hs
+   data CannotShow = CannotShow
+                deriving (Show) --原书例子这行应该要注释掉的,不然和下面自己的注释打架了.
+
+   -- will not compile, since CannotShow is not an instance of Show
+   data CannotDeriveShow = CannotDeriveShow CannotShow
+                         deriving (Show)
+
+   data OK = OK
+
+   instance Show OK where
+       show _ = "OK"
+
+   data ThisWorks = ThisWorks OK
+                    deriving (Show)
 
 ::
+   *Main> :l AutomaticDerivation.hs
+    [1 of 1] Compiling Main             ( AutomaticDerivation.hs, interpreted )
 
+    AutomaticDerivation.hs:7:35:
+        No instance for (Show CannotShow)
+          arising from the 'deriving' clause of a data type declaration
+    Possible fix:
+        add an instance declaration for (Show CannotShow)
+        or use a standalone 'deriving instance' declaration,
+            so you can specify the instance context yourself
+    When deriving the instance for (Show CannotDeriveShow)
+    Failed, modules loaded: none.
+
+其实编译器提示很清爽了,就是说 ``No instance for (Show CannotShow)``,然后还给出了两条 ``fix``:
+``add an instance declaration for (Show CannotShow)`` (huangz等译者采用的例子采用自动派生的方式修复 ``BookInfo``) 或者 ``use a standalone 'deriving instance' declaration``.(上面 ``ThisWorks``采用自己定义的方式修补.)
+将例子代入上面那句话,当我们自动派生(``Show``)类型类的一个实例(``CannotShow``)时,在我们利用 ``data`` 关键词声明参考这个实例(``CannotShow``)的类型(``CannotDeriveShow``)，也必须是给定类型类的实例（手动或自动地）。
+]
+
+[huangz等译者的例子:
+举个例子，以下代码不能使用自动派生：
+
+::
+    -- file: ch06/cant_ad.hs
     data Book = Book
 
     data BookInfo = BookInfo Book
                     deriving (Show)
 
-Ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， ``BookInfo`` 才能对 ``Show`` 进行自动推导：
+ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， ``BookInfo`` 才能对 ``Show`` 进行自动派生(``driving``)：
 
 ::
-
     Prelude> :load cant_ad.hs
     [1 of 1] Compiling Main             ( cant_ad.hs, interpreted )
 
@@ -867,10 +908,10 @@ Ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， 
         When deriving the instance for (Show BookInfo)
     Failed, modules loaded: none.
 
-相反，以下代码可以使用自动推导，因为它对 ``Book`` 类型也使用了自动推导，使得 ``Book`` 类型变成了 ``Show`` 的实例：
+相反，以下代码可以使用自动派生，因为它对 ``Book`` 类型也使用了自动派生，使得 ``Book`` 类型变成了 ``Show`` 的实例：
 
 ::
-
+    -- file: ch06/ad.hs
     data Book = Book
                 deriving (Show)
 
@@ -880,7 +921,6 @@ Ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， 
 使用 ``:info`` 命令在 ghci 中确认两种类型都是 ``Show`` 的实例：
 
 ::
-
     Prelude> :load ad.hs
     [1 of 1] Compiling Main             ( ad.hs, interpreted )
     Ok, modules loaded: Main.
@@ -892,7 +932,7 @@ Ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， 
     *Main> :info BookInfo
     data BookInfo = BookInfo Book   -- Defined at ad.hs:4:6
     instance Show BookInfo -- Defined at ad.hs:5:27
-
+]
 
 类型类实战：让 JSON 更好用
 ==========================
