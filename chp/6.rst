@@ -573,9 +573,11 @@ Read
 使用 ``Read`` 和 ``Show`` 进行序列化
 ------------------------------------
 
-很多时候，程序需要将内存中的数据保存为文件，又或者，反过来，需要将文件中的数据转换为内存中的数据实体。这种转换过程称为\ *序列化*\ 和\ *反序列化*\  .
+很多时候，程序需要将内存中的数据保存为硬盘上的文件以备将来获取，或者通过网络发送出去．把内存中的数据转化成为了存储的为序列的过程，被称为 ``序列化``.
 
-通过将类型实现为 ``Read`` 和 ``Show`` 的实例类型， ``read`` 和 ``show`` 两个函数可以成为非常好的序列化工具。
+通过将类型实现为 ``Read`` 和 ``Show`` 的实例类型， ``read`` 和 ``show`` 两个函数可以成为非常好的序列化工具。 ``show`` 函数生成的输出是人类和机器皆可读的．大部分 ``show`` 输出也是对Haskell语法合法的，虽然他取决于人们如何写 ``Show`` 实例来达到这个结果的．
+[作者注释：解析大字符串们：
+字符串处理在Haskell中通常是惰性的，所以 ``read`` 和 ``show`` 能被无意外地用于很大的数据结构．Haskell中内建的 ``read`` 和 ``show`` 实例被实现成高效的纯函数.如果想知道怎么处理解析的异常,请参考"19章 错误处理".]
 
 作为例子，以下代码将一个内存中的列表序列化到文件中：
 
@@ -611,6 +613,39 @@ Read
 
 ``readFile`` 读入给定的 ``years.txt`` ，并将它的内存传给 ``input`` 变量，最后，通过使用 ``read`` ，我们成功将字符串反序列化成一个列表。
 
+[sancao2译注:原作者的例子实在不如huangz等译者的清爽,不翻译,将实验贴在这里.
+::
+   ghci> let d1 = [Just 5, Nothing, Nothing, Just 8, Just 9]::[Maybe Int]
+   ghci> putStrLn (show d1)
+   [Just 5,Nothing,Nothing,Just 8,Just 9]
+   ghci> writeFile "test" (show d1)
+::
+   ghci> input <- readFile "test"
+   "[Just 5,Nothing,Nothing,Just 8,Just 9]"
+   ghci> let d2 = read input
+   
+   <interactive>:1:9:
+       Ambiguous type variable `a' in the constraint:
+         `Read a' arising from a use of `read' at <interactive>:1:9-18
+       Probable fix: add a type signature that fixes these type variable(s)
+   ghci> let d2 = (read input)::[Maybe Int]
+   ghci> print d1
+   [Just 5,Nothing,Nothing,Just 8,Just 9]
+   ghci> print d2
+   [Just 5,Nothing,Nothing,Just 8,Just 9]
+   ghci> d1 == d2
+   True
+::
+   ghci> putStrLn $ show [("hi", 1), ("there", 3)]
+   [("hi",1),("there",3)]
+   ghci> putStrLn $ show [[1, 2, 3], [], [4, 0, 1], [], [503]]
+   [[1,2,3],[],[4,0,1],[],[503]]
+   ghci> putStrLn $ show [Left 5, Right "three", Left 0, Right "nine"]
+   [Left 5,Right "three",Left 0,Right "nine"]
+   ghci> putStrLn $ show [Left 0, Right [1, 2, 3], Left 5, Right []]
+   [Left 0,Right [1,2,3],Left 5,Right []]
+]
+   
 .. _numeric-types:
 
 数字类型
