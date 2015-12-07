@@ -328,7 +328,7 @@ Show
 ``show`` 经常用于定义数据(data)的字符串(``String``)表示,其非常有利于机器使用用 ``Read`` 类型类解析回来.
 Haskell程序员经常写自己的函数去格式化(format)数据以漂亮的方式为终端用户呈现,如果这种表示方式有别于 ``Show`` 预期的输出.]
 
-[原来译文: 因此，如果你定义了一种新的数据类型，并且希望通过 ghci 来显示它，那么你就应该将这个类型实现为 ``Show`` 类型类的实例，否则 ghci 就会向你抱怨，说它不知道该怎样用字符串的形式表示这种数据类型：
+[huangz,labyrlnth,YenvY等译文: 因此，如果你定义了一种新的数据类型，并且希望通过 ghci 来显示它，那么你就应该将这个类型实现为 ``Show`` 类型类的实例，否则 ghci 就会向你抱怨，说它不知道该怎样用字符串的形式表示这种数据类型：
 ::
     Main> data Color = Red | Green | Blue;
 
@@ -357,6 +357,8 @@ Haskell程序员经常写自己的函数去格式化(format)数据以漂亮的�
         show Red   = "Red"
         show Green = "Green"
         show Blue  = "Blue"
+        
+[sancao2译注:因为 ``Color`` 的类型定义在naiveeq.hs中，所以我就把关于 ``Color`` 的类型类实例都放这里了，下同.]
 
 当然， ``show`` 函数的打印值并不是非要和类型构造器一样不可，比如 ``Red`` 值并不是非要表示为 ``"Red"`` 不可，以下是另一种实例化 ``Show`` 类型类的方式：
 
@@ -381,17 +383,85 @@ sancao2译注:添加运行如下:
 Read
 ----
 
-``Read`` 和 ``Show`` 类型类的作用正好相反，它将字符串转换为值。
-
-``Read`` 最有用的函数是 ``read`` ：它接受一个字符串作为参数，对这个字符串进行处理，并返回一个值，这个值的类型为 ``Read`` 实例类型的成员（所有实例类型中的一种）。
-
+``Read`` 类型类,本质上 和 ``Show`` 类型类相反: 其(``Read``)最有用的函数是 ``read``,它接受一个字符串作为参数，对这个字符串进行解析(parse)，并返回一个值.这个值的类型为 ``Read`` 实例类型的成员（所有实例类型中的一种）。
+[sancao2译注:就是下面编译器提示的:"Read a", 代表 ``Read`` 实例类型.]
 ::
-
     Prelude> :type read
     read :: Read a => String -> a
+这是一个例子,展示了 ``read`` 和 ``show`` 函数的用法:
+::
+   -- file: ch06/read.hs
+   main = do
+     putStrLn "Please enter a Double:"
+     inpStr <- getLine
+     let inpDouble = (read inpStr)::Double
+     putStrLn ("Twice " ++ show inpDouble ++ " is " ++ show (inpDouble * 2))
 
-以下代码展示了 ``read`` 的用法：
+测试结果如下.
+::
+   Prelude> :l read.hs 
+   [1 of 1] Compiling Main             ( read.hs, interpreted )
+   Ok, modules loaded: Main.
+   *Main> main
+   Please enter a Double:
+   123.213
+   Twice 123.213 is 246.426
 
+这是一个简单的例子,关于 ``read`` 和 ``show``.请注意,我们给出了一个显式的 ``Double`` 类型,当运行 ``read`` 函数的时候.
+
+那是因为 ``read`` 会返回任意类型的值(a value of type) ``Read a => a``, 并且 ``show`` 期望任意类型的值 ``Show a => a``.存在着许许多多类型(type),其拥有定义于 ``Read`` 和 ``Show`` 之上的实例(instance).
+
+不知道一个特定的类型,编译器必须从许多类型中猜出那个才是必须的(needed).在上面的这种情况下,他可能会经常选择 ``Integer`` 类型.如果我们想要接受的是浮点输入,他就不会正常工作,所以我们提供了一个显式的类型.
+
+[作者注释:关于默认值的笔记
+在大多数情况下,如果显式的 ``Double`` 类型标记被忽略了,编译器会拒绝猜测一个通用的类型,并仅仅返回一个错误.
+他能默认以 ``Integer`` 类型这件事请是个特例. 他起因于以下事实:字面值 ``2`` (在程序中 ``inpDouble * 2``)被当成 ``Integer`` 除非他得到一个不同类型的期望.]
+
+[sancao2译注:实验以下, 去掉 ``Double`` 的显示指定.
+::
+   -- file: ch06/read.hs
+   main = do
+     putStrLn "Please enter a Double:"
+     inpStr <- getLine
+     let inpDouble = (read inpStr)
+     putStrLn ("Twice " ++ show inpDouble ++ " is " ++ show (inpDouble * 2))
+::
+   *Main> :reload 
+   Ok, modules loaded: Main.
+   *Main> main
+   Please enter a Double:
+   2
+   Twice 2 is 4
+   *Main> main
+   Please enter a Double:
+   2.1
+   Twice *** Exception: Prelude.read: no parse
+
+果然是这样.那么将字面值 ``2`` 改成 ``2.0``,他的结果会怎么样呢?
+::
+   -- file: ch06/read.hs
+   main = do
+     putStrLn "Please enter a Double:"
+     inpStr <- getLine
+     let inpDouble = (read inpStr)
+     putStrLn ("Twice " ++ show inpDouble ++ " is " ++ show (inpDouble * 2.0))
+::
+   *Main> :re
+   Ok, modules loaded: Main.
+   *Main> main
+   Please enter a Double:
+   2.1
+   Twice 2.1 is 4.2
+   *Main> main
+   Please enter a Double:
+   2
+   Twice 2.0 is 4.0
+
+果然是这样,编译器会根据程序中的字面值猜测程序中未显式制定类型的变量的类型.继续玩.]   
+
+你能看到相同的效果在起作用,如果你试着在 ``ghci`` 命令行中使用 ``read``.
+``ghci`` 内部使用 ``show`` 来展示结果, 意味着你可能同样会碰到一样会碰到模棱两可的类型问题.
+你将须要显式地指定类型于 ``read`` 的结果在 ``ghci`` 当中,如下.
 ::
 
     Prelude> read "3"
@@ -419,8 +489,86 @@ Read
 
 因此，为了让 ``read`` 函数返回正确类型的值，必须给它指示正确的类型。
 
-.. 这里省略了 readsPrec 库的介绍，对初学者来说太复杂了
+回想一下, ``read`` 函数的类型签名: ``(Read a) => String -> a``. ``a`` 在这里是 ``Read`` 类型类的任何实例类型.
+其特定的解析函数被调用取决于 ``read`` 返回值的期望类型.让我们看看他是怎么工作的.
+::
+   ghci> (read "5.0")::Double
+   5.0
+   ghci> (read "5.0")::Integer
+   *** Exception: Prelude.read: no parse
+   
+注意到错误(将发生)当你试图解析 ``5.0`` 作为一个整数 ``Integer``.解释器选择了一个不同的 ``Read`` 实例：
+当返回值的期望是 ``Integer``,而他做的却是期望得到一个 ``Double``. ``Integer`` 的解析器不能接受小数点，从而抛出一个异常．
 
+``Read`` 类型提供了一些相当复杂的解析器．你可能定义一个简单的解析其，通过提供 ``readsPrec`` 函数的实现．
+你的实现能返回一个列表(list)，其包含一个元组(tuple)在解析成功的时候，或者一个空列表在解析失败的时候．下面是一个实现的例子．
+::
+   -- file: ch06/naiveeq.hs
+   instance Read Color where
+       -- readsPrec is the main function for parsing input
+       readsPrec _ value = 
+           -- We pass tryParse a list of pairs.  Each pair has a string
+           -- and the desired return value.  tryParse will try to match
+           -- the input to one of these strings.
+           tryParse [("Red", Red), ("Green", Green), ("Blue", Blue)]
+           where tryParse [] = []    -- If there is nothing left to try, fail
+                 tryParse ((attempt, result):xs) =
+                      -- Compare the start of the string to be parsed to the
+                      -- text we are looking for.
+                      if (take (length attempt) value) == attempt
+                         -- If we have a match, return the result and the
+                         -- remaining input
+                         then [(result, drop (length attempt) value)]
+                         -- If we don't have a match, try the next pair
+                         -- in the list of attempts.
+                         else tryParse xs
+运行测试一下:
+::
+   *Main> :l naiveeq.hs
+   [1 of 1] Compiling Main             ( naiveeq.hs, interpreted )
+   Ok, modules loaded: Main.
+   *Main> (read "Red")::Color
+   Color 1: Red
+   *Main> (read "Green")::Color
+   Color 2: Green
+   *Main> (read "Blue")::Color
+   Color 3: Blue
+   *Main> (read "[Red]")::Color
+   *** Exception: Prelude.read: no parse
+   *Main> (read "[Red]")::[Color]
+   [Color 1: Red]
+   *Main> (read "[Red,Green,Blue]")::[Color]
+   [Color 1: Red,Color 2: Green,Color 3: Blue]
+   *Main> (read "[Red, Green, Blue]")::[Color]
+   *** Exception: Prelude.read: no parse
+   
+[sancao2译注:``(read "Red")::Color`` 输出 ``Color 1: Red`` 的结果而不是 ``Red``,是因为前面重载了 ``show`` 函数的结果．]
+注意到最后的尝试产生了错误．那是因为我们的编译器没有聪明到可以处理前置的空格．你可以改进他，通过些该你的 ``Read`` 实例以忽略任何前置的空格．这在Haskell程序中是常见的做法．
+
+[sancao2译注:因为某个原因前面报错了，所以搜索了一下，不小心找到了．就是把 ``value`` 过滤清洗(``dropWhile isSpace``)一下，放到返回的list中的 ``drop``.
+::
+   import Data.Char (isSpace)
+   
+   instance Read Color where
+       readsPrec _ value = tryParse colors
+           where
+             cleanedUpValue = dropWhile isSpace value
+             tryParse [] = []
+             tryParse ((attempt, result):xs) =
+                 if (take (length attempt) cleanedUpValue) == attempt
+                 then [(result, drop (length attempt) cleanedUpValue)]
+                 else tryParse xs
+             colors = [("Red", Red), ("Green", Green), ("Blue", Blue)]
+             
+::
+   Prelude> :re
+   [1 of 1] Compiling Main             ( naiveeq.hs, interpreted )
+   Ok, modules loaded: Main.
+   *Main> (read "[Red, Green, Blue]")::[Color]
+   [Color 1: Red,Color 2: Green,Color 3: Blue]
+   *Main> (read "[Red , Green , Blue   ]")::[Color]
+   [Color 1: Red,Color 2: Green,Color 3: Blue]
+]
 
 使用 ``Read`` 和 ``Show`` 进行序列化
 ------------------------------------
