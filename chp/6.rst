@@ -19,7 +19,6 @@
 你的应用由一个简单的 ``Color`` 类型组成．首先你尝试了一下，像这样：［sancao2译注:很naive（幼稚）的版本,看文件名字,囧］
 
 ::
-   
    -- file: ch06/naiveeq.hs
    data Color = Red | Green | Blue
    
@@ -32,7 +31,6 @@
 让我们在 ghci 里测试一下：
 
 ::
-   
     Prelude> :l naiveeq.hs
     [1 of 1] Compiling Main             ( naiveeq.hs, interpreted )
     Ok, modules loaded: Main.
@@ -47,7 +45,6 @@
 所以我们可以写一个小函数来运行那个测试(相等性测试)．为了简单（偷懒）起见，我们作弊一下：使用 ``==`` 操作符．
 
 ::
-   
    -- file: ch06/naiveeq.hs
    stringEq :: [Char] -> [Char] -> Bool
 
@@ -63,7 +60,6 @@
 让我们运行一下：
 
 ::
-   
    Prelude> :l naiveeq.hs
    [1 of 1] Compiling Main             ( naiveeq.hs, interpreted )
    Ok, modules loaded: Main.
@@ -110,7 +106,6 @@ sancao2译注:我觉得作者不是不知道类型类应该与接口和多态方
 下面是我们的类型的初定义：
 
 ::
-   
     -- file: ch06/eqclasses.hs
     class BasicEq a where
         isEqual :: a -> a -> Bool
@@ -128,7 +123,6 @@ Haskell中用于定义一个类型类的关键词是 ``class``.不幸的是，�
 让我们在 ``ghci`` 看一下 ``isEqual`` 的类型．回想一下，在 ``ghci`` 我们能用 ``:type`` （简写 ``:t`` ）来查看某些东西的类型．
 
 ::
-
     Prelude> :load eqclasses.hs
     [1 of 1] Compiling Main             ( eqclasses.hs, interpreted )
     Ok, modules loaded: Main.
@@ -151,7 +145,6 @@ Haskell中用于定义一个类型类的关键词是 ``class``.不幸的是，�
 你能用 ``ghci`` 来验证我们基于 ``Bool`` 类的 ``isEqual``, 而不是基于其他实例类型的．
 
 ::
-
     *Main> isEqual True True
     True
     
@@ -176,7 +169,6 @@ Haskell中用于定义一个类型类的关键词是 ``class``.不幸的是，�
 在这个例子中，一个＂不相等＂（not-equal-to）函数可能很有用．这里我们可以做的是，定义一个带两个函数的类型类（typeclass）：
 
 ::
-   
     -- file: ch06/eqclasses.hs
     class BasicEq2 a where
         isEqual2    :: a -> a -> Bool
@@ -187,7 +179,6 @@ Haskell中用于定义一个类型类的关键词是 ``class``.不幸的是，�
 为了避免让类型类的用户为所有类型都定义两个函数，我们可以提供他们（两个函数）的默认实现.然后，用户只要自己实现其中一个就可以了．这里的例子展示了如何实现这种做法．
 
 ::
-   
     -- file: ch06/eqclasses.hs
     class BasicEq3 a where
         isEqual3 :: a -> a -> Bool
@@ -213,7 +204,6 @@ Haskell中用于定义一个类型类的关键词是 ``class``.不幸的是，�
 我们只要定义 ``isEqual3`` 函数，就可以“免费”得到 ``isNotEqual3`` ：
 
 ::
-
     Prelude> :load eqclasses.hs
     [1 of 1] Compiling Main             ( eqclasses.hs, interpreted )
     Ok, modules loaded: Main.
@@ -272,32 +262,25 @@ Haskell中用于定义一个类型类的关键词是 ``class``.不幸的是，�
 
 .. _important-built-in-typeclasses:
 
-几个重要的内置类型类
+重要的内置类型类
 ====================
 
-前面两节分别介绍了类型类的定义，以及如何让某个类型成为给定类型类的实例类型。
+前面两节我们分别讨论了(如何)定义你自己的类型类(typeclass)，以及如何创造你自己的类型类实例(type instance)。
 
-正本节会介绍几个 ``Prelude`` 库中包含的类型类。如本章开始时所说的，类型类是 Haskell 语言某些特性的奠基石，本节就会介绍几个这方面的例子。
-
-更多信息可以参考 Haskell 的函数参考，那里一般都给出了类型类的详细介绍，并且说明，要成为这个类型类的实例，需要实现那些函数。
+是时候介绍几个作为 ``Prelude`` 库一部分的类型类。如本章开始时所说的，类型类处于 Haskell 语言某些重要特性的中心.我们将讨论最常见的几个。更多细节,"Haskell library reference" 是一个很好的资源.其将给你介绍类型类，并且将常常告诉你什么函数是你必须要实现的以获得一份完整的定义[sancao2译注:当你创造你自己的类型类实例的时候].
 
 
 Show
 ----
 
-``Show`` 类型类用于将值转换为字符串，它最重要的函数是 ``show`` 。
-
-``show`` 函数使用单个参数接收输入数据，并返回一个表示该输入数据的字符串：
-
+``Show`` 类型类用于将值(values)转换为字符串(Strings)，其最常用的可能是将数字(numbers)转换成字符串,但是他被定义成如此多类型以至于能转化相当多东西.如果你已经定义了你自己的类型们(types),创造他们(types) ``Show`` 的实例,将会使他们能够在 ``ghci`` 中展示或者在程序中打印出来.
+``Show`` 类型类中最重要的函数是 ``show``. 其接受一个参数,以用于数据(data)转换,并返回一个 ``String`` ,以代表这个数据(data).
 ::
-
     Main> :type show
     show :: Show a => a -> String
 
-以下是一些 ``show`` 函数调用的例子：
-
+让我们看看一些例子,关于转化数值到字符串的.
 ::
-
     Main> show 1
     "1"
 
@@ -307,23 +290,46 @@ Show
     Main> show (1, 2)
     "(1,2)"
 
-Ghci 输出一个值，实际上就是对这个值调用 ``putStrLn`` 和 ``show`` ：
-
+记住 ``ghci`` 显示出结果,就像你进入一个Haskell的程序.所以表达式 ``show 1`` 返回一个包含数字 ``1`` 的单字符的字符串。即引号不是字符串本身的一部分.我们将使用 ``putStrLn`` 明确这一点.
 ::
- 
-    Main> 1
+    ghci> putStrLn (show 1)
     1
+    ghci> putStrLn (show [1,2,3])
+    [1,2,3]
 
-    Main> show 1
-    "1"
-
-    Main> putStrLn (show 1)
-    1
-
-因此，如果你定义了一种新的数据类型，并且希望通过 ghci 来显示它，那么你就应该将这个类型实现为 ``Show`` 类型类的实例，否则 ghci 就会向你抱怨，说它不知道该怎样用字符串的形式表示这种数据类型：
-
+你也可以将 ``show`` 用在 ``String`` 上面.
 ::
+   ghci> show "Hello!"
+   "\"Hello!\""
+   ghci> putStrLn (show "Hello!")
+   "Hello!"
+   ghci> show ['H', 'i']
+   "\"Hi\""
+   ghci> putStrLn (show "Hi")
+   "Hi"
+   ghci> show "Hi, \"Jane\""
+   "\"Hi, \\\"Jane\\\"\""
+   ghci> putStrLn (show "Hi, \"Jane\"")
+   "Hi, \"Jane\""
 
+运行 ``show`` 于 ``String`` 之上,可能使你感到困惑. 因为 ``show`` 生成了一个结果,其适用于Haskell的字面值(literal),
+或者说, ``show`` 添加了引号和转义符号("\"),其适用于Haskell程序内部. ``ghci`` 也用 ``show`` 来显示结果, 所以引号和转义符号被添加了两次.使用 ``putStrLn`` 能帮助你明确这种差异.
+
+你能轻易地定义你自己的 ``Show`` 实例,如下.
+::
+   -- file: ch06/naiveeq.hs
+   instance Show Color where
+       show Red   = "Red"
+       show Green = "Green"
+       show Blue  = "Blue"
+
+上面的例子定义了 ``Show`` 类型类的实例,其针对我们章节前面的定义的类型 ``Color``.
+[作者注释: ``Show`` 类型类:
+``show`` 经常用于定义数据(data)的字符串(``String``)表示,其非常有利于机器使用用 ``Read`` 类型类解析回来.
+Haskell程序员经常写自己的函数去格式化(format)数据以漂亮的方式为终端用户呈现,如果这种表示方式有别于 ``Show`` 预期的输出.]
+
+[原来译文: 因此，如果你定义了一种新的数据类型，并且希望通过 ghci 来显示它，那么你就应该将这个类型实现为 ``Show`` 类型类的实例，否则 ghci 就会向你抱怨，说它不知道该怎样用字符串的形式表示这种数据类型：
+::
     Main> data Color = Red | Green | Blue;
 
     Main> show Red
@@ -346,7 +352,7 @@ Ghci 输出一个值，实际上就是对这个值调用 ``putStrLn`` 和 ``show
 通过实现 ``Color`` 类型的 ``show`` 函数，让 ``Color`` 类型成为 ``Show`` 的类型实例，可以解决以上问题：
 
 ::
-
+    -- file: ch06/naiveeq.hs
     instance Show Color where
         show Red   = "Red"
         show Green = "Green"
@@ -355,12 +361,22 @@ Ghci 输出一个值，实际上就是对这个值调用 ``putStrLn`` 和 ``show
 当然， ``show`` 函数的打印值并不是非要和类型构造器一样不可，比如 ``Red`` 值并不是非要表示为 ``"Red"`` 不可，以下是另一种实例化 ``Show`` 类型类的方式：
 
 ::
-
+    -- file: ch06/naiveeq.hs
     instance Show Color where
         show Red   = "Color 1: Red"
         show Green = "Color 2: Green"
         show Blue  = "Color 3: Blue"
-
+        
+sancao2译注:添加运行如下:
+::
+   *Main> :reload 
+   [1 of 1] Compiling Main             ( naiveeq.hs, interpreted )
+   Ok, modules loaded: Main.
+   
+   *Main> let red = Red
+   *Main> red
+   Color 1: Red
+]
 
 Read
 ----
@@ -452,7 +468,7 @@ Read
 数字类型
 --------
 
-Haskell 有一集非常强大的数字类型：从速度飞快的 32 位或 64 位整数，到任意精度的有理数，包罗万有。
+Haskell 有一个非常强大的数字类型集合：从速度飞快的 32 位或 64 位整数，到任意精度的有理数，包罗万有。
 
 除此之外，Haskell 还有一系列通用算术操作符，这些操作符可以用于几乎所有数字类型。而对数字类型的这种强有力的支持就是建立在类型类的基础上的。
 

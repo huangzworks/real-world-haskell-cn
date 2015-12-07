@@ -17,3 +17,13 @@ stringEq (x:xs) (y:ys) = x == y && stringEq xs ys
 
 -- Everything else doesn't match
 stringEq _ _ = False
+
+-- instance Show Color where
+--     show Red   = "Red"
+--     show Green = "Green"
+--     show Blue  = "Blue"
+
+instance Show Color where
+    show Red   = "Color 1: Red"
+    show Green = "Color 2: Green"
+    show Blue  = "Color 3: Blue"
