@@ -1306,26 +1306,31 @@ GHC 支持另外一个有用的语言扩展, ``OverlappingInstances``. 它解决
     这种行为是很有用的，当我们在写一个库(library)的时候:我们能选择去创造可覆盖的(overlappable)实例，但是库的用户不必须激活(enable)任何特殊的语言扩展．
 
 [sancao2译注:overlap,我翻译它的时候，当它为动词时为覆盖，形容词形式（overlapped）为重叠．
-同样，instance,我翻译它的时候，当它为动词（几乎）的时候成举例，名词时候大家都翻译成实例．其实在代码中 ``instance Foo Char where``,我很想翻译成＂举Foo Char的例子于此...＂,如果后面再加上＂举Foo String的例子于此...＂是不是代码本身就能读出模式匹配的味道，我中毒了不药了．
+同样，instance,我翻译它的时候，当它为动词（几乎没有）的时候成举例，名词时候大家都翻译成实例．其实在代码中 ``instance Foo Char where``,我很想翻译成＂举Foo Char的例子于此...＂,如果后面再加上＂举Foo String的例子于此...＂是不是代码本身就能读出模式匹配的味道，我中毒了不药了．
 ]
 
 .. _how-does-show-work-for-strings:
 
-字符串的 show 是如何工作的？
+show怎么为String工作的? 
 ----------------------------
 
-``OverlappingInstances`` 和 ``TypeSynonymInstances`` 语言扩展是 GHC 特有的，Haskell 98 并不支持。
-然而，Haskell 98 中的 ``Show`` 类型类在转化 ``Char`` 列表和 ``Int`` 列表时却用了不同的方法。它用了一个聪明但简单的小技巧。
+``OverlappingInstances`` ("覆盖同例")和 ``TypeSynonymInstances`` ("同义类型")语言扩展是特定于GHC的，而在定义上不出现(present)于Haskell 98。然而，大家熟悉的 ``Show`` 类型类，来自Haskell 98，以某种方法区别地"渲染"(render) ``Char`` 列表(list)，对比 ``Int`` 列表。它达成这个（"区别地渲染"）通过一个聪明但简单的把戏(trick)。
 
-``Show`` 类型类定义了转换单个值的 ``show`` 方法和转换列表的 ``showList`` 方法。
-``showList`` 默认使用中括号和逗号转换列表。
+``Show`` 类型类定义了两个方法：一个 ``show`` 方法，渲染单值(one value)和一个 ``showList`` 方法，渲染值的列表．
+``showList`` 的默认实现，渲染列表采用中括号们和逗号们．
 
-``[a]`` 的 ``Show`` 实例使用 ``showList`` 实现。``Char`` 的 ``Show`` 实例提供了一个特殊的 ``showList`` 实现，
-它使用双引号，并转义非 ASCII 打印字符。
+``Show`` 对于 ``a`` 的实例是使用 ``showList`` 实现的。 ``Show`` 对于 ``Char`` 实例提供了一个特殊的 ``showList`` 实现．
+其（该实现）使用双引号，并转义"非ASCII可打印"(non-ASCII-printable)的字符们。
 
-结果是，如果有人想对 ``[Char]`` 应用 ``show``，编译器会选择 ``showList`` 的实现，并使用双引号正确转换这个字符串。
+作为结果，如果有人想应用(apply) ``show`` 于 ``[Char]`` 数值,  ``showList`` 实现会被选择，并且他将会正确地渲染字符串，通过使用括号们．
 
-这样，换个角度看问题，我们就能避免 ``OverlappingInstances`` 扩展了。
+[sancao2译注:这个实现思路真是黑魔法．
+btw,我很想说，这里的apply的翻译方法，其实相当于库函数里面apply方法, ``apply show [Char]``．
+匹配类型于某个模式，应用show于[Char],而不是原来翻译得那样＂对[Char]应用show＂．原作者的用词和思维是不是很Haskell? 我中毒了不药了．]
+
+至少有时，因而，我们就能避免对 ``OverlappingInstances`` (覆盖同例)扩展的需求，带着一点点(时间维度)横向思维(lateral thinking)。
+
+[sancao2译注:lateral thinking, 字面译成后向的思维，就是这里的说的在"覆盖同例"这个扩展出现之前（Haskell 98之前），前人是怎么hack这个问题的．然后hack前人的方法的思维．]
 
 .. _how-to-give-a-type-a-new-identity:
 
