@@ -136,6 +136,8 @@
 
 - `Tang Weinan <https://github.com/twn39>`_
 
+- `lkk2003rty <https://github.com/lkk2003rty>`_
+
 - 还有更多待添加 ...
 
 
