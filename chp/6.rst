@@ -1225,13 +1225,17 @@ ghci环境的提示符也变成 ``BrokenClass`` 的了。happy。
         In the expression: toJValue [("foo", "bar")]
         In an equation for ‘it’: it = toJValue [("foo", "bar")]
 
+[sancao2译注:上面的抱怨说的是匹配了两个实例，编译器不知道选择哪一个。
+``Matching instances: instance xxx, instance xxx`` 。]
+
 \ *重叠实例*\ 问题是由 Haskell 的"开放世界假设"的一个后果(a consequence)。
-这里有一个更简单的例子来说明什么在发生。
+这里有一个更简单的例子来说明什么东西在发生。
 [sancao2译注:what's going on,原译为"发生了什么",我想保持英语的倒装语序,也能保留进行时态的意涵。]
 
 ::
 
     -- file: ch06/Overlap.hs
+    {-# LANGUAGE FlexibleInstances #-}
     class Borked a where
         bork :: a -> String
 
@@ -1246,13 +1250,114 @@ ghci环境的提示符也变成 ``BrokenClass`` 的了。happy。
 
 我们有两个 ``Borked`` 类型类实例应用于序对(for pairs)：一个是 ``Int`` 序对，另一个是任意类型的序对，只要这个类型是 ``Borked`` 类型类的实例。
 
-假设我们想把 ``bork`` 应用于 ``Int`` 序对。为了这样做,编译器必须选择一个实例来用。因为这些实例都是正确的(right next to each other)，所以它似乎可以选择更相关的(specific,具体的?)的实例。
+假设我们想把 ``bork`` 应用于 ``Int`` 序对。为了这样做,编译器必须选择一个实例来用。因为这些实例都是正确地紧挨着(right next to each other)，所以它似乎可以选择更相关的(specific,具体的?)的实例。
 
-但是, ``GHC`` 在默认情况下是保守的,且坚持(insist)仅存在这一个可能的实例它能用。它将这样报个错,如果我们尝试去使用 ``bork`` 。
+但是, ``GHC`` 在默认情况下是保守的,且坚持(insist)只有一个可能的GHC 能使用的实例 。它将因此报个错,如果我们尝试去使用 ``bork`` 。
+[sancao2译注:我来补上实验，我先注释掉重叠的类型。
+::
+   Prelude> :!cat Overlap.hs
+   -- file: ch06/Overlap.hs
+   {-# LANGUAGE FlexibleInstances #-}
+   class Borked a where
+       bork :: a -> String
 
+   instance Borked Int where
+       bork = show
+
+   instance Borked (Int, Int) where
+       bork (a, b) = bork a ++ ", " ++ bork b
+
+   -- instance (Borked a, Borked b) => Borked (a, b) where
+   --     bork (a, b) = ">>" ++ bork a ++ " " ++ bork b ++ "<<"
+
+   Prelude> :l Overlap.hs
+   [1 of 1] Compiling Main             ( Overlap.hs, interpreted )
+   Ok, modules loaded: Main.
+   *Main> bork 1
+
+   <interactive>:4:1:
+       No instance for (Borked a0) arising from a use of `bork'
+       The type variable `a0' is ambiguous
+       Possible fix: add a type signature that fixes these type variable(s)  －－可能的fix:添加类型签名
+       Note: there are several potential instances:                          －－有着多个潜在的实例
+         instance Borked (Int, Int) -- Defined at Overlap.hs:9:10
+         instance Borked Int -- Defined at Overlap.hs:6:10
+       In the expression: bork 1
+       In an equation for `it': it = bork 1
+
+    <interactive>:4:6:
+        No instance for (Num a0) arising from the literal `1'
+        The type variable `a0' is ambiguous
+        Possible fix: add a type signature that fixes these type variable(s)
+        Note: there are several potential instances:
+          instance Num Double -- Defined in `GHC.Float'
+          instance Num Float -- Defined in `GHC.Float'
+          instance Integral a => Num (GHC.Real.Ratio a)
+            -- Defined in `GHC.Real'
+          ...plus three others
+        In the first argument of `bork', namely `1'
+        In the expression: bork 1
+        In an equation for `it': it = bork 1
+    *Main> bork 1::Int
+
+    <interactive>:5:1:
+        Couldn't match type `[Char]' with `Int'
+        Expected type: Int　　　　　　　　　　　　 －－期望的类型是Int,因为我们强制加了一个(::Int)来转型
+          Actual type: String                  －－实际的类型为String
+        In the return type of a call of `bork' －－在bork的返回值中,fuck,一定是被理解成(bork 1)::Int
+        In the expression: bork 1 :: Int
+        In an equation for `it': it = bork 1 :: Int
+    *Main> (bork 1)::Int
+
+    <interactive>:13:2:
+        Couldn't match type `[Char]' with `Int'
+        Expected type: Int
+          Actual type: String
+        In the return type of a call of `bork' －－果然！
+        In the expression: (bork 1) :: Int
+        In an equation for `it': it = (bork 1) :: Int
+    
+    *Main> bork (1::Int)
+    "1"
+    *Main> bork (1::Int,1::Int)
+    "1, 1"
+然后注释掉最后的重叠实例声明。
+::
+    Prelude> :!cat Overlap.hs
+    -- file: ch06/Overlap.hs
+    {-# LANGUAGE FlexibleInstances #-}
+    class Borked a where
+        bork :: a -> String
+
+    instance Borked Int where
+        bork = show
+
+    instance Borked (Int, Int) where
+        bork (a, b) = bork a ++ ", " ++ bork b
+
+    instance (Borked a, Borked b) => Borked (a, b) where
+        bork (a, b) = ">>" ++ bork a ++ " " ++ bork b ++ "<<"
+
+    Prelude> :l Overlap.hs
+    [1 of 1] Compiling Main             ( Overlap.hs, interpreted )
+    Ok, modules loaded: Main.
+    *Main> bork (1::Int)
+    "1"
+    *Main> bork (1::Int,1::Int)
+
+    <interactive>:17:1:
+        Overlapping instances for Borked (Int, Int)
+          arising from a use of `bork'
+        Matching instances:                                          －－看，果然很贱，像大姨妈如期而至。
+          instance Borked (Int, Int) -- Defined at Overlap.hs:9:10
+          instance (Borked a, Borked b) => Borked (a, b)
+            -- Defined at Overlap.hs:12:10
+        In the expression: bork (1 :: Int, 1 :: Int)
+        In an equation for `it': it = bork (1 :: Int, 1 :: Int)
+]
 
 .. note::
-   [作者注释:重叠实例什么时候会要紧(matter)？
+   [作者注释:什么时候重叠实例要紧(matter)？
 
     就像我们之前提到的，我们可以分散一个类型类的实例横跨于(across)几个模块中。GHC 不会抱怨重叠实例的单单存在(mere existence)。
     取而代之地，他会抱怨,只有当我们试图使用受影响的类型类的函数时，只有他被迫要去做决定采用哪个实例时。
@@ -1369,17 +1474,17 @@ btw,我很想说，这里的apply的翻译方法，其实相当于库函数里�
     编译器会视 ``UniqueID`` 为 一个不同的类型于 ``Int`` 。
     作为一个 ``UniqueID`` 的用户，我们只知道它有一个"唯一标识符"(Unique ID,英语字面意思)；我们并不知道它被实现，当作一个 ``Int`` 。
 
-当我们声明一个 ``newtype`` 时，我们必须选择哪个潜在类型的类型类实例，其我们想暴露。
-这里，我们让 ``NewtypeInt`` 提供 ``Int`` 类型的 ``Eq``， ``Ord`` 和 ``Show`` 实例。
-这样，我们就可以比较和打印 ``NewtypeInt`` 类型的值了。
+当我们声明一个 ``newtype`` 时，我们必须选择哪个潜在类型的类型类实例，对其（该实例）我们想暴露。
+这里，我们决定使 ``NewtypeInt`` 提供 ``Int`` 的实例，为(for) ``Eq`` ， ``Ord`` 和 ``Show`` 。
+作为一个结果，我们可以比较和打印 ``NewtypeInt`` 类型的值。
 
 ::
 
     *Main> N 1 < N 2
     True
 
-由于我们没有暴露 ``Int`` 的 ``Num`` 或 ``Integral`` 实例，``NewtypeInt`` 类型的值并不是数值。
-例如，我们不能做加法。
+由于我们没有暴露 ``Int`` 的 ``Num`` 或 ``Integral`` 实例， ``NewtypeInt`` 类型的值并不是数字们。
+例如，我们不能加他们。
 
 ::
 
@@ -1390,31 +1495,30 @@ btw,我很想说，这里的apply的翻译方法，其实相当于库函数里�
         In the expression: N 313 + N 37
         In an equation for ‘it’: it = N 313 + N 37
 
-跟用 ``data`` 关键字一样，我们可以用 ``newtype`` 的值构造器创建新值，或者对现有值进行模式匹配。
+跟用 ``data`` 关键字一样，我们可以用 ``newtype`` 的值构造器创建一个新值，或者模式匹配于存在的值。
 
-如果 ``newtype`` 没用自动派生来暴露对应类型的类型类实现的话，我们可以自己写一个新实例或者干脆不实现那个类型类。
+如果 ``newtype`` 没用自动派生来暴露一个类型类的潜在（underlying）类型实现的话，我们是自由的，或者写一个新实例，或者留那个类型类处于不实现状态。
 
 .. _data-and-newtype:
 
-data 和 newtype 的区别
+data 和 newtype 声明之间的区别
 ----------------------
 
-``newtype`` 关键字给现有类型一个不同的身份，相比起 ``data``，它使用时的限制更多。具体来讲，``newtype`` 只能有一个值构造器，
-并且这个构造器只能有一个字段。
+``newtype`` 关键字存在着给现有类型以一个新的身份（id）。它有更多的限制于其使用上，比起 ``data`` 关键字。说白了， ``newtype`` 只能有一个值构造器，并且那个构造器须恰有一个字段(field)。
 
 ::
 
     -- file: ch06/NewtypeDiff.hs
-    -- 可以：任意数量的构造器和字段
+    -- 可以：任意数量的构造器和字段（这里的两个Int为两个字段(fields)）
     data TwoFields = TwoFields Int Int
 
-    -- 可以：一个字段
+    -- 可以：恰一个字段
     newtype Okay = ExactlyOne Int
 
-    -- 可以：使用类型变量
+    -- 可以：类型变量是没问题的
     newtype Param a b = Param (Either a b)
 
-    -- 可以：使用记录语法
+    -- 可以：记录语法是友好的
     newtype Record = Record {
             getInt :: Int
         }
@@ -1429,8 +1533,7 @@ data 和 newtype 的区别
     newtype TooManyCtors = Bad Int
                          | Worse Int
 
-除此之外，``data`` 和 ``newtype`` 还有一个重要区别。由 ``data`` 关键字创建的类型在运行时有一个簿记开销，
-如记录某个值是用哪个构造器创建的。而 ``newtype`` 只有一个构造器，所以不需要这个额外开销。
+在此之上，还有另一个重要的区别于 ``data`` 和 ``newtype`` 之间。一个类型，由 ``data`` 关键字创建，有一个簿记保持（book-keeping）的开销在运行时。例如，追踪（track）哪个构造器，用其（构造器）一个值被创建。而 ``newtype`` 只有一个构造器，所以不需要这个额外开销。
 这使得它在运行时更省时间和空间。
 
 由于 ``newtype`` 的构造器只在编译时使用，运行时甚至不存在，
