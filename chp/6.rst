@@ -1154,7 +1154,62 @@ Haskell 的有意地设计成允许我们任意创建类型类的实例,每当�
     [2 of 2] Compiling BrokenClass      ( BrokenClass.hs, interpreted )
     Ok, modules loaded: JSONClass, BrokenClass
 
-然而，当我们使用序对列表实例时，麻烦来了。
+[sancao2译注:为什么我运行到这里就成这样了?
+::
+   *SimpleJSON> :l BrokenClass.hs ../ch05/SimpleJSON.hs JSONClass.hs
+
+   <no location info>:
+       module `main:Main' is defined in multiple files: BrokenClass.hs
+                                                     JSONClass.hs
+   Failed, modules loaded: none.
+看编译器提示.谷歌是良师,编译器是诤友.总说坏话的人,不一定对你有恶意.不扯淡了.
+他抱怨 ``main:Main`` 模块在多个地方(``BrokenClass.hs,JSONClass.hs``)定义了.
+原来我是个伸手党,书上说什么,复制下来,想都不想的.从最简单的开始,原来我在BrokenClass.hs开头都没有 ``import JSONClass``.
+然后报下面的错.
+::
+   Prelude> :l BrokenClass.hs JSONClass.hs 
+
+   JSONClass.hs:1:1:
+       File name does not match module name:
+       Saw: `Main'
+       Expected: `JSONClass'
+   Failed, modules loaded: none.
+编译器的意思是,他看(``Saw``)到是 ``main``,而希望(``Expected``)的是 ``JSONClass``.所以要在JSONClass.hs的开头也加上 ``module JSONClass where``. 前面几节中编译JSONClass.hs是把他当成 ``Main`` 的,现在我测试好了,就想把你拿来用了,所以把你声明成模块.
+::
+   Prelude> :l BrokenClass.hs JSONClass.hs 
+
+   JSONClass.hs:7:8:
+       Could not find module `SimpleJSON'
+       Use -v to see a list of the files searched for.
+   Failed, modules loaded: none.
+这个已经出现过了,因为JSONClass.hs开头要用到 ``SimpleJSON``,然后编译器抱怨说找不到(``Could not find module``).
+::
+   Prelude> :l BrokenClass.hs JSONClass.hs ../ch05/SimpleJSON.hs
+   [1 of 3] Compiling SimpleJSON       ( ../ch05/SimpleJSON.hs, interpreted )
+   [2 of 3] Compiling JSONClass        ( JSONClass.hs, interpreted )
+   [3 of 3] Compiling BrokenClass      ( BrokenClass.hs, interpreted )
+
+   BrokenClass.hs:11:22:
+       Illegal instance declaration for `JSON [(String, a)]'
+         (All instance types must be of the form (T a1 ... an)
+          where a1 ... an are *distinct type variables*,
+          and each type variable appears at most once in the instance head.
+          Use -XFlexibleInstances if you want to disable this.)
+       In the instance declaration for `JSON [(String, a)]'
+   Failed, modules loaded: SimpleJSON, JSONClass.
+这个错误,前面作者已经介绍过了,加编译器选项 ``{-# LANGUAGE XXXX #-}``. 这里的 ``XXXX``, 就是编译器抱怨里面的 ``-XFlexibleInstances``, -X后面的那一坨东西.加在开头.说到开头,如果你把 ``import`` 放在 ``module`` 声明之前,那么你也会悲剧,不信自己试试看,编译器会教育你的.
+最后,就是很没意思的成功了.
+::
+   Prelude> :l BrokenClass.hs JSONClass.hs ../ch05/SimpleJSON.hs
+   [1 of 3] Compiling SimpleJSON       ( ../ch05/SimpleJSON.hs, interpreted )
+   [2 of 3] Compiling JSONClass        ( JSONClass.hs, interpreted )
+   [3 of 3] Compiling BrokenClass      ( BrokenClass.hs, interpreted )
+   Ok, modules loaded: BrokenClass, JSONClass, SimpleJSON.
+   *BrokenClass>
+ghci环境的提示符也变成 ``BrokenClass`` 的了.happy.   
+]
+
+然而，一旦我们使用序对列表实例时，我们就"跑"(不是get,体会一下)进麻烦里面了(run in trouble)。
 
 ::
 
@@ -1170,8 +1225,9 @@ Haskell 的有意地设计成允许我们任意创建类型类的实例,每当�
         In the expression: toJValue [("foo", "bar")]
         In an equation for ‘it’: it = toJValue [("foo", "bar")]
 
-\ *重叠实例*\ 问题是由 Haskell 的开放世界假设造成的。
-这里有一个更简单的例子来说明发生了什么。
+\ *重叠实例*\ 问题是由 Haskell 的"开放世界假设"的一个后果(a consequence)。
+这里有一个更简单的例子来说明什么在发生.
+[sancao2译注:what's going on,原译为"发生了什么",我想保持英语的倒装语序,也能保留进行时态的意涵.]
 
 ::
 
@@ -1188,19 +1244,19 @@ Haskell 的有意地设计成允许我们任意创建类型类的实例,每当�
     instance (Borked a, Borked b) => Borked (a, b) where
         bork (a, b) = ">>" ++ bork a ++ " " ++ bork b ++ "<<"
 
-对于序对，我们有两个 ``Borked`` 类型类实例：一个是 ``Int`` 序对，另一个是任意类型的序对，只要这个类型是 ``Borked`` 类型类的实例。
+我们有两个 ``Borked`` 类型类实例应用于序对(for pairs)：一个是 ``Int`` 序对，另一个是任意类型的序对，只要这个类型是 ``Borked`` 类型类的实例。
 
-假设我们想把 ``bork`` 应用于 ``Int`` 序对。编译器必须选择一个实例来用。由于这两个实例都能用，所以看上去它好像只要选那个更相关（specific）的实例就可以了。
+假设我们想把 ``bork`` 应用于 ``Int`` 序对。为了这样做,编译器必须选择一个实例来用。因为这些实例都是正确的(right next to each other)，所以它似乎可以选择更具体(specific)的实例.
 
-但是，``GHC`` 默认是保守的。它坚持只能有一个可用实例。这样，当我们试图使用 ``bork`` 时，它就会报错。
+但是, ``GHC`` 在默认情况下是保守的,且坚持(insist)仅存在这一个可能的实例它能用。它将这样报个错,如果我们尝试去使用 ``bork`` 。
+
 
 .. note::
+   [作者注释:重叠实例什么时候会出问题？
 
-    重叠实例什么时候会出问题？
-
-    之前我们提到，我们可以把某个类型类的实例分散在几个模块中。GHC 并不会在意重叠实例的存在。
-    相反，只有当我们使用受影响的类型类的函数，GHC 被迫要选择使用哪个实例时，它才会报错。
-
+    就像我们之前提到的，我们可以分散一个类型类的实例于几个模块中。GHC 不会抱怨重叠实例的仅仅存在(mere existence)。
+    然而，他仅会抱怨,只有当我们试图使用受影响的类型类的函数时，只有当他被迫要去做决定哪个实例来用时，
+   ]
 .. _relaxing-some-restrictions-on-typeclasses:
 
 取消类型类的一些限制
