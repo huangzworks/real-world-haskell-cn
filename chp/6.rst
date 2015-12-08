@@ -1246,7 +1246,7 @@ ghci环境的提示符也变成 ``BrokenClass`` 的了.happy.
 
 我们有两个 ``Borked`` 类型类实例应用于序对(for pairs)：一个是 ``Int`` 序对，另一个是任意类型的序对，只要这个类型是 ``Borked`` 类型类的实例。
 
-假设我们想把 ``bork`` 应用于 ``Int`` 序对。为了这样做,编译器必须选择一个实例来用。因为这些实例都是正确的(right next to each other)，所以它似乎可以选择更具体(specific)的实例.
+假设我们想把 ``bork`` 应用于 ``Int`` 序对。为了这样做,编译器必须选择一个实例来用。因为这些实例都是正确的(right next to each other)，所以它似乎可以选择更相关的(specific,具体的?)的实例.
 
 但是, ``GHC`` 在默认情况下是保守的,且坚持(insist)仅存在这一个可能的实例它能用。它将这样报个错,如果我们尝试去使用 ``bork`` 。
 
@@ -1259,19 +1259,19 @@ ghci环境的提示符也变成 ``BrokenClass`` 的了.happy.
    ]
 .. _relaxing-some-restrictions-on-typeclasses:
 
-取消类型类的一些限制
+放松(relex)类型类的一些限制
 --------------------
 
-通常，我们不能给多态类型（polymorphic type）的特化版本（specialized version）写类型类实例。
-``[Char]`` 类型就是多态类型 ``[a]`` 特化成 ``Char`` 的结果。因此我们禁止声明 ``[Char]`` 为某个类型类的实例。
-这非常不方便，因为字符串在代码中无处不在。
+通常，我们不能写一个类型类实例,为了一个多态类型（polymorphic type）的特化版本（specialized version）.
+``[Char]`` 类型就是多态类型 ``[a]`` (其中的 ``a``)特化成类型 ``Char`` 。我们就这样被禁止声明 ``[Char]`` 为某个类型类的实例。
+这高度地(highly,哈哈)不方便，因为字符串无处不在于实际的代码中。
 
-``FlexibleInstances`` 语言扩展取消了这个限制，它允许我们写这样的实例。
+``TypeSynonymInstances`` 语言扩展取消了这个限制，并允许我们写这样的实例。
 
-GHC 支持另外一个有用的语言扩展，``OverlappingInstances``，它解决了重叠实例带来的问题。
-如果存在重叠实例，编译器会选择最相关的（specific）那一个。
+GHC 支持另外一个有用的语言扩展, ``OverlappingInstances``. 它解决(address?)了我门在处理重叠实例时候碰到的问题。
+如果存在多个重叠的实例去从中选择，这个扩展会"采摘"(pick)最相关的（specific,具体的?）那一个。
 
-我们经常把这个扩展和 ``TypeSynonymInstances`` 放在一起使用。下面是一个例子。
+我们经常使用这个扩展,同 ``TypeSynonymInstances`` 一起。这里是一个例子。
 
 ::
 
@@ -1292,14 +1292,22 @@ GHC 支持另外一个有用的语言扩展，``OverlappingInstances``，它解�
     instance Foo String where
         foo = id
 
-如果我们对 ``String`` 应用 ``foo``，编译器会选择 ``String`` 的特定实现。
-即使 ``[a]`` 和 ``Char`` 都是 ``Foo`` 的实例，但由于 ``String`` 实例更相关，因此 GHC 选择了它。
+如果我们应用(apply) ``foo`` 于 ``String`` ，编译器会选择 ``String`` 相关的(specific)实现。
+虽然我们有一个 ``Foo`` 的实例关于 ``[a]`` 和 ``Char`` ，但关于 ``String`` 的实例更相关，所以 GHC 选择它。
 
-即使开了 ``OverlappingInstances`` 扩展，如果 GHC 发现了多个同样相（equally specific）关的实例，它仍然会拒绝代码。
+即使 ``OverlappingInstances`` 扩展被使能(enabled)，GHC仍将拒绝代码，若他找到一个以上等价地相关的（equally specific）实例．
 
 .. _note:
 
-    何时使用 OverlappingInstances 扩展（to be added）
+    何时去使用 ``OverlappingInstances`` 扩展
+    这是一个重要的点：GHC视 ``OverlappingInstances`` 为影响一个实力的声明，而不是一个位置于此我们使用一个实例．换句话说，
+    当我们定义一个实例，其（这个实例）我们希望能（被）允许重叠（overlap）于其他实例的时候，我们必须激活(enable，使能)该扩展(``OverlappingInstances``)为这个模块，而其（这个模块）包含着定义．当他编译这个模块的时候，GHC会记录那个实例为＂能被覆盖（overlap）以其他的模块＂.
+    一旦我们引入(import)这个模块而使用他的实例，我们将不需要使能(enable) ``OverlappingInstances`` 编译选项在引入模块的时候：GHC将已经知道这个实例是被标记为＂对覆盖友好的＂(okay to overlap)，当他被定义．
+    这种行为是很有用的，当我们在写一个库(library)的时候:我们能选择去创造可覆盖的(overlappable)实例，但是库的用户不必须激活(enable)任何特殊的语言扩展．
+
+[sancao2译注:overlap,我翻译它的时候，当它为动词时为覆盖，形容词形式（overlapped）为重叠．
+同样，instance,我翻译它的时候，当它为动词（几乎）的时候成举例，名词时候大家都翻译成实例．其实在代码中 ``instance Foo Char where``,我很想翻译成＂举Foo Char的例子于此...＂,如果后面再加上＂举Foo String的例子于此...＂是不是代码本身就能读出模式匹配的味道，我中毒了不药了．
+]
 
 .. _how-does-show-work-for-strings:
 
