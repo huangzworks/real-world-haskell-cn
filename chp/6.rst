@@ -1783,16 +1783,18 @@ data 和 newtype 声明之间的区别
 
 .. _summary-the-three-ways-of-naming-types:
 
-总结：命名类型的三种方式
+总结：三种命名类型的方式
 ------------------
 
-这里简要回顾一下 haskell 引入新类型名的三种方式。
+这是一份简要重述（recap），关于 Ｈaskell 的三种方式用来为类型提出（introduce）新名。
 
-- ``data`` 关键字定义一个真正的代数数据类型。
+- ``data`` 关键字提出（introduce）一个真正的代数（albegraic）数据类型。
 
-- ``type`` 关键字给现有类型定义别名，而类型和别名可以通用。
+- ``type`` 关键字给我们一个别名（synonym）去用，为一个存在着的（existing）类型。
+  我们可以交换地（interchangeably）使用这个类型和他的别名,
 
-- ``newtype`` 关键字给现有类型定义一个不同的身份（distinct identity）,而原类型和新类型不能通用。
+- ``newtype`` 关键字给予一个存在着的类型以一个独特的身份（distinct identity）。
+  这个原类型和这个新类型是不可交换的（interchangeable）。
 
 
 .. _json_typeclasses_without_overlapping_instances:
