@@ -1993,9 +1993,24 @@ Haskell 98 有一个微妙的特性可能会在某些意想不到的情况下“
         In an equation for ‘myShow’: myShow = show
         Failed, modules loaded: none.
 
-[译注：译者得到的输出和原文有出入，这里提供的是使用最新版本 GHC 得到的输出。]
+[译注：译者得到的输出和原文有出入，这里提供的是使用最新版本 GHC 得到的输出。
+还有我的输出有23种了， ``...plus 23 others`` 。]
+::
+   ghci> :load Monomorphism            ----旧版本ghc的报错。
+   [1 of 1] Compiling Main             ( Monomorphism.hs, interpreted )
 
-错误信息中提到的 “monomorphism” 是 Haskell 98 的一部分。
+   Monomorphism.hs:2:9:
+       Ambiguous type variable `a' in the constraint:
+         `Show a' arising from a use of `show' at Monomorphism.hs:2:9-12
+       Possible cause: the monomorphism restriction applied to the following:
+          myShow :: a -> String (bound at Monomorphism.hs:2:0)
+       Probable fix: give these definition(s) an explicit type signature
+                     or use -fno-monomorphism-restriction
+   Failed, modules loaded: none.
+   
+[sancao2译注:下面那段话，引用原版错误输出，所以我把他也贴出来。]
+
+错误信息中提到的 “monomorphism restriction” 是 Haskell 98 的一部分。
 \ *单一同态*\ 是多态（polymorphism）的反义词：它表明某个表达式只有一种类型。
 Haskell 有时会强制使某些声明不像我们预想的那么多态。
 
@@ -2031,8 +2046,7 @@ Haskell 社区一致同意它并不经常出现；它解释起来很棘手（tri
   它取消了单一同态限制。
 
 没人喜欢单一同态限制，因此几乎可以肯定的是下一个版本的 Haskell 会去掉它。
-但这并不是说加上 ``NoMonomorphismRestriction`` 就可以一劳永逸：有些编译器（包括一些老版本的 GHC）
-识别不了这个扩展，但用另外两种方法就可以解决问题。
+但这并不是说加上 ``NoMonomorphismRestriction`` 就可以一劳永逸：有些编译器（包括一些老版本的 GHC）识别不了这个扩展，但用另外两种方法就可以解决问题。
 如果这种可移植性对你不是问题，那么请务必打开这个扩展。
 
 .. _conclusion:
