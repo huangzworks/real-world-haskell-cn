@@ -5,7 +5,7 @@
  第 6 章：使用类型类
 =====================
 
-类型类（typeclass）跻身于 ``Haskell`` 最强大功能之列：它们（typeclasses）允许你定义通用接口，其（这些接口）为各种不同的类型（type）提供一组公共特性集。
+类型类（typeclass）跻身于 ``Haskell`` 最强大功能之列：它们（typeclasses）允许你定义通用接口，而其（这些接口）为各种不同的类型（type）提供一组公共特性集。
 类型类是某些基本语言特性的核心，比如相等性测试（equality testing）和数值操作符（numeric operators）。
 在讨论到底类型类是什么之前，我想解释下他们的作用（the need for them）。
 
@@ -15,8 +15,10 @@
 类型类的作用
 ============
 
-让我们想象一下某个高深莫测（无厘头）的原因， ``Haskell`` 语言的设计者拒绝实现相等性测试 ``==`` 。一旦你听到这个噩耗，你决定山寨一套自己的相等性测试 ``==`` 。
-你的应用由一个简单的 ``Color`` 类型组成。首先你尝试了一下，像这样：［sancao2译注:很naive（幼稚）的版本,看文件名字,囧。］
+让我们想象一下某个高深莫测（无厘头）的原因， ``Haskell`` 语言的设计者拒绝实现相等性测试 ``==`` 。
+一旦你听到这个噩耗，你决定山寨一套自己的相等性测试 ``==`` 。
+你的应用由一个简单的 ``Color`` 类型组成。首先你尝试了一下，像这样：
+［sancao2译注:很naive（幼稚）的版本，看文件名字，囧。］
 
 ::
    -- file: ch06/naiveeq.hs
@@ -41,8 +43,9 @@
     *Main> colorEq Red Green
     False
 
-现在，假设你想要添加 ``String`` 的相等性测试(equality testing)。因为一个 ``Haskell`` 的 ``String`` 其实是字符们（characters）的列表(即[char])，
-所以我们可以写一个小函数来运行那个测试(相等性测试)。为了简单（偷懒）起见，我们作弊一下：使用 ``==`` 操作符。
+现在，假设你想要添加 ``String`` 的相等性测试(equality testing)。
+因为一个 ``Haskell`` 的 ``String`` 其实是字符们（characters）的列表(即[char])，所以我们可以写一个小函数来运行那个测试(相等性测试)。
+为了简单（偷懒）起见，我们作一下弊：使用 ``==`` 操作符。
 
 ::
    -- file: ch06/naiveeq.hs
@@ -77,16 +80,18 @@
    In the second argument of `stringEq', namely `[""]'
    In the expression: stringEq "" [""]
    
-［sancao2译注:囧，报错了，无所谓了，意思到了就可以了。示意（illustrate）一下，你懂的？继续。］
+［sancao2译注:囧，报错了，无所谓了，意思到了就可以了。
+示意（illustrate）一下，你懂的？继续。］
 
-你现在应该能看出一个问题了吧：我们不得不为各个不同类型（type）实现一坨带有不同名字的函数（function），以便我们有能力用其进行比较。
-这种做法非常低效，而且烦人。如果我们能用 ``==`` 对比任何类型的值，就再方便不过了。
+现在你应该能看出一个问题了吧：我们不得不为各个不同类型（type）实现一坨带有不同名字的函数（function），以便我们有能力用其进行比较。
+这种做法非常低效，而且烦人。
+如果我们能用 ``==`` 对比任何类型的值，就再方便不过了。
 
-同时，我们能定义一些通用（generic）函数，比如基于 ``==`` 的 ``/=``, 其能对几乎所有的东西（anything）合法。
-通过写一个通用函数其能比较所有的东西，也能使我们的代码一般化（generic）：如果一段代码仅需要比较（compare）一些东西，
-然后他应该能够接受任何数据类型，对其（这些类型）编译器是知道如何比较的。
+同时，我们能定义一些通用（generic）函数，比如基于 ``==`` 的 ``/=`` ， 其能对几乎任何东西（anything）合法。
+通过写一个通用函数，其能比较所有的东西，也能使我们的代码一般化（generic）：如果一段代码仅需要比较（compare）一些东西，然后他应该就能够接受任何数据类型，而对其（这些类型）编译器是知道如何比较的。
 
-而且更进一步，如果以后新类型被添加进来，现有的代码不应该被修改。Haskell 的类型类（typeclass）就是被设计成处理上面的这些破事的。
+而且更进一步，如果以后新类型被添加进来，现有的代码不应该被修改。
+而Haskell 的类型类（typeclass）就是被设计成处理上面的这些破事的。
 
 
 .. _what-are-typeclasses:
@@ -94,14 +99,17 @@
 什么是类型类？
 ==============
 
-类型类定义了一系列函数，这些函数对于不同类型的值使用不同的函数实现。它和面向对象（object-oriented）语言的对象（objects）有些类似，但是他们是完全不同的．
+类型类定义了一系列函数，而这些函数对于不同类型的值使用不同的函数实现。
+它和面向对象（object-oriented）语言的对象（objects）有些类似，但是他们是完全不同的。
 
 [huangz，labyrlnth，YenvY等译者注：这里原文是将“面向对象编程中的对象”和 Haskell 的类型类进行类比，但实际上这种类比并不太恰当，类比成接口和多态方法更适合一点。]
-[sancao2译注:我觉得作者不是不知道类型类应该与接口和多态方法类比,他这么说的原因是下面他自己的注释"When is a class not a class?"里面说的,
-因为类型类的关键词是class,传统面向对象编程里面的关键词也是class,囧rz。]
+[sancao2译注:我觉得作者不是不知道类型类应该与接口和多态方法类比，他这么说的原因是下面他自己的注释"When is a class not a class?"里面说的，因为类型类的关键词是class，传统面向对象编程里面的关键词也是class，囧rz。]
 
-让我们使用类型类来解决我们章节前面相等性测试的困境。首先，我们定义类型类本身．我们需要一个函数，其接受两个参数。
-每个参数拥有相同的类型，然后返回一个 ``Bool`` 类型以指示他们是否相等。我们不关心这些类型到底是什么，但是我需要的是同一个类型的两项(item)。
+让我们使用类型类来解决我们章节前面相等性测试的困局。
+首先，我们定义类型类本身。
+我们需要一个函数，其接受两个参数。
+每个参数拥有相同的类型，然后返回一个 ``Bool`` 类型以指示他们是否相等。
+我们不关心这些类型到底是什么，但我需要的是同一个类型的两项(items)。
 
 下面是我们的类型的初定义：
 
@@ -110,17 +118,24 @@
     class BasicEq a where
         isEqual :: a -> a -> Bool
 
-这个定义说，我们申明（使用 ``class`` 关键字）了一个类型类（typeclass）,其名字叫 ``BasicEq`` 。
-接着我们将引用实例类型（instance types）,带着字母 ``a`` 作名字。一个类型类的实例类型可以是任何类型，其（实例类型）只要实现了类型类中定义的函数。
-这个类型类定义了一个函数(``isEqual``)。这个函数接受两个参数，其（这俩参数）对应于实例类型即 ``a``,　并且返回一个 ``Bool`` 型。
+这个定义说，我们申明（使用 ``class`` 关键字）了一个类型类（typeclass），其名字叫 ``BasicEq`` 。
+接着我们将引用（refer to）实例类型（instance types），带着字母 ``a`` 作名字。
+一个类型类的实例类型可以是任何类型，只要其（实例类型）实现了类型类中定义的函数。
+这个类型类定义了一个函数(``isEqual``)，而这个函数接受两个参数，他们（这俩参数）对应于实例类型即 ``a`` ，　并且返回一个 ``Bool`` 型。
 
-［作者注释：什么时候一个类（class，指的是关键词）不是一个类（OOP中的class）？原句：“When is a class not a class?”
-Haskell中用于定义一个类型类的关键词是 ``class`` 。不幸的是，这可能会使那些来自面向对象背景的家伙感到困惑，因为我们说得不是一个东西。鸡同鸭讲，233。］
+.. note::
+   ［作者注释：什么时候一个类（class，指的是Haskell关键词）不是一个类（OOP中的class）？原句：“When is a class not a class?”
+   Haskell中用于定义一个类型类的关键词是 ``class`` 。
+   不幸的是，这可能会使那些来自面向对象背景的家伙困惑，因为我们说的不是一个东西。
+   鸡同鸭讲呀，233。］
 
-在定义的第一行，参数（实例类型）的名字是任选的。就是说，我们能使用任意名字。关键之处在于，当我们列出函数的类型，我们必须使用相同的名字引用这些实例类型（instance types）。
+在定义的第一行，参数（实例类型）的名字是任选的。
+就是说，我们能使用任意名字。
+关键之处在于，当我们列出函数的类型时，我们必须使用相同的名字引用实例类型们（instance types）。
 比如说，我们使用 ``a`` 来表示实例类型，那么函数签名中也必须使用 ``a`` 来代表这个实例类型。
 
-让我们在 ``ghci`` 看一下 ``isEqual`` 的类型。回想一下，在 ``ghci`` 我们能用 ``:type`` （简写 ``:t`` ）来查看某些东西的类型。
+让我们在 ``ghci`` 看一下 ``isEqual`` 的类型。
+回想一下，在 ``ghci`` 我们能用 ``:type`` （简写 ``:t`` ）来查看某些东西的类型。
 
 ::
     Prelude> :load eqclasses.hs
@@ -130,10 +145,10 @@ Haskell中用于定义一个类型类的关键词是 ``class`` 。不幸的是�
     *Main> :type isEqual
     isEqual :: (BasicEq a) => a -> a -> Bool
 
-这种方式让我们读出：＂对于所有的类型 ``a``,只要 ``a`` 是 ``BasicEq`` 的一个实例， ``isEqual`` 就能接受两个类型为 ``a`` 的参数，返回一个 ``Bool`` 。＂
-[sancao2译注:这句话为什么原文加引号,其实是帮助读者解读编译器输出"(BasicEq a) => a -> a -> Bool" 。]
+这种方式让我们读出：＂对于所有的类型 ``a`` ，只要 ``a`` 是 ``BasicEq`` 的一个实例， ``isEqual`` 就能接受两个类型为 ``a`` 的参数，并返回一个 ``Bool`` 。＂
+[sancao2译注:这句话为什么原文加引号，其实是帮助读者解读编译器输出"``(BasicEq a) => a -> a -> Bool``" 。]
 让我们快速地浏览一遍为某个特定类型定义的 ``isEqual`` 吧。
-[sancao2译注,注意(定义类型类实例的手法)关键词变成了 ``instance``,然后 ``a`` 被替换成 ``Bool`` 类型,然后才是类型类须实现的函数的定义。]
+[sancao2译注，注意(定义实例的手法)关键词变成了 ``instance``，接着 ``a`` 被替换成 ``Bool`` 类型，然后才是类型类须实现的函数的定义。]
 
 ::
     -- file: ch06/eqclasses.hs
@@ -142,7 +157,7 @@ Haskell中用于定义一个类型类的关键词是 ``class`` 。不幸的是�
         isEqual False False = True
         isEqual _     _     = False
 
-你能用 ``ghci`` 来验证我们基于 ``Bool`` 类的 ``isEqual``, 而不是基于其他实例类型的。
+你能用 ``ghci`` 来验证我们基于 ``Bool`` 类的 ``isEqual`` ， 而不是基于其他实例类型的。
 
 ::
     *Main> isEqual True True
@@ -160,13 +175,16 @@ Haskell中用于定义一个类型类的关键词是 ``class`` 。不幸的是�
         In the expression: isEqual "hello" "moto"
         In an equation for `it': it = isEqual "hello" "moto"
 
-注意,当我们试图比较两个字符串,ghci抱怨到，我们没有提供基于 ``String`` 实例类型的 ``BasicEq`` 。所以他不知道如何去比较 ``String`` 。
-[sancao2译注:作者给我们解读编译器"No instance for (BasicEq [Char])"的报警/抱怨。学会看编译器的输出是非常重要的,作者真是用心良苦。]
-并且建议到我们可以通过定义基于 ``[Char]`` (等价于 ``String``) 实例类型的 ``BasicEq`` 。
-[sancao2译注:编译器"Possible fix: add an instance declaration for (BasicEq [Char])"的解读。]
+注意，当我们试图比较两个字符串，ghci抱怨到，“我们没有提供基于 ``[Char]`` 实例类型的 ``BasicEq`` ，所以他不知道如何去比较 ``[Char]`` 。”
+[sancao2译注:作者给我们解读编译器"``No instance for (BasicEq [Char])``"的报警/抱怨。
+学会看编译器的输出是非常重要的，作者真是用心良苦。]
+并且建议（"``Possible fix``"）到我们可以通过定义基于 ``[Char]`` 实例类型的 ``BasicEq`` 。
+[sancao2译注:编译器"``Possible fix: add an instance declaration for (BasicEq [Char])``"的解读。]
 
-稍后的一节我们将会详细介绍定义实例类型（instances）。不过，首先让我们继续看看定义类型类(typeclass)。
-在这个例子中，一个＂不相等＂（not-equal-to）函数可能很有用。这里我们可以做的是，定义一个带两个函数的类型类（typeclass）：
+稍后的一节我们将会详细介绍定义实例（instances）。
+不过，首先让我们继续看定义类型类(typeclass)。
+在这个例子中，一个＂不相等＂（not-equal-to）函数可能很有用。
+这里我们可以做的是，定义一个带两个函数的类型类（typeclass）：
 
 ::
     -- file: ch06/eqclasses.hs
@@ -174,9 +192,12 @@ Haskell中用于定义一个类型类的关键词是 ``class`` 。不幸的是�
         isEqual2    :: a -> a -> Bool
         isNotEqual2 :: a -> a -> Bool
 
-如果有人要提供一个 ``BasicEq2`` 的实例（instance），他将要定义两个函数： ``isEqual2`` 和 ``isNotEqual2`` 。
-当我们定义好以上的 ``BasicEq2``, 看起来我们为自己制造了额外的工作。从逻辑上讲，如果我们知道 ``isEqual2`` 或 ``isNotEqual2`` 返回的是什么，那么我们就可以知道另外一个函数的返回值，对于所有类型来说。
-为了避免让类型类的用户为所有类型都定义两个函数，我们可以提供他们（两个函数）的默认实现。然后，用户只要自己实现其中一个就可以了。这里的例子展示了如何实现这种做法。
+如果有人要提供一个 ``BasicEq2`` 的实例（instance），那么他将要定义两个函数： ``isEqual2`` 和 ``isNotEqual2`` 。
+当我们定义好以上的 ``BasicEq2`` ， 看起来我们为自己制造了额外的工作。
+从逻辑上讲，如果我们知道 ``isEqual2`` 或 ``isNotEqual2`` 返回的是什么，那么我们就可以知道另外一个函数的返回值，对于所有（输入）类型来说。
+为了避免让类型类的用户为所有类型都定义两个函数，我们可以提供他们（两个函数）的默认实现。
+然后，用户只要自己实现其中一个就可以了。
+这里的例子展示了如何实现这种手法。
 
 ::
     -- file: ch06/eqclasses.hs
@@ -187,12 +208,14 @@ Haskell中用于定义一个类型类的关键词是 ``class`` 。不幸的是�
         isNotEqual3 :: a -> a -> Bool
         isNotEqual3 x y = not (isEqual3 x y)
 
-人们实现这个类型类必须提供至少一个函数的实现。当然他们可以实现两个，如果他们乐意，但是他们不必被强制（这么做）。
-虽然我们提供两个函数的默认实现，每个函数取决于另外一个来计算答案。如果我们不指定至少一个，所产生的代码将是一个无尽循环。
-［saocao2译注:翻译成＂死循环＂好,还是字面翻译(endless loop)无尽循环好？］
+人们实现这个类型类必须提供至少一个函数的实现。
+当然他们可以实现两个，如果他们乐意，但是他们不必被强制（这么做）。
+虽然我们提供两个函数的默认实现，每个函数取决于另外一个来计算答案。
+如果我们不指定至少一个，所产生的代码将是一个无尽循环。
 因此，至少得有一个函数总是要被实现。
 
-[huangz，labyrlnth，YenvY等译者提供的实例类型的例子,赞。以下是将 ``Bool`` 作为 ``BasicEq3`` 实例类型的例子。
+[huangz，labyrlnth，YenvY等译者提供的实例类型的例子，赞。
+以下是将 ``Bool`` 作为 ``BasicEq3`` 实例类型的例子。
 
 ::
     -- file: ch06/eqclasses.hs
@@ -218,10 +241,12 @@ Haskell中用于定义一个类型类的关键词是 ``class`` 。不幸的是�
     True
 ]
 
-用 ``BasicEq3``, 我们提供了一个类型类(class)，其行为类似于 ``Haskell`` 原生 ``==`` 和 ``/=`` 操作符。
-事实上,这些操作符本来就是被一个类型类定义的,其看起来几乎等价于 ``BasicEq3`` 。
-"Haskell 98 Report"定义了一个类型类,它实现了相等性比较(equality comparison)。
-这是内建类型类 ``Eq`` 的代码。注意到他和我们的 ``BasicEq3`` 类型类多么相似呀。[废话,你抄他的呀,233。]
+用 ``BasicEq3`` ， 我们提供了一个类型类(class)，其行为类似于 ``Haskell`` 原生的 ``==`` 和 ``/=`` 操作符。
+事实上，这些操作符本来就是被一个类型类定义的，其看起来几乎等价于 ``BasicEq3`` 。
+"Haskell 98 Report"定义了一个类型类，它实现了相等性比较(equality comparison)。
+这是内建类型类 ``Eq`` 的代码。
+注意到他和我们的 ``BasicEq3`` 类型类多么相似呀。
+[sancao2译注:废话，你抄他的呀，233。]
 ::
    class  Eq a  where
     (==), (/=) :: a -> a -> Bool
@@ -236,13 +261,14 @@ Haskell中用于定义一个类型类的关键词是 ``class`` 。不幸的是�
 定义类型类实例
 ==============
 
-现在你知道了怎么定义一个类型类,是时候学习一下怎么定义某个类型类的实例(instance)。
-回忆一下那些用于创造某个特定类型类的实例的类型(types),他们是通过实现对那个类型类必须的函数来实现的。
-回忆一下我们位于章节前面的企图(attemp),针对 ``Color`` 类型创造的相等性测试。
-[saocao2译注,这句话本来我想调整从句的位置,更加符合汉语的习惯。但是,转念一想,其实英语的顺序代表了作者想强调的东西,或者说作者想强调的东西会放在前面。
+现在你知道了怎么定义一个类型类，是时候学习一下怎么定义某个类型类的实例(instance)。
+回忆一下那些用于创造某个特定类型类的实例的类型(types)，他们是通过实现对那个类型类必须的函数来实现的。
+回忆一下我们位于章节前面的企图(attemp)，针对 ``Color`` 类型创造的相等性测试。
+[saocao2译注，这句话本来我想调整从句的位置，更加符合汉语的习惯。
+但是，转念一想，其实英语的顺序代表了作者想强调的东西，或者说作者想强调的东西会放在前面。
 所以我这里尽量保持作者的语序。]
 
-那么让我们看看我们要怎样创造同样的 ``Color`` 类型,作为 ``BasicEq3`` 类型类的一员。
+那么让我们看看我们要怎样创造同样的 ``Color`` 类型，作为 ``BasicEq3`` 类型类的一员。
 
 ::
     -- file: ch06/naiveeq.hs
@@ -252,13 +278,15 @@ Haskell中用于定义一个类型类的关键词是 ``class`` 。不幸的是�
         isEqual3 Green Green = True
         isEqual3 _ _ = False
 
-注意，这里的函数定义和之前 "类型类的作用" 章节的 ``colorEq`` 函数定义实际上没有什么不同。 事实上,它的实现就是等价的。
-然而,在本例中,我们能将 ``isEqual3`` 使用于\*任何*\类型上,只要其(该类型)声明成 ``BasicEq3`` 的一个实例(instance), 而不仅仅限于 ``Color`` 一类。
-我们能定义相等性测试,针对任何东西,从数值到图形,通过采用相同的基本模式(basic pattern)的方式。
-事实上,我们将会在 "相等性，有序和对比" 章节中看到,这就是你能使Haskell的 ``==`` 操作符作用于你自己的类型的方式。
+注意，这里的函数定义和之前 "类型类的作用" 章节的 ``colorEq`` 函数定义实际上没有什么不同。
+事实上，它的实现就是等价的。
+然而，在本例中，我们能将 ``isEqual3`` 使用于\*任何*\类型上，只要其(该类型)声明成 ``BasicEq3`` 的一个实例(instance)， 而不仅仅限于 ``Color`` 一类。
+我们能定义相等性测试，针对任何东西，从数值到图形，通过采用相同的基本模式(basic pattern)的方式。
+事实上，我们将会在 "相等性，有序和对比" 章节中看到，这就是你能使Haskell的 ``==`` 操作符作用于你自己的类型的方式。
 
-还要注意到,虽然 ``BasicEq3`` 类型类定义了两个函数 ``isEqual`` 和 ``isNotEqual``, 但是我们只实现了其中的一个,在 ``Color`` 的例子中。
-那得归功于包含于 ``BasicEq3`` 中的默认实现. 即使我们没有显式地定义 ``isNotEqual3``, 编译器也会自动地使用 ``BasicEq3`` 声明中的默认实现。
+还要注意到，虽然 ``BasicEq3`` 类型类定义了两个函数 ``isEqual`` 和 ``isNotEqual`` ， 但是我们只实现了其中的一个，在 ``Color`` 的例子中。
+那得归功于包含于 ``BasicEq3`` 中的默认实现。
+即使我们没有显式地定义 ``isNotEqual3`` ， 编译器也会自动地使用 ``BasicEq3`` 声明中的默认实现。
 
 .. _important-built-in-typeclasses:
 
@@ -267,19 +295,25 @@ Haskell中用于定义一个类型类的关键词是 ``class`` 。不幸的是�
 
 前面两节我们分别讨论了(如何)定义你自己的类型类(typeclass)，以及如何创造你自己的类型类实例(type instance)。
 
-是时候介绍几个作为 ``Prelude`` 库一部分的类型类。如本章开始时所说的，类型类处于 Haskell 语言某些重要特性的中心。我们将讨论最常见的几个。更多细节,"Haskell library reference" 是一个很好的资源。其将给你介绍类型类，并且将一直告诉你什么函数是你必须要实现的以获得一份完整的定义[sancao2译注:当你创造你自己的类型类实例的时候。]
+是时候介绍几个作为 ``Prelude`` 库一部分的类型类。
+如本章开始时所说的，类型类处于 Haskell 语言某些重要特性的中心。
+我们将讨论最常见的几个。
+更多细节，"Haskell library reference" 是一个很好的资源。
+其将给你介绍类型类，并且将一直告诉你什么函数是你必须要实现的以获得一份完整的定义[sancao2译注:当你创造你自己的类型类实例的时候。]
 
 
 Show
 ----
 
-``Show`` 类型类用于将值(values)转换为字符串(Strings)，其最常用的可能是将数值(numbers)转换成字符串,但是他被定义成如此多类型以至于能转化相当多东西。如果你已经定义了你自己的类型们(types),创造他们(types) ``Show`` 的实例,将会使他们能够在 ``ghci`` 中展示或者在程序中打印出来。
-``Show`` 类型类中最重要的函数是 ``show`` 。其接受一个参数,以用于数据(data)转换,并返回一个 ``String`` ,以代表这个数据(data)。
+``Show`` 类型类用于将值(values)转换为字符串(Strings)，其最常用的可能是将数值(numbers)转换成字符串，但是他被定义成如此多类型以至于能转化相当多东西。
+如果你已经定义了你自己的类型们(types)，创造他们(types) ``Show`` 的实例，将会使他们能够在 ``ghci`` 中展示或者在程序中打印出来。
+``Show`` 类型类中最重要的函数是 ``show`` 。
+其接受一个参数，以用于数据(data)转换，并返回一个 ``String`` ，以代表这个数据(data)。
 ::
     Main> :type show
     show :: Show a => a -> String
 
-让我们看看一些例子,关于转化数值到字符串的。
+让我们看看一些例子，关于转化数值到字符串的。
 ::
     Main> show 1
     "1"
@@ -290,7 +324,10 @@ Show
     Main> show (1, 2)
     "(1,2)"
 
-记住 ``ghci`` 显示出结果,就像你进入一个Haskell的程序。所以表达式 ``show 1`` 返回一个包含数字 ``1`` 的单字符的字符串。即引号不是字符串本身的一部分.我们将使用 ``putStrLn`` 明确这一点。
+记住 ``ghci`` 显示出结果，就像你进入一个Haskell的程序。
+所以表达式 ``show 1`` 返回一个包含数字 ``1`` 的单字符的字符串。
+即引号不是字符串本身的一部分。
+我们将使用 ``putStrLn`` 明确这一点。
 ::
     ghci> putStrLn (show 1)
     1
@@ -312,10 +349,13 @@ Show
    ghci> putStrLn (show "Hi, \"Jane\"")
    "Hi, \"Jane\""
 
-运行 ``show`` 于 ``String`` 之上,可能使你感到困惑。因为 ``show`` 生成了一个结果,其适用于Haskell的字面值(literal),
-或者说, ``show`` 添加了引号和转义符号("\"),其适用于Haskell程序内部。 ``ghci`` 也用 ``show`` 来显示结果，所以引号和转义符号被添加了两次。使用 ``putStrLn`` 能帮助你明确这种差异。
+运行 ``show`` 于 ``String`` 之上，可能使你感到困惑。
+因为 ``show`` 生成了一个结果，其适用于Haskell的字面值(literal)，
+或者说， ``show`` 添加了引号和转义符号("\")，其适用于Haskell程序内部。
+ ``ghci`` 也用 ``show`` 来显示结果，所以引号和转义符号被添加了两次。
+使用 ``putStrLn`` 能帮助你明确这种差异。
 
-你能轻易地定义你自己的 ``Show`` 实例,如下。
+你能轻易地定义你自己的 ``Show`` 实例，如下。
 ::
    -- file: ch06/naiveeq.hs
    instance Show Color where
@@ -323,12 +363,12 @@ Show
        show Green = "Green"
        show Blue  = "Blue"
 
-上面的例子定义了 ``Show`` 类型类的实例,其针对我们章节前面的定义的类型 ``Color``。
+上面的例子定义了 ``Show`` 类型类的实例，其针对我们章节前面的定义的类型 ``Color`` 。
 [作者注释: ``Show`` 类型类:
-``show`` 经常用于定义数据(data)的字符串(``String``)表示,其非常有利于机器使用用 ``Read`` 类型类解析回来。
-Haskell程序员经常写自己的函数去格式化(format)数据以漂亮的方式为终端用户呈现,如果这种表示方式有别于 ``Show`` 预期的输出。]
+``show`` 经常用于定义数据(data)的字符串(``String``)表示，其非常有利于机器使用用 ``Read`` 类型类解析回来。
+Haskell程序员经常写自己的函数去格式化(format)数据以漂亮的方式为终端用户呈现，如果这种表示方式有别于 ``Show`` 预期的输出。]
 
-[huangz,labyrlnth,YenvY等译文: 因此，如果你定义了一种新的数据类型，并且希望通过 ghci 来显示它，那么你就应该将这个类型实现为 ``Show`` 类型类的实例，否则 ghci 就会向你抱怨，说它不知道该怎样用字符串的形式表示这种数据类型：
+[huangz，labyrlnth，YenvY等译文: 因此，如果你定义了一种新的数据类型，并且希望通过 ghci 来显示它，那么你就应该将这个类型实现为 ``Show`` 类型类的实例，否则 ghci 就会向你抱怨，说它不知道该怎样用字符串的形式表示这种数据类型：
 ::
     Main> data Color = Red | Green | Blue;
 
@@ -383,12 +423,13 @@ sancao2译注:添加运行如下:
 Read
 ----
 
-``Read`` 类型类,本质上 和 ``Show`` 类型类相反: 其(``Read``)最有用的函数是 ``read``,它接受一个字符串作为参数，对这个字符串进行解析(parse)，并返回一个值.这个值的类型为 ``Read`` 实例类型的成员（所有实例类型中的一种）。
-[sancao2译注:就是下面编译器提示的:"Read a", 代表 ``Read`` 实例类型。]
+``Read`` 类型类，本质上 和 ``Show`` 类型类相反: 其(``Read``)最有用的函数是 ``read`` ，它接受一个字符串作为参数，对这个字符串进行解析(parse)，并返回一个值。
+这个值的类型为 ``Read`` 实例类型的成员（所有实例类型中的一种）。
+[sancao2译注:就是下面编译器提示的:"Read a"， 代表 ``Read`` 实例类型。]
 ::
     Prelude> :type read
     read :: Read a => String -> a
-这是一个例子,展示了 ``read`` 和 ``show`` 函数的用法:
+这是一个例子，展示了 ``read`` 和 ``show`` 函数的用法:
 ::
    -- file: ch06/read.hs
    main = do
@@ -407,17 +448,22 @@ Read
    123.213
    Twice 123.213 is 246.426
 
-这是一个简单的例子,关于 ``read`` 和 ``show``.请注意,我们给出了一个显式的 ``Double`` 类型,当运行 ``read`` 函数的时候。
+这是一个简单的例子，关于 ``read`` 和 ``show``。
+请注意，我们给出了一个显式的 ``Double`` 类型，当运行 ``read`` 函数的时候。
 
-那是因为 ``read`` 会返回任意类型的值(a value of type) ``Read a => a``, 并且 ``show`` 期望任意类型的值 ``Show a => a`` 。存在着许许多多类型(type),其拥有定义于 ``Read`` 和 ``Show`` 之上的实例(instance)。
+那是因为 ``read`` 会返回任意类型的值(a value of type) ``Read a => a`` ， 并且 ``show`` 期望任意类型的值 ``Show a => a`` 。
+存在着许许多多类型(type)，其拥有定义于 ``Read`` 和 ``Show`` 之上的实例(instance)。
 
-不知道一个特定的类型,编译器必须从许多类型中猜出那个才是必须的(needed)。在上面的这种情况下,他可能会经常选择 ``Integer`` 类型。如果我们想要接受的是浮点输入,他就不会正常工作,所以我们提供了一个显式的类型。
+不知道一个特定的类型，编译器必须从许多类型中猜出那个才是必须的(needed)。
+在上面的这种情况下，他可能会经常选择 ``Integer`` 类型。
+如果我们想要接受的是浮点输入，他就不会正常工作，所以我们提供了一个显式的类型。
 
 [作者注释:关于默认值的笔记
-在大多数情况下,如果显式的 ``Double`` 类型标记被忽略了,编译器会拒绝猜测一个通用的类型,并仅仅返回一个错误。
-他能默认以 ``Integer`` 类型这件事请是个特例。他起因于以下事实:字面值 ``2`` (在程序中 ``inpDouble * 2``)被当成 ``Integer`` 除非他得到一个不同类型的期望。]
+在大多数情况下，如果显式的 ``Double`` 类型标记被忽略了，编译器会拒绝猜测一个通用的类型，并仅仅返回一个错误。
+他能默认以 ``Integer`` 类型这件事请是个特例。
+他起因于以下事实:字面值 ``2`` (在程序中 ``inpDouble * 2``)被当成 ``Integer`` 除非他得到一个不同类型的期望。]
 
-[sancao2译注:实验以下, 去掉 ``Double`` 的显示指定。
+[sancao2译注:实验以下， 去掉 ``Double`` 的显示指定。
 ::
    -- file: ch06/read.hs
    main = do
@@ -437,7 +483,8 @@ Read
    2.1
    Twice *** Exception: Prelude.read: no parse
 
-果然是这样。那么将字面值 ``2`` 改成 ``2.0``,他的结果会怎么样呢?
+果然是这样。
+那么将字面值 ``2`` 改成 ``2.0`` ，他的结果会怎么样呢?
 ::
    -- file: ch06/read.hs
    main = do
@@ -457,11 +504,12 @@ Read
    2
    Twice 2.0 is 4.0
 
-果然是这样,编译器会根据程序中的字面值猜测程序中未显式制定类型的变量的类型。继续玩。]
+果然是这样，编译器会根据程序中的字面值猜测程序中未显式制定类型的变量的类型。
+继续玩。]
 
-你能看到相同的效果在起作用,如果你试着在 ``ghci`` 命令行中使用 ``read`` 。
-``ghci`` 内部使用 ``show`` 来展示结果, 意味着你可能同样会碰到一样会碰到模棱两可的类型问题。
-你将须要显式地指定类型于 ``read`` 的结果在 ``ghci`` 当中,如下。
+你能看到相同的效果在起作用，如果你试着在 ``ghci`` 命令行中使用 ``read`` 。
+``ghci`` 内部使用 ``show`` 来展示结果， 意味着你可能同样会碰到一样会碰到模棱两可的类型问题。
+你将须要显式地指定类型于 ``read`` 的结果在 ``ghci`` 当中，如下。
 ::
 
     Prelude> read "3"
@@ -485,11 +533,13 @@ Read
     Prelude> :type it
     it :: Double
 
-注意在第一次调用 ``read`` 的时候，我们并没有显式地给定类型签名，这时对 ``read "3"`` 的求值会引发错误。这是因为有非常多的类型都是 ``Read`` 的实例，而编译器在 ``read`` 函数读入 ``"3"`` 之后，不知道应该将这个值转换成什么类型，于是编译器就会向我们发牢骚。
+注意在第一次调用 ``read`` 的时候，我们并没有显式地给定类型签名，这时对 ``read "3"`` 的求值会引发错误。
+这是因为有非常多的类型都是 ``Read`` 的实例，而编译器在 ``read`` 函数读入 ``"3"`` 之后，不知道应该将这个值转换成什么类型，于是编译器就会向我们发牢骚。
 
 因此，为了让 ``read`` 函数返回正确类型的值，必须给它指示正确的类型。
 
-回想一下, ``read`` 函数的类型签名: ``(Read a) => String -> a``. ``a`` 在这里是 ``Read`` 类型类的任何实例类型。
+回想一下， ``read`` 函数的类型签名: ``(Read a) => String -> a`` 。
+ ``a`` 在这里是 ``Read`` 类型类的任何实例类型。
 其特定的解析函数被调用取决于 ``read`` 返回值的期望类型.让我们看看他是怎么工作的。
 ::
    ghci> (read "5.0")::Double
@@ -497,11 +547,15 @@ Read
    ghci> (read "5.0")::Integer
    *** Exception: Prelude.read: no parse
    
-注意到错误(将发生)当你试图解析 ``5.0`` 作为一个整数 ``Integer`` 。解释器选择了一个不同的 ``Read`` 实例：
-当返回值的期望是 ``Integer``,而他做的却是期望得到一个 ``Double`` 。 ``Integer`` 的解析器不能接受小数点，从而抛出一个异常。
+注意到错误(将发生)当你试图解析 ``5.0`` 作为一个整数 ``Integer`` 。
+解释器选择了一个不同的 ``Read`` 实例：
+当返回值的期望是 ``Integer`` ，而他做的却是期望得到一个 ``Double`` 。
+ ``Integer`` 的解析器不能接受小数点，从而抛出一个异常。
 
-``Read`` 类型提供了一些相当复杂的解析器。你可能定义一个简单的解析其，通过提供 ``readsPrec`` 函数的实现。
-你的实现能返回一个列表(list)，其包含一个元组(tuple)在解析成功的时候，或者一个空列表在解析失败的时候。下面是一个实现的例子。
+``Read`` 类型提供了一些相当复杂的解析器。
+你可能定义一个简单的解析其，通过提供 ``readsPrec`` 函数的实现。
+你的实现能返回一个列表(list)，其包含一个元组(tuple)在解析成功的时候，或者一个空列表在解析失败的时候。
+下面是一个实现的例子。
 ::
    -- file: ch06/naiveeq.hs
    instance Read Color where
@@ -542,10 +596,14 @@ Read
    *Main> (read "[Red, Green, Blue]")::[Color]
    *** Exception: Prelude.read: no parse
    
-[sancao2译注:``(read "Red")::Color`` 输出 ``Color 1: Red`` 的结果而不是 ``Red``,是因为前面重载了 ``show`` 函数的结果。]
-注意到最后的尝试产生了错误。那是因为我们的编译器没有聪明到可以处理前置的空格。你可以改进他，通过些该你的 ``Read`` 实例以忽略任何前置的空格。这在Haskell程序中是常见的做法。
+[sancao2译注:``(read "Red")::Color`` 输出 ``Color 1: Red`` 的结果而不是 ``Red`` ，是因为前面重载了 ``show`` 函数的结果。]
+注意到最后的尝试产生了错误。
+那是因为我们的编译器没有聪明到可以处理前置的空格。
+你可以改进他，通过些该你的 ``Read`` 实例以忽略任何前置的空格。
+这在Haskell程序中是常见的做法。
 
-[sancao2译注:因为某个原因前面报错了，所以搜索了一下，不小心找到了。就是把 ``value`` 过滤清洗(``dropWhile isSpace``)一下，放到返回的list中的 ``drop`` 。
+[sancao2译注:因为某个原因前面报错了，所以搜索了一下，不小心找到了。
+就是把 ``value`` 过滤清洗(``dropWhile isSpace``)一下，放到返回的list中的 ``drop`` 。
 ::
    import Data.Char (isSpace)
    
@@ -573,11 +631,16 @@ Read
 使用 ``Read`` 和 ``Show`` 进行序列化
 ------------------------------------
 
-很多时候，程序需要将内存中的数据保存为硬盘上的文件以备将来获取，或者通过网络发送出去。把内存中的数据转化成为了存储的为序列的过程，被称为 ``序列化`` 。
+很多时候，程序需要将内存中的数据保存为硬盘上的文件以备将来获取，或者通过网络发送出去。
+把内存中的数据转化成为了存储的为序列的过程，被称为 ``序列化`` 。
 
-通过将类型实现为 ``Read`` 和 ``Show`` 的实例类型， ``read`` 和 ``show`` 两个函数可以成为非常好的序列化工具。 ``show`` 函数生成的输出是人类和机器皆可读的。大部分 ``show`` 输出也是对Haskell语法合法的，虽然他取决于人们如何写 ``Show`` 实例来达到这个结果的。
+通过将类型实现为 ``Read`` 和 ``Show`` 的实例类型， ``read`` 和 ``show`` 两个函数可以成为非常好的序列化工具。
+ ``show`` 函数生成的输出是人类和机器皆可读的。
+大部分 ``show`` 输出也是对Haskell语法合法的，虽然他取决于人们如何写 ``Show`` 实例来达到这个结果的。
 [作者注释：解析大字符串们：
-字符串处理在Haskell中通常是惰性的，所以 ``read`` 和 ``show`` 能被无意外地用于很大的数据结构。Haskell中内建的 ``read`` 和 ``show`` 实例被实现成高效的纯函数。如果想知道怎么处理解析的异常,请参考"19章 错误处理"。]
+字符串处理在Haskell中通常是惰性的，所以 ``read`` 和 ``show`` 能被无意外地用于很大的数据结构。
+Haskell中内建的 ``read`` 和 ``show`` 实例被实现成高效的纯函数。
+如果想知道怎么处理解析的异常，请参考"19章 错误处理"。]
 
 作为例子，以下代码将一个内存中的列表序列化到文件中：
 
@@ -599,7 +662,9 @@ Read
     $ cat years.txt
     [1999,2010,2012]
 
-[sancao2译注:我看以前的译者在shell里面用cat。其实可以不用退出ghci环境的。如下,打印出来没有换行,所以下面的提示符重叠上去了,233。
+[sancao2译注:我看以前的译者在shell里面用cat。
+其实可以不用退出ghci环境的。
+如下，打印出来没有换行，所以下面的提示符重叠上去了，233。
 ::
    Prelude> :!cat years.txt 
    [1999,2010,2012]Prelude> 
@@ -619,7 +684,7 @@ Read
 
 ``readFile`` 读入给定的 ``years.txt`` ，并将它的内存传给 ``input`` 变量，最后，通过使用 ``read`` ，我们成功将字符串反序列化成一个列表。
 
-[sancao2译注:原作者的例子实在不如huangz等译者的清爽,不翻译,将实验贴在这里。
+[sancao2译注:原作者的例子实在不如huangz等译者的清爽，不翻译，将实验贴在这里。
 ::
    ghci> let d1 = [Just 5, Nothing, Nothing, Just 8, Just 9]::[Maybe Int]
    ghci> putStrLn (show d1)
@@ -658,11 +723,14 @@ Read
 --------
 
 Haskell 有一个非常强大的数值类型集合：从速度飞快的 32 位或 64 位整数，到任意精度的有理数，无所不包。
-你可能知道操作符(比如 ``(+)``)能作用于所有的这些类型。这个特性是用类型(typeclass)类实现的。作为附带的好处,
-他(Haskell)允许你定义自己的数值类型,并且把他们当做Haskell的一等公民(first-class citizens)。
+你可能知道操作符(比如 ``(+)``)能作用于所有的这些类型。
+这个特性是用类型(typeclass)类实现的。
+作为附带的好处，
+他(Haskell)允许你定义自己的数值类型，并且把他们当做Haskell的一等公民(first-class citizens)。
 
-让我们开始讨论,关于围绕在数值类型(numberic types)周围的类型类们(typeclass),用以类型们(type)本身的检查(examination)。
-以下表格显示了 Haskell 中最常用的一些数值类型。请注意,存在这更多数值类型用于特定的目的,比如提供接口给 ``C``。
+让我们开始讨论，关于围绕在数值类型(numberic types)周围的类型类们(typeclass)，用以类型们(type)本身的检查(examination)。
+以下表格显示了 Haskell 中最常用的一些数值类型。
+请注意，存在这更多数值类型用于特定的目的，比如提供接口给 ``C`` 。
 
 **表格 6.1 ： 部分数值类型**
 
@@ -685,11 +753,14 @@ Word32      32 位无符号整数
 Word64      64 位无符号整数
 ========    =====================================================================
 
-这是相当多的数值类型。存在这某些操作符,比如加号 ``(+)``,其能在他们中的所有上面工作。
+这是相当多的数值类型。
+存在这某些操作符，比如加号 ``(+)`` ，其能在他们中的所有上面工作。
 另外的一部分函数，比如 ``asin`` ，只能用于浮点数类型。
 
-以下表格汇总了操作(operate)于不同类型的不同函数。当你读到表,记住,Haskell操作符们(operators)只是函数。
-你可以通过 ``(+) 2 3`` 或者 ``2 + 3`` 得到相同的结果。按照惯例,当讲操作符当做函数时,他们被卸载括号中如下表 6.2。
+以下表格汇总了操作(operate)于不同类型的不同函数。
+当你读到表，记住，Haskell操作符们(operators)只是函数。
+你可以通过 ``(+) 2 3`` 或者 ``2 + 3`` 得到相同的结果。
+按照惯例，当讲操作符当做函数时，他们被卸载括号中如下表 6.2。
 
 **表格 6.2 ： 部分数值函数和常量
 
@@ -745,10 +816,12 @@ xor             Bits a => a -> a -> a                       Data.Bits   二进�
 ]
 
 “数值类型及其对应的类型类” 列举在下表 6.3。
-[sancao2译注:这张表非常重要,能帮助我们看懂编译器的对函数的报错。同时也可以看做是一种对默认数值类型的分类。
+[sancao2译注:这张表非常重要，能帮助我们看懂编译器的对函数的报错。
+同时也可以看做是一种对默认数值类型的分类。
 所以找出规律记住这些分类是必须的。
-``Bits`` (``Integral``) 比 ``Bounded`` (有界的,顾名思义就是有限长度的整形。)多一种无限长度整形(``Integer``),用计算机的比特精确的表示数值类型。
-``Fractional`` (``RealFrac``) 是和 ``Bits`` (``Integral``)互补的概念,他的原理是科学计数法类似的,significant*base^exponent,他的某几位分别表示significant,base,exponent的,他是表示范围和精度的一种妥协(trade-off)。 ``Floating`` 是 ``Fractional`` 的子集,少了 ``Rational or any Ratio`` 。
+``Bits`` (``Integral``) 比 ``Bounded`` (有界的，顾名思义就是有限长度的整形。)多一种无限长度整形(``Integer``)，用计算机的比特精确的表示数值类型。
+``Fractional`` (``RealFrac``) 是和 ``Bits`` (``Integral``)互补的概念，他的原理是科学计数法类似的，significant*base^exponent，他的某几位分别表示significant，base，exponent的，他是表示范围和精度的一种妥协(trade-off)。
+ ``Floating`` 是 ``Fractional`` 的子集，少了 ``Rational or any Ratio`` 。
 ``Num`` 和 ``Real`` 都代表全集。]
 **表格 6.3 ： 数值类型的类型类实例**
 
@@ -792,25 +865,29 @@ Word64                     X    X                               X        X    X
 相等性，有序和对比
 ------------------
 
-我们已经讨论过了算术符号,比如 ``(+)`` 能用到不同数字的所有类型。
-但是Haskell中还存在着某些甚至更加广泛使用的操作符。最显然的,当然,就是相等性测试: ``(==)`` 和 ``(/=)``,这些操作符都定义于 ``Eq`` 类(class)中。
+我们已经讨论过了算术符号比如 ``(+)`` 能用到不同数字的所有类型。
+但是Haskell中还存在着某些甚至更加广泛使用的操作符。
+最显然的，当然，就是相等性测试: ``(==)`` 和 ``(/=)`` ，这些操作符都定义于 ``Eq`` 类(class)中。
 
-[sancao2译注:这句话原文是 ``Eq`` class,我想作者已经不区分 ``typeclass`` 和 ``class`` 了。
-希望读者心里知道,Haskell的类就是类型类(typeclass)]
+[sancao2译注:这句话原文是 ``Eq`` class，我想作者已经不区分 ``typeclass`` 和 ``class`` 了。
+希望读者心里知道，Haskell的类就是类型类(typeclass)]
 
-存在着其他的比较操作符, 如 ``>=`` 和 ``<=`` ，其则由 ``Ord`` 类型类定义。他们(``Ord``)是放在于单独类中是因为存在着某些类型,比如 ``Handle``, 使在这些地方相等性测试有意义(make sense),而表达特定的序(ording)一点意义都没有。
+存在着其他的比较操作符， 如 ``>=`` 和 ``<=`` ，其则由 ``Ord`` 类型类定义。
+他们(``Ord``)是放在于单独类中是因为存在着某些类型，比如 ``Handle`` ， 使在这些地方相等性测试有意义(make sense)，而表达特定的序(ording)一点意义都没有。
 
 所有 ``Ord`` 实例都可以使用 ``Data.List.sort`` 来排序。
 
 几乎所有 Haskell 内置类型都是 ``Eq`` 类型类的实例，而 ``Ord`` 类的实例类型也几乎一样多。
 
 [作者注释:小贴士
-有时候,序(the ordering)在 ``Ord`` 是随意的(arbitrary)。比如,像 ``Maybe``, ``Nothing`` 排序于 ``Just x`` 之前,但是这是多少有点随意决定的,囧。]
+有时候，序(the ordering)在 ``Ord`` 是随意的(arbitrary)。
+比如，像 ``Maybe`` ， ``Nothing`` 排序于 ``Just x`` 之前，但是这是多少有点随意决定的，囧。]
 
 自动派生
 ========
 
-对于许多简单的数据类型， Haskell 编译器可以自动将类型派生（derivation）为 ``Read`` 、 ``Show`` 、 ``Bounded`` 、 ``Enum`` 、 ``Eq`` 和 ``Ord`` 的实例。这节省了我们大量的精力用于手动写代码进行比较或者显示他们的类型。
+对于许多简单的数据类型， Haskell 编译器可以自动将类型派生（derivation）为 ``Read`` 、 ``Show`` 、 ``Bounded`` 、 ``Enum`` 、 ``Eq`` 和 ``Ord`` 的实例。
+这节省了我们大量的精力用于手动写代码进行比较或者显示他们的类型。
 
 
 以下代码将 ``Color`` 类型派生为 ``Read`` 、 ``Show`` 、 ``Eq`` 和 ``Ord`` 的实例：
@@ -843,11 +920,14 @@ Word64                     X    X                               X        X    X
     True
 
 [作者注释:什么类型(types)能被自动派生?
-Haskell标准要求编译器能自动派生这些制定类型类的实例。[sancao2译注:哪些??估计就是上面这坨].他们的自动对其他类型类无效。]
+Haskell标准要求编译器能自动派生这些制定类型类的实例。
+[sancao2译注:哪些??估计就是上面这坨].他们的自动对其他类型类无效。]
 
-注意 ``Color`` 类型的排序位置由定义类型时值构造器的排序决定,即对应上面例子就是 ``Red | Green | Blue`` 的顺序。
+注意 ``Color`` 类型的排序位置由定义类型时值构造器的排序决定，即对应上面例子就是 ``Red | Green | Blue`` 的顺序。
 
-自动派生并不总是可用的。比如说，如果定义类型 ``data MyType = MyType (Int -> Bool)`` ，那么编译器就没办法派生 ``MyType`` 为 ``Show`` 的实例，因为它不知道该怎么渲染(render)一个函数。我们会得到一个造成编译错误在上面这种情况下。
+自动派生并不总是可用的。
+比如说，如果定义类型 ``data MyType = MyType (Int -> Bool)`` ，那么编译器就没办法派生 ``MyType`` 为 ``Show`` 的实例，因为它不知道该怎么渲染(render)一个函数。
+我们会得到一个造成编译错误在上面这种情况下。
 
 当我们自动派生某个类型类的一个实例时，在我们利用 ``data`` 关键词声明参考这个实例的类型，也必须是给定类型类的实例（手动或自动地）。
 
@@ -883,9 +963,10 @@ Haskell标准要求编译器能自动派生这些制定类型类的实例。[san
     When deriving the instance for (Show CannotDeriveShow)
     Failed, modules loaded: none.
 
-其实编译器提示很清爽了,就是说 ``No instance for (Show CannotShow)``,然后还给出了两条 ``fix``:
-``add an instance declaration for (Show CannotShow)`` (huangz等译者采用的例子采用自动派生的方式修复 ``BookInfo``) 或者 ``use a standalone 'deriving instance' declaration`` 。(上面 ``ThisWorks`` 采用自己定义的方式修补。)
-将例子代入上面那句话,当我们自动派生(``Show``)类型类的一个实例(``CannotShow``)时,在我们利用 ``data`` 关键词声明参考这个实例(``CannotShow``)的类型(``CannotDeriveShow``)，也必须是给定类型类的实例（手动或自动地）。
+其实编译器提示很清爽了，就是说 ``No instance for (Show CannotShow)`` ，然后还给出了两条 ``fix``:
+``add an instance declaration for (Show CannotShow)`` (huangz等译者采用的例子采用自动派生的方式修复 ``BookInfo``) 或者 ``use a standalone 'deriving instance' declaration`` 。
+(上面 ``ThisWorks`` 采用自己定义的方式修补。)
+将例子代入上面那句话，当我们自动派生(``Show``)类型类的一个实例(``CannotShow``)时，在我们利用 ``data`` 关键词声明参考这个实例(``CannotShow``)的类型(``CannotDeriveShow``)，也必须是给定类型类的实例（手动或自动地）。
 ]
 
 [huangz等译者的例子:
@@ -943,7 +1024,8 @@ ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， 
 类型类实战：让 JSON 更好用
 ==========================
 
-我们在 :ref:`representing-json-data-in-haskell` 一节介绍的 ``JValue`` 用起来还不够简便。这里是一段由的经过截断(truncate)和整齐化(tidy)之后的实际 JSON 数据,由一个知名搜索引擎生成。
+我们在 :ref:`representing-json-data-in-haskell` 一节介绍的 ``JValue`` 用起来还不够简便。
+这里是一段由的经过截断(truncate)和整齐化(tidy)之后的实际 JSON 数据，由一个知名搜索引擎生成。
 
 .. code-block:: json
 
@@ -985,8 +1067,9 @@ ghci 会给出提示，说明 ``Book`` 类型也必须是 ``Show`` 的实例， 
         ]
 
 由于 Haskell 不原生支持包含不同类型值的列表，我们不能直接表示包含不同类型值的 JSON 对象。
-我们需要把每个值都用 JValue 构造器包装起来。但这样我们的灵活性就受到了限制：如果我们想把数字 ``3920`` 转换成字符串 ``"3,920"``,
-我们就必须改变构造器,即我们使用它(JValue构造器)从 ``JNumber`` 构造器到 ``JString`` 构造器包装(wrap)数据。
+我们需要把每个值都用 JValue 构造器包装起来。
+但这样我们的灵活性就受到了限制：如果我们想把数字 ``3920`` 转换成字符串 ``"3,920"`` ，
+我们就必须改变构造器，即我们使用它(JValue构造器)从 ``JNumber`` 构造器到 ``JString`` 构造器包装(wrap)数据。
 
 Haskell 的类型类对这个问题提供了一个诱人的解决方案：
 
@@ -1012,10 +1095,12 @@ Haskell 的类型类对这个问题提供了一个诱人的解决方案：
 让错误信息更有用
 ----------------
 
-``fromJValue`` 函数的返回类型为 ``Either`` 。跟 ``Maybe`` 一样，这个类型是为我们预定义的。我们经常用它来表示可能会失败的计算。
+``fromJValue`` 函数的返回类型为 ``Either`` 。
+跟 ``Maybe`` 一样，这个类型是为我们预定义的。
+我们经常用它来表示可能会失败的计算。
 
 虽然 ``Maybe`` 也用作这个目的，但它在错误发生时没有给我们足够有用的信息：我们只得到一个 ``Nothing`` 。
-虽然 ``Either`` 类型的结构相同，但是不同于 ``Nothing`` (相对于 ``Maybe``), "坏事情发生"构造器命名为 ``Left`` ，并且其还接受一个参数。
+虽然 ``Either`` 类型的结构相同，但是不同于 ``Nothing`` (相对于 ``Maybe``)， "坏事情发生"构造器命名为 ``Left`` ，并且其还接受一个参数。
 
 ::
 
@@ -1039,7 +1124,7 @@ Haskell 的类型类对这个问题提供了一个诱人的解决方案：
         fromJValue (JBool b) = Right b
         fromJValue _ = Left "not a JSON boolean"
 
-[译注：读者若想在 **ghci** 中尝试 ``fromJValue``，需要为其提供类型标注，例如 ``(fromJValue(toJValue True))::Either JSONError Bool`` 。]
+[译注：读者若想在 **ghci** 中尝试 ``fromJValue`` ，需要为其提供类型标注，例如 ``(fromJValue(toJValue True))::Either JSONError Bool`` 。]
 
 .. _making-an-instance-with-a-type-synonym:
 
@@ -1057,7 +1142,8 @@ Haskell 98标准不允许我们用下面的形式声明实例，尽管它看起�
         fromJValue (JString s) = Right s
         fromJValue _           = Left "not a JSON string"
 
-回忆一下, ``String`` 是 ``[Char]`` 的别名。因此它的类型是 ``[a]`` ，并用 ``Char`` 替换了类型变量 ``a`` 。
+回忆一下， ``String`` 是 ``[Char]`` 的别名。
+因此它的类型是 ``[a]`` ，并用 ``Char`` 替换了类型变量 ``a`` 。
 根据 Haskell 98的规则，我们在声明实例的时候不允许提供一个类型替代类型变量。
 也就是说，我们可以给 ``[a]`` 声明实例，但给 ``[Char]`` 不行。
 
@@ -1069,12 +1155,14 @@ Haskell 98标准不允许我们用下面的形式声明实例，尽管它看起�
     {-# LANGUAGE TypeSynonymInstances #-}
 
 这条注释是一条编译器指令，称为\ *编译选项（pragma）*\，它告诉编译器允许这项语言扩展。
-上面的代码因为 ``TypeSynonymInstances`` 这项语言扩展而合法。
+上面的代码因为 ``TypeSynonymInstances`` ("同义类型的实例")这项语言扩展而合法。
 我们在本章（本书）还会碰到更多的语言扩展。
 
-[译注：作者举的这个例子实际上牵涉到了两个问题。第一，Haskell 98不允许类型别名，这个问题可以通过上述方法解决。
+[译注：作者举的这个例子实际上牵涉到了两个问题。
+第一，Haskell 98不允许类型别名，这个问题可以通过上述方法解决。
 第二，Haskell 98不允许 ``[Char]`` 这种形式的类型，这个问题需要通过增加另外一条编译选项 ``{-# LANGUAGE FlexibleInstances #-}`` 来解决。]
-[sancao2译注,若没有 ``{-# LANGUAGE FlexibleInstances #-}`` 这条编译选项,就会产生下面的结果。其实编译器的 ``fix`` 提示给大家了。
+[sancao2译注，若没有 ``{-# LANGUAGE FlexibleInstances #-}`` 这条编译选项，就会产生下面的结果。
+其实编译器的 ``fix`` 提示给大家了。
 ::
    Prelude> :l JSONClass.hs  ../ch05/SimpleJSON.hs
    [1 of 2] Compiling SimpleJSON       ( ../ch05/SimpleJSON.hs, interpreted )
@@ -1095,7 +1183,7 @@ Haskell 98标准不允许我们用下面的形式声明实例，尽管它看起�
 生活在开放世界
 ==============
 
-Haskell 的有意地设计成允许我们任意创建类型类的实例,每当我们认为合适时。
+Haskell 的有意地设计成允许我们任意创建类型类的实例，每当我们认为合适时。
 
 ::
 
@@ -1116,10 +1204,12 @@ Haskell 的有意地设计成允许我们任意创建类型类的实例,每当�
         toJValue = JNumber
         fromJValue = doubleToJValue id
 
-我们可以在任意地方添加新实例，而不仅限于在定义了类型类的模块中。类型类系统的这个特性被称为\ *开放世界假设*\ （open world assumption）。
+我们可以在任意地方添加新实例，而不仅限于在定义了类型类的模块中。
+类型类系统的这个特性被称为\ *开放世界假设*\ （open world assumption）。
 如果我们有方法表示“这个类型类只存在这些实例”，那我们将得到一个\ *封闭的*\ 世界。
 
-我们希望把列表(list)转为 JSON 数组(array)。我们现在还不用关心实现细节，所以让我们暂时使用 ``undefined`` 作为函数内容。
+我们希望把列表(list)转为 JSON 数组(array)。
+我们现在还不用关心实现细节，所以让我们暂时使用 ``undefined`` 作为函数内容。
 
 ::
 
@@ -1137,8 +1227,13 @@ Haskell 的有意地设计成允许我们任意创建类型类的实例,每当�
         toJValue = undefined
         fromJValue = undefined
 
-[sancao2译注:不得不提一句,其实这种开发方法,就是面向接口的。（台湾人叫做接口导向的，这样翻译其实更好。Oriented，译成导向，更动态的。）先定义接口,然后再去实现。就像先划线测量,搞出个搭个花架子,然后再打地基,配钢筋,垒砖头,浇水泥,至于那种抹石灰搬砖的活大家自己想象把。
-同时也让人想到西方的教育是一种dream式的教育,我要现有wish,我做不到没关系,我先留着,我知道这个可以实现的。如果不能实现,就是因为我设计不好。或者一定可以通过增加一个层来规避复杂度的。学习也是一样,刚开始要从tutorial开始,把细节隐藏起来。]
+[sancao2译注:不得不提一句，其实这种开发方法，就是面向接口的。
+（台湾人叫做接口导向的，这样翻译其实更好。Oriented，译成导向，更动态的。）先定义接口，然后再去实现。
+就像先划线测量，搞出个搭个花架子，然后再打地基，配钢筋，垒砖头，浇水泥，至于那种抹石灰搬砖的活大家自己想象把。
+同时也让人想到西方的教育是一种dream式的教育，我要现有wish，我做不到没关系，我先留着，我知道这个可以实现的。
+如果不能实现，就是因为我设计不好。
+或者一定可以通过增加一个层来规避复杂度的。
+学习也是一样，刚开始要从tutorial开始，把细节隐藏起来。]
 
 .. _when-do-overlapping-instances-cause-problems:
 
@@ -1162,9 +1257,13 @@ Haskell 的有意地设计成允许我们任意创建类型类的实例,每当�
        module `main:Main' is defined in multiple files: BrokenClass.hs
                                                      JSONClass.hs
    Failed, modules loaded: none.
-看编译器提示。谷歌是良师,编译器是诤友。总说坏话的人,不一定对你有恶意。不扯淡了。
+看编译器提示。
+谷歌是良师，编译器是诤友。
+总说坏话的人，不一定对你有恶意。
+不扯淡了。
 他抱怨 ``main:Main`` 模块在多个地方(``BrokenClass.hs,JSONClass.hs``)定义了。
-原来我是个伸手党,书上说什么,复制下来,想都不想的。从最简单的开始,原来我在BrokenClass.hs开头都没有 ``import JSONClass`` 。
+原来我是个伸手党，书上说什么，复制下来，想都不想的。
+从最简单的开始，原来我在BrokenClass.hs开头都没有 ``import JSONClass`` 。
 然后报下面的错。
 ::
    Prelude> :l BrokenClass.hs JSONClass.hs 
@@ -1174,7 +1273,9 @@ Haskell 的有意地设计成允许我们任意创建类型类的实例,每当�
        Saw: `Main'
        Expected: `JSONClass'
    Failed, modules loaded: none.
-编译器的意思是,他看(``Saw``)到是 ``main``,而希望(``Expected``)的是 ``JSONClass`` 。所以要在JSONClass.hs的开头也加上 ``module JSONClass where`` 。前面几节中编译JSONClass.hs是把他当成 ``Main`` 的,现在我测试好了,就想把你拿来用了,所以把你声明成模块。
+编译器的意思是，他看(``Saw``)到是 ``main`` ，而希望(``Expected``)的是 ``JSONClass`` 。
+所以要在JSONClass.hs的开头也加上 ``module JSONClass where`` 。
+前面几节中编译JSONClass.hs是把他当成 ``Main`` 的，现在我测试好了，就想把你拿来用了，所以把你声明成模块。
 ::
    Prelude> :l BrokenClass.hs JSONClass.hs 
 
@@ -1182,7 +1283,7 @@ Haskell 的有意地设计成允许我们任意创建类型类的实例,每当�
        Could not find module `SimpleJSON'
        Use -v to see a list of the files searched for.
    Failed, modules loaded: none.
-这个已经出现过了,因为JSONClass.hs开头要用到 ``SimpleJSON``,然后编译器抱怨说找不到(``Could not find module``)。
+这个已经出现过了，因为JSONClass.hs开头要用到 ``SimpleJSON`` ，然后编译器抱怨说找不到(``Could not find module``)。
 ::
    Prelude> :l BrokenClass.hs JSONClass.hs ../ch05/SimpleJSON.hs
    [1 of 3] Compiling SimpleJSON       ( ../ch05/SimpleJSON.hs, interpreted )
@@ -1197,8 +1298,10 @@ Haskell 的有意地设计成允许我们任意创建类型类的实例,每当�
           Use -XFlexibleInstances if you want to disable this.)
        In the instance declaration for `JSON [(String, a)]'
    Failed, modules loaded: SimpleJSON, JSONClass.
-这个错误,前面作者已经介绍过了,加编译器选项 ``{-# LANGUAGE XXXX #-}`` 。这里的 ``XXXX``, 就是编译器抱怨里面的 ``-XFlexibleInstances``, -X后面的那一坨东西。加在开头。说到开头,如果你把 ``import`` 放在 ``module`` 声明之前,那么你也会悲剧,不信自己试试看,编译器会教育你的。
-最后,就是很没意思的成功了。
+这个错误，前面作者已经介绍过了，加编译器选项 ``{-# LANGUAGE XXXX #-}`` 。
+这里的 ``XXXX`` ， 就是编译器抱怨里面的 ``-XFlexibleInstances`` ， -X后面的那一坨东西,加在开头。
+说到开头，如果你把 ``import`` 放在 ``module`` 声明之前，那么你也会悲剧，不信自己试试看，编译器会教育你的。
+最后，就是很没意思的成功了。
 ::
    Prelude> :l BrokenClass.hs JSONClass.hs ../ch05/SimpleJSON.hs
    [1 of 3] Compiling SimpleJSON       ( ../ch05/SimpleJSON.hs, interpreted )
@@ -1209,7 +1312,7 @@ Haskell 的有意地设计成允许我们任意创建类型类的实例,每当�
 ghci环境的提示符也变成 ``BrokenClass`` 的了。happy。   
 ]
 
-然而，一旦我们使用序对列表实例时，我们就"跑"(不是get,体会一下)进麻烦里面了(run in trouble)。
+然而，一旦我们使用序对列表实例时，我们就"跑"(不是get，体会一下)进麻烦里面了(run in trouble)。
 
 ::
 
@@ -1230,7 +1333,7 @@ ghci环境的提示符也变成 ``BrokenClass`` 的了。happy。
 
 \ *重叠实例*\ 问题是由 Haskell 的"开放世界假设"的一个后果(a consequence)。
 这里有一个更简单的例子来说明什么东西在发生。
-[sancao2译注:what's going on,原译为"发生了什么",我想保持英语的倒装语序,也能保留进行时态的意涵。]
+[sancao2译注:what's going on，原译为"发生了什么"，我想保持英语的倒装语序，也能保留进行时态的意涵。]
 
 ::
 
@@ -1250,9 +1353,12 @@ ghci环境的提示符也变成 ``BrokenClass`` 的了。happy。
 
 我们有两个 ``Borked`` 类型类实例应用于序对(for pairs)：一个是 ``Int`` 序对，另一个是任意类型的序对，只要这个类型是 ``Borked`` 类型类的实例。
 
-假设我们想把 ``bork`` 应用于 ``Int`` 序对。为了这样做,编译器必须选择一个实例来用。因为这些实例都是正确地紧挨着(right next to each other)，所以它似乎可以选择更相关的(specific,具体的?)的实例。
+假设我们想把 ``bork`` 应用于 ``Int`` 序对。
+为了这样做，编译器必须选择一个实例来用。
+因为这些实例都是正确地紧挨着(right next to each other)，所以它似乎可以选择更相关的(specific，具体的?)的实例。
 
-但是, ``GHC`` 在默认情况下是保守的,且坚持(insist)只有一个可能的GHC 能使用的实例 。它将因此报个错,如果我们尝试去使用 ``bork`` 。
+但是， ``GHC`` 在默认情况下是保守的，且坚持(insist)只有一个可能的GHC 能使用的实例 。
+它将因此报个错，如果我们尝试去使用 ``bork`` 。
 [sancao2译注:我来补上实验，我先注释掉重叠的类型。
 ::
    Prelude> :!cat Overlap.hs
@@ -1359,24 +1465,28 @@ ghci环境的提示符也变成 ``BrokenClass`` 的了。happy。
 .. note::
    [作者注释:什么时候重叠实例要紧(matter)？
 
-    就像我们之前提到的，我们可以分散一个类型类的实例横跨于(across)几个模块中。GHC 不会抱怨重叠实例的单单存在(mere existence)。
-    取而代之地，他会抱怨,只有当我们试图使用受影响的类型类的函数时，只有他被迫要去做决定采用哪个实例时。
+    就像我们之前提到的，我们可以分散一个类型类的实例横跨于(across)几个模块中。
+    GHC 不会抱怨重叠实例的单单存在(mere existence)。
+    取而代之地，他会抱怨，只有当我们试图使用受影响的类型类的函数时，只有他被迫要去做决定采用哪个实例时。
    ]
 .. _relaxing-some-restrictions-on-typeclasses:
 
 放松(relex)类型类的一些限制
 --------------------
 
-通常，我们不能写一个类型类实例,(仅)为了一个多态类型（polymorphic type）的特化版本（specialized version）。
-``[Char]`` 类型就是多态类型 ``[a]`` (其中的 ``a``)特化成类型 ``Char`` 。我们就这样被禁止声明 ``[Char]`` 为某个类型类的实例。
+通常，我们不能写一个类型类实例，(仅)为了一个多态类型（polymorphic type）的特化版本（specialized version）。
+``[Char]`` 类型就是多态类型 ``[a]`` (其中的 ``a``)特化成类型 ``Char`` 。
+我们就这样被禁止声明 ``[Char]`` 为某个类型类的实例。
 这"高度地"(highly)不方便，因为字符串无处不在于实际的代码中。
 
-``TypeSynonymInstances`` 语言扩展取消了这个限制，并允许我们写这样的实例。
+``TypeSynonymInstances`` ("同义类型的实例")语言扩展取消了这个限制，并允许我们写这样的实例。
 
-GHC 支持另外一个有用的语言扩展, ``OverlappingInstances`` 。它解决(address?)了我门在处理重叠实例时候碰到的问题。
+GHC 支持另外一个有用的语言扩展， ``OverlappingInstances`` 。
+它解决(英文为address)了我门在处理重叠实例时候碰到的问题。
 如果存在多个重叠的实例去从中选择，这个扩展会"采摘"(pick)最相关的（specific）那一个。
 
-我们经常使用这个扩展,同 ``TypeSynonymInstances`` 一起。这里是一个例子。
+我们经常使用这个扩展，同 ``TypeSynonymInstances`` 一起。
+这里是一个例子。
 
 ::
 
@@ -1400,7 +1510,7 @@ GHC 支持另外一个有用的语言扩展, ``OverlappingInstances`` 。它解�
 如果我们应用(apply) ``foo`` 于 ``String`` ，编译器会选择 ``String`` 相关的(specific)实现。
 虽然我们有一个 ``Foo`` 的实例关于 ``[a]`` 和 ``Char`` ，但关于 ``String`` 的实例更相关，所以 GHC 选择它。
 
-即使 ``OverlappingInstances`` 扩展被使能(enabled)，GHC仍将拒绝代码，若他找到一个以上等价地相关的（equally specific）实例。
+即使 ``OverlappingInstances`` (覆盖实例)扩展被使能(enabled)，GHC仍将拒绝代码，若他找到一个以上等价地相关的（equally specific）实例。
 
 .. _note:
 
@@ -1411,8 +1521,9 @@ GHC 支持另外一个有用的语言扩展, ``OverlappingInstances`` 。它解�
     一旦我们引入(import)这个模块而使用他的实例，我们将不需要使能(enable) ``OverlappingInstances`` 编译选项在引入模块的时候：GHC将已经知道这个实例是被标记为＂对覆盖友好的＂(okay to overlap)，当他被定义的时候。
     这种行为是很有用的，当我们在写一个库(library)的时候:我们能选择去创造可覆盖的(overlappable)实例，但是库的用户不必须使能(enable)任何特殊的语言扩展。
 
-[sancao2译注:overlap,我翻译它的时候，当它为动词时为覆盖，形容词形式（overlapped）为重叠。
-同样，instance,我翻译它的时候，当它为动词（几乎没有）的时候成举例，名词时候大家都翻译成实例。其实在代码中 ``instance Foo Char where``,我很想翻译成＂举Foo Char的例子于此...＂,如果后面再加上＂举Foo String的例子于此...＂是不是代码本身就能读出模式匹配的味道，我中Haskell毒了深矣。
+[sancao2译注:overlap，我翻译它的时候，当它为动词时为覆盖，形容词形式（overlapped）为重叠。
+同样，instance，我翻译它的时候，当它为动词（几乎没有）的时候成举例，名词时候大家都翻译成实例。
+其实在代码中 ``instance Foo Char where`` ，我很想翻译成＂举Foo Char的例子于此...＂，如果后面再加上＂举Foo String的例子于此...＂是不是代码本身就能读出模式匹配的味道，我中Haskell毒了深矣。
 ]
 
 .. _how-does-show-work-for-strings:
@@ -1420,25 +1531,30 @@ GHC 支持另外一个有用的语言扩展, ``OverlappingInstances`` 。它解�
 show怎么为String工作的? 
 ----------------------------
 
-``OverlappingInstances`` ("覆盖同例")和 ``TypeSynonymInstances`` ("同义类型")语言扩展是特定于GHC的，而在定义上过去没有出现(present)于“Haskell 98”。
-然而，大家熟悉的 ``Show`` 类型类，来自“Haskell 98”，以某种方法区别地"渲染"(render) ``Char`` 列表(list)和 ``Int`` 列表。它达成这个（"区别地渲染"）通过一个聪明但简单的把戏(trick)。
+``OverlappingInstances`` (覆盖实例)和 ``TypeSynonymInstances`` ("同义类型的实例")语言扩展是特定于GHC的，而在定义上过去没有出现(present)于“Haskell 98”。
+然而，大家熟悉的 ``Show`` 类型类，来自“Haskell 98”，以某种方法区别地"渲染"(render) ``Char`` 列表(list)和 ``Int`` 列表。
+它达成这个（"区别地渲染"）通过一个聪明但简单的把戏(trick)。
 
 ``Show`` 类型类定义了两个方法：一个 ``show`` 方法，用于渲染单值(one value)和一个 ``showList`` 方法，用于渲染值的列表。
 而 ``showList`` 的默认实现，渲染一个列表，以使用中括号们和逗号们的方式。
 
-``Show`` 的实例对于 ``[a]`` 是使用 ``showList`` 实现的。 ``Show`` 的实例为 ``[Char]`` 提供了一个特殊的 ``showList`` 实现。其（该实现）使用双引号，并转义"非ASCII可打印"(non-ASCII-printable)的字符们。
+``Show`` 的实例对于 ``[a]`` 是使用 ``showList`` 实现的。
+ ``Show`` 的实例为 ``[Char]`` 提供了一个特殊的 ``showList`` 实现。
+其（该实现）使用双引号，并转义"非ASCII可打印"(non-ASCII-printable)的字符们。
 
-[sancao2译注:上面那句 ``[Char]`` 原文没有 ``[]`` ,应该是错了。]
+[sancao2译注:上面那句 ``[Char]`` 原文没有 ``[]`` ，应该是错了。]
 
-作为结果，如果有人应用(apply) ``show`` 于 ``[Char]`` 数值,  ``showList`` 的实现会被选上，并且他将会正确地渲染字符串，通过使用括号们。
+作为结果，如果有人应用(apply) ``show`` 于 ``[Char]`` 数值，  ``showList`` 的实现会被选上，并且他将会正确地渲染字符串，通过使用括号们。
 
 [sancao2译注:
-我很想说，这里的apply的翻译方法，其实相当于库函数里面apply方法, ``apply show [Char]``。
-匹配类型于某个模式，应用show于[Char],而不是原来翻译得那样＂对[Char]应用show＂。原作者的用词和思维是不是很Haskell? 我中毒了无药了。]
+我很想说，这里的apply的翻译方法，其实相当于库函数里面apply方法， ``apply show [Char]`` 。
+匹配类型于某个模式，应用show于[Char]，而不是原来翻译得那样＂对[Char]应用show＂。
+原作者的用词和思维是不是很Haskell? 我中毒了无药了。]
 
-至少有时，因而，我们就能克制对 ``OverlappingInstances`` (覆盖同例)扩展的需要，带着一点点(时间维度的)横向思维(lateral thinking)。
+至少有时，因而，我们就能克制对 ``OverlappingInstances`` (覆盖实例)扩展的需要，带着一点点(时间维度的)横向思维(lateral thinking)。
 
-[sancao2译注:lateral thinking，就是这里的说的在"覆盖同例"这个扩展出现之前的时间里（“Haskell 98”之前没有），前人是怎么hack这个问题的。然后hack前人的方法的这种思维。]
+[sancao2译注:lateral thinking，就是这里的说的在"覆盖同例"这个扩展出现之前的时间里（“Haskell 98”之前没有），前人是怎么hack这个问题的。
+然后hack前人的方法的这种思维。]
 
 .. _how-to-give-a-type-a-new-identity:
 
@@ -1456,17 +1572,19 @@ show怎么为String工作的?
     newtype NewtypeInt = N Int
         deriving (Eq, Ord, Show)
 
-``newtype`` 声明的目的是重命名一个存在着的类型，来给它一个独特的身份(id)。像我们能看到的，它的用法和采用 ``data`` 关键字进行声明，在表面上很相似。
+``newtype`` 声明的目的是重命名一个存在着的类型，来给它一个独特的身份(id)。
+像我们能看到的，它的用法和采用 ``data`` 关键字进行声明，在表面上很相似。
 
 .. note::
 
     type 和 newtype 关键字
 
-    尽管他们的名字是类似的, ``type`` 和 ``newtype`` 关键字有不同的目的。
+    尽管他们的名字是类似的， ``type`` 和 ``newtype`` 关键字有不同的目的。
     ``type`` 关键字给了我们另一种方式以引用(refer to)某个类型，就像昵称之于一个朋友。
     我们和编译器都知道 ``[Char]`` 和 ``String`` 引用的是同一个类型。
 
-    比较起来(与 ``type``)， ``newtype`` 关键字存在，以隐藏一个类型的本性(nature)。考虑一个 ``UniqueID`` 类型。
+    比较起来(与 ``type``)， ``newtype`` 关键字存在，以隐藏一个类型的本性(nature)。
+    考虑一个 ``UniqueID`` 类型。
 
     ::
 
@@ -1475,7 +1593,7 @@ show怎么为String工作的?
             deriving (Eq)
 
     编译器会视 ``UniqueID`` 为 一个不同的类型于 ``Int`` 。
-    作为一个 ``UniqueID`` 的用户，我们只知道它有一个"唯一标识符"(Unique ID,英语字面意思)；我们并不知道它被实现为一个 ``Int`` 。
+    作为一个 ``UniqueID`` 的用户，我们只知道它有一个"唯一标识符"(Unique ID，英语字面意思)；我们并不知道它被实现为一个 ``Int`` 。
 
 当我们声明一个 ``newtype`` 时，我们必须选择哪个潜在类型的类型类实例，而对其（该实例）我们想要暴露。
 在这里，我们决定使 ``NewtypeInt`` 提供 ``Int`` 的 ``Eq`` 、 ``Ord`` 和 ``Show`` 实例。
@@ -1507,7 +1625,9 @@ show怎么为String工作的?
 data 和 newtype 声明之间的区别
 ----------------------
 
-``newtype`` 关键字存在着给现有类型以一个新的身份（id）。它有更多的限制于其使用上，比起 ``data`` 关键字。说白了， ``newtype`` 只能有一个值构造器，并且那个构造器须恰有一个字段(field)。
+``newtype`` 关键字存在着给现有类型以一个新的身份（id）。
+它有更多的限制于其使用上，比起 ``data`` 关键字。
+说白了， ``newtype`` 只能有一个值构造器，并且那个构造器须恰有一个字段(field)。
 
 ::
 
@@ -1570,11 +1690,17 @@ data 和 newtype 声明之间的区别
        Failed, modules loaded: none.
          
 
-在此之上，还有另一个重要的区别于 ``data`` 和 ``newtype`` 之间。一个类型，由 ``data`` 关键字创建，有一个簿记保持（book-keeping）的开销在运行时。例如，追踪（track）哪个构造器，而用这个构造器一个值被创建。而另一方面， ``newtype`` 只能有一个构造器，所以不需要这个额外开销。这使得它在运行时更省时间和空间。
+在此之上，还有另一个重要的区别于 ``data`` 和 ``newtype`` 之间。
+一个类型，由 ``data`` 关键字创建，有一个簿记保持（book-keeping）的开销在运行时。
+例如，追踪（track）哪个构造器，而用这个构造器一个值被创建。
+而另一方面， ``newtype`` 只能有一个构造器，所以不需要这个额外开销。
+这使得它在运行时更省时间和空间。
 
 因为 ``newtype`` 的构造器只在编译时使用，运行时甚至不存在，所以类型匹配在 ``undefined`` 之上表现得不同，对于用 ``newtype`` 定义的类型和那些用 ``data`` 定义的。
 
-为了理解这个不同点，让我们首先回顾一下，我们可能期望一个普通的类型什么东西。普通数据类型的行为。我们已经非常熟悉，如果在运行时对 ``undefined`` 求值会导致崩溃。
+为了理解这个不同点，让我们首先回顾一下，我们可能期望一个普通的类型什么东西。
+普通数据类型的行为。
+我们已经非常熟悉，如果在运行时对 ``undefined`` 求值会导致崩溃。
 
 ::
 
@@ -1616,29 +1742,34 @@ data 和 newtype 声明之间的区别
 
 .. _summary-the-three-ways-of-naming-types:
 
-命名类型的三种方式
+总结：命名类型的三种方式
 ------------------
 
 这里简要回顾一下 haskell 引入新类型名的三种方式。
 
 - ``data`` 关键字定义一个真正的代数数据类型。
 
-- ``type`` 关键字给现有类型定义别名。类型和别名可以通用。
+- ``type`` 关键字给现有类型定义别名，而类型和别名可以通用。
 
-- ``newtype`` 关键字给现有类型定义一个不同的身份（distinct identity）。原类型和新类型不能通用。
+- ``newtype`` 关键字给现有类型定义一个不同的身份（distinct identity）,而原类型和新类型不能通用。
 
 
 .. _json_typeclasses_without_overlapping_instances:
 
 不会造成重叠实例的JSON类型类
 ============================
-开启GHC的重叠实例支持可以方便快速地让我们的JSON代码通过编译。在更复杂的场景中，我们有时会面对这样一种情况：某个类型类有多个相关程度相同实例，重叠实例没法帮我们搞定，我们得靠自己添加几处 ``newtype`` 声明。我们将使用 ``newtype`` 代替重叠实例来重做这个JSON类型类，并以此了解其中的复杂之处。
+开启GHC的重叠实例支持可以方便快速地让我们的JSON代码通过编译。
+在更复杂的场景中，我们有时会面对这样一种情况：某个类型类有多个相关程度相同实例，重叠实例没法帮我们搞定，我们得靠自己添加几处 ``newtype`` 声明。
+我们将使用 ``newtype`` 代替重叠实例来重做这个JSON类型类，并以此了解其中的复杂之处。
 
-我们的第一个任务，是帮助GHC区分即用来表示JSON数组的类型 ``[a]`` ；以及用来表示JSON对象的类型 ``[(String, [a])]`` 。这两个类型在我们学会 ``OverlappingInstances`` 以前给我们带来了点小麻烦。我们把列表类型做了包装，所以编译器不会把它看作列表。
+我们的第一个任务，是帮助GHC区分即用来表示JSON数组的类型 ``[a]`` ；以及用来表示JSON对象的类型 ``[(String, [a])]`` 。
+这两个类型在我们学会 ``OverlappingInstances`` （覆盖实例）以前给我们带来了点小麻烦。
+我们把列表类型做了包装，所以编译器不会把它看作列表。
 
 .. literalinclude:: /code/ch06/JAry.hs
 
-当我们从自己的模块导出这个类型时，我们会把该类型的所有细节都暴露出来。这个模块的头部看起来会像是这样：
+当我们从自己的模块导出这个类型时，我们会把该类型的所有细节都暴露出来。
+这个模块的头部看起来会像是这样：
 
 .. literalinclude:: /code/ch06/JSONClassExport.hs
 
@@ -1656,9 +1787,11 @@ data 和 newtype 声明之间的区别
 
     .. literalinclude:: /code/ch06/JSONClassExport2.hs
 
-    由于我们没有导出数据构造器，所以我们的库的用户们就只能使用我们导出的函数对该类型的值进行构造和结构了。这个特性为我们这些库作者提供了随时改变类型的内部表示形式的自由。
+    由于我们没有导出数据构造器，所以我们的库的用户们就只能使用我们导出的函数对该类型的值进行构造和结构了。
+这个特性为我们这些库作者提供了随时改变类型的内部表示形式的自由。
 
-    如果我们导出了数据构造器，用户方就可能编写依赖数据构造器的代码，比方说拿数据构造器做模式识别。如果哪天我们想要修改这个类型的内部构造，就要冒这种风险：可能修改之后，所有涉及数据构造器的代码都被破坏了。
+    如果我们导出了数据构造器，用户方就可能编写依赖数据构造器的代码，比方说拿数据构造器做模式识别。
+如果哪天我们想要修改这个类型的内部构造，就要冒这种风险：可能修改之后，所有涉及数据构造器的代码都被破坏了。
 
     在当前的场景中，让数组的包装器保持抽象也得不到什么额外的好处，所以我们就干脆把类型的完整定义全数导出了。
 
@@ -1674,7 +1807,8 @@ data 和 newtype 声明之间的区别
 
 .. literalinclude:: /code/ch06/JSONClass5.hs
 
-我们来单步跟踪将一个 ``JAry a``值转换为 ``JValue``值的过程。假设有一个包含的元素都是 ``JSON`` 类型类实例的列表，把该列表转换为 ``JValue`` 组成的列表的过程很简单。
+我们来单步跟踪将一个 ``JAry a`` 值转换为 ``JValue`` 值的过程。
+假设有一个包含的元素都是 ``JSON`` 类型类实例的列表，把该列表转换为 ``JValue`` 组成的列表的过程很简单。
 
 .. literalinclude:: /code/ch06/listToJValues.hs
 
@@ -1682,7 +1816,9 @@ data 和 newtype 声明之间的区别
 
 .. literalinclude:: /code/ch06/JSONClass6.hs
 
-(记住，这种做法没有任何性能代价。我们只是要求编译器隐藏“正在操作的对象是一个列表”这个事实。)要把这个值转换为 ``JValue`` 值，我们还得应用另一个类型构造器。
+(记住，这种做法没有任何性能代价。
+我们只是要求编译器隐藏“正在操作的对象是一个列表”这个事实。
+)要把这个值转换为 ``JValue`` 值，我们还得应用另一个类型构造器。
 
 .. literalinclude:: /code/ch06/jaryOfJValuesToJvalue.hs
 
@@ -1690,7 +1826,8 @@ data 和 newtype 声明之间的区别
 
 .. literalinclude:: /code/ch06/jaryToJValue.hs
 
-要把 ``JValue`` 值转换为 ``JAry a`` 需要做更多的工作，但是我们把它拆分成多个可重用的部分。转换函数的基本骨架一目了然。
+要把 ``JValue`` 值转换为 ``JAry a`` 需要做更多的工作，但是我们把它拆分成多个可重用的部分。
+转换函数的基本骨架一目了然。
 
 .. literalinclude:: /code/ch06/jaryFromJValue.hs
 
@@ -1698,11 +1835,13 @@ data 和 newtype 声明之间的区别
 
 .. literalinclude:: /code/ch06/whenRight.hs
 
-``mapEithers``函数要更复杂一些。它的行为就像 ``map`` 函数，但如果它遇到一个 ``Left``值，会直接返回该值，而不会继续积累 ``Right`` 值构成的列表。
+``mapEithers``函数要更复杂一些。
+它的行为就像 ``map`` 函数，但如果它遇到一个 ``Left`` 值，会直接返回该值，而不会继续积累 ``Right`` 值构成的列表。
 
 .. literalinclude:: /code/ch06/mapEithers.hs
 
-由于隐藏在 ``JObj`` 类型中的列表元素有更细碎的结构，相应的，在它和 ``JValue`` 类型之间互相转换的代码就会有点复杂。万幸的是，我们可以重用刚刚定义过的函数。
+由于隐藏在 ``JObj`` 类型中的列表元素有更细碎的结构，相应的，在它和 ``JValue`` 类型之间互相转换的代码就会有点复杂。
+万幸的是，我们可以重用刚刚定义过的函数。
 
 .. literalinclude:: /code/ch06/toJValue.hs
 
@@ -1711,7 +1850,7 @@ data 和 newtype 声明之间的区别
 
 1. 在 **ghci** 中加载 ``Control.Arrow`` 模块，弄清 ``second`` 函数的功能。
 
-2. ``(,)``是什么类型？在 **ghci** 中调用它时，它的行为是什么？ ``(,,)`` 呢？
+2. ``(,)`` 是什么类型？在 **ghci** 中调用它时，它的行为是什么？ ``(,,)`` 呢？
 
 
 
@@ -1720,7 +1859,8 @@ data 和 newtype 声明之间的区别
 可怕的单一同态限定（monomorphism restriction）
 ==============================================
 
-Haskell 98 有一个微妙的特性可能会在某些意想不到的情况下“咬”到我们。下面这个简单的函数展示了这个问题。
+Haskell 98 有一个微妙的特性可能会在某些意想不到的情况下“咬”到我们。
+下面这个简单的函数展示了这个问题。
 
 ::
 
@@ -1763,8 +1903,10 @@ Haskell 有时会强制使某些声明不像我们预想的那么多态。
     只要在心里知道有这么回事就可以了，除非 GHC 真的报告了跟上面类似的错误。
     如果真的发生了，记得在这儿曾读过这个错误，然后回过头来看就行了。
 
-我们不会试图去解释单一同态限制。Haskell 社区一致同意它并不经常出现；它解释起来很棘手（tricky)；
-它几乎没什么实际用处；它唯一的作用就是坑人。举个例子来说明它为什么棘手：尽管上面的例子违反了这个限制，
+我们不会试图去解释单一同态限制。
+Haskell 社区一致同意它并不经常出现；它解释起来很棘手（tricky)；
+它几乎没什么实际用处；它唯一的作用就是坑人。
+举个例子来说明它为什么棘手：尽管上面的例子违反了这个限制，
 下面的两个编译起来却毫无问题。
 
 ::
@@ -1781,16 +1923,19 @@ Haskell 有时会强制使某些声明不像我们预想的那么多态。
 
 - 显式定义类型签名，而不是依靠编译器去推导。
 
-- 不改代码，编译模块的时候用上 ``NoMonomorphismRestriction`` 语言扩展。它取消了单一同态限制。
+- 不改代码，编译模块的时候用上 ``NoMonomorphismRestriction`` 语言扩展。
+  它取消了单一同态限制。
 
 没人喜欢单一同态限制，因此几乎可以肯定的是下一个版本的 Haskell 会去掉它。
 但这并不是说加上 ``NoMonomorphismRestriction`` 就可以一劳永逸：有些编译器（包括一些老版本的 GHC）
-识别不了这个扩展，但用另外两种方法就可以解决问题。如果这种可移植性对你不是问题，那么请务必打开这个扩展。
+识别不了这个扩展，但用另外两种方法就可以解决问题。
+如果这种可移植性对你不是问题，那么请务必打开这个扩展。
 
 .. _conclusion:
 
 结论
 ====
 
-在这章，你学到了类型类有什么用以及怎么用它们。我们讨论了如何定义自己的类型类，然后又讨论了一些 Haskell 库里定义的类型类。
+在这章，你学到了类型类有什么用以及怎么用它们。
+我们讨论了如何定义自己的类型类，然后又讨论了一些 Haskell 库里定义的类型类。
 最后，我们展示了怎么让 Haskell 编译器给你的类型自动派生出某些类型类实例。
