@@ -112,6 +112,9 @@ JSON 还提供了两种复合类型：\ *数组*\ 是值的有序序列，而\ *
     getInt (JNumber n) = Just (truncate n)
     getInt _           = Nothing
 
+    getDouble (JNumber n) = Just n
+    getDouble _           = Nothing
+    
     getBool (JBool b) = Just b
     getBool _         = Nothing
 
@@ -243,6 +246,7 @@ SimpleJSON 模块已经有了 JSON 类型的表示了，那么下一步要做的
 
 ::
 
+    -- file: ch05/PutJSON.hs
     module PutJSON where
 
     import Data.List (intercalate)
@@ -312,7 +316,7 @@ Haskell 编译器的类型推导能力非常强大也非常有价值。在刚开
 
     upcaseFirst (c:cs) = toUpper c  -- 这里忘记了 ":cs"
 
-这个函数试图将输入单词的第一个字母设置为大写，但是它在设置之后，忘记了重新拼接字符串的后续部分 ``xs`` 。在我们的预想中，这个函数的类型应该是 ``String -> String`` ，但编译器推导出的类型却是 ``String -> Char`` 。
+这个函数试图将输入单词的第一个字母设置为大写，但是它在设置之后，忘记了重新拼接字符串的后续部分 ``cs`` 。在我们的预想中，这个函数的类型应该是 ``String -> String`` ，但编译器推导出的类型却是 ``String -> Char`` 。
 
 现在，有另一个函数调用这个 ``upcaseFirst`` 函数：
 
@@ -563,7 +567,7 @@ Haskell 开发诀窍
 
 ::
 
-    -- file: ch05/PrettyJSON.hs
+    -- file: ch05/Prettify.hs
     series :: Char -> Char -> (a -> Doc) -> [a] -> Doc
     series open close f = enclose open close
                         . fsep . punctuate (char ',') . map f
@@ -633,7 +637,7 @@ Haskell 开发诀窍
 可以看出载入标准模块和我们自己写的模块没什么区别。[译注：原文在 ``PrettyJSON.hs`` 头部载入了 ``Numeric`` 和 ``Data.Bits`` 模块。但事实上并无必要，因此在译文中删除。
 此处作者的说明部分未作改动。]
 
-在每个 ``import`` 命令中，我们都列出了想要引入我们的模块的命名空间的名字。这并非强制：如果省略这些名字，我们就可以使用一个模块导出的所有名字。然而，通常来讲显式地载入更好。
+在每个 ``import`` 命令中，我们都显式地列出了名字，用以引入我们模块的命名空间。这并非强制：如果省略这些名字，我们就可以使用一个模块导出的所有名字。然而，通常来讲显式地载入更好。
 
 - 一个显式列表清楚地表明了我们从哪里载入了哪个名字。如果读者碰到了不熟悉的函数，这便于他们查看文档。
 
@@ -818,7 +822,24 @@ Haskell 开发诀窍
 
 现在我们终于可以在 **ghci** 里试试 ``compact`` 函数了。[译注：这里要对 ``PrettyJSON.hs`` 里 ``import Prettify`` 部分作一下修改才能使 ``PrettyJSON.hs`` 编译。
 包括去掉还未实现的 ``pretty`` 函数，增加缺少的 ``string``, ``series`` 函数等。一个可以编译的版本如下。]
-
+[我(sancao2)还是不能编译成功,报错:
+::
+   Prelude> :l PrettyJSON.hs
+   
+   Prettify.hs:1:1:
+       File name does not match module name:
+       Saw: `Main'
+       Expected: `Prettify'
+   Failed, modules loaded: none.
+在开头加上 ``module Prettify where``.就能编译通过了.
+::
+   Prelude> :l PrettyJSON
+   [1 of 3] Compiling SimpleJSON       ( SimpleJSON.hs, interpreted )
+   [2 of 3] Compiling Prettify         ( Prettify.hs, interpreted )
+   [3 of 3] Compiling PrettyJSON       ( PrettyJSON.hs, interpreted )
+   Ok, modules loaded: PrettyJSON, SimpleJSON, Prettify.
+]
+   
 ::
 
     -- file: ch05/PrettyJSON.hs
@@ -867,7 +888,7 @@ Haskell 开发诀窍
 ^^^^^^^^^^^^^^^^^^^^
 
 我们的 ``compact`` 方便了机器之间的交流，人阅读起来却非常困难。我们写一个 ``pretty`` 函数来产生可读性较强的输出。
-跟 ``compact`` 相比，``pretty``多了一个参数：每行的最大宽度(有几列)。(假设我们使用等宽字体。)
+跟 ``compact`` 相比, ``pretty`` 多了一个参数：每行的最大宽度(有几列)。(假设我们使用等宽字体。)
 
 ::
 
