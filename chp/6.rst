@@ -1810,13 +1810,20 @@ JSON类型类,不带有重叠实例
 前者（ ``[a]`` ）我们用来表示JSON数组们（arrays），而后者（ ``[(String, [a])]`` ）用来表示JSON对象们（objects）。
 他们是这些类型们，其给我们制造了麻烦于我们学会 ``OverlappingInstances`` （覆盖实例）之前。
 我们包装了（wrap up）列表（list）类型，以至于编译器不会视其为一个列表。
-
-.. literalinclude:: /code/ch06/JAry.hs
+::
+   -- file: ch06/JSONClass.hs
+   newtype JAry a = JAry {
+         fromJAry :: [a]
+         } deriving (Eq, Ord, Show)
 
 当我们从自己的模块导出这个类型时，我们会导出该类型完整的细节。
 我们的模块头部将看起来像这样：
-
-.. literalinclude:: /code/ch06/JSONClassExport.hs
+::
+   -- file: ch06/JSONClassExport.hs
+   module JSONClass
+       (
+         JAry(..)
+       ) where
 
 紧跟着 ``Jary`` 的” ``(..)`` “，意思是“导出这个类型的所有细节”。
 
@@ -1826,12 +1833,19 @@ JSON类型类,不带有重叠实例
 
     通常地，当我们导出一个 ``newtype`` 的时候，我们 *不会* 导出这个类型的数据构造器，为了保持其细节的抽象（abstract）。
     取而代之，我们会定义一个函数为我们应用（apply）该数据构造器。
-
-    .. literalinclude:: /code/ch06/JSONClass2.hs
+    ::
+       -- file: ch06/JSONClass.hs
+       jary :: [a] -> JAry a
+       jary = JAry
 
     于是，我们会导出类型构造器、解构函数和我们的构造函数，除了数据构造器。
-
-    .. literalinclude:: /code/ch06/JSONClassExport2.hs
+    ::
+       -- file: ch06/JSONClassExport.hs
+       module JSONClass
+           (
+             JAry(fromJAry)
+           , jary
+           ) where
 
     当我们没有导出一个类型的数据构造器，我们库的顾客们就只能使用我们提供的函数们去构造和解构该类型的值。
 这个特性为我们，这些库作者们，提供了自由去改变类型的内部表示形式（represention），如果我们需要去（这么做）。
@@ -1842,54 +1856,99 @@ JSON类型类,不带有重叠实例
     在我们这里的情况下，我们得不到什么额外的好处，通过让数组的包装器保持抽象，所以我们就干脆地导出该类型的整个定义。
 
 我们提供另一个包装类型，而其隐藏了一个JSON对象的我们的表示形式（represention）。
-
-.. literalinclude:: /code/ch06/JSONClass3.hs
-
+::
+   -- file: ch06/JSONClass.hs
+   newtype JObj a = JObj {
+         fromJObj :: [(String, a)]
+       } deriving (Eq, Ord, Show)
+       
 带着这些定义好的类型，我们制造一些小改动到我们的 ``JValue`` 类型的定义。
-
-.. literalinclude:: /code/ch06/JSONClass4.hs
+::
+   -- file: ch06/JSONClass.hs
+   data JValue = JString String
+               | JNumber Double
+               | JBool Bool
+               | JNull
+               | JObject (JObj JValue)   -- was [(String, JValue)]
+               | JArray (JAry JValue)    -- was [JValue]
+                 deriving (Eq, Ord, Show)
 
 这个改动不会影响到 ``JSON`` 类型类的实例们，而那些我们已经写完。
 但是我们还要为我们新的 ``JAry`` 和 ``JObj`` 类型编写实例。
+::
+   -- file: ch06/JSONClass.hs
+   jaryFromJValue :: (JSON a) => JValue -> Either JSONError (JAry a)
 
-.. literalinclude:: /code/ch06/JSONClass5.hs
+   jaryToJValue :: (JSON a) => JAry a -> JValue
+
+   instance (JSON a) => JSON (JAry a) where
+       toJValue = jaryToJValue
+       fromJValue = jaryFromJValue
 
 让我们缓慢地走过各个步骤，而这些步骤会转换一个 ``JAry a`` 到一个 ``JValue`` 。
 给定一个列表，其中内部每一个元素都是一个 ``JSON`` 实例，转换它（前面的列表）到一个 ``JValue`` s 组成的列表是简单的。
-
-.. literalinclude:: /code/ch06/listToJValues.hs
+::
+   -- file: ch06/JSONClass.hs
+   listToJValues :: (JSON a) => [a] -> [JValue]
+   listToJValues = map toJValue
 
 取得这个值并包装他来得到一个 ``JAry JValue`` 的过程，实际上就是对其应用 ``newtype`` 的类型构造器。
-
-.. literalinclude:: /code/ch06/JSONClass6.hs
-
+::
+   -- file: ch06/JSONClass.hs
+   jvaluesToJAry :: [JValue] -> JAry JValue
+   jvaluesToJAry = JAry
+    
 (记住，这种做法没有任何性能代价。我们只是告诉编译器隐藏这个事实：我们正在使用一个列表。)
 为了转化这个值成为一个 ``JValue`` ，我们应用另一个类型构造器。
-
-.. literalinclude:: /code/ch06/jaryOfJValuesToJvalue.hs
+::
+   -- file: ch06/JSONClass.hs
+   jaryOfJValuesToJValue :: JAry JValue -> JValue
+   jaryOfJValuesToJValue = JArray
 
 组装这些代码片段，通过使用函数组合(function composition)，而我们得到一个简洁的单行（代码），用于转换得到一个 ``JValue`` 。
-
-.. literalinclude:: /code/ch06/jaryToJValue.hs
+::
+   -- file: ch06/JSONClass.hs
+   jaryToJValue = JArray . JAry . map toJValue . fromJAry
 
 我们有更多的工作去做来实现从 ``JValue`` 到 ``JAry a`` 的转换，但是我们把它“碎裂”（break）成一些可重用的部分。
 基本函数一目了然（straightforward）。
-
-.. literalinclude:: /code/ch06/jaryFromJValue.hs
+::
+   -- file: ch06/JSONClass.hs
+   jaryFromJValue (JArray (JAry a)) =
+       whenRight JAry (mapEithers fromJValue a)
+   jaryFromJValue _ = Left "not a JSON array"
 
 ``whenRight`` 函数会检查传给它的参数：如果第二个参数是用 ``Right`` 构造器创建的，以它为参数调用第一个参数指定的函数；如果第二个参数是 ``Left`` 构造器创建的，则将它保持原状返回，其它什么也不做。
+::
+   -- file: ch06/JSONClass.hs
+   whenRight :: (b -> c) -> Either a b -> Either a c
+   whenRight _ (Left err) = Left err
+   whenRight f (Right a) = Right (f a)
 
-.. literalinclude:: /code/ch06/whenRight.hs
-
-``mapEithers``函数要更复杂一些。
+``mapEithers`` 函数要更复杂一些。
 它的行为就像 ``map`` 函数，但如果它遇到一个 ``Left`` 值，会直接返回该值，而不会继续积累 ``Right`` 值构成的列表。
-
-.. literalinclude:: /code/ch06/mapEithers.hs
+::
+   -- file: ch06/JSONClass.hs
+   mapEithers :: (a -> Either b c) -> [a] -> Either b [c]
+   mapEithers f (x:xs) = case mapEithers f xs of
+                           Left err -> Left err
+                           Right ys -> case f x of
+                                         Left err -> Left err
+                                         Right y -> Right (y:ys)
+   mapEithers _ _ = Right []
 
 由于隐藏在 ``JObj`` 类型中的列表元素有更细碎的结构，相应的，在它和 ``JValue`` 类型之间互相转换的代码就会有点复杂。
 万幸的是，我们可以重用刚刚定义过的函数。
+::
+   -- file: ch06/JSONClass.hs
+   import Control.Arrow (second)
 
-.. literalinclude:: /code/ch06/toJValue.hs
+   instance (JSON a) => JSON (JObj a) where
+       toJValue = JObject . JObj . map (second toJValue) . fromJObj
+
+       fromJValue (JObject (JObj o)) = whenRight JObj (mapEithers unwrap o)
+         where unwrap (k,v) = whenRight ((,) k) (fromJValue v)
+       fromJValue _ = Left "not a JSON object"
 
 练习题
 ------
@@ -1909,7 +1968,6 @@ Haskell 98 有一个微妙的特性可能会在某些意想不到的情况下“
 下面这个简单的函数展示了这个问题。
 
 ::
-
     -- file: ch06/Monomorphism.hs
     myShow = show
 
