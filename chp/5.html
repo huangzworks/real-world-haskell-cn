@@ -27,7 +27,7 @@
     <script type="text/javascript" src="../_static/doctools.js"></script>
     <script type="text/javascript" src="../_static/theme_extras.js"></script>
     <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
-    <link rel="next" title="第 6 章：类型类" href="6.html" />
+    <link rel="next" title="第 6 章：使用类型类" href="6.html" />
     <link rel="prev" title="第 4 章：函数式编程" href="4.html" /> 
   </head>
   <body role="document">
@@ -41,7 +41,7 @@
         &#160;&#160;::&#160;&#160;
         <a class="uplink" href="../index.html">Contents</a>
         &#160;&#160;::&#160;&#160;
-        <a href="6.html">第 6 章：类型类</a>&#160;&#160;»
+        <a href="6.html">第 6 章：使用类型类</a>&#160;&#160;»
         </p>
 
       </div>
@@ -135,6 +135,9 @@
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/SimpleJSON.hs</span>
 <span class="nf">getInt</span> <span class="p">(</span><span class="kt">JNumber</span> <span class="n">n</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="p">(</span><span class="n">truncate</span> <span class="n">n</span><span class="p">)</span>
 <span class="nf">getInt</span> <span class="kr">_</span>           <span class="ow">=</span> <span class="kt">Nothing</span>
+
+<span class="nf">getDouble</span> <span class="p">(</span><span class="kt">JNumber</span> <span class="n">n</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="n">n</span>
+<span class="nf">getDouble</span> <span class="kr">_</span>           <span class="ow">=</span> <span class="kt">Nothing</span>
 
 <span class="nf">getBool</span> <span class="p">(</span><span class="kt">JBool</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="n">b</span>
 <span class="nf">getBool</span> <span class="kr">_</span>         <span class="ow">=</span> <span class="kt">Nothing</span>
@@ -236,7 +239,8 @@ Prelude Data.Ratio&gt; truncate (22 % 7)
 <h2>打印 JSON 数据<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
 <p>SimpleJSON 模块已经有了 JSON 类型的表示了，那么下一步要做的就是将 Haskell 值翻译（render）成 JSON 数据。</p>
 <p>有好几种方法可以将 Haskell 值翻译成 JSON 数据，最直接的一种是编写翻译函数，以 JSON 格式来打印 Haskell 值。稍后会介绍完成这个任务的其他更有趣方法。</p>
-<div class="highlight-haskell"><div class="highlight"><pre><span class="kr">module</span> <span class="nn">PutJSON</span> <span class="kr">where</span>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/PutJSON.hs</span>
+<span class="kr">module</span> <span class="nn">PutJSON</span> <span class="kr">where</span>
 
 <span class="kr">import</span> <span class="nn">Data.List</span> <span class="p">(</span><span class="nf">intercalate</span><span class="p">)</span>
 <span class="kr">import</span> <span class="nn">SimpleJSON</span>
@@ -292,7 +296,7 @@ Prelude Data.Ratio&gt; truncate (22 % 7)
 <span class="nf">upcaseFirst</span> <span class="p">(</span><span class="n">c</span><span class="kt">:</span><span class="n">cs</span><span class="p">)</span> <span class="ow">=</span> <span class="n">toUpper</span> <span class="n">c</span>  <span class="c1">-- 这里忘记了 &quot;:cs&quot;</span>
 </pre></div>
 </div>
-<p>这个函数试图将输入单词的第一个字母设置为大写，但是它在设置之后，忘记了重新拼接字符串的后续部分 <code class="docutils literal"><span class="pre">xs</span></code> 。在我们的预想中，这个函数的类型应该是 <code class="docutils literal"><span class="pre">String</span> <span class="pre">-&gt;</span> <span class="pre">String</span></code> ，但编译器推导出的类型却是 <code class="docutils literal"><span class="pre">String</span> <span class="pre">-&gt;</span> <span class="pre">Char</span></code> 。</p>
+<p>这个函数试图将输入单词的第一个字母设置为大写，但是它在设置之后，忘记了重新拼接字符串的后续部分 <code class="docutils literal"><span class="pre">cs</span></code> 。在我们的预想中，这个函数的类型应该是 <code class="docutils literal"><span class="pre">String</span> <span class="pre">-&gt;</span> <span class="pre">String</span></code> ，但编译器推导出的类型却是 <code class="docutils literal"><span class="pre">String</span> <span class="pre">-&gt;</span> <span class="pre">Char</span></code> 。</p>
 <p>现在，有另一个函数调用这个 <code class="docutils literal"><span class="pre">upcaseFirst</span></code> 函数：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Trouble.hs</span>
 
@@ -485,7 +489,7 @@ Failed, modules loaded: none.
 <div class="section" id="arrays-and-objects-and-the-module-header">
 <span id="id9"></span><h2>数组和对象<a class="headerlink" href="#arrays-and-objects-and-the-module-header" title="Permalink to this headline">¶</a></h2>
 <p>跟字符串比起来，美观打印数组和对象就简单多了。我们已经知道它们两个看起来很像：以起始字符开头，中间是用逗号隔开的一系列值，以终止字符结束。我们写个函数来体现它们的共同特点：</p>
-<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/PrettyJSON.hs</span>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
 <span class="nf">series</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span>
 <span class="nf">series</span> <span class="n">open</span> <span class="n">close</span> <span class="n">f</span> <span class="ow">=</span> <span class="n">enclose</span> <span class="n">open</span> <span class="n">close</span>
                     <span class="o">.</span> <span class="n">fsep</span> <span class="o">.</span> <span class="n">punctuate</span> <span class="p">(</span><span class="n">char</span> <span class="sc">&#39;,&#39;</span><span class="p">)</span> <span class="o">.</span> <span class="n">map</span> <span class="n">f</span>
@@ -539,7 +543,7 @@ Failed, modules loaded: none.
 <p>关于载入部分，<code class="docutils literal"><span class="pre">Numeric</span></code> 和 <code class="docutils literal"><span class="pre">Data.Bits</span></code> 模块是 GHC 内置的。我们已经写好了 <code class="docutils literal"><span class="pre">SimpleJSON</span></code> 模块，<code class="docutils literal"><span class="pre">Prettify</span></code> 模块的框架也搭好了。
 可以看出载入标准模块和我们自己写的模块没什么区别。[译注：原文在 <code class="docutils literal"><span class="pre">PrettyJSON.hs</span></code> 头部载入了 <code class="docutils literal"><span class="pre">Numeric</span></code> 和 <code class="docutils literal"><span class="pre">Data.Bits</span></code> 模块。但事实上并无必要，因此在译文中删除。
 此处作者的说明部分未作改动。]</p>
-<p>在每个 <code class="docutils literal"><span class="pre">import</span></code> 命令中，我们都列出了想要引入我们的模块的命名空间的名字。这并非强制：如果省略这些名字，我们就可以使用一个模块导出的所有名字。然而，通常来讲显式地载入更好。</p>
+<p>在每个 <code class="docutils literal"><span class="pre">import</span></code> 命令中，我们都显式地列出了名字，用以引入我们模块的命名空间。这并非强制：如果省略这些名字，我们就可以使用一个模块导出的所有名字。然而，通常来讲显式地载入更好。</p>
 <ul class="simple">
 <li>一个显式列表清楚地表明了我们从哪里载入了哪个名字。如果读者碰到了不熟悉的函数，这便于他们查看文档。</li>
 <li>有时候库的维护者会删除或者重命名函数。一个函数很可能在我们写完模块很久之后才从第三方库中消失并导致编译错误。显式列表提醒我们消失的名字是从哪儿载入的，有助于我们更快找到问题。</li>
@@ -686,7 +690,26 @@ Failed, modules loaded: none.
 在 <code class="docutils literal"><span class="pre">case</span></code> 表达式里，前几个分支在 <code class="docutils literal"><span class="pre">ds</span></code> 上递归，每次处理一个栈顶的元素。
 最后两个分支在 <code class="docutils literal"><span class="pre">ds</span></code> 前面加了东西：<code class="docutils literal"><span class="pre">Concat</span></code> 分支把两个元素都加到栈里，<code class="docutils literal"><span class="pre">Union</span></code> 分支忽略左侧元素（我们对它调用了 <code class="docutils literal"><span class="pre">flatten</span></code> ），只把右侧元素加进栈里。</p>
 <p>现在我们终于可以在 <strong>ghci</strong> 里试试 <code class="docutils literal"><span class="pre">compact</span></code> 函数了。[译注：这里要对 <code class="docutils literal"><span class="pre">PrettyJSON.hs</span></code> 里 <code class="docutils literal"><span class="pre">import</span> <span class="pre">Prettify</span></code> 部分作一下修改才能使 <code class="docutils literal"><span class="pre">PrettyJSON.hs</span></code> 编译。
-包括去掉还未实现的 <code class="docutils literal"><span class="pre">pretty</span></code> 函数，增加缺少的 <code class="docutils literal"><span class="pre">string</span></code>, <code class="docutils literal"><span class="pre">series</span></code> 函数等。一个可以编译的版本如下。]</p>
+包括去掉还未实现的 <code class="docutils literal"><span class="pre">pretty</span></code> 函数，增加缺少的 <code class="docutils literal"><span class="pre">string</span></code>, <code class="docutils literal"><span class="pre">series</span></code> 函数等。一个可以编译的版本如下。]
+[我(sancao2)还是不能编译成功,报错:</p>
+<div class="highlight-haskell"><div class="highlight"><pre>Prelude&gt; :l PrettyJSON.hs
+
+Prettify.hs:1:1:
+    File name does not match module name:
+    Saw: `Main&#39;
+    Expected: `Prettify&#39;
+Failed, modules loaded: none.
+</pre></div>
+</div>
+<p>在开头加上 <code class="docutils literal"><span class="pre">module</span> <span class="pre">Prettify</span> <span class="pre">where</span></code>.就能编译通过了.</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="kt">PrettyJSON</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">3</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">SimpleJSON</span>       <span class="p">(</span> <span class="kt">SimpleJSON</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="p">[</span><span class="mi">2</span> <span class="kr">of</span> <span class="mi">3</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Prettify</span>         <span class="p">(</span> <span class="kt">Prettify</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="p">[</span><span class="mi">3</span> <span class="kr">of</span> <span class="mi">3</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">PrettyJSON</span>       <span class="p">(</span> <span class="kt">PrettyJSON</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">PrettyJSON</span><span class="p">,</span> <span class="kt">SimpleJSON</span><span class="p">,</span> <span class="kt">Prettify</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>]</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/PrettyJSON.hs</span>
 <span class="kr">import</span> <span class="nn">Prettify</span> <span class="p">(</span><span class="kt">Doc</span><span class="p">,</span> <span class="p">(</span><span class="o">&lt;&gt;</span><span class="p">),</span> <span class="nf">string</span><span class="p">,</span> <span class="nf">series</span><span class="p">,</span> <span class="nf">char</span><span class="p">,</span> <span class="nf">double</span><span class="p">,</span> <span class="nf">fsep</span><span class="p">,</span> <span class="nf">hcat</span><span class="p">,</span> <span class="nf">punctuate</span><span class="p">,</span> <span class="nf">text</span><span class="p">,</span> <span class="nf">compact</span><span class="p">)</span>
 </pre></div>
@@ -733,7 +756,7 @@ Failed, modules loaded: none.
 <div class="section" id="true-pretty-printing">
 <span id="id13"></span><h3>真正的美观打印<a class="headerlink" href="#true-pretty-printing" title="Permalink to this headline">¶</a></h3>
 <p>我们的 <code class="docutils literal"><span class="pre">compact</span></code> 方便了机器之间的交流，人阅读起来却非常困难。我们写一个 <code class="docutils literal"><span class="pre">pretty</span></code> 函数来产生可读性较强的输出。
-跟 <code class="docutils literal"><span class="pre">compact</span></code> 相比，<a href="#id14"><span class="problematic" id="id15">``</span></a>pretty``多了一个参数：每行的最大宽度(有几列)。(假设我们使用等宽字体。)</p>
+跟 <code class="docutils literal"><span class="pre">compact</span></code> 相比, <code class="docutils literal"><span class="pre">pretty</span></code> 多了一个参数：每行的最大宽度(有几列)。(假设我们使用等宽字体。)</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Prettify.hs</span>
 <span class="nf">pretty</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Doc</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
 <span class="nf">pretty</span> <span class="ow">=</span> <span class="n">undefined</span>
@@ -781,7 +804,7 @@ Failed, modules loaded: none.
 </div>
 </div>
 <div class="section" id="following-the-pretty-printer">
-<span id="id16"></span><h3>理解美观打印器<a class="headerlink" href="#following-the-pretty-printer" title="Permalink to this headline">¶</a></h3>
+<span id="id14"></span><h3>理解美观打印器<a class="headerlink" href="#following-the-pretty-printer" title="Permalink to this headline">¶</a></h3>
 <p>为了理解这段代码是如何工作的，我们首先来考虑一个简单的 <code class="docutils literal"><span class="pre">Doc</span></code> 值。[译注：<code class="docutils literal"><span class="pre">PrettyJSON.hs</span></code> 并未载入 <code class="docutils literal"><span class="pre">empty</span></code> 和 <code class="docutils literal"><span class="pre">&lt;/&gt;</span></code>。需要读者自行载入。]</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">empty</span> <span class="o">&lt;/&gt;</span> <span class="n">char</span> <span class="sc">&#39;a&#39;</span>
 <span class="kt">Concat</span> <span class="p">(</span><span class="kt">Union</span> <span class="p">(</span><span class="kt">Char</span> <span class="sc">&#39; &#39;</span><span class="p">)</span> <span class="kt">Line</span><span class="p">)</span> <span class="p">(</span><span class="kt">Char</span> <span class="sc">&#39;a&#39;</span><span class="p">)</span>
@@ -815,7 +838,7 @@ Failed, modules loaded: none.
 </div>
 </div>
 <div class="section" id="exercises">
-<span id="id17"></span><h3>练习<a class="headerlink" href="#exercises" title="Permalink to this headline">¶</a></h3>
+<span id="id15"></span><h3>练习<a class="headerlink" href="#exercises" title="Permalink to this headline">¶</a></h3>
 <p>我们现有的美观打印器已经可以满足一定的空间限制要求，我们还可以对它做更多改进。</p>
 <ol class="arabic">
 <li><p class="first">用下面的类型签名写一个函数 <code class="docutils literal"><span class="pre">fill</span></code>。</p>
@@ -837,10 +860,10 @@ Failed, modules loaded: none.
 </div>
 </div>
 <div class="section" id="creating-a-package">
-<span id="id18"></span><h2>创建包<a class="headerlink" href="#creating-a-package" title="Permalink to this headline">¶</a></h2>
+<span id="id16"></span><h2>创建包<a class="headerlink" href="#creating-a-package" title="Permalink to this headline">¶</a></h2>
 <p>Cabal 是 Haskell 社区用来构建，安装和发布软件的一套标准工具。Cabal 将软件组织为<em>包（package）</em>。一个包有且只能有一个库，但可以有多个可执行程序。</p>
-<div class="section" id="id19">
-<h3>为包添加描述<a class="headerlink" href="#id19" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id17">
+<h3>为包添加描述<a class="headerlink" href="#id17" title="Permalink to this headline">¶</a></h3>
 <p>Cabal 要求你给每个包添加描述。这些描述放在一个以 <code class="docutils literal"><span class="pre">.cabal</span></code> 结尾的文件当中。这个文件需要放在你项目的顶层目录里。它的格式很简单，下面我们就来介绍它。</p>
 <p>每个 Cabal 包都需要有个名字。通常来说，包的名字和 <code class="docutils literal"><span class="pre">.cabal</span></code> 文件的名字相同。如果我们的包叫做 <code class="docutils literal"><span class="pre">mypretty</span></code> ，那我们的文件就是 <code class="docutils literal"><span class="pre">mypretty.cabal</span></code> 。通常，包含 <code class="docutils literal"><span class="pre">.cabal</span></code>
 文件的目录名字和包名字相同，如 <code class="docutils literal"><span class="pre">mypretty</span></code> 。</p>
@@ -906,8 +929,8 @@ PrettyJSON.hs:8:7:
 <code class="docutils literal"><span class="pre">ghc-pkg</span> <span class="pre">list</span></code> 命令列出已安装的包。当我们想要卸载一个包时，<code class="docutils literal"><span class="pre">ghc-pkg</span> <span class="pre">unregister</span></code> 告诉 GHC 我们不再用这个包了。
 （我们需要手动删除已安装的文件。）</p>
 </div>
-<div class="section" id="id20">
-<h3>配置，构建和安装<a class="headerlink" href="#id20" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id18">
+<h3>配置，构建和安装<a class="headerlink" href="#id18" title="Permalink to this headline">¶</a></h3>
 <p>除了 <code class="docutils literal"><span class="pre">.cabal</span></code> 文件，每个包还必须包含一个 <em>setup</em> 文件。 这使得 Cabal 可以在需要的时候自定义构建过程。一个最简单的配置文件如下所示。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch05/Setup.hs</span>
 <span class="o">#!/</span><span class="n">usr</span><span class="o">/</span><span class="n">bin</span><span class="o">/</span><span class="n">env</span> <span class="n">runhaskell</span>
@@ -938,24 +961,24 @@ PrettyJSON.hs:8:7:
 </div>
 </div>
 <div class="section" id="practical-pointers-and-further-reading">
-<span id="id21"></span><h2>实用链接和扩展阅读<a class="headerlink" href="#practical-pointers-and-further-reading" title="Permalink to this headline">¶</a></h2>
+<span id="id19"></span><h2>实用链接和扩展阅读<a class="headerlink" href="#practical-pointers-and-further-reading" title="Permalink to this headline">¶</a></h2>
 <p>GHC 内置了一个美观打印库，<code class="docutils literal"><span class="pre">Text.PrettyPrint.HughesPJ</span></code>。它提供的 API 和我们的例子相同并且有更丰富有用的美观打印函数。与自己实现相比，我们更推荐使用它。</p>
-<p>John Hughes 在 <a class="reference internal" href="#hughes95" id="id22">[Hughes95]</a> 中介绍了 <code class="docutils literal"><span class="pre">HughesPJ</span></code> 美观打印器的设计。这个库后来被 Simon Peyton Jones 改进，也因此得名。
+<p>John Hughes 在 <a class="reference internal" href="#hughes95" id="id20">[Hughes95]</a> 中介绍了 <code class="docutils literal"><span class="pre">HughesPJ</span></code> 美观打印器的设计。这个库后来被 Simon Peyton Jones 改进，也因此得名。
 Hughes 的论文很长，但他对怎样设计 Haskell 库的讨论非常值得一读。</p>
-<p>本章介绍的美观打印库基于 Philip Wadler 在 <a class="reference internal" href="#wadler98" id="id23">[Wadler98]</a> 中描述的一个更简单的系统。
+<p>本章介绍的美观打印库基于 Philip Wadler 在 <a class="reference internal" href="#wadler98" id="id21">[Wadler98]</a> 中描述的一个更简单的系统。
 Daan Leijen 扩展了这个库，扩展之后的版本可以从 Hackage 里下载： <code class="docutils literal"><span class="pre">wl-pprint</span></code>。
 如果你用 <strong>cabal</strong> 命令行工具，一个命令即可完成下载，构建和安装： <strong>cabal install wl-pprint</strong>。</p>
 <table class="docutils citation" frame="void" id="hughes95" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id22">[Hughes95]</a></td><td>John Hughes. &#8220;<a class="reference external" href="http://citeseer.ist.psu.edu/hughes95design.html">The design of a pretty-printing library</a>&#8221;.
+<tr><td class="label"><a class="fn-backref" href="#id20">[Hughes95]</a></td><td>John Hughes. &#8220;<a class="reference external" href="http://citeseer.ist.psu.edu/hughes95design.html">The design of a pretty-printing library</a>&#8221;.
 May, 1995. First International Spring School on Advanced Functional Programming Techniques. Bastad, Sweden. .</td></tr>
 </tbody>
 </table>
 <table class="docutils citation" frame="void" id="wadler98" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id23">[Wadler98]</a></td><td>Philip Wadler. “<a class="reference external" href="http://citeseer.ist.psu.edu/wadler98prettier.html">A prettier printer</a>”. March 1998.</td></tr>
+<tr><td class="label"><a class="fn-backref" href="#id21">[Wadler98]</a></td><td>Philip Wadler. “<a class="reference external" href="http://citeseer.ist.psu.edu/wadler98prettier.html">A prettier printer</a>”. March 1998.</td></tr>
 </tbody>
 </table>
 </div>
@@ -990,7 +1013,7 @@ May, 1995. First International Spring School on Advanced Functional Programming 
         &#160;&#160;::&#160;&#160;
         <a class="uplink" href="../index.html">Contents</a>
         &#160;&#160;::&#160;&#160;
-        <a href="6.html">第 6 章：类型类</a>&#160;&#160;»
+        <a href="6.html">第 6 章：使用类型类</a>&#160;&#160;»
         </p>
 
       </div>

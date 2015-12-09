@@ -471,7 +471,7 @@
 <span id="extended-example-numeric-types"></span><h2>扩展示例：数字类型（Numeric Types）<a class="headerlink" href="#numeric-types" title="Permalink to this headline">¶</a></h2>
 <p>我们已经讲过 Haskell 的类型系统有多强大，表达能力有多强。我们已经讲过很多利用这种能力的方法。
 现在我们来举一个实际的例子看看。</p>
-<p>在 <a class="reference internal" href="6.html#numeric-types"><span>数字类型</span></a> 一节中，我们展示了 Haskell 的数字类型类。现在，我们来定义一些类，然后用数字类型类把它们和 Haskell 的基本数学结合起来，看看能得到什么。</p>
+<p>在 <a class="reference internal" href="6.html#numeric-types"><span>数值类型</span></a> 一节中，我们展示了 Haskell 的数字类型类。现在，我们来定义一些类，然后用数字类型类把它们和 Haskell 的基本数学结合起来，看看能得到什么。</p>
 <p>我们先来想想我们想用这些新类型在 <strong>ghci</strong> 里干什么。首先，一个不错的选择是把数学表达式转成字符串，并确保它显示了正确的优先级。我们可以写一个 <code class="docutils literal"><span class="pre">prettyShow</span></code> 函数来实现。稍后我们就告诉你怎么写，先来看看怎么用它。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="n">num</span><span class="o">.</span><span class="n">hs</span>
 <span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">num</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
