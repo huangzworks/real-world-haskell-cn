@@ -152,7 +152,7 @@ Haskell程序中的所有I/O动作都是驱动自 ``main`` 的顶部，而其（
           putStrLn outStr
 
 注意例子中的 ``name2replay`` 函数。
-这是一个Haskell的常规函数，遵守所有规则们，其（规则们）我们告诉过你的：它总返回同样的结果，一旦给以相同的输入；它没有副作用们；且懒惰地（lazily）操作着（operates）。
+这是一个Haskell的常规函数，遵守所有的规则们，其（规则们）我们告诉过你的：它总返回同样的结果，一旦给以相同的输入；它没有副作用们；且懒惰地（lazily）操作着（operates）。
 它使用其他Haskell函数们： ``(++)`` ， ``show`` 和 ``length`` 。
 
 往下，在 ``main`` 中，我们绑定 ``name2replay inpStr`` 的结果到 ``outStr`` 。
@@ -160,10 +160,10 @@ Haskell程序中的所有I/O动作都是驱动自 ``main`` 的顶部，而其（
 当（ ``let`` statement）被使用于 ``do`` 代码块中时，你不应当置 ``in`` 于 ``let`` 陈述句之后。
 
 [sancao2译注：let statement:我翻译成let陈述句，我是故意的。
-若翻译成let语句，不准确；如let声明，声明是中文的关键词，对应于英文中的”declare“。
+若翻译成let语句，不准确；若let声明，声明是中文代码世界的关键词，对应于英文中的”declare“。
 我觉得”let陈述句“，很准确地指代这句代码 ``let outStr = name2reply inpStr`` ，其就是在陈述（state）一件事情。]
 
-你可以看到这里，怎么样我们读取这人的名字，从键盘中。
+你能看到这里，怎么样我们读取这人的名字，从键盘。
 接着，那个数据被传（got passed）到一个纯函数，且它（纯函数）的结果被打印。
 实际上， ``main`` 的这最后两行可以且已经被替换成 ``putStrLn (name2reply inpStr)`` 。
 所以，虽然 ``main`` 拥有副作用们（比如，它造成一些东西显示于终端。），但是 ``name2replay`` 就没有且不能有。
@@ -185,14 +185,41 @@ Haskell程序中的所有I/O动作都是驱动自 ``main`` 的顶部，而其（
    Pleased to meet you, John.
    Your name contains 4 characters.
 
-字符串里面的 ``\n`` 是换行符， 它让终端在输出中开始新的一行。
-在 **ghci** 直接调用 ``name2replay "John"`` 会字面上显示 ``\n`` ，因为使用 ``show`` 来显示返回值。
+ ``\n`` ，含于字符串，是”行的末尾“（新行）字符，其造成（cause）终端开始一个新的行于其（终端）输出。
+仅仅调用 ``name2replay "John"`` 于 **ghci** 会字面上显示 ``\n`` ，因为使用 ``show`` 来显示返回值。
 但是使用 ``putStrLn`` 来发送到终端的话，终端会把 ``\n`` 解释成开始新的一行。
 
-如果你就在 **ghci** 提示符那打上 ``main`` ，你觉得会发生什么？来试一下吧。
+[sancao2译注：作者解释得非常细致。也就是说 ``show`` （ ``name2replay`` 调用）和 ``putStrLn`` 解析规格不同。
+::
+   *Main> name2reply "John\n"
+   "Pleased to meet you, John\n.\nYour name contains 5 characters."
+   *Main> putStrLn (name2reply "John\n")
+   Pleased to meet you, John
+   .　　　　　　　　　　　　　　　　　<－－－这里注入（inject）了一行。
+   Your name contains 5 characters.
+多嘴一句，软件安全领域的“SQL injection”的原理也不过是如此。
+一句话，解析器的规则不统一，导致后端的数据库认为是代码的东西，前端解析器认为是数据。
+比如前端payload有一个特殊字符，截断数据，中间插入代码，紧着关闭（注释）原来代码中的数据。
+这里的特殊字符可以是你的payload中有，也可以由你前端解析器生成，也（很少）可能由后端解析器生成。
+这里就能产生各种"跨"(bypass,绕过)的“猥琐流”，学名“跨站师”；各种xss的高级黑。
+因为我有说解析器只有两个吗？
+]
 
-看完这几个例子程序之后，你可能会好奇Haskell是不是真正的命令式语言呢，而不是纯的，惰性的，函数式的。
-这些例子里的一些看起来是按照顺序的一连串的操作。
+如果你就在 **ghci** 提示符那打上 ``main`` ，你觉得会发生什么？来试一下吧。
+[::
+   *Main> main
+   Greetings once again.  What is your name?
+   acbc
+   Pleased to meet you, acbc.
+   Your name contains 4 characters.
+   *Main> main
+   Greetings once again.  What is your name?
+   \n\n
+   Pleased to meet you, \n\n.
+   Your name contains 4 characters.
+]
+看了这几个例子程序之后，你可能好奇：Haskell是不是真正的命令式的（imperative）呢，而不是纯的，惰性的，函数式的。
+这些例子中的几个看起来像一连串依次紧跟着的动作们（actions）。
 这里面还有很多东西，我们会在这一章的 `Haskell 实际上是命令式的吗？`_ 和 `惰性I/O`_ 章节来讨论这个问题。
 
 
