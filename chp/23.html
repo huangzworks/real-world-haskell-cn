@@ -1,0 +1,444 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>第 23 章：用 gtk2hs 进行图形界面编程 &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
+    <link rel="next" title="第 24 章：并发和多核编程" href="24.html" />
+    <link rel="prev" title="第 22 章：扩展示例 —— Web 客户端编程" href="22.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="22.html">第 22 章：扩展示例 —— Web 客户端编程</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="24.html">第 24 章：并发和多核编程</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="gtk2hs">
+<h1>第 23 章：用 gtk2hs 进行图形界面编程<a class="headerlink" href="#gtk2hs" title="Permalink to this headline">¶</a></h1>
+<p>在本书前面的内容中，我们开发了一系列简单的文本工具。尽管这些工具提供的文本接口在大部分情况下都能令人满意，但在某些情况下，我们还是需要用到图形用户界面（GUI）。有很多可供 Haskell 使用的图形界面工具。在这一章中，我们将使用其中的一个，gtk2hs <a class="footnote-reference" href="#id14" id="id1">[53]</a> 。</p>
+<div class="section" id="id2">
+<h2>安装 gtk2hs<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
+<p>在我们研究如何使用 gtk2hs 工作前，需要先安装它。在大多数 Linux，BSD，或者其它 POSIX 平台，有已经打包好的 gtk2hs 安装包。你一般需要安装 GTK+ 开发环境，Glade，和 gtk2hs。安装的细节不同版本各有不同。</p>
+<p>使用 Windows 和 Mac 的开发者应该查阅 <a class="reference external" href="http://www.haskell.org/gtk2hs/download/">gtk2hs 下载站</a> 。从下载 gtk2hs 开始，然后你需要 Glade version 3 的版本。Mac 开发者可以从 <a class="reference external" href="http://www.macports.org/">macports</a> 找到，Windows 开发者应该查阅 <a class="reference external" href="http://sourceforge.net/projects/gladewin32">sourceforge</a> 。</p>
+</div>
+<div class="section" id="gtk">
+<h2>概览 GTK+ 开发栈<a class="headerlink" href="#gtk" title="Permalink to this headline">¶</a></h2>
+<p>在深入代码前，让我们暂停一会考虑一下我们将要使用的系统的架构。首先，我们使用的 GTK+ 是一个跨平台的，用 C 语言来实现的 GUI 工具集。可以跑在 Windows，Mac，Linux，BSD 等等操作系统上。Gnome 桌面环境的下层就是用了它。</p>
+<p>然后，我们使用的 Glade 是一个用户界面设计工具，可以让你用图形化的方式来设计你应用的窗口和对话框等。Glade 把你的设计保存在 XML 文件中，你的应用程序会在运行时加载这些 XML 文件。</p>
+<p>最后使用的是 gtk2hs。这是一个 GTK+，Glade 以及一些依赖库的 Haskell 绑定。它只是很多编程语言对 GTK+ 绑定的一种。</p>
+</div>
+<div class="section" id="glade">
+<h2>使用 Glade 进行用户界面设计<a class="headerlink" href="#glade" title="Permalink to this headline">¶</a></h2>
+<p>在这一小节中，我们将为 <a class="reference external" href="https://github.com/huangz1990/real-world-haskell-cn/blob/master/chp/22.rst">第22章中开发的播客下载器</a> 开发一个图形界面版本。我们的第一项任务就是在 Glade 中设计图形界面。当我们完成设计时，我们将编写 Haskell 代码集成进应用中。</p>
+<p>因为这是一本 Haskell 书，而不是一本图形界面设计书，所以我们快速带过前面的步骤。需要更多关于使用 Glade 设计图形界面的信息，你可以参考下面的资源：</p>
+<ul class="simple">
+<li><a class="reference external" href="http://glade.gnome.org/">Glade 主页</a> ，包含了 Glade 的文档。</li>
+<li><a class="reference external" href="http://www.gtk.org/">GTK+ 的主页</a> 包含了不同窗口小部件的信息。参考文档章节，然后进入稳定版 GTK 文档的区域。</li>
+<li><a class="reference external" href="https://wiki.haskell.org/Gtk2Hs">gtk2hs 主页</a> 也有很有用的文档，包含了 gtk2hs 的 API 参考和一个 glade 的教程。</li>
+</ul>
+</div>
+<div class="section" id="id8">
+<h2>Glade 基本概念<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h2>
+<p>Glade 是一个图形界面设计工具。让我们用图形界面的方式来设计图形界面。我们可以使用一堆 GTK+ 的函数来创建窗口组件，但更简单的方式是使用 Glade。</p>
+<p>我们要使用 GTK+ 来开发的基础的东西叫<strong>窗口小部件</strong>。一个窗口小部件代表了 GUI 的一部分，可能这个小部件还包含了别的小部件。比如一些小部件包含了一个窗口，对话框，按钮，以及带文字的按钮。</p>
+<p>我们在 Glade 中初始化小部件树，最高级的窗口在树的根部。你可以把 Glade 和小部件想象成 HTML：你可以像 table 布局一样排列组件，然后设置 padding 规则，然后组织完整的继承逻辑。</p>
+<p>Glade 把组件描述保存在 XML 文件中。我们的程序在运行时加载这些文件。我们通过指定名字从 Glade 运行时库中加载对应的组件。</p>
+<p>下面是一个使用 Glade 设计我们应用主界面的截图：</p>
+<img alt="../_images/ch23-gui-glade-3.png" src="../_images/ch23-gui-glade-3.png" />
+<p>在本书的附加下载材料中，你可以找到完整的 Glade XML 文件(podresources.glade)，然后你可以加载它或者按你希望的修改它。</p>
+</div>
+<div class="section" id="id9">
+<h2>基于事件编程<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h2>
+<p>GTK+ 就像其它的 GUI 工具集一样，是事件驱动的工具集。这就意味着，我们不是要显示一个对话框，然后等待用户点击按钮，相反的，我们是要告诉 gtk2hs 当点击某个按钮时要调用什么函数，而不是坐在那儿等待点击对话框。</p>
+<p>这跟传统的控制台编程是不同的模式。一个 GUI 程序应该有多个窗口打开，但坐在那儿编写代码来组合输入特性组合的打开窗口是一个复杂的命题。</p>
+<p>事件驱动编程很好的补充了 Haskell。就像我们在书中一遍又一遍的讨论，函数是语言通过传递函数来繁荣昌盛。所以当某些事件发生时，我们将调用传给 gtk2hs 的函数。这种做法被称为回调函数。</p>
+<p>GTK+ 程序的核心是主循环(<strong>main loop</strong>)。这部分程序等待用户或者程序命令运行，然后执行它们。GTK+ 的主循环由 GTK+ 来掌控。对于我们来说，它看起来就像一个 I/O 操作，我们执行命令，然后知道主循环执行到我们的命令才返回结果(即不立即返回)。</p>
+<p>因为主循环负责响应一切的点击鼠标重绘窗口事件，所以它必须始终是可用状态的。我们不能执行一个很耗时的任务 &#8211; 比如在主循环
+中下载一个播客节目。这会使得 GUI 出于无法响应的状态，所有的动作比如点击取消按钮将不会被及时的执行。</p>
+<p>所以，我们将使用多线程来处理这些耗时任务。更多关于多线程的信息请查看[本书第24章]()。现在，你只需要知道我们将使用 <cite>forkIO</cite> 来创建新的线程来处理像下载播客的节目单和节目。对于很快的任务，像是添加一个播客到数据库里，就不用新开一个线程来处理了，因为它快到用户无法感知。</p>
+</div>
+<div class="section" id="gui">
+<h2>初始化 GUI<a class="headerlink" href="#gui" title="Permalink to this headline">¶</a></h2>
+<p>第一步我们先来初始化我们的 GUI 项目。我们将创建一个小文件 <cite>PodLocalMain.hs</cite> 然后加载 <cite>PodMain</cite> 然后把它的路径传到 <cite>podresources.glade</cite>，这个被 Glade 保存的 XML 文件提供了我们的 GUI 组件的信息，这么做的原因我们将在 [使用 Cabal]() 这一章中解释。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch23/PodLocalMain.hs</span>
+<span class="kr">module</span> <span class="nn">Main</span> <span class="kr">where</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">PodMainGUI</span>
+<span class="nf">main</span> <span class="ow">=</span> <span class="kt">PodMainGUI</span><span class="o">.</span><span class="n">main</span> <span class="s">&quot;podresources.glade&quot;</span>
+</pre></div>
+</div>
+<p>现在让我们来考虑一下 <cite>PodMainGUI.hs</cite> 该怎么写。这个文件是我们在 <a class="reference external" href="https://github.com/huangz1990/real-world-haskell-cn/blob/master/chp/22.rst">第 22 章</a> 的例子基础上唯一要修改的文件，我们修改它以便于让它可以作为 GUI 工作。我们先把 <cite>PodMainGUI.hs</cite> 重命名为 <cite>PodMain.hs</cite> 使它更加清晰。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch23/PodMainGUI.hs</span>
+<span class="kr">module</span> <span class="nn">PodMainGUI</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">PodDownload</span>
+<span class="kr">import</span> <span class="nn">PodDB</span>
+<span class="kr">import</span> <span class="nn">PodTypes</span>
+<span class="kr">import</span> <span class="nn">System.Environment</span>
+<span class="kr">import</span> <span class="nn">Database.HDBC</span>
+<span class="kr">import</span> <span class="nn">Network.Socket</span><span class="p">(</span><span class="n">withSocketsDo</span><span class="p">)</span>
+
+<span class="c1">-- GUI libraries</span>
+
+<span class="kr">import</span> <span class="nn">Graphics.UI.Gtk</span> <span class="k">hiding</span> <span class="p">(</span><span class="nf">disconnect</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Graphics.UI.Gtk.Glade</span>
+
+<span class="c1">-- Threading</span>
+
+<span class="kr">import</span> <span class="nn">Control.Concurrent</span>
+</pre></div>
+</div>
+<p><cite>PodMainGUI.hs</cite> 的第一部分跟非GUI版本基本相同。我们引入三个附加的组件，首先，我们引入 <cite>Graphics.UI.Gtk</cite>，它提供了我们需要使用的大部分 GTK+ 函数。这个模块和叫 <cite>Database.HDBC</cite> 的模块都提供了一个函数叫 <cite>disconnect</cite>。我们将使用 HDBC 版本提供的，而不是 GTK+ 版本的，所以我们不从 <cite>Graphics.UI.Gtk</cite> 导入这个函数。<cite>Graphics.UI.Gtk.Glade</cite> 包含了需要加载的函数且可以跟我们的 Glade 文件协同工作。</p>
+<p>然后我们引入 <cite>Control.Concurrent</cite>，它提供了多线程编程的基础。我们从这里开始将使用少量的函数来描述上面提到的功能。接下来，让我们定义一个类型来存储我们的 GUI 信息。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch23/PodMainGUI.hs</span>
+<span class="c1">-- | Our main GUI type</span>
+<span class="kr">data</span> <span class="kt">GUI</span> <span class="ow">=</span> <span class="kt">GUI</span> <span class="p">{</span>
+      <span class="n">mainWin</span> <span class="ow">::</span> <span class="kt">Window</span><span class="p">,</span>
+      <span class="n">mwAddBt</span> <span class="ow">::</span> <span class="kt">Button</span><span class="p">,</span>
+      <span class="n">mwUpdateBt</span> <span class="ow">::</span> <span class="kt">Button</span><span class="p">,</span>
+      <span class="n">mwDownloadBt</span> <span class="ow">::</span> <span class="kt">Button</span><span class="p">,</span>
+      <span class="n">mwFetchBt</span> <span class="ow">::</span> <span class="kt">Button</span><span class="p">,</span>
+      <span class="n">mwExitBt</span> <span class="ow">::</span> <span class="kt">Button</span><span class="p">,</span>
+      <span class="n">statusWin</span> <span class="ow">::</span> <span class="kt">Dialog</span><span class="p">,</span>
+      <span class="n">swOKBt</span> <span class="ow">::</span> <span class="kt">Button</span><span class="p">,</span>
+      <span class="n">swCancelBt</span> <span class="ow">::</span> <span class="kt">Button</span><span class="p">,</span>
+      <span class="n">swLabel</span> <span class="ow">::</span> <span class="kt">Label</span><span class="p">,</span>
+      <span class="n">addWin</span> <span class="ow">::</span> <span class="kt">Dialog</span><span class="p">,</span>
+      <span class="n">awOKBt</span> <span class="ow">::</span> <span class="kt">Button</span><span class="p">,</span>
+      <span class="n">awCancelBt</span> <span class="ow">::</span> <span class="kt">Button</span><span class="p">,</span>
+      <span class="n">awEntry</span> <span class="ow">::</span> <span class="kt">Entry</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>我们的新 GUI 类型存储所有我们在程序中需要关心的组件。即使是规模较大的程序，通常也不会用到这么单一而庞大的类型。但是对于这个小示例来说，单一类型更容易在函数之间传递，并使得我们可以随时拿到所需的信息，因此我们不妨在这里开个特例。</p>
+<p>这个类型记录中，我们有 <cite>Window</cite>(顶层窗口)， <cite>Dialog</cite>(对话框窗口)， <cite>Button</cite>(可被点击的按钮)， <cite>Label</cite>(文本)，以及 <cite>Entry</cite>(用户输入文本的地方)。让我们马上看一下 <cite>main</cite> 函数：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch23/PodMainGUI.hs</span>
+<span class="nf">main</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">main</span> <span class="n">gladepath</span> <span class="ow">=</span> <span class="n">withSocketsDo</span> <span class="o">$</span> <span class="n">handleSqlError</span> <span class="o">$</span>
+    <span class="kr">do</span> <span class="n">initGUI</span>                  <span class="c1">-- Initialize GTK+ engine</span>
+
+       <span class="c1">-- Every so often, we try to run other threads.</span>
+       <span class="n">timeoutAddFull</span> <span class="p">(</span><span class="n">yield</span> <span class="o">&gt;&gt;</span> <span class="n">return</span> <span class="kt">True</span><span class="p">)</span>
+                      <span class="n">priorityDefaultIdle</span> <span class="mi">100</span>
+
+       <span class="c1">-- Load the GUI from the Glade file</span>
+       <span class="n">gui</span> <span class="ow">&lt;-</span> <span class="n">loadGlade</span> <span class="n">gladepath</span>
+
+       <span class="c1">-- Connect to the database</span>
+       <span class="n">dbh</span> <span class="ow">&lt;-</span> <span class="n">connect</span> <span class="s">&quot;pod.db&quot;</span>
+
+       <span class="c1">-- Set up our events</span>
+       <span class="n">connectGui</span> <span class="n">gui</span> <span class="n">dbh</span>
+
+       <span class="c1">-- Run the GTK+ main loop; exits after GUI is done</span>
+       <span class="n">mainGUI</span>
+
+       <span class="c1">-- Disconnect from the database at the end</span>
+       <span class="n">disconnect</span> <span class="n">dbh</span>
+</pre></div>
+</div>
+<p>注意这里的 <cite>main</cite> 函数的类型与通常的优点区别，因为它被<strong>PodLocalMain.hs</strong>中的 <cite>main</cite> 调用。我们一开始调用了 <cite>initGUI</cite> 来初始化 GTK+ 系统。接下来我们调用了 <cite>timeoutAddFull</cite>。这个调用只有在进行多线程 GTK+ 编程才需要。它告诉 GTK+ 的主循环时不时地给其它线程机会去执行。</p>
+<p>之后，我们调用 <cite>loadGlade</cite> 函数(见下面的代码)来加载我们的 Glade XML 文件。接着，我们连接数据库并调用 <cite>connectGui</cite> 函数来设置我们的回调函数。然后，我们启动 GTK+ 主循环。我们期望它在 <cite>mainGUI</cite> 返回之前可能执行数分钟，数小时，甚至是数天。当 <cite>mainGUI</cite> 返回时，它表示用户已经关闭了主窗口或者是点击了退出按钮。这时，我们关闭数据库连接并且结束程序。现在，来看看 <cite>loadGlade</cite> 函数：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch23/PodMainGUI.hs</span>
+<span class="nf">loadGlade</span> <span class="n">gladepath</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="c1">-- Load XML from glade path.</span>
+       <span class="c1">-- Note: crashes with a runtime error on console if fails!</span>
+       <span class="kt">Just</span> <span class="n">xml</span> <span class="ow">&lt;-</span> <span class="n">xmlNew</span> <span class="n">gladepath</span>
+
+       <span class="c1">-- Load main window</span>
+       <span class="n">mw</span> <span class="ow">&lt;-</span> <span class="n">xmlGetWidget</span> <span class="n">xml</span> <span class="n">castToWindow</span> <span class="s">&quot;mainWindow&quot;</span>
+
+       <span class="c1">-- Load all buttons</span>
+
+       <span class="p">[</span><span class="n">mwAdd</span><span class="p">,</span> <span class="n">mwUpdate</span><span class="p">,</span> <span class="n">mwDownload</span><span class="p">,</span> <span class="n">mwFetch</span><span class="p">,</span> <span class="n">mwExit</span><span class="p">,</span> <span class="n">swOK</span><span class="p">,</span> <span class="n">swCancel</span><span class="p">,</span>
+        <span class="n">auOK</span><span class="p">,</span> <span class="n">auCancel</span><span class="p">]</span> <span class="ow">&lt;-</span>
+           <span class="n">mapM</span> <span class="p">(</span><span class="n">xmlGetWidget</span> <span class="n">xml</span> <span class="n">castToButton</span><span class="p">)</span>
+           <span class="p">[</span><span class="s">&quot;addButton&quot;</span><span class="p">,</span> <span class="s">&quot;updateButton&quot;</span><span class="p">,</span> <span class="s">&quot;downloadButton&quot;</span><span class="p">,</span>
+            <span class="s">&quot;fetchButton&quot;</span><span class="p">,</span> <span class="s">&quot;exitButton&quot;</span><span class="p">,</span> <span class="s">&quot;okButton&quot;</span><span class="p">,</span> <span class="s">&quot;cancelButton&quot;</span><span class="p">,</span>
+            <span class="s">&quot;auOK&quot;</span><span class="p">,</span> <span class="s">&quot;auCancel&quot;</span><span class="p">]</span>
+
+       <span class="n">sw</span> <span class="ow">&lt;-</span> <span class="n">xmlGetWidget</span> <span class="n">xml</span> <span class="n">castToDialog</span> <span class="s">&quot;statusDialog&quot;</span>
+       <span class="n">swl</span> <span class="ow">&lt;-</span> <span class="n">xmlGetWidget</span> <span class="n">xml</span> <span class="n">castToLabel</span> <span class="s">&quot;statusLabel&quot;</span>
+
+       <span class="n">au</span> <span class="ow">&lt;-</span> <span class="n">xmlGetWidget</span> <span class="n">xml</span> <span class="n">castToDialog</span> <span class="s">&quot;addDialog&quot;</span>
+       <span class="n">aue</span> <span class="ow">&lt;-</span> <span class="n">xmlGetWidget</span> <span class="n">xml</span> <span class="n">castToEntry</span> <span class="s">&quot;auEntry&quot;</span>
+
+       <span class="n">return</span> <span class="o">$</span> <span class="kt">GUI</span> <span class="n">mw</span> <span class="n">mwAdd</span> <span class="n">mwUpdate</span> <span class="n">mwDownload</span> <span class="n">mwFetch</span> <span class="n">mwExit</span>
+              <span class="n">sw</span> <span class="n">swOK</span> <span class="n">swCancel</span> <span class="n">swl</span> <span class="n">au</span> <span class="n">auOK</span> <span class="n">auCancel</span> <span class="n">aue</span>
+</pre></div>
+</div>
+<p>这个函数从调用 <cite>xmlNew</cite> 开始来加载 Glade XML 文件。当发生错误时它返回 <cite>Nothing</cite>。当执行成功时我们用模式匹配来获取结果值。如果失败，那么命令行将会有异常被输出；这是这一章结束的练习题之一。</p>
+<p>现在 Glade XML 文件已经被加载了，你将看到一大堆 <cite>xmlGetWidget</cite> 的函数调用。这个 Glade 函数被用来加载一个组件的 XML 定义，同时返回一个 GTK+ 组件类型给对应的组件。我们将传给这个函数一个值来指出我们期望的 GTK+ 类型 &#8211; 当类型不匹配的时候会得到一个运行时错误。</p>
+<p>我们开始在主窗口创建一个组件。它在 XML 里被定义为 <cite>mainWindow</cite> 并被加载，然后存到 <cite>mw</cite> 这个变量里。接着我们通过模式匹配和 <cite>mapM</cite> 来加载所有的按钮。然后，我们有了两个对话框，一个标签，和一个被加载的实体。最后，我们使用所有的这些来建立 GUI 类型并且返回。接下来，我们设置回调函数作为事件控制器：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch23/PodMainGUI.hs</span>
+<span class="nf">connectGui</span> <span class="n">gui</span> <span class="n">dbh</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="c1">-- When the close button is clicked, terminate GUI loop</span>
+       <span class="c1">-- by calling GTK mainQuit function</span>
+       <span class="n">onDestroy</span> <span class="p">(</span><span class="n">mainWin</span> <span class="n">gui</span><span class="p">)</span> <span class="n">mainQuit</span>
+
+       <span class="c1">-- Main window buttons</span>
+       <span class="n">onClicked</span> <span class="p">(</span><span class="n">mwAddBt</span> <span class="n">gui</span><span class="p">)</span> <span class="p">(</span><span class="n">guiAdd</span> <span class="n">gui</span> <span class="n">dbh</span><span class="p">)</span>
+       <span class="n">onClicked</span> <span class="p">(</span><span class="n">mwUpdateBt</span> <span class="n">gui</span><span class="p">)</span> <span class="p">(</span><span class="n">guiUpdate</span> <span class="n">gui</span> <span class="n">dbh</span><span class="p">)</span>
+       <span class="n">onClicked</span> <span class="p">(</span><span class="n">mwDownloadBt</span> <span class="n">gui</span><span class="p">)</span> <span class="p">(</span><span class="n">guiDownload</span> <span class="n">gui</span> <span class="n">dbh</span><span class="p">)</span>
+       <span class="n">onClicked</span> <span class="p">(</span><span class="n">mwFetchBt</span> <span class="n">gui</span><span class="p">)</span> <span class="p">(</span><span class="n">guiFetch</span> <span class="n">gui</span> <span class="n">dbh</span><span class="p">)</span>
+       <span class="n">onClicked</span> <span class="p">(</span><span class="n">mwExitBt</span> <span class="n">gui</span><span class="p">)</span> <span class="n">mainQuit</span>
+
+       <span class="c1">-- We leave the status window buttons for later</span>
+</pre></div>
+</div>
+<p>我们通过调用 <cite>onDestroy</cite> 来开始调用 <cite>connectGui</cite> 函数。这意味着当某个人点击了操作系统的关闭按钮(在 Windows 或者 Linux 上 是标题栏上面的 X 标志，在 Mac OS X 上 是红色的圆点)，我们在主窗口调用 <cite>mainQuit</cite> 函数。<cite>mainQuit</cite> 关闭所有的 GUI 窗口然后结束 GTK+ 主循环。</p>
+<p>接下来，我们调用 <cite>onClicked</cite> 对五个不同按钮的点击来注册事件控制器。对于每个按钮，当用户通过键盘选择按钮时控制器同样会被触发。点击这些按钮将会调用比如 <cite>guiAdd</cite> 这样的函数，传递 GUI 记录以及一个对数据库的调用。</p>
+<p>现在，我们完整地定义了我们 GUI 播客的主窗口。它看起来像下面的截图。</p>
+<img alt="../_images/ch23-gui-pod-mainwin.png" src="../_images/ch23-gui-pod-mainwin.png" />
+</div>
+<div class="section" id="id11">
+<h2>增加播客窗口<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h2>
+<p>现在，我们已经完整介绍了主窗口，让我们来介绍别的需要呈现的窗口，从增加播客窗口开始。当用户点击增加一个播客的时候，我们需要弹出一个对话框来提示输入播客的 URL。我们已经在 Glade 中定义了这个对话框，所以接下来需要做的就是设置它：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch23/PodMainGUI.hs</span>
+<span class="nf">guiAdd</span> <span class="n">gui</span> <span class="n">dbh</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="c1">-- Initialize the add URL window</span>
+       <span class="n">entrySetText</span> <span class="p">(</span><span class="n">awEntry</span> <span class="n">gui</span><span class="p">)</span> <span class="s">&quot;&quot;</span>
+       <span class="n">onClicked</span> <span class="p">(</span><span class="n">awCancelBt</span> <span class="n">gui</span><span class="p">)</span> <span class="p">(</span><span class="n">widgetHide</span> <span class="p">(</span><span class="n">addWin</span> <span class="n">gui</span><span class="p">))</span>
+       <span class="n">onClicked</span> <span class="p">(</span><span class="n">awOKBt</span> <span class="n">gui</span><span class="p">)</span> <span class="n">procOK</span>
+
+       <span class="c1">-- Show the add URL window</span>
+       <span class="n">windowPresent</span> <span class="p">(</span><span class="n">addWin</span> <span class="n">gui</span><span class="p">)</span>
+       <span class="kr">where</span> <span class="n">procOK</span> <span class="ow">=</span>
+           <span class="kr">do</span> <span class="n">url</span> <span class="ow">&lt;-</span> <span class="n">entryGetText</span> <span class="p">(</span><span class="n">awEntry</span> <span class="n">gui</span><span class="p">)</span>
+               <span class="n">widgetHide</span> <span class="p">(</span><span class="n">addWin</span> <span class="n">gui</span><span class="p">)</span> <span class="c1">-- Remove the dialog</span>
+               <span class="n">add</span> <span class="n">dbh</span> <span class="n">url</span>             <span class="c1">-- Add to the DB</span>
+</pre></div>
+</div>
+<p>我们通过调用 <cite>entrySetText</cite> 来设置输入框(用户填写播客 URL 的地方)的内容，让我们先设置为一个空字符串。这是因为这个组件在我们程序的生命周期中会被复用，所以我们不希望用户最后添加的 URL 被留在输入框中。接下来，我们设置对话框中两个按钮的事件。如果用户点击取消按钮，我们就调用 <cite>widgetHide</cite> 函数来从屏幕上移除这个对话框。如果用户点击了 OK按钮，我们调用 <cite>procOK</cite>。</p>
+<p><cite>procOK</cite> 先获取输入框中提供的 URL。接下来，它用 <cite>widgetHide</cite> 函数来隐藏输入框，最后它调用 <cite>add</cite> 函数来往输入库里增加 URL。这个 <cite>add</cite> 函数跟我们没有 GUI 版本的程序中的一样。</p>
+<p>我们在 <cite>guiAdd</cite> 里做的最后一件事是弹出窗口，这个通过调用 <cite>windowPresent</cite> 来做，这个函数功能正好跟 <cite>widgetHide</cite> 相反。</p>
+<p>注意 <cite>guiAdd</cite> 函数会立即返回。它只是设置组件并且让输入框显示出来；它不会阻塞自己等待输入。下图显示了对话框看起来是什么样的。</p>
+<img alt="../_images/ch23-gui-pod-addwin.png" src="../_images/ch23-gui-pod-addwin.png" />
+</div>
+<div class="section" id="id12">
+<h2>长时间执行的任务<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h2>
+<p>在主窗口的按钮中，有三个点击之后的任务是需要等一会才会完成的，这三个分别是 更新(update)，下载(download)，已经获取(fetch)。当这些操作发生时，我们希望做两件事：提供给用户当前操作的进度，以及可以取消当前正在执行的操作的功能。</p>
+<p>因为这些操作都非常类似，所以可以提供一个通用的处理方式来处理这些交互。我们已经在 Glade 文件中定义了一个状态窗口组件，这个组件将会被这三个操作使用。在我们的 Haskell 代码中，我们定义了一个通用的 <cite>statusWindow</cite> 函数来同时被这三个操作使用。</p>
+<p><cite>statusWindow</cite> 需要 4 个参数：GUI 信息，数据库信息，表示该窗口标题的字符串，一个执行操作的函数。这个函数自己将会被当做参数传递给汇报进度的那个函数。下面是代码：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch23/PodMainGUI.hs</span>
+<span class="nf">statusWindow</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span>
+                <span class="kt">GUI</span>
+             <span class="ow">-&gt;</span> <span class="n">conn</span>
+             <span class="ow">-&gt;</span> <span class="kt">String</span>
+             <span class="ow">-&gt;</span> <span class="p">((</span><span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span><span class="p">)</span>
+             <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">statusWindow</span> <span class="n">gui</span> <span class="n">dbh</span> <span class="n">title</span> <span class="n">func</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="c1">-- Clear the status text</span>
+       <span class="n">labelSetText</span> <span class="p">(</span><span class="n">swLabel</span> <span class="n">gui</span><span class="p">)</span> <span class="s">&quot;&quot;</span>
+
+       <span class="c1">-- Disable the OK button, enable Cancel button</span>
+       <span class="n">widgetSetSensitivity</span> <span class="p">(</span><span class="n">swOKBt</span> <span class="n">gui</span><span class="p">)</span> <span class="kt">False</span>
+       <span class="n">widgetSetSensitivity</span> <span class="p">(</span><span class="n">swCancelBt</span> <span class="n">gui</span><span class="p">)</span> <span class="kt">True</span>
+
+       <span class="c1">-- Set the title</span>
+       <span class="n">windowSetTitle</span> <span class="p">(</span><span class="n">statusWin</span> <span class="n">gui</span><span class="p">)</span> <span class="n">title</span>
+
+       <span class="c1">-- Start the operation</span>
+       <span class="n">childThread</span> <span class="ow">&lt;-</span> <span class="n">forkIO</span> <span class="n">childTasks</span>
+
+       <span class="c1">-- Define what happens when clicking on Cancel</span>
+       <span class="n">onClicked</span> <span class="p">(</span><span class="n">swCancelBt</span> <span class="n">gui</span><span class="p">)</span> <span class="p">(</span><span class="n">cancelChild</span> <span class="n">childThread</span><span class="p">)</span>
+
+       <span class="c1">-- Show the window</span>
+       <span class="n">windowPresent</span> <span class="p">(</span><span class="n">statusWin</span> <span class="n">gui</span><span class="p">)</span>
+    <span class="kr">where</span> <span class="n">childTasks</span> <span class="ow">=</span>
+              <span class="kr">do</span> <span class="n">updateLabel</span> <span class="s">&quot;Starting thread...&quot;</span>
+                 <span class="n">func</span> <span class="n">updateLabel</span>
+                 <span class="c1">-- After the child task finishes, enable OK</span>
+                 <span class="c1">-- and disable Cancel</span>
+                 <span class="n">enableOK</span>
+
+          <span class="n">enableOK</span> <span class="ow">=</span>
+      <span class="kr">do</span> <span class="n">widgetSetSensitivity</span> <span class="p">(</span><span class="n">swCancelBt</span> <span class="n">gui</span><span class="p">)</span> <span class="kt">False</span>
+         <span class="n">widgetSetSensitivity</span> <span class="p">(</span><span class="n">swOKBt</span> <span class="n">gui</span><span class="p">)</span> <span class="kt">True</span>
+         <span class="n">onClicked</span> <span class="p">(</span><span class="n">swOKBt</span> <span class="n">gui</span><span class="p">)</span> <span class="p">(</span><span class="n">widgetHide</span> <span class="p">(</span><span class="n">statusWin</span> <span class="n">gui</span><span class="p">))</span>
+         <span class="n">return</span> <span class="nb">()</span>
+
+  <span class="n">updateLabel</span> <span class="n">text</span> <span class="ow">=</span>
+      <span class="n">labelSetText</span> <span class="p">(</span><span class="n">swLabel</span> <span class="n">gui</span><span class="p">)</span> <span class="n">text</span>
+  <span class="n">cancelChild</span> <span class="n">childThread</span> <span class="ow">=</span>
+      <span class="kr">do</span> <span class="n">killThread</span> <span class="n">childThread</span>
+         <span class="n">yield</span>
+         <span class="n">updateLabel</span> <span class="s">&quot;Action has been cancelled.&quot;</span>
+         <span class="n">enableOK</span>
+</pre></div>
+</div>
+<p>这个函数一开始清理了它上次运行时的标签内容。接下来，我们使 OK 按钮不可被点击(变灰色)，同时使取消按钮可被点击。当操作在进行中时，点击 OK 按钮不起任何作用，当操作结束后，点击取消按钮不起任何作用。</p>
+<p>接着，我们设置窗口的标题。这个标题会出现在系统显示的窗口标题栏中。最后，我们启动一个新的线程(通过调用 <cite>childTasks</cite>)，然后保存这个线程ID。然后，我们定义当用户点击取消按钮之后的行为 &#8211; 我们调用 <cite>cancelChild</cite> 传入线程 ID。最后，我们调用 <cite>windowPresent</cite> 来显示进度窗口。</p>
+<p>在子任务中，我们显示一条信息来说明我们正在启动线程。然后我们调用真正的工作函数，传入 <cite>updateLabel</cite> 函数来显示状态信息。注意命令行版本的程序可以传入 <cite>putStrLn</cite> 函数。</p>
+<p>最后，当工作函数退出后，我们调用 <cite>enableOK</cite> 函数。这个函数使取消按钮变得不可被点击，并且让 OK 按钮变得可点击，顺便定义在点击 OK 按钮时候的行为 &#8211; 让进度窗口消失。</p>
+<p><cite>updateLabel</cite> 简单地调用在标签组件上的 <cite>labelSetText</cite> 函数来更新标签显示信息。最后，<cite>cancelChild</cite> 函数被调用来杀死执行任务的线程，更新标签信息，并且使 OK 按钮可被点击。</p>
+<p>现在我们需要的基础功能都就位了。他们看起来像下面这样：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch23/PodMainGUI.hs</span>
+<span class="nf">guiUpdate</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span> <span class="kt">GUI</span> <span class="ow">-&gt;</span> <span class="n">conn</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">guiUpdate</span> <span class="n">gui</span> <span class="n">dbh</span> <span class="ow">=</span>
+    <span class="n">statusWindow</span> <span class="n">gui</span> <span class="n">dbh</span> <span class="s">&quot;Pod: Update&quot;</span> <span class="p">(</span><span class="n">update</span> <span class="n">dbh</span><span class="p">)</span>
+
+<span class="nf">guiDownload</span> <span class="n">gui</span> <span class="n">dbh</span> <span class="ow">=</span>
+    <span class="n">statusWindow</span> <span class="n">gui</span> <span class="n">dbh</span> <span class="s">&quot;Pod: Download&quot;</span> <span class="p">(</span><span class="n">download</span> <span class="n">dbh</span><span class="p">)</span>
+
+<span class="nf">guiFetch</span> <span class="n">gui</span> <span class="n">dbh</span> <span class="ow">=</span>
+    <span class="n">statusWindow</span> <span class="n">gui</span> <span class="n">dbh</span> <span class="s">&quot;Pod: Fetch&quot;</span>
+                     <span class="p">(</span><span class="nf">\</span><span class="n">logf</span> <span class="ow">-&gt;</span> <span class="n">update</span> <span class="n">dbh</span> <span class="n">logf</span> <span class="o">&gt;&gt;</span> <span class="n">download</span> <span class="n">dbh</span> <span class="n">logf</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>我们只给出了第一个函数的类型，但是其实三个函数类型都是相同的，Haskell 可以通过类型推断来推导出它们的类型。注意我们实现的 <cite>guiFetch</cite> 函数，我们不用调用两次 <cite>statusWindow</cite> 函数，相反，我们在它的操作中组合函数来实现。</p>
+<p>最后一点构成三个函数的部分是真正做想要的工作。<cite>add</cite> 函数是命令行版本直接拿过来的，没有任何修改。<cite>update</cite> 和 <cite>download</cite> 函数仅仅修改了一小部分 &#8211; 通过一个记录函数(logging function)来取代调用 <cite>putStrLn</cite> 函数来更新进度状态。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch23/PodMainGUI.hs</span>
+<span class="nf">add</span> <span class="n">dbh</span> <span class="n">url</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">addPodcast</span> <span class="n">dbh</span> <span class="n">pc</span>
+       <span class="n">commit</span> <span class="n">dbh</span>
+    <span class="kr">where</span> <span class="n">pc</span> <span class="ow">=</span> <span class="kt">Podcast</span> <span class="p">{</span><span class="n">castId</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">castURL</span> <span class="ow">=</span> <span class="n">url</span><span class="p">}</span>
+
+<span class="nf">update</span> <span class="ow">::</span> <span class="kt">IConnection</span> <span class="n">conn</span> <span class="ow">=&gt;</span> <span class="n">conn</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">update</span> <span class="n">dbh</span> <span class="n">logf</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">pclist</span> <span class="ow">&lt;-</span> <span class="n">getPodcasts</span> <span class="n">dbh</span>
+       <span class="n">mapM_</span> <span class="n">procPodcast</span> <span class="n">pclist</span>
+       <span class="n">logf</span> <span class="s">&quot;Update complete.&quot;</span>
+    <span class="kr">where</span> <span class="n">procPodcast</span> <span class="n">pc</span> <span class="ow">=</span>
+              <span class="kr">do</span> <span class="n">logf</span> <span class="o">$</span> <span class="s">&quot;Updating from &quot;</span> <span class="o">++</span> <span class="p">(</span><span class="n">castURL</span> <span class="n">pc</span><span class="p">)</span>
+                 <span class="n">updatePodcastFromFeed</span> <span class="n">dbh</span> <span class="n">pc</span>
+
+<span class="nf">download</span> <span class="n">dbh</span> <span class="n">logf</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">pclist</span> <span class="ow">&lt;-</span> <span class="n">getPodcasts</span> <span class="n">dbh</span>
+       <span class="n">mapM_</span> <span class="n">procPodcast</span> <span class="n">pclist</span>
+       <span class="n">logf</span> <span class="s">&quot;Download complete.&quot;</span>
+    <span class="kr">where</span> <span class="n">procPodcast</span> <span class="n">pc</span> <span class="ow">=</span>
+              <span class="kr">do</span> <span class="n">logf</span> <span class="o">$</span> <span class="s">&quot;Considering &quot;</span> <span class="o">++</span> <span class="p">(</span><span class="n">castURL</span> <span class="n">pc</span><span class="p">)</span>
+                 <span class="n">episodelist</span> <span class="ow">&lt;-</span> <span class="n">getPodcastEpisodes</span> <span class="n">dbh</span> <span class="n">pc</span>
+                 <span class="kr">let</span> <span class="n">dleps</span> <span class="ow">=</span> <span class="n">filter</span> <span class="p">(</span><span class="nf">\</span><span class="n">ep</span> <span class="ow">-&gt;</span> <span class="n">epDone</span> <span class="n">ep</span> <span class="o">==</span> <span class="kt">False</span><span class="p">)</span>
+                             <span class="n">episodelist</span>
+                 <span class="n">mapM_</span> <span class="n">procEpisode</span> <span class="n">dleps</span>
+          <span class="n">procEpisode</span> <span class="n">ep</span> <span class="ow">=</span>
+              <span class="kr">do</span> <span class="n">logf</span> <span class="o">$</span> <span class="s">&quot;Downloading &quot;</span> <span class="o">++</span> <span class="p">(</span><span class="n">epURL</span> <span class="n">ep</span><span class="p">)</span>
+                 <span class="n">getEpisode</span> <span class="n">dbh</span> <span class="n">ep</span>
+</pre></div>
+</div>
+<p>下图展示了更新操作执行完成的结果是什么样子的。</p>
+<img alt="../_images/ch23-gui-update-complete.png" src="../_images/ch23-gui-update-complete.png" />
+</div>
+<div class="section" id="cabal">
+<h2>使用 Cabal<a class="headerlink" href="#cabal" title="Permalink to this headline">¶</a></h2>
+<p>我们通过一个 Cabal 文件来构建我们命令行版本的项目。我们需要做一些修改来让它支持构建我们 GUI 版本的项目。首先我们需要增加 gtk2hs 包的依赖。当然还有 Glade XML 文件的问题。</p>
+<p>在前面，我们写了<strong>PodLocalMain.hs</strong>文件来假定配置文件叫 <cite>podresources.glade</cite>，然后把它存到当前目录下。但是对于真正的系统安装来说，我们不能做这个假设。而且，不同的操作系统会把文件放到不同的路径下。</p>
+<p>Cabal 提供了处理这个问题的方法。它自动生成一个模块，这个模块可以通过导出函数来查询环境变量。我们必须在 Cabal 依赖文件里增加一行 <cite>Data-files</cite>。这个文件名称表示了所有需要一同安装的数据文件。然后，Cabal 将会导出一个 <cite>Paths_pod</cite> 模块(pod 部分来自 Cabal文件中的 Name 行)，我们可以使用这个模块来在运行时查看文件路径。下面是我们新的 Cabal 依赖文件：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- ch24/pod.cabal</span>
+<span class="nf">name</span><span class="kt">:</span> <span class="n">pod</span>
+<span class="kt">Version:</span> <span class="mf">1.0</span><span class="o">.</span><span class="mi">0</span>
+<span class="kt">Build</span><span class="o">-</span><span class="kr">type</span><span class="kt">:</span> <span class="kt">Simple</span>
+<span class="kt">Build</span><span class="o">-</span><span class="kt">Depends:</span> <span class="kt">HTTP</span><span class="p">,</span> <span class="kt">HaXml</span><span class="p">,</span> <span class="n">network</span><span class="p">,</span> <span class="kt">HDBC</span><span class="p">,</span> <span class="kt">HDBC</span><span class="o">-</span><span class="n">sqlite3</span><span class="p">,</span> <span class="n">base</span><span class="p">,</span>
+               <span class="n">gtk</span><span class="p">,</span> <span class="n">glade</span>
+<span class="kt">Data</span><span class="o">-</span><span class="n">files</span><span class="kt">:</span> <span class="n">podresources</span><span class="o">.</span><span class="n">glade</span>
+
+<span class="kt">Executable:</span> <span class="n">pod</span>
+<span class="kt">Main</span><span class="o">-</span><span class="kt">Is:</span> <span class="kt">PodCabalMain</span><span class="o">.</span><span class="n">hs</span>
+<span class="kt">GHC</span><span class="o">-</span><span class="kt">Options:</span> <span class="o">-</span><span class="kt">O2</span>
+</pre></div>
+</div>
+<p>当然还有 <cite>PodCabalMain.hs</cite>：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch23/PodCabalMain.hs</span>
+<span class="kr">module</span> <span class="nn">Main</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">PodMainGUI</span>
+<span class="kr">import</span> <span class="nn">Paths_pod</span><span class="p">(</span><span class="n">getDataFileName</span><span class="p">)</span>
+
+<span class="nf">main</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">gladefn</span> <span class="ow">&lt;-</span> <span class="n">getDataFileName</span> <span class="s">&quot;podresources.glade&quot;</span>
+       <span class="kt">PodMainGUI</span><span class="o">.</span><span class="n">main</span> <span class="n">gladefn</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id13">
+<h2>练习<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h2>
+<ol class="arabic simple">
+<li>如果调用 <cite>xmlNew</cite> 返回了 <cite>Nothging</cite>，显示一个图形话的出错信息。</li>
+<li>修改项目来实现在同一个代码仓库既可以使用图形界面的方式，又可以选择命令行模式来运行程序。提示：把通用代码移出 <cite>PodMainGUI.hs</cite>，然后创建两个 <cite>main</cite> 模块，一个为图形界面服务，一个为命令行服务。</li>
+<li>为什么 <cite>guiFetch</cite> 函数组合工作函数而不是调用 <cite>statusWindow</cite> 两次？</li>
+</ol>
+<table class="docutils footnote" frame="void" id="id14" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[53]</a></td><td>还有很多别的选择，除了 gtk2hs 之外，wxHaskell 也是非常杰出的跨平台图形界面工具集。</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="22.html">第 22 章：扩展示例 —— Web 客户端编程</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="24.html">第 24 章：并发和多核编程</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.3.
+    </div>
+  </body>
+</html>
