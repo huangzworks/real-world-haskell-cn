@@ -83,6 +83,8 @@ Real World Haskell 中文版
 
 - `sancao2 <https://github.com/sancao2>`_
 
+- `Damon Zhao <https://github.com/se77en>`_
+
 除了进行翻译之外，本文档还在原书的基础上做了以下改进：
 
 * 修正原文正文和代码中的错误
