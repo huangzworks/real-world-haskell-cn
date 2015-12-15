@@ -22,7 +22,7 @@
 使用 Glade 进行用户界面设计
 ---------------------------
 
-在这一小节中，我们将为`第22章中开发的播客下载器 <https://github.com/huangz1990/real-world-haskell-cn/blob/master/chp/22.rst>`_ 开发一个图形界面版本。我们的第一项任务就是在 Glade 中设计图形界面。当我们完成设计时，我们将编写 Haskell 代码集成进应用中。
+在这一小节中，我们将为 `第22章中开发的播客下载器 <https://github.com/huangz1990/real-world-haskell-cn/blob/master/chp/22.rst>`_ 开发一个图形界面版本。我们的第一项任务就是在 Glade 中设计图形界面。当我们完成设计时，我们将编写 Haskell 代码集成进应用中。
 
 因为这是一本 Haskell 书，而不是一本图形界面设计书，所以我们快速带过前面的步骤。需要更多关于使用 Glade 设计图形界面的信息，你可以参考下面的资源：
 
