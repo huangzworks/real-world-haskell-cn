@@ -1,0 +1,347 @@
+第十四章：Monads
+================
+
+.. _introduction:
+简介
+-----
+
+在 :doc:`7` 中，我们讨论了 ``IO`` monad，但是我们刻意把精力集中在如何与外界交互上，并没有讨论monad是什么。
+
+在 :doc:`7` 中我们看到 ``IO`` Monad确实很好用；除了在语法上不同之外，在 ``IO`` monad中写代码跟其他命令式语言基本没有什么区别。
+
+在之前的章节我们解决一些实际问题的时候引入了一些数据结构，很快我们就会知道它们其实就是monads。我们想告诉你的是，在解决某些问题的时候，monad通常是一个非常直观且实用的工具。本章我们将定义一些monads并告诉你它有多么简单。
+
+.. _revisiting-earlier-code-examples:
+回顾之前代码
+------------
+
+.. _maybe-chaining:
+Maybe链
+^^^^^^^
+
+我们先看看我们在 :doc:`10` 写的 ``parseP5`` 函数:
+
+::
+
+    -- file: ch10/PNM.hs
+    matchHeader :: L.ByteString -> L.ByteString -> Maybe L.ByteString
+    
+    -- "nat" here is short for "natural number"
+    getNat :: L.ByteString -> Maybe (Int, L.ByteString)
+    
+    getBytes :: Int -> L.ByteString
+             -> Maybe (L.ByteString, L.ByteString)
+    
+	parseP5 s =
+	  case matchHeader (L8.pack "P5") s of
+	    Nothing -> Nothing
+	    Just s1 ->
+	      case getNat s1 of
+	        Nothing -> Nothing
+	        Just (width, s2) ->
+	          case getNat (L8.dropWhile isSpace s2) of
+	            Nothing -> Nothing
+	            Just (height, s3) ->
+	              case getNat (L8.dropWhile isSpace s3) of
+	                Nothing -> Nothing
+	                Just (maxGrey, s4)
+	                  | maxGrey > 255 -> Nothing
+	                  | otherwise ->
+	                      case getBytes 1 s4 of
+	                        Nothing -> Nothing
+	                        Just (_, s5) ->
+	                          case getBytes (width * height) s5 of
+	                            Nothing -> Nothing
+	                            Just (bitmap, s6) ->
+	                              Just (Greymap width height maxGrey bitmap, s6)
+
+这个函数要是再复杂一点，就要超出屏幕的右边了；我们使用 ``(>>?)`` 操作符避免了这种情况失控：
+
+::
+
+	-- file: ch10/PNM.hs
+	(>>?) :: Maybe a -> (a -> Maybe b) -> Maybe b
+	Nothing >>? _ = Nothing
+	Just v  >>? f = f v
+
+我们对 ``(>>?)`` 操作符的类型进行了精挑细选使得它能把一系列返回类型是 ``Maybe`` 的函数串联起来；只要一个函数的返回值能和下一个函数的参数类型匹配，我们就能无限串联返回类型是 ``Maybe`` 的函数。 ``(>>?)`` 的函数体把细节隐藏了起来，我们不知道我们通过 ``(>>?)`` 串联的函数是由于中间某个函数返回 ``Nothing`` 而中断了还是所有函数全部执行了。
+
+    
+.. _implicit-state:
+隐式状态
+^^^^^^^^
+``(>>?)`` 被用来整理 ``parseP5`` 的结构，但是再解析的时候我们还是要一点一点地处理输入字符串；这使得我们必须我们当前处理的值通过一个元组传递下去[若干个函数串联了起来，都返回Maybe，作者称之为Maybe链]。Maybe链上的每一个函数把自己处理的结果以及自己没有解析的剩下的字符串放到元组里面传递下去。
+::
+
+	-- file: ch10/PNM.hs
+	parseP5_take2 :: L.ByteString -> Maybe (Greymap, L.ByteString)
+	parseP5_take2 s =
+	    matchHeader (L8.pack "P5") s       >>?
+	    \s -> skipSpace ((), s)           >>?
+	    (getNat . snd)                    >>?
+	    skipSpace                         >>?
+	    \(width, s) ->   getNat s         >>?
+	    skipSpace                         >>?
+	    \(height, s) ->  getNat s         >>?
+	    \(maxGrey, s) -> getBytes 1 s     >>?
+	    (getBytes (width * height) . snd) >>?
+	    \(bitmap, s) -> Just (Greymap width height maxGrey bitmap, s)
+	
+	skipSpace :: (a, L.ByteString) -> Maybe (a, L.ByteString)
+	skipSpace (a, s) = Just (a, L8.dropWhile isSpace s)
+
+我们又碰到了有着重复行为的模式：处理字符串的时候，某个函数消耗部分字符串并返回处理它处理的结果，同时把剩下的字符串传递给下一个函数继续处理。但是，这个模式比之前的更糟糕：如果我们要在处理链往下传递另外一些额外信息，我们必须把传递的二元组修改为三元组，这几乎要修改这个处理链上的所有元素！
+
+我们把管理当前字符串的任务从处理链上的单个函数移出来，将它交给串联这些处理函数的函数中！[译：比如上面的 ``(>>?)``]
+
+::
+
+	-- file: ch10/Parse.hs
+	(==>) :: Parse a -> (a -> Parse b) -> Parse b
+	
+	firstParser ==> secondParser  =  Parse chainedParser
+	  where chainedParser initState   =
+	          case runParse firstParser initState of
+	            Left errMessage ->
+	                Left errMessage
+	            Right (firstResult, newState) ->
+	                runParse (secondParser firstResult) newState
+
+我们把解析状态的细节隐藏在 ``ParseState`` 类型中，就连 ``getState`` 和 ``putState``  都不会窥视解析状态，所以，无论对 ``ParseState`` 做怎样的修改都不会影响已有的代码。
+
+寻找共同特征
+------------
+如果我们仔细分析上面的例子，它们好像看起来没有什么共同特点。不过有一点比较明显，它们都想把函数串联起来并试图隐藏细节以便我们写出整洁的代码。然后，我们先不管那些细节，从更粗略的层面去思考一下。
+
+首先，我们看一看类型声明：
+
+::
+
+	-- file: ch14/Maybe.hs
+	data Maybe a = Nothing
+	             | Just a
+
+::
+
+	-- file: ch11/Parse.hs
+	newtype Parse a = Parse {
+	      runParse :: ParseState -> Either String (a, ParseState)
+	    }
+
+这两个类型的共同特点是它们都有一个类型参数，因此它们都是范型，对具体的类型一无所知。
+
+然后看一看我们给两个类型写的串联函数：
+
+::
+
+	ghci> :type (>>?)
+	(>>?) :: Maybe a -> (a -> Maybe b) -> Maybe b
+
+:: 
+
+	ghci> :type (==>)
+	(==>) :: Parse a -> (a -> Parse b) -> Parse b
+
+这两个函数的类型非常相似，如果我们把它们的类型构造器替换为一个类型变量，我们会得到一个更加抽象的类型。
+
+::
+
+	-- file: ch14/Maybe.hs
+	chain :: m a -> (a -> m b) -> m b
+
+最终，在两种情况下，我们都得到了一个获取一个普通的值，然后把它“注入”到一个目标类型里面去的函数。对于 ``Maybe`` 类型，这个函数就是它的一个值构造器 ``Just`` ，``Parse``的注入函数就略微复杂一些。
+
+::
+
+	-- file: ch10/Parse.hs
+	identity :: a -> Parse a
+	identity a = Parse (\s -> Right (a, s))
+
+我们不用关心它的实现细节，也不管它有多么复杂；重要的是，这些类型都有一个“注入器”函数，它大致长这样：
+
+::
+
+	-- file: ch14/Maybe.hs
+	inject :: a -> m a
+
+在Haskell里面，正是这三个属性和一些如何使用它们的规则定义了monad。我们集中总结一下：
+
+#. 一个类型构造器 ``m``
+#. 一个用于把某个函数的输出串联到另外一个函数输入上的函数，它的类型是 ``m a -> (a -> m b) -> m b``
+#. 一个类型是 ``a -> m a`` 类型的函数，它把普通值注入到调用链里面，也就是说，它把类型 ``a`` 用类型构造器 ``m`` 包装起来。
+
+Maybe 类型的类型构造器 ``Maybe a`` ,串联函数 ``(>>?)`` 以及注入函数 ``Just`` 使Maybe称为一个monad。对于 ``Parse`` 类型，对应的是类型构造器 ``Parse a`` ,串联函数 ``Parse a`` 以及注入函数 ``identify`` 。
+
+对于Monad的串联函数和注入函数具体应该干什么我们刻意只字未提，因为它几乎不重要。事实上，正是因为Monad如此简单，它在Haskell里面无处不在。许多常见的编程模式都用到了monad结构：传递隐式数据，或是短路求值链。
+
+
+Monad 类型类
+---------------
+在Haskell里面我们可以使用一个类型类(typeclass)来表示“串联”以及“注入”的概念以及它们的类型。标准库的Predule模块已经包含了这样一个类型类，也就是 ``Monad`` 。
+
+::
+
+	-- file: ch14/Maybe.hs
+	class Monad m where
+	    -- chain
+	    (>>=)  :: m a -> (a -> m b) -> m b
+	    -- inject
+	    return :: a -> m a
+
+在这里，``(>>=)`` 就是我们的串联函数。 在 :ref:`sequencing` 中我们已经介绍了它。通常将这个操作符称呼为“绑定”，因为它把左侧运算的结果绑定到右侧运算的参数上。
+
+我们的注入函数是 ``return`` ,在 :ref:`the-nature-of-return` 中讲过，选用 ``return`` 这个名字有点倒霉。这个关键字在命令式语言中广泛使用并且有一个非常容易理解的含义。但是在Haskell里面它的含义完全不同；具体来说，在函数调用链中间使用 ``return`` 并不会导致调用链提前中止；我们可以这样理解它：它把纯值( ``a`` 类型)放进(returns)monads( ``m a`` 类型)里。
+
+``(>>=)`` 和 ``return`` 是 ``Monad`` 这个typeclass的核心函数；除此之外，它还定义了另外两个函数。一个函数是 ``(>>)`` ，类似于 ``(>>=)`` ，它的作用也是串联，但是它忽略左侧的值。
+
+::
+
+    -- file: ch14/Maybe.hs
+        (>>) :: m a -> m b -> m b
+            a >> f = a >>= \_ -> f
+
+当我们需要按顺序执行一系列操作的，并且不关心先前的计算结果的时候，可以使用这操作符。这样也许看起来让人觉得费解：为什么我们会忽略一个函数的返回值呢，这样有什么意义？回想一下，我们之前定义了一个 ``(==>&)`` 组合子来专门表达这个概念。另外，考虑一下 ``print`` 这样的函数，它的返回结果是一个占位符，我们没有必要关心它返回值是什么。
+
+::
+
+    ghci> :type print "foo"
+    print "foo" :: IO ()
+
+如果我们使用普通的 ``(>>=)`` 来串联调用，我们必须提供一个新的函数来忽略参数（这个参数是前一个 ``print`` 的返回值。)
+
+::
+
+    ghci> print "foo" >>= \_ -> print "bar"
+    "foo"
+    "bar"
+
+但是，如果我们使用 ``(>>)`` 操作符，那么就可以去掉那个没什么用的函数了：
+
+::
+
+    ghci> print "baz" >> print "quux"
+    "baz"
+    "quux"
+
+正如我们上面看到的一样， ``(>>)`` 的默认实现是通过 ``(>>=)`` 完成的。
+
+Monad类型类另外一个非核心函数是 ``fail`` ,这个函数接受一个错误消息然后让函数调用链失败。
+
+.. warning::
+
+    许多Monad的实现并没有重写 ``fail``函数的默认实现，因此在这些Monad的里面， ``fail`` 使用的 ``error`` 。由于error函数直接抛出某个异常使得调用者无法捕获或者无法预期，所以调用 ``errror`` 通常是非常不会欢迎的。
+    就算你很清楚你在Monad使用 ``fail`` 在当前场景下是个明智之选，但是依然非常不推荐使用它。当你以后重构代码的时候，很有可能这个 ``fail`` 函数在新的语境下无法工作从而导致非常复杂的问题，这种情况太容易发生了。
+
+回顾一下我们在 :doc:`10` 写的parse, 里面有一个 ``Monad`` 的实例：
+
+::
+
+    -- file: ch10/Parse.hs
+    instance Monad Parse where
+        return = identity
+            (>>=) = (==>)
+                fail = bail
+
+术语解释
+---------
+可能你对monad的某些惯用语并不熟悉，虽然他们不是正是术语，但是很常见；因此有必要了解一下。
+
+* "Monadic"仅仅表示“和Monad相关的”。一个monadic 类型就是一个Monad 类型类的实例；一个monadic值就是一个具有monadic类型的值。
+* 当我们说某个东西“是一个monad”的时候，我们其实表达的意思是“这个类型是Monad这个类型类的实例”；作为Monad的实例就有三要素：类型构造器，注入函数，串联函数。
+* 同样，当我们谈到“Foo这个monad”的时候，我们实际上指的是Foo这个类型，只不过Foo是Monad这个类型类的实例。
+* Monadic值的一个别称是“动作”；这个说法可能源自 ``I/O Monad`` 的引入， ``print "foo"`` 这样的monad值会导致副作用。返回类型是monadic值的函数有时候也被称之为动作，虽然这样并不太常见。
+
+
+
+使用新的Monad
+--------------
+
+我们在介绍Monad的时候，展示了一些之前的代码，并说明它们其实就是Monad。既然我们慢慢知道monad是什么，而且已经见识过 ``Monad`` 这个类型类；现在就让我们用学到的知识来写一个Monad吧。我们先定义它的接口，然后使用它；一旦完成了这些，我们就写出了自己的Monad！
+
+纯粹的Haskell代码写起来非常简洁，但是它不能执行IO操作；有时候，我们想记下我们程序的一些操作，但是又不想直接把日志信息写入文件；现在就这些需求，我们开发一个小型库。
+
+信息隐藏
+^^^^^^^^^^^
+
+Controlled escape
+^^^^^^^^^^^^^^^^^^
+
+Leaving a trace
+^^^^^^^^^^^^^^^^^^^^^
+
+使用 Logger monad
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+同时使用puer和monadic代码
+-------------------------
+
+关于Monad的一些误解
+--------------------
+
+创建Logger Monad
+------------------
+
+Maybe monad
+--------------
+
+Executing the Maybe monad
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Maybe at work, and good API design
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+List Monad
+---------------
+
+理解List monad
+^^^^^^^^^^^^^^^^^^^
+
+使用List Monad
+^^^^^^^^^^^^^^^^^^^
+
+Desugaring of do blocks
+---------------------------
+
+Monads as a programmable semicolon
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Why go sugar-free
+^^^^^^^^^^^^^^^^^^^^^
+
+The state monad 
+------------------
+
+lmost a state monad
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Reading and modifying the state
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Will the real state monad please stand up?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+使用State monad生成随机数
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A first attempt at purity
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Random valueas in the state monad
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Running the state monad
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+What about a bit more state?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Monad and functors
+--------------------
+
+Another way of looking at monads
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The monad laws, and good coding style
+--------------------------------------
+
+

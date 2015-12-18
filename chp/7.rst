@@ -1034,6 +1034,7 @@ Monad是一种强大的将函数链在一起的方法，在 `第十四章：Mona
 现在回到 ``main`` ， ``mapM_`` 在 ``numbers . show`` 每个元素上应用 ``(str2action . show)`` ， ``number . show`` 把每个数字转换成一个 ``String`` ， ``str2action`` 把每个 ``String`` 转换成一个操作。
  ``mapM_`` 把这些单独的操作组合成一个更大的操作，然后打印出这些行。
 
+.. _sequencing:
 
 串联化（Sequencing）
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1085,6 +1086,7 @@ Monad是一种强大的将函数链在一起的方法，在 `第十四章：Mona
 .. tip::
    忘记了怎么使用 ``\`` (lambda表达式)了吗？参见 `匿名（lambda）函数`_ 一节。
 
+.. _the-nature-of-return:
 
 Return的本色
 ^^^^^^^^^^^^^^^^^^^^^^^

@@ -5,3 +5,4 @@ _build/*
 *.o
 *.hi
 *.*~
+.DS_Store
