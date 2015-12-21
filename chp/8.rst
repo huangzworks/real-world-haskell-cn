@@ -383,6 +383,8 @@ Haskell 中的正则表达式
 
 Hackage 上也有其他 Haskell 正则表达式包可供下载。其中一些比内置的 POSIX 引擎拥有更好的执行效率 (如 regex-tdfa); 另外一些提供了大多数程序员熟悉的 Perl 风格正则匹配 (如 regex-pcre)。它们都按照我们这节提到的 API 编写。
 
+.. _translate-a-glob-pattern-into-a-regular-expression:
+
 将 glob 模式翻译为正则表达式
 ----------------------------------
 
