@@ -1318,16 +1318,139 @@ state monad里面的随机数值
 	  setStdGen newState
 	  return result
 
-What about a bit more state?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _what-about-a-bit-more-state
 
-Monad and functors
+管理更多的状态
+^^^^^^^^^^^^^^
+
+很难想象针对单个状态我们竟写了这么多有趣的代码，当我们想一次性纪录多个状态的时候，通常的办法是把这些状态放在一个数据结构里面管理。下面是一个纪录我们生成随机数数目的例子：
+
+::
+
+	-- file: ch14/Random.hs
+	data CountedRandom = CountedRandom {
+	      crGen :: StdGen
+	    , crCount :: Int
+	    }
+	
+	type CRState = State CountedRandom
+	
+	getCountedRandom :: Random a => CRState a
+	getCountedRandom = do
+	  st <- get
+	  let (val, gen') = random (crGen st)
+	  put CountedRandom { crGen = gen', crCount = crCount st + 1 }
+	  return val
+
+上面的函数每次被调用的时候都会处理状态的两个元素然后返回一个全新的状态；更常见的情况是我们只需要读写整个状态的某一部分；下面的函数可以获取当前生成过的随机数的数目：
+
+::
+
+	-- file: ch14/Random.hs
+	getCount :: CRState Int
+	getCount = crCount `liftM` get
+
+这个例子也说明了我们为什么要使用纪录语法定义 ``CountedRandom`` 状态；使用纪录函数提供的访问函数，把它与 ``get`` 函数结合起来可以很方便地读取状态的特定部分。
+
+如果想要更新整个状态的某一部分，下面的代码可能不是很吸引人：
+
+::
+
+	-- file: ch14/Random.hs
+	putCount :: Int -> CRState ()
+	putCount a = do
+	  st <- get
+	  put st { crCount = a }
+
+这一段代码我们使用了纪录更新语法而不是用一个函数。表达式 ``st { crCount = a }`` 会创建一个和 ``st`` 几乎完全相等的值，只是使用给定的 ``a`` 作为 ``crCount``  字段的值。由于这是个语法上的小技巧，因此它没有使用函数那么灵活。纪录语法可能并没有Haskell通常的语法那么优雅，但是至少它能完成我们的目的。
+
+函数 ``modify`` 组合了 ``get`` 和 ``put`` , 它接受一个状态转换函数，但是依然不太令人满意：还是需要使用纪录语法。
+
+::
+
+	-- file: ch14/Random.hs
+	putCountModify :: Int -> CRState ()
+	putCountModify a = modify $ \st -> st { crCount = a }
+
+.. _monad-and-functors:
+
+Monad和Functors
+----------------
+
+Functor和Monad之间有非常紧密的联系，这两个术语是从数学里面的范畴论引入的，但是又与数学定义不完全相同。
+
+在范畴论里面，monad通过functor构建出来。你可能希望在Haskell里面也是这样，也就是 ``Monad`` 这个类型类是 ``Functor`` 类型类的子类；但是在标准库的Prelude里面并不是这么定义的。这是个很不幸的疏忽。
+
+但是，Haskell库的作者们提供了一个变通方案：一旦他们写了一个 ``Monad`` 的实例，几乎总是也给 ``Functor`` 定义一个实例。所以对于任何monad你都可以使用 ``Functor`` 类型类的 ``fmap`` 函数。
+
+如果把 ``fmap`` 函数的类型签名与我们已经见到过标准库里面Monad的一些函数做比较，大致就知道在monad里面 ``fmap`` 函数是干什么的了。
+
+::
+
+	ghci> :type fmap
+	fmap :: (Functor f) => (a -> b) -> f a -> f b
+	ghci> :module +Control.Monad
+	ghci> :type liftM
+	liftM :: (Monad m) => (a1 -> r) -> m a1 -> m r
+
+可以看出， ``fmap`` 函数作用和 ``liftM`` 一样，它把一个纯函数lift到monad里面。
+
+换个角度看Monad
+^^^^^^^^^^^^^^^^
+
+我们已经知道了monad和functor之间的联系，如果回头再看看List这个monad，会发现一些有趣的东西；具体来说，是list的 ``(>>=)`` 定义。
+
+::
+
+	-- file: ch14/ListMonad.hs
+	instance Monad [] where
+	    return x = [x]
+	    xs >>= f = concat (map f xs)
+
+ ``f`` 的类型是 ``a -> [a]`` 我们调用 ``map f xs`` 的时候，我们会得到一个类型是 ``[[a]]`` 的值，然后我们必须使用 ``concat`` 把它“压扁”（flatten).
+
+想一想如果 ``Monad`` 是 ``Functor`` 的子类的时候我们能做什么；由于list的 ``fmap`` 定义就是 ``map`` , 在 ``(>>=)`` 定义里面我们可以使用 ``fmap`` 替换 ``map`` .这个替换本身并没有什么特殊意义，我们再进一步探讨一下。
+
+ ``concat`` 函数的类型是 ``[[a]] -> [a]`` :正如我们提到的，它把一个嵌套的列表压平。我们可以把list的这函数的类型签名从list推广到所有monad，也就是一个“移除一层嵌套”的类型 ``m (m a) -> m a``; 具有这种类型前面的函数通常叫做 ``join`` .
+
+如果已经有了 ``join`` 和 ``fmap`` 的定义，我们就不需要为每一个monad定义一个 ``(>>=)`` 函数了，因为它完全可以由 ``join`` 和 ``fmap`` 定义出来。下面是 ``Monad`` 类型类另外一种定义方式。
+
+::
+
+	-- file: ch14/AltMonad.hs
+	import Prelude hiding ((>>=), return)
+	
+	class Functor m => AltMonad m where
+	    join :: m (m a) -> m a
+	    return :: a -> m a
+	
+	(>>=) :: AltMonad m => m a -> (a -> m b) -> m b
+	xs >>= f = join (fmap f xs)
+
+不能说哪一种定义比另外一种更好，因为有了 ``join`` 我们可以定义 ``(>>=)`` ，反之亦然。但是这两个不同的角度给了我们对Monad全新的认识。
+
+移除一层monadic包装实际上是非常有用的，在 ``Control.Monad`` 里面由一个标准的 ``join`` 定义。
+
+::
+
+	-- file: ch14/MonadJoin.hs
+	join :: Monad m => m (m a) -> m a
+	join x = x >>= id
+
+下面是一些使用 ``join`` 的例子。
+
+::
+
+	ghci> join (Just (Just 1))
+	Just 1
+	ghci> join Nothing
+	Nothing
+	ghci> join [[1],[2,3]]
+	[1,2,3]
+
+.. _the-monad-laws-and-good-coding-style:
+
+单子律，好的代码风格
 --------------------
-
-Another way of looking at monads
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The monad laws, and good coding style
---------------------------------------
 
 
