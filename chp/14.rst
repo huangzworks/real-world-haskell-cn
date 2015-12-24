@@ -1,0 +1,1568 @@
+第十四章：Monads
+================
+
+.. _introduction:
+简介
+-----
+
+在 :doc:`7` 中，我们讨论了 ``IO`` monad，那时我们刻意把精力集中在如何与外界交互上，并没有讨论monad是什么。
+
+在 :doc:`7` 中我们看到 ``IO`` Monad确实很好用；除了在语法上不同之外，在 ``IO`` monad中写代码跟其他命令式语言基本没有什么区别。
+
+在前面的章节中，我们在解决一些实际问题的时候引入了一些数据结构，很快我们就会知道它们其实就是monads。我们想告诉你的是，在解决某些问题的时候，monad通常是一个非常直观且实用的工具。本章我们将定义一些monads并告诉你它有多么简单。
+
+.. _revisiting-earlier-code-examples:
+
+回顾之前代码
+------------
+
+.. _maybe-chaining:
+
+Maybe链
+^^^^^^^
+
+我们先看看我们在 :doc:`10` 写的 ``parseP5`` 函数:
+
+::
+
+    -- file: ch10/PNM.hs
+    matchHeader :: L.ByteString -> L.ByteString -> Maybe L.ByteString
+    
+    -- "nat" here is short for "natural number"
+    getNat :: L.ByteString -> Maybe (Int, L.ByteString)
+    
+    getBytes :: Int -> L.ByteString
+             -> Maybe (L.ByteString, L.ByteString)
+    
+	parseP5 s =
+	  case matchHeader (L8.pack "P5") s of
+	    Nothing -> Nothing
+	    Just s1 ->
+	      case getNat s1 of
+	        Nothing -> Nothing
+	        Just (width, s2) ->
+	          case getNat (L8.dropWhile isSpace s2) of
+	            Nothing -> Nothing
+	            Just (height, s3) ->
+	              case getNat (L8.dropWhile isSpace s3) of
+	                Nothing -> Nothing
+	                Just (maxGrey, s4)
+	                  | maxGrey > 255 -> Nothing
+	                  | otherwise ->
+	                      case getBytes 1 s4 of
+	                        Nothing -> Nothing
+	                        Just (_, s5) ->
+	                          case getBytes (width * height) s5 of
+	                            Nothing -> Nothing
+	                            Just (bitmap, s6) ->
+	                              Just (Greymap width height maxGrey bitmap, s6)
+
+这个函数要是再复杂一点，就要超出屏幕的右边了；当时我们使用 ``(>>?)`` 操作符避免了这种情况:
+
+::
+
+	-- file: ch10/PNM.hs
+	(>>?) :: Maybe a -> (a -> Maybe b) -> Maybe b
+	Nothing >>? _ = Nothing
+	Just v  >>? f = f v
+
+我们对 ``(>>?)`` 操作符的类型进行了精挑细选使得它能把一系列返回类型是 ``Maybe`` 的函数串联起来；只要一个函数的返回值能和下一个函数的参数类型匹配，我们就能无限串联返回类型是 ``Maybe`` 的函数。 ``(>>?)`` 的函数体把细节隐藏了起来，我们不知道我们通过 ``(>>?)`` 串联的函数是由于中间某个函数返回 ``Nothing`` 而中断了还是所有函数全部执行了。
+
+.. _implicit-state:
+
+隐式状态
+^^^^^^^^
+
+``(>>?)`` 被用来整理 ``parseP5`` 的结构，但是在解析的时候我们还是要一点一点地处理输入字符串；这使得我们必须把当前处理的值通过一个元组传递下去[若干个函数串联了起来，都返回Maybe，作者称之为Maybe链]。Maybe链上的每一个函数把自己处理的结果以及自己没有解析的剩下的字符串放到元组里面, 并传递下去。
+::
+
+	-- file: ch10/PNM.hs
+	parseP5_take2 :: L.ByteString -> Maybe (Greymap, L.ByteString)
+	parseP5_take2 s =
+	    matchHeader (L8.pack "P5") s       >>?
+	    \s -> skipSpace ((), s)           >>?
+	    (getNat . snd)                    >>?
+	    skipSpace                         >>?
+	    \(width, s) ->   getNat s         >>?
+	    skipSpace                         >>?
+	    \(height, s) ->  getNat s         >>?
+	    \(maxGrey, s) -> getBytes 1 s     >>?
+	    (getBytes (width * height) . snd) >>?
+	    \(bitmap, s) -> Just (Greymap width height maxGrey bitmap, s)
+	
+	skipSpace :: (a, L.ByteString) -> Maybe (a, L.ByteString)
+	skipSpace (a, s) = Just (a, L8.dropWhile isSpace s)
+
+我们又碰到了有着重复行为的模式：处理字符串的时候，某个函数消耗部分字符串并返回它处理的结果，同时把剩下的字符串传递给下一个函数继续处理。但是，这个模式比之前的更糟糕：如果我们要在处理链往下传递另外一些额外信息，我们必须把传递的二元组修改为三元组，这几乎要修改这个处理链上的所有元素！
+
+我们把管理当前字符串的任务从处理链上的单个函数移出来，将它(管理字符串)转交给串联这些单个函数的函数完成！[译：比如上面的 ``(>>?)``]
+
+::
+
+	-- file: ch10/Parse.hs
+	(==>) :: Parse a -> (a -> Parse b) -> Parse b
+	
+	firstParser ==> secondParser  =  Parse chainedParser
+	  where chainedParser initState   =
+	          case runParse firstParser initState of
+	            Left errMessage ->
+	                Left errMessage
+	            Right (firstResult, newState) ->
+	                runParse (secondParser firstResult) newState
+
+我们把解析状态的细节隐藏在 ``ParseState`` 类型中，就连 ``getState`` 和 ``putState``  都不会窥视解析状态，所以，无论对 ``ParseState`` 做怎样的修改都不会影响已有的代码。
+
+.. _looking-for-shared-patterns:
+
+寻找共同特征
+------------
+
+如果我们仔细分析上面的例子，它们好像没有什么共同特点。不过有一点比较明显，它们都想把函数串联起来并试图隐藏细节以便我们写出整洁的代码。然后，我们先不管那些细节，从更粗略的层面去思考一下。
+
+首先，我们看一看类型声明：
+
+::
+
+	-- file: ch14/Maybe.hs
+	data Maybe a = Nothing
+	             | Just a
+
+::
+
+	-- file: ch11/Parse.hs
+	newtype Parse a = Parse {
+	      runParse :: ParseState -> Either String (a, ParseState)
+	    }
+
+这两个类型的共同特点是它们都有一个类型参数，因此它们都是范型，对具体的类型一无所知。
+
+然后看一看我们给两个类型写的串联函数：
+
+::
+
+	ghci> :type (>>?)
+	(>>?) :: Maybe a -> (a -> Maybe b) -> Maybe b
+
+:: 
+
+	ghci> :type (==>)
+	(==>) :: Parse a -> (a -> Parse b) -> Parse b
+
+这两个函数的类型非常相似，如果我们把它们的类型构造器替换为一个类型变量，我们会得到一个更加抽象的类型。
+
+::
+
+	-- file: ch14/Maybe.hs
+	chain :: m a -> (a -> m b) -> m b
+
+最终，在两种情况下，我们都得到了一个获取一个普通的值，然后把它“注入”到一个目标类型里面去的函数。对于 ``Maybe`` 类型，这个函数就是它的一个值构造器 ``Just`` ，``Parse``的注入函数就略微复杂一些。
+
+::
+
+	-- file: ch10/Parse.hs
+	identity :: a -> Parse a
+	identity a = Parse (\s -> Right (a, s))
+
+我们不用关心它的实现细节，也不管它有多么复杂；重要的是，这些类型都有一个“注入器”函数，它大致长这样：
+
+::
+
+	-- file: ch14/Maybe.hs
+	inject :: a -> m a
+
+在Haskell里面，正是这三个属性和一些如何使用它们的规则定义了monad。我们集中总结一下：
+
+#. 一个类型构造器 ``m``
+#. 一个用于把某个函数的输出串联到另外一个函数输入上的函数，它的类型是 ``m a -> (a -> m b) -> m b``
+#. 一个类型是 ``a -> m a`` 类型的函数，它把普通值注入到调用链里面，也就是说，它把类型 ``a`` 用类型构造器 ``m`` 包装起来。
+
+Maybe 类型的类型构造器 ``Maybe a`` ,串联函数 ``(>>?)`` 以及注入函数 ``Just`` 使Maybe成为一个monad。对于 ``Parse`` 类型，对应的是类型构造器 ``Parse a`` ,串联函数 ``Parse a`` 以及注入函数 ``identify`` 。
+
+对于Monad的串联函数和注入函数具体应该干什么我们刻意只字未提，因为它几乎不重要。事实上，正是因为Monad如此简单，它在Haskell里面无处不在。许多常见的编程模式都用到了monad结构：传递隐式数据，或是短路求值链。
+
+.. _the-monad-typeclass:
+
+Monad 类型类
+---------------
+在Haskell里面我们可以使用一个类型类(typeclass)来表示“串联”以及“注入”的概念以及它们的类型。标准库的Predule模块已经包含了这样一个类型类，也就是 ``Monad`` 。
+
+::
+
+	-- file: ch14/Maybe.hs
+	class Monad m where
+	    -- chain
+	    (>>=)  :: m a -> (a -> m b) -> m b
+	    -- inject
+	    return :: a -> m a
+
+在这里，``(>>=)`` 就是我们的串联函数。 在 :ref:`sequencing` 中我们已经介绍了它。通常将这个操作符称呼为“绑定”，因为它把左侧运算的结果绑定到右侧运算的参数上。
+
+我们的注入函数是 ``return`` ,在 :ref:`the-nature-of-return` 中讲过，选用 ``return`` 这个名字有点倒霉。这个关键字在命令式语言中被广泛使用并且有一个非常容易理解的含义。但是在Haskell里面它的含义完全不同；具体来说，在函数调用链中间使用 ``return`` 并不会导致调用链提前中止；我们可以这样理解它：它把纯值( ``a`` 类型)放进(returns)monads( ``m a`` 类型)里。
+
+``(>>=)`` 和 ``return`` 是 ``Monad`` 这个类型类的核心函数；除此之外，它还定义了另外两个函数。一个函数是 ``(>>)`` ，类似于 ``(>>=)`` ，它的作用也是串联，但是它忽略左侧的值。
+
+::
+
+    -- file: ch14/Maybe.hs
+        (>>) :: m a -> m b -> m b
+            a >> f = a >>= \_ -> f
+
+当我们需要按顺序执行一系列操作的，并且不关心先前的计算结果的时候，可以使用这操作符。这样也许看起来让人觉得费解：为什么我们会忽略一个函数的返回值呢，这样有什么意义？回想一下，我们之前定义了一个 ``(==>&)`` 组合子来专门表达这个概念。另外，考虑一下 ``print`` 这样的函数，它的返回结果是一个占位符，我们没有必要关心它返回值是什么。
+
+::
+
+    ghci> :type print "foo"
+    print "foo" :: IO ()
+
+如果我们使用普通的 ``(>>=)`` 来串联调用，我们必须提供一个新的函数来忽略参数（这个参数是前一个 ``print`` 的返回值。)
+
+::
+
+    ghci> print "foo" >>= \_ -> print "bar"
+    "foo"
+    "bar"
+
+但是，如果我们使用 ``(>>)`` 操作符，那么就可以去掉那个没什么用的函数了：
+
+::
+
+    ghci> print "baz" >> print "quux"
+    "baz"
+    "quux"
+
+正如我们上面看到的一样， ``(>>)`` 的默认实现是通过 ``(>>=)`` 完成的。
+
+Monad类型类另外一个非核心函数是 ``fail`` ,这个函数接受一个错误消息然后让函数调用链失败。
+
+.. warning::
+
+    许多Monad的实现并没有重写 ``fail``函数的默认实现，因此在这些Monad的里面， ``fail`` 将由 ``error`` 函数实现。由于error函数直接抛出某个异常使得调用者无法捕获或者无法预期，所以调用 ``errror`` 通常是非常不受欢迎的。
+    就算你很清楚在Monad使用 ``fail`` 在当前场景下是个明智之选，但是依然非常不推荐使用它。当你以后重构代码的时候，很有可能这个 ``fail`` 函数在新的语境下无法工作从而导致非常复杂的问题，这种情况太容易发生了。
+
+回顾一下我们在 :doc:`10` 写的parse, 里面有一个 ``Monad`` 的实例：
+
+::
+
+	-- file: ch10/Parse.hs
+	instance Monad Parse where
+	    return = identity
+	    (>>=) = (==>)
+	    fail = bail
+
+.. _and-now-a-jargon-moment:
+
+术语解释
+---------
+可能你对monad的某些惯用语并不熟悉，虽然他们不是正是术语，但是很常见；因此有必要了解一下。
+
+* "Monadic"仅仅表示“和Monad相关的”。一个monadic 类型就是一个Monad 类型类的实例；一个monadic值就是一个具有monadic类型的值。
+* 当我们说某个东西“是一个monad”的时候，我们其实表达的意思是“这个类型是Monad这个类型类的实例”；作为Monad的实例就有三要素：类型构造器，注入函数，串联函数。
+* 同样，当我们谈到“Foo这个monad”的时候，我们实际上指的是Foo这个类型，只不过Foo是Monad这个类型类的实例。
+* Monadic值的一个别称是“动作”；这个说法可能源自 ``I/O Monad`` 的引入， ``print "foo"`` 这样的monad值会导致副作用。返回类型是monadic值的函数有时候也被称之为动作，虽然这样并不太常见。
+
+.. _using-a-new-monad-show-your-work:
+
+使用新的Monad
+--------------
+
+我们在介绍Monad的时候，展示了一些之前的代码，并说明它们其实就是Monad。既然我们慢慢知道monad是什么，而且已经见识过 ``Monad`` 这个类型类；现在就让我们用学到的知识来写一个Monad吧。我们先定义它的接口，然后使用它；一旦完成了这些，我们就写出了自己的Monad！
+
+纯粹的Haskell代码写起来非常简洁，但是它不能执行IO操作；有时候，我们想记下我们程序的一些操作，但是又不想直接把日志信息写入文件；就这些需求，我们开发一个小型库。
+
+回忆一下我们在 :ref:`translate-a-glob-pattern-into-a-regular-expression` 中定义的 ``globToRegex`` 函数；我们修改它让它能够记住每次它翻译过的句子。我们又回到了熟悉的恐怖场景：比较同一份代码的Monadic版本和非Monadic版。
+
+首先，我们可以使用一个 ``Logger`` 类型类把处理结果的类型包装起来。
+
+::
+
+    -- file: ch14/Logger.hs
+    globToRegex :: String -> Logger String
+
+.. _information-hiding:
+
+信息隐藏
+^^^^^^^^^^^
+
+我们将刻意隐藏 ``Logger`` 模块的实现。
+
+::
+
+	-- file: ch14/Logger.hs
+	module Logger
+	    (
+	      Logger
+	    , Log
+	    , runLogger
+	    , record
+	    ) where
+
+像这样隐藏实现有两个好处：它很大程度出上保证了我们对于Monad实现的灵活性，更重要的是，这样有一个非常简单的接口。
+
+``Logger`` 类型就是单纯的一个类型构造器。我们并没有将它的值构造器导出，因此 ``Logger`` 模块的使用者没有办法自己创建一个 ``Logger`` 类型的值，它们对于 ``Logger`` 类型能做的就是把它写在类型签名上。
+
+``Log`` 类型就是一串字符串的别名，这样写是为了让它可读性更好。同时我们使用一串字符串来保持实现的简单。
+
+::
+
+	-- file: ch14/Logger.hs
+	type Log = [String]
+
+我们给接口的使用者提供了一个 ``runLogger`` 函数来执行某个日志操作，而不是直接给他们一个值构造器。这个函数既回传了日志纪录这个操作，同时也回传了日志信息本身。
+
+::
+
+	-- file: ch14/Logger.hs
+	runLogger :: Logger a -> (a, Log)
+
+.. _controlled-escape:
+
+受控的Monad
+^^^^^^^^^^^
+
+Monad类型类没有提供任何方法使一个monadic的值成为一个普通的值。我们可以使用 ``return`` 函数把一个普通的值“注入”到monad里面；我们也可以用 ``(>>=)`` 操作符把一个monadic的值提取出来，但是经过操作符处理之后还是回传一个monadic的值。
+
+很多monads都有一个或者多个类似 ``runLogger`` 的函数； ``IO`` monad是个例外，通常情况下我们只能退出整个程序来脱离这个monad。
+
+一个Monad函数在monad内部执行然后向外返回结果；一般来说这些函数是把一个Monadic的值脱离Monad成为一个普通值的唯一方法。因此，Monad的创建者对于如何处理这个过程有着完全的控制权。
+
+有的Monad有好几个执行函数。在我们这个Logger的例子里面，我们可以假设有一些 ``runLogger`` 的替代方法：一个仅仅返回日志信息，另外一个可能返回日志操作，然后把日志信息本身丢掉。
+
+.. _leaving-a-trace:
+
+日志纪录
+^^^^^^^^
+
+当我们执行一个 ``Logger`` 动作的时候，代码将调用 ``record`` 函数来纪录某些东西。
+
+::
+
+	-- file: ch14/Logger.hs
+	record :: String -> Logger ()
+
+由于日志纪录的过程发生在Monad的内部，因此 ``record`` 这个动作并不返回什么有用的信息（ ``()`` )
+
+通常Monad会提供一些类似 ``record`` 这样的辅助函数；这些函数也是我们访问这个Monad某些特定行为的方式。
+
+我们的模块也把 ``Logger`` 定义为了 ``Monad`` 的实例。这个实例里面的定义就是使用 ``Logger`` 类型所需要的全部东西。
+
+下面就是使用我们的 ``Logger`` 类的一个例子：
+
+::
+
+	ghci> let simple = return True :: Logger Bool
+	ghci> runLogger simple
+	(True,[])
+
+当我们使用 ``runLogger`` 函数执行被记录的操作之后，会得到一个二元组。二元组的第一个元素是我们代码的执行结果；第二个元素是我们的日志动作执行的时候纪录信息的列表。由于我们没有纪录任何东西，所以返回的列表是空；来个有日志信息的例子。
+
+::
+
+	ghci> runLogger (record "hi mom!" >> return 3.1337)
+	(3.1337,["hi mom!"])
+
+.. _using-the-logger-monad:
+
+使用 Logger monad
+^^^^^^^^^^^^^^^^^^
+
+在 ``Logger`` monad里面我们可以剔除通配符到正则表达式的转换，代码如下：
+
+::
+
+	-- file: ch14/Logger.hs
+	globToRegex cs =
+	    globToRegex' cs >>= \ds ->
+	    return ('^':ds)
+
+然后我们来简单说明一下一些值得注意的代码风格。我们函数体在函数名字下面一行，要这么做，需要添加一些水平的空格；对于匿名函数，我们把它的参数放在另起的一行，这是monadic代码通常的组织方式。
+
+回忆一下 ``(>>=)`` 的类型：它从 ``Logger`` 包装器中中提取出操作符 ``(>>=)`` 左边的值，然后把取出来的值传递给右边的函数。右边的操作数函数必须把这个取出来的值用 ``Logger`` 包装起来然后回传出去。这个操作正如正如 ``return`` 一样：接受一个纯值，然后用Monad的类型构造器包装一下返回。
+
+::
+
+	ghci> :type (>>=)
+	(>>=) :: (Monad m) => m a -> (a -> m b) -> m b
+	ghci> :type (globToRegex "" >>=)
+	(globToRegex "" >>=) :: (String -> Logger b) -> Logger b
+
+就算我们写一个什么都不做的函数，我们也必须使用 ``return`` 去包装具有正确类型的值。
+
+::
+
+	-- file: ch14/Logger.hs
+	globToRegex' :: String -> Logger String
+	globToRegex' "" = return "$"
+
+当我们要使用 ``record`` 函数纪录某些日志的时候，我们采用 ``(>>)`` 而不是 ``(>>=)`` 来串联一系列的日志操作。
+
+::
+
+	-- file: ch14/Logger.hs
+	globToRegex' ('?':cs) =
+	    record "any" >>
+	    globToRegex' cs >>= \ds ->
+	    return ('.':ds)
+
+``(>>)`` 就是 ``(>>=)`` 的一个变种，只不过它会忽略左边操作的结果；由于 ``record`` 函数的返回值永远都是 ``()`` 因此获取它的返回值没有什么意义，直接使用 ``>>`` 更简洁。
+
+另外，我们也可以使用在 :ref:`sequencing` 引入的 ``do`` 表示法来整理代码。
+
+::
+
+	-- file: ch14/Logger.hs
+	globToRegex' ('*':cs) = do
+	    record "kleene star"
+	    ds <- globToRegex' cs
+	    return (".*" ++ ds)
+
+选择使用 ``do`` 表示法还是显式使用 ``(>>=)`` 结合匿名函数完全取决于个人爱好，但是对于长度超过两行的代码来说，几乎所有人都会选择使用 ``do``. 这两种风格有一个非常重要的区别，我们将会在 :ref:`desugaring-of-do-blocks` 里面介绍。
+
+对于解析单个字符的情况，monadic的代码几乎和普通的一样：
+
+:: 
+
+	-- file: ch14/Logger.hs
+	globToRegex' ('[':'!':c:cs) =
+	    record "character class, negative" >>
+	    charClass cs >>= \ds ->
+	    return ("[^" ++ c : ds)
+	globToRegex' ('[':c:cs) =
+	    record "character class" >>
+	    charClass cs >>= \ds ->
+	    return ("[" ++ c : ds)
+	globToRegex' ('[':_) =
+	    fail "unterminated character class"
+
+.. _mixing-pure-and-monadic-code:
+
+同时使用puer和monadic代码
+-------------------------
+
+迄今为止我们看到的Monad好像有一个非常明显的缺陷：Monad的类型构造器把一个值包装成一个monadic的值，这样导致在monad里面使用普通的纯函数有点困难。举个例子，假设我们有一段运行在monad里面的代码，它所做的就是返回一个字符串：
+
+::
+
+    ghci> let m = return "foo" :: Logger String
+
+如果我们想知道字符串的长度是多少，我们不能直接调用 ``length`` 函数：因为这个字符串被 ``Logger`` 这个monad包装起来了，因此类型并不匹配。
+
+::
+
+	ghci> length m
+	
+	<interactive>:1:7:
+	    Couldn't match expected type `[a]'
+	           against inferred type `Logger String'
+	    In the first argument of `length', namely `m'
+	    In the expression: length m
+	    In the definition of `it': it = length m
+
+我们能做的事情就是下面这样：
+
+::
+
+	ghci> :type   m >>= \s -> return (length s)
+	m >>= \s -> return (length s) :: Logger Int
+
+我们使用 ``(>>=)`` 把字符串从monad里面取出来，然后使用一个匿名函数调用 ``length`` 接着用 ``return`` 把这个字符串重新包装成 ``Logger`` 。
+
+由于这种形式的代码经常在Haskell里面出现，因此已经有一个类似的操作符存在了。在 :ref:`introducing-functors` 里面我们介绍了 *lifting* 这种技术；把一个纯函数 Lift 为一个函子通常意味着从一个带有上下文的特殊值里面取出那个值，然后使用这个普通的值调用纯函数，得到结果之后用特定的类型构造器包装成原来有着上下文的特殊值。
+
+在monad里面，我们需要干同样的一件事。由于 ``Monad`` 这个类型类已经提供了 ``(>>=)`` 和 ``return`` 这两个函数处理monadic的值和普通值之间的转换，因此 ``liftM`` 函数不需要知道monad的任何实现细节。
+
+::
+
+    -- file: ch14/Logger.hs
+    liftM :: (Monad m) => (a -> b) -> m a -> m b
+    liftM f m = m >>= \i ->
+                return (f i)
+
+当我们把一个类型声明为 ``Functor`` 这个类型类的实例之后，我们必须根据这个特定的类型实现对应的 ``fmap`` 函数；但是， 由于 ``(>>=)`` 和 ``return`` 对monad的进行了抽象，因此``liftM`` 不需要知道任何monad的任何实现细节。我们只需要实现一次并配上合适的类型签名即可。
+
+在标准库的 ``Control.Monad`` 模块里面已经为我们定义好了 ``liftM`` 函数。
+
+我们来看看使用 ``liftM`` 对于提升我们代码可读性有什么作用；先看看没有使用 ``liftM`` 的代码：
+
+::
+
+	-- file: ch14/Logger.hs
+	charClass_wordy (']':cs) =
+	    globToRegex' cs >>= \ds ->
+	    return (']':ds)
+	charClass_wordy (c:cs) =
+	    charClass_wordy cs >>= \ds ->
+	    return (c:ds)
+
+然后我们用 ``liftM`` 去掉那些 ``(>>=))`` 和匿名函数：
+
+::
+
+	-- file: ch14/Logger.hs
+	charClass (']':cs) = (']':) `liftM` globToRegex' cs
+	charClass (c:cs) = (c:) `liftM` charClass cs
+
+正如 ``fmap`` 一样，我们通常用中缀的方式调用 ``liftM`` 。可以用这种方式来阅读这个表达式：把右边操作得到的monadic的值应用到左边的纯函数上。
+
+``liftM`` 函数实在是太有用了，因此 ``Control.Monad`` 定义了它的几个变种，这些变种可以处理更长的参数；我们可以看一看 ``globToRegex`` 这个函数的最后一个分句：
+
+::
+
+	-- file: ch14/Logger.hs
+	globToRegex' (c:cs) = liftM2 (++) (escape c) (globToRegex' cs)
+	
+	escape :: Char -> Logger String
+	escape c
+	    | c `elem` regexChars = record "escape" >> return ['\\',c]
+	    | otherwise           = return [c]
+	  where regexChars = "\\+()^$.{}]|"
+
+上面这段代码用到的 ``liftM2`` 函数的定义如下：
+
+::
+
+	-- file: ch14/Logger.hs
+	liftM2 :: (Monad m) => (a -> b -> c) -> m a -> m b -> m c
+	liftM2 f m1 m2 =
+	    m1 >>= \a ->
+	    m2 >>= \b ->
+	    return (f a b)
+
+它首先执行第一个动作，接着执行第二个操作，然后把这两个操作的结果组合起来应用到那个纯函数上并包装返回的结果。 ``Control.Monad`` 里面定义了 ``liftM`` ``liftM2`` 直到 ``liftM5`` 。
+
+.. _putting-a-few-misconceptions-to-rest:
+
+关于Monad的一些误解
+--------------------
+
+我们已经见识过很多Monad的例子并且对monad也有一些感觉了；在继续探讨monad之前，有一些广为流传的关于monad的观念需要澄清。你肯定经常听到这些说法，因此你可能已经有一些很好的理由来反驳这些谬论了。
+
+* *Monads很难理解* 我们已经从好几个实例的问题来说明Monad是如何工作的了，并且我们已经知道理解monad最好的方式就是先通过一些具体的例子来进行解释，然后抽象出这些这些例子共同的东西。
+* *Monads仅仅用于 I/O 操作和命令式代码*  虽然我们在Haskell的IO里面使用Monad，但是Monad在其他的地方也非常有用。我们已经通过monad串联简单的计算，隐藏复杂的状态以及纪录日志了；然而，Monad的作用我们还只看到冰山一角。
+* *只有Haskell才有Monad* Haskell有可能是显式使用Monad最多的语言，但是在别的语言里面也存在，从C++到OCaml。由于Haskell的 ``do`` 表示法，强大的类型系统以及语言的语法使得Monad在Haskell里面非常容易处理。
+* *Monads使用来控制求值顺序的*
+
+.. _building-the-logger-monad:
+
+创建Logger Monad
+------------------
+
+``Logger`` 类的定义非常简单：
+
+::
+
+    -- file: ch14/Logger.hs
+    newtype Logger a = Logger { execLogger :: (a, Log) }
+
+它其实就是一个二元组，第一个元素是执行动作的结果，第二元素是我们执行动作的时候纪录的日志信息列表。
+
+我们使用 ``newtype`` 关键字把二元组进行了包装使它的类型更加清晰易读。 ``runLogger`` 函数可以从这个Monad里面取出这个元组里面的值；这个函数其实是 ``execLogger`` 的一个别名。
+
+::
+
+    -- file: ch14/Logger.hs
+    runLogger = execLogger
+
+``record`` 这个函数将为接收到的日志信息创建一个只包含单个元素的列表。
+
+::
+
+    -- file: ch14/Logger.hs
+    record s = Logger ((), [s])
+
+这个动作的结果是 ``()`` 。
+
+让我们以 ``return`` 开始，构建 ``Monad`` 实例；先尝试一下：它什么都不记录，然后把结果存放在二元组里面。
+
+::
+
+    -- file: ch14/Logger.hs
+    instance Monad Logger where
+        return a = Logger (a, [])
+
+``(>>=)`` 的定义更有趣，当然它也是monad的核心。 ``(>>=)`` 把一个普通的值和一个monadic的函数结合起来，得到新的运算结果和一个新的日志信息。
+
+::
+
+	-- file: ch14/Logger.hs
+	    -- (>>=) :: Logger a -> (a -> Logger b) -> Logger b
+	    m >>= k = let (a, w) = execLogger m
+	                  n      = k a
+	                  (b, x) = execLogger n
+	              in Logger (b, w ++ x)
+
+我们看看这段代码里面发生了什么。首先使用 ``runLogger`` 函数从动作 ``m`` 取出结果 ``a`` ,然后把它传递给monadic函数 ``k``; 接着我们又取出 ``b`` ；最后把 ``w`` 和 ``x`` 拼接得到一个新的日志。
+
+.. _sequential-logging-not-sequential-evaluation:
+
+顺序的日志，而不是顺序的求值
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+我们定义的 ``(>>=)`` 保证了新输出的日志一定在之前的输出的日志之后。但是这并不意味着 ``a`` 和 ``b`` 的求值是顺序的：``(>>=)`` 操作符是惰性求值的。
+
+正如Monad的很多其他行为一样，求值的严格性是由Monad的实现者控制的，并不是所有Monad的共同性质。事实上，有一些Monad同时有几种特性，每一种都有着不同程度的严格性（求值）。
+
+.. _the-writer-monad:
+
+Writer monad
+^^^^^^^^^^^^^
+
+我们创建的 ``Logger`` monad实际上是标准库里面 ``Writer`` Monad的一个特例；``Writer`` Monad可以在 ``mtl`` 包里面的 ``Control.Monad.Writer`` 模块找到。我们会在 :ref:`using-typeclasses` 里面介绍 ``Writer`` 的用法。
+
+.. _the-maybe-monad:
+
+Maybe monad
+--------------
+
+``Maybe`` 应该是最简单的Monad了。它代表了一种可能不会产生计算结果的计算过程。
+
+::
+
+	-- file: ch14/Maybe.hs
+	instance Monad Maybe where
+	    Just x >>= k  =  k x
+	    Nothing >>= _ =  Nothing
+	
+	    Just _ >> k   =  k
+	    Nothing >> _  =  Nothing
+	
+	    return x      =  Just x
+	
+	    fail _        =  Nothing
+
+当我们使用 ``(>>=)`` 或者 ``(>>)`` 串联一些 ``Maybe`` 计算的时候，如果这些计算中的任何一个返回了 ``Nothing`` ， ``(>>=)`` 和 ``(>>)`` 就不会对余下的任何计算进行求值。
+
+值得一提的是，整个调用链并不是完全短路的。每一个 ``(>>=)`` 或者 ``(>>)`` 仍然会匹配它左边的 ``Nothing`` 然后给右边的函数一个 ``Nothing``, 直到达到调用链的末端。这一点很容易被遗忘：当调用链中某个计算失败的时候，之前计算的结果，余下的调用链以及使用的 ``Nothing`` 值在运行时的开销是廉价的，但并不是完全没有开销。
+
+.. _executing-the-maybe-monad:
+
+执行Maybe monad
+^^^^^^^^^^^^^^^^
+
+适合执行 ``Maybe`` Monad的函数是 ``maybe`` (“执行”一个monad意味着取出Monad里面包含的值，移除Monad类的包装）
+
+::
+
+    -- file: ch14/Maybe.hs
+    maybe :: b -> (a -> b) -> Maybe a -> b
+    maybe n _ Nothing  = n
+    maybe _ f (Just x) = f x
+
+如果第三个参数是 ``Nothing`` ， ``maybe`` 将使用第一个参数作为返回值；而第二个参数则是在 ``Just`` 值构造器里面进行包装值的函数。
+
+由于 ``Maybe`` 类型非常简单，直接对它进行模式匹配和调用 ``maybe`` 函数使用起来差不多，在不同的场景下，两种方式都有各自的优点。
+
+.. _maybe-at-work-and-good-api-design:
+
+使用Maybe，以及好的API设计方式
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+下面是一个使用 ``Maybe`` 的例子。给出一个顾客的名字，找出它们手机号对应的账单地址。
+
+::
+
+	-- file: ch14/Carrier.hs
+	import qualified Data.Map as M
+	
+	type PersonName = String
+	type PhoneNumber = String
+	type BillingAddress = String
+	data MobileCarrier = Honest_Bobs_Phone_Network
+	                   | Morrisas_Marvelous_Mobiles
+	                   | Petes_Plutocratic_Phones
+	                     deriving (Eq, Ord)
+	
+	findCarrierBillingAddress :: PersonName
+	                          -> M.Map PersonName PhoneNumber
+	                          -> M.Map PhoneNumber MobileCarrier
+	                          -> M.Map MobileCarrier BillingAddress
+	                          -> Maybe BillingAddress
+
+我们的第一个实现使用 ``case`` 表达式，用它完成的代码相当难看，差不多超出了屏幕的右边。
+
+::
+
+	-- file: ch14/Carrier.hs
+	variation1 person phoneMap carrierMap addressMap =
+	    case M.lookup person phoneMap of
+	      Nothing -> Nothing
+	      Just number ->
+	          case M.lookup number carrierMap of
+	            Nothing -> Nothing
+	            Just carrier -> M.lookup carrier addressMap
+
+模块 ``Data.Map`` 的函数 ``lookup`` 返回一个 monadic的值：
+
+::
+
+	ghci> :module +Data.Map
+	ghci> :type Data.Map.lookup
+	Data.Map.lookup :: (Ord k, Monad m) => k -> Map k a -> m a
+
+换句话说，如果给定的key在map里面存在，那么 ``lookup`` 函数使用 ``return`` 把这个值注入到monad里面去；否则就会调用 ``fail`` 函数。这是这个API一个有趣的实现，虽然有人觉得它很糟糕。
+
+* 这样设计好的一方式是，根据具体Monad实现的不同，查找成功和失败的结果是可以根据不同需求定制的；而且， ``lookup`` 函数本身对于具体的这些行为完全不用关心。
+* 坏处就是，在有些Monad里面调用 ``fail`` 会直接抛出让人恼火的异常；之前我们就警告过最好不要使用 ``fail`` 函数，这里就不在赘述了。
+
+实际上，每个人都使用 ``Maybe`` 类型作为 ``lookup`` 函数的返回结果；这样一个简单的函数对于它的返回结果提供了它并不需要的通用性：其实 ``lookup`` 应该直接返回 ``Maybe`` 。
+
+先放下API设计的问题，我们来处理一下我们之前用 ``case`` 编写的丑陋代码。
+
+::
+
+	-- file: ch14/Carrier.hs
+	variation2 person phoneMap carrierMap addressMap = do
+	  number <- M.lookup person phoneMap
+	  carrier <- M.lookup number carrierMap
+	  address <- M.lookup carrier addressMap
+	  return address
+
+如果这其中的任何一个查找失败， ``(>>=)`` 和 ``(>>)`` 的定义告诉我们整个运算的结果将会是 ``Nothing``; 就和我们显式使用 ``case`` 表达式结果一样。
+
+使用Monad的版本的代码更加整洁，但是其实 ``return`` 是不必要的；从风格上说，使用 ``return`` 让代码看起来更加有规律，另外熟悉命令式编程的程序员可能对它感觉更熟悉；但其实上它是多余的；下面是与它等价的版本：
+
+::
+
+	-- file: ch14/Carrier.hs
+	variation2a person phoneMap carrierMap addressMap = do
+	  number <- M.lookup person phoneMap
+	  carrier <- M.lookup number carrierMap
+	  M.lookup carrier addressMap
+
+.. _the-list-monad:
+
+List Monad
+---------------
+
+``Maybe`` 类型代表有可能有值也可能没有值的计算；也有的情况下希望计算会返回一系列的结果，显然，List正适合这个目的。List的类型带有一个参数，这暗示它有可能能作为一个monad使用；事实上，我们确实能把它当作monad使用。
+
+先不看标准库的 ``Prelude`` 对于List monad的实现，我们自己来看看一个 List 的monad应该是什么样的。这个过程很简单：首先看 ``(>>=)`` 和 ``return`` 的类型，然后进行一些替换操作，看看我们能不能使用一些熟悉的list函数。
+
+``return`` 和 ``(>>=)`` 这两个函数里面显然 ``return`` 比较简单。我们已经知道 ``return`` 函数接受一个类型，然后把它用类型构造器 ``m`` 包装一下然后产生一个新的类型 ``m a``. 在List这种情况下，这个类型构造器就是 ``[]``. 把这个类型构造器使用List的类型构造器替换掉我们就得到了类型 ``[] a`` (当然，这样写是非法的！）；可以把它写成更加熟悉的形式 ``[a]``.
+
+现在我们知道list的 ``return`` 函数的类型应该是 ``a -> [a]`` 。对于这种类型的函数，只有少数那么几种实现的可能：要么它返回一个空列表，要么返回一个单个元素的列表，或者一个无穷长度的列表。基于我们现在对于Monad的理解，最有可能的实现方式应该是返回单个元素的列表：它不会丢失已有信息，也不会无限重复。
+
+::
+
+    -- file: ch14/ListMonad.hs
+    returnSingleton :: a -> [a]
+    returnSingleton x = [x]
+
+如果我们对 ``(>>=)`` 的类型签名进行和 ``return`` 类似的替换，我们会得到： ``[a] -> (a -> [b]) -> [b]`` . 这看起来和 ``map`` 非常相似。
+
+::
+
+    ghci> :type (>>=)
+    (>>=) :: (Monad m) => m a -> (a -> m b) -> m b
+    ghci> :type map
+    map :: (a -> b) -> [a] -> [b]
+
+``map`` 函数的参数顺序和它有点不对应，我们可以改成这样：
+
+::
+
+    ghci> :type (>>=)
+    (>>=) :: (Monad m) => m a -> (a -> m b) -> m b
+    ghci> :type flip map
+    flip map :: [a] -> (a -> b) -> [b]
+
+但是还是有一点小问题： ``flip map`` 的第二个参数的类型是 ``a -> b`` ，但是 ``(>>=)`` 的第二个参数的类型是 ``a -> [b]`` ,应该怎么办呢？
+
+我们对类型进行更多的替换，看看会发生什么。 ``flip map`` 这个函数能把任何类型 ``b`` 作为返回结果；如果我们使用 ``[b]`` 来替换 ``b`` ，这个函数的类型就成了 ``a -> (a -> [n]) -> [[b]]``. 换句话说，如果我们使用 ``map`` ，将一个列表与一个返回列表的函数进行映射，我们会得到一个包含列表的列表。
+
+::
+
+    ghci> flip map [1,2,3] (\a -> [a,a+100])
+    [[1,101],[2,102],[3,103]]
+
+有趣的是，我们这么做并没有让 ``flip map`` 和 ``(>>=)`` 的类型更加匹配一点； ``(>>=)`` 的类型是 ``[a] -> (a -> [b]) -> [b]`` ；然而，``flip map`` 如果对返回列表的函数进行map那么它的类型签名是 ``[a] -> (a -> [b]) -> [[b]]`` .在类型上依然是不匹配的，我们仅仅是把不匹配的类型从中间转移到了末尾。但是，我们的努力并没有白费：我们现在其实只需要一个能把 ``[[b]]`` 转化成 ``[b]`` 的函数就好了。很明显 ``concat`` 符合我们的要求。
+
+::
+
+    ghci> :type concat
+    concat :: [[a]] -> [a]
+
+``(>>=)`` 的类型告诉我们应该把 ``map`` 的参数进行翻转，然后使用 ``concat`` 进行处理得到单个列表。
+
+::
+
+    ghci> :type \xs f -> concat (map f xs)
+    \xs f -> concat (map f xs) :: [a] -> (a -> [a1]) -> [a1]
+
+事实上lists的 ``(>>=)`` 定义就是这样：
+
+::
+
+    -- file: ch14/ListMonad.hs
+    instance Monad [] where
+        return x = [x]
+            xs >>= f = concat (map f xs)
+
+它使用函数 ``f`` 对列表 ``xs`` 的每一个元素 ``x`` 进行处理，然后把得到的结果拼接起来得到单个列表。
+
+现在我们已经搞定了List这个Monad的两个核心函数，另外两个非核心函数实现起来就很容易了：
+
+::
+
+	-- file: ch14/ListMonad.hs
+	    xs >> f = concat (map (\_ -> f) xs)
+	    fail _ = []
+
+.. _understanding-the-list-monad:
+
+理解List monad
+^^^^^^^^^^^^^^^^^^^
+
+List monad与Haskell的另外一个工具——列表推导非常相似。我们可以通过计算两个列表的笛卡尔集来说明它们之间的相似性。首先，我们写一个列表推导：
+
+::
+
+	-- file: ch14/CartesianProduct.hs
+	comprehensive xs ys = [(x,y) | x <- xs, y <- ys]
+
+这里我们使用大括号语法来表示monadic代码，这样会告诉我们monadic代码和列表推导该有多么相似。
+
+::
+
+	-- file: ch14/CartesianProduct.hs
+	monadic xs ys = do { x <- xs; y <- ys; return (x,y) }
+
+唯一的一个不同点是使用monadic代码计算的结果在一系列表达式的末尾得到；而列表推导的结果表示在最开始。除此之外，这个函数计算的结果是完全相同的。
+
+::
+
+	ghci> comprehensive [1,2] "bar"
+	[(1,'b'),(1,'a'),(1,'r'),(2,'b'),(2,'a'),(2,'r')]
+	ghci> comprehensive [1,2] "bar" == monadic [1,2] "bar"
+	True
+
+一开始肯定对列表monad非常迷惑，我们一起看一下monadic代码计算笛卡尔集的过程。
+
+::
+
+	-- file: ch14/CartesianProduct.hs
+	blockyDo xs ys = do
+	    x <- xs
+	    y <- ys
+	    return (x, y)
+
+``x`` 每次取列表 ``xs`` 的一个值， ``y`` 每次取列表 ``ys`` 的一个值，然后组合在一起得到最终结果；事实上，这就是两层嵌套循环！这也说明了关于monad的一个很重要的事实：除非你知道monad内部是如何执行的，否则你将无法预期monadic代码的行为。
+
+我们再进一步观察这个代码；首先去掉 ``do`` 表示法；稍微改变一下代码的结构让它看起来更像一个嵌套循环。
+
+::
+
+	-- file: ch14/CartesianProduct.hs
+	blockyPlain xs ys =
+	    xs >>=
+	    \x -> ys >>=
+	    \y -> return (x, y)
+	
+	blockyPlain_reloaded xs ys =
+	    concat (map (\x ->
+	                 concat (map (\y ->
+	                              return (x, y))
+	                         ys))
+	            xs)
+
+如果 ``xs`` 的值是 ``[1, 2, 3]`` ，那么函数体的前两行会依次把x值绑定为 ``1`` , ``2`` 和 ``3`` ；如果 ``ys`` 的值是 ``[True, False]``; 那么最后一行会被求值六次：一次是 ``x`` 为 ``1`` , ``y`` 值为 ``True`` ；然后是 ``x`` 值为 ``1`` , ``y`` 的值为 ``False`` ；一直继续下去。 ``return`` 表达式把每个元组包装成一个单个列表的元素。
+
+.. _putting-the-list-monad-to-work:
+
+使用List Monad
+^^^^^^^^^^^^^^^^^^^
+
+给定一个整数，找出所有的正整数对，使得它们两个积等于这个整数；下面是这个问题的简单解法：
+
+::
+
+	-- file: ch14/MultiplyTo.hs
+	guarded :: Bool -> [a] -> [a]
+	guarded True  xs = xs
+	guarded False _  = []
+	
+	multiplyTo :: Int -> [(Int, Int)]
+	multiplyTo n = do
+	  x <- [1..n]
+	  y <- [x..n]
+	  guarded (x * y == n) $
+	    return (x, y)
+
+使用 **ghci** 验证结果：
+
+::
+
+	ghci> multiplyTo 8
+	[(1,8),(2,4)]
+	ghci> multiplyTo 100
+	[(1,100),(2,50),(4,25),(5,20),(10,10)]
+	ghci> multiplyTo 891
+	[(1,891),(3,297),(9,99),(11,81),(27,33)]
+
+.. _desugaring-of-do-blocks:
+
+还原do的本质
+---------------------------
+
+Haskell的 ``do`` 表示法实际上是个语法糖：它给我们提供了一种不使用 ``(>>=)`` 和匿名函数来写monadic代码的方式。去除do语法糖的过程就是把它翻译为 ``(>>=)`` 和匿名函数。
+
+去除do语法糖的规则非常简单。我们可以简单的把编译器想象为机械重复地对这些do语句块执行这些规则直到没有任何do关键字为止。
+
+``do`` 关键字后面接单个动作（action）直接翻译为动作本身。
+
+::
+
+	-- file: ch14/Do.hs
+	doNotation1 =
+	    do act
+
+::
+
+	-- file: ch14/Do.hs
+	translated1 =
+	    act
+
+``do`` 后面包含多个动作（action）的表示是这样的：首先是第一个动作，但是接一个 ``(>>)`` 操作符，然后一个 ``do`` 关键字；最后接剩下的动作。当我们对do语句块重复应用这条规则的时候，整个do语句快就会被 ``(>>)`` 串联起来。
+
+::
+
+	-- file: ch14/Do.hs
+	doNotation2 =
+	    do act1
+	       act2
+	       {- ... etc. -}
+	       actN
+
+::
+
+	-- file: ch14/Do.hs
+	translated2 =
+	    act1 >>
+	    do act2
+	       {- ... etc. -}
+	       actN
+	
+	finalTranslation2 =
+	    act1 >>
+	    act2 >>
+	    {- ... etc. -}
+	    actN
+
+``<-`` 标记需要额外注意。在 ``<-`` 的左边是一个正常的Haskell模式，可以是单个变量或者更复杂的东西；但是这里不允许使用模式匹配的守卫(guards):
+
+::
+
+	-- file: ch14/Do.hs
+	doNotation3 =
+	    do pattern <- act1
+	       act2
+	       {- ... etc. -}
+	       actN
+
+::
+
+	-- file: ch14/Do.hs
+	translated3 =
+	    let f pattern = do act2
+	                       {- ... etc. -}
+	                       actN
+	        f _     = fail "..."
+	    in act1 >>= f
+
+这种情况会被翻译为声明了一个名字唯一的局部函数(上面的例子里面我们仅仅使用了 ``f`` 这个名字)的 ``let`` 表达式； ``<-`` 右边的动作会用 ``(>>=)`` 和这个局部函数串联起来。
+
+要注意的是，如果模式匹配失败， ``let`` 表达式会调用Monad的 ``fail`` 函数；下面是一个使用 ``Maybe`` monad的例子。
+
+::
+
+	-- file: ch14/Do.hs
+	robust :: [a] -> Maybe a
+	robust xs = do (_:x:_) <- Just xs
+	               return x
+
+``Maybe`` monad里面 ``fail`` 的实现是返回一个 ``Nothing`` 。如果上面的代码模式匹配失败，那么整个计算结果就会是 ``Nothing`` .
+
+::
+
+	ghci> robust [1,2,3]
+	Just 2
+	ghci> robust [1]
+	Nothing
+
+当我们在 ``do`` 块里面使用 ``let`` 表达式的时候，可以省略掉 ``in`` 关键字；但是 ``let`` 后面的语句必须和它对齐。
+
+::
+
+	-- file: ch14/Do.hs
+	doNotation4 =
+	    do let val1 = expr1
+	           val2 = expr2
+	           {- ... etc. -}
+	           valN = exprN
+	       act1
+	       act2
+	       {- ... etc. -}
+	       actN
+
+::
+
+	-- file: ch14/Do.hs
+	translated4 =
+	    let val1 = expr1
+	        val2 = expr2
+	        valN = exprN
+	    in do act1
+	          act2
+	          {- ... etc. -}
+	          actN
+
+.. _monads-as-a-programmable-semicolon:
+
+Monads: 可编程分号
+^^^^^^^^^^^^^^^^^^
+
+在 :ref:`the-offside-rule-is-not-mandatory` 里面提到过缩进排版是Haskell的标准，但是这并不是必要的。我们可以使用 ``do`` 表示法来替代缩进排版。
+
+::
+
+	-- file: ch14/Do.hs
+	semicolon = do
+	  {
+	    act1;
+	    val1 <- act2;
+	    let { val2 = expr1 };
+	    actN;
+	  }
+
+::
+
+	-- file: ch14/Do.hs
+	semicolonTranslated =
+	    act1 >>
+	    let f val1 = let val2 = expr1
+	                 in actN
+	        f _ = fail "..."
+	    in act2 >>= f
+
+虽然很少人有这么用，但是在单个表达式里面显式地使用分号容易让人产生这种感觉：monads是一种“可编程的分号”，因为在每个monad里面 ``(>>=)`` 和 ``(>>)`` 的行为都是不一样的。
+
+.. _why-go-sugar-free:
+
+为什么要sugar-free
+^^^^^^^^^^^^^^^^^^^^^
+
+当我们在代码里面显式使用 ``(>>=)`` 的时候，它提醒我们在使用组合子组合函数而不是简单的序列化动作。
+
+如果你对monad感觉还很陌生，那么我建议你多显式地使用 ``(>>=)`` 而不是 ``do`` 语法来写monadic的代码。这些重复对于大多数的程序员来说都能帮助理解。
+
+当熟悉了monad的时候，你可以按照需要选择你自己的风格；但是永远不要再同一个函数里面混用 ``do`` 和 ``(>>=)`` 。
+
+不管你用不用do表示法， ``(=<<)`` 函数经常被使用；它就是 ``(>>=)`` 的参数翻转版本。
+
+::
+
+	ghci> :type (>>=)
+	(>>=) :: (Monad m) => m a -> (a -> m b) -> m b
+	ghci> :type (=<<)
+	(=<<) :: (Monad m) => (a -> m b) -> m a -> m b
+
+如果想把monadic函数按照通常Haskell从右往左结合起来的话，那么 ``(=<<)`` 非常有用。
+
+::
+
+	-- file: ch14/CartesianProduct.hs
+	wordCount = print . length . words =<< getContents
+
+.. _the-state-monad:
+
+状态monad
+------------------
+
+在 :doc:`10` 里面我们说 ``Parse`` 是一个monad。 ``Parser`` 有两个完全不同的角度像Monad，其一是它在解析失败时候的行为——我们使用 ``Either`` 表达；其二是它携带这一些隐式的状态信息（每次被部分消耗的 ``ByteString`` .
+
+在Haskell里面读写状态这种场景太常见了，因此标准库提供了一个叫做 ``State`` 的monad解决这个问题。在 ``Control.Monad.State`` 这个模块可以找到它。
+
+我们的 ``Parse`` 类型能携带一个 ``ByteString`` 类型的状态， ``State`` monad可以携带任意类型的状态。姑且把这个未知状态的类型记为 ``s`` .
+
+我们能对一个状态做什么？给定一个状态的值，我们可以查看这个状态，产生一个结果然后返回一个新的状态。假设计算的结果类型是 ``a`` . 那么表达这个过程的类型就是 ``s -> (a, s)`` : 接受一个状态 ``s`` 对它进行某些操作，返回结果 ``a`` 和新状态 ``s`` .
+
+.. _almost-a-state-monad:
+
+自己定义State monad
+^^^^^^^^^^^^^^^^^^^^^^^
+
+我们先自己实现一个State monad，然后看看标准库的实现是什么样的。首先我们从类型定义开始，正如上面我们已经讨论过的，State的类型定义如下：
+
+::
+
+	-- file: ch14/SimpleState.hs
+	type SimpleState s a = s -> (a, s)
+
+我们定义的monad是把一个状态转换为另外一个状态的函数，在转化的过程中产生一个计算结果。因此，state monad也经常被称为状态转换monad。
+
+在这一章的开始，我们说过monad有一个带单个类型参数的类型构造器，但是这里我们有两个类型参数。理解这里的关键是，我们可以把类型构造器像使用函数一样部分应用（partially apply）；下面是一个最简单的例子。
+
+::
+
+	-- file: ch14/SimpleState.hs
+	type StringState a = SimpleState String a
+
+这里我们把类型变量 ``s`` 固定为了 ``String`` 类型。 ``StringState`` 还带有一个类型参数 ``a`` ；这样就能比较明显的看出来这个类型与Monad类型构造器比较匹配了。换句话说，现在monad的类型构造器是 ``SimpleState s`` ,而不是单独的 ``SimpleState`` .
+
+实现这个State monad接下来要做的就是定义 ``return`` 函数。
+
+::
+
+	-- file: ch14/SimpleState.hs
+	returnSt :: a -> SimpleState s a
+	returnSt a = \s -> (a, s)
+
+这里 ``return`` 函数所做的就是接受一个结果和当前状态，把它包装成一个二元组，然后返回。你现在应该已经习惯了Haskell把带有多个参数的函数当成一系列单个参数函数的串联调用，以下是另一种更直观的写法：
+
+::
+
+	-- file: ch14/SimpleState.hs
+	returnAlt :: a -> SimpleState s a
+	returnAlt a s = (a, s)
+
+实现自定义的State monad最后一步就是定义 ``(>>=)`` 。下面是标准库的 ``State`` monad对于 ``(>>=)`` 的实现：
+
+::
+
+	-- file: ch14/SimpleState.hs
+	bindSt :: (SimpleState s a) -> (a -> SimpleState s b) -> SimpleState s b
+	bindSt m k = \s -> let (a, s') = m s
+	                   in (k a) s'
+
+这些单个参数的变量不太容易懂，先把它们换成一些更可读的名字。
+
+::
+
+	-- file: ch14/SimpleState.hs
+	-- m == step
+	-- k == makeStep
+	-- s == oldState
+	
+	bindAlt step makeStep oldState =
+	    let (result, newState) = step oldState
+	    in  (makeStep result) newState
+
+.. _reading-and-modifying-the-state: 
+
+读取和修改状态
+^^^^^^^^^^^^^^^
+
+``(>>=)`` 和 ``return`` 的定义仅仅转移状态，但是并不对状态内部做任何事情。因此我们需要一些简单的辅助函数来对状态进行操作。
+
+::
+
+	-- file: ch14/SimpleState.hs
+	getSt :: SimpleState s s
+	getSt = \s -> (s, s)
+
+ ``getSt`` 函数就是接受当前状态并把它作为计算结果和状态一并返回； ``putSt`` 函数忽略当前状态并使用一个新的状态取代它。
+
+.. _will-the-real-state-monad-please-stand-up:
+
+真正的State monad定义
+^^^^^^^^^^^^^^^^^^^^^^
+
+我们之前实现的 ``SimpleState`` 仅仅使用了类型别名而不是使用一个新的类型；如果我们当时就使用 ``newtype`` 包装一个新的类型，那么对于这个类型的处理会使我们的代码不太容易懂。
+
+要定义一个Monad的实例，除了实现 ``(>>=)`` 和 ``return`` 还要提供一个合适的类型构造器。这正是标准库的 ``State`` Monad的做法：
+
+::
+
+	-- file: ch14/State.hs
+	newtype State s a = State {
+	      runState :: s -> (a, s)
+	    }
+
+这里所做的就是把 ``s -> (a, s)`` 类型用 ``State`` 构造器包装起来。通过使用Haskell的纪录语法来定义新类型，我们自动获得了一个 ``runState`` 函数来从类型构造器里面提取状态值。 ``runState`` 的类型是 `` State s a -> s -> (a, s)``
+
+标准库的State monad中 ``return`` 的定义和我们的 ``SimpleState`` 的 ``return`` 定义基本相同，只不过这里使用 ``State`` 构造器包装了一下状态函数。
+
+::
+
+	-- file: ch14/State.hs
+	returnState :: a -> State s a
+	returnState a = State $ \s -> (a, s)
+
+由于 ``(>>=)`` 要使用 ``runState`` 函数来提取 ``State`` 的值，因此它的的定义略微复杂一些。
+
+::
+
+	-- file: ch14/State.hs
+	bindState :: State s a -> (a -> State s b) -> State s b
+	bindState m k = State $ \s -> let (a, s') = runState m s
+	                              in runState (k a) s'
+
+这个函数与我们之前在 ``SimpleState`` 里面定义的 ``bindSt`` 函数唯一的不同是它有提取和包装一些值的操作。
+
+同样，我们也修改了读取和修改状态的函数（提取和包装了一些值）：
+
+::
+
+	-- file: ch14/State.hs
+	get :: State s s
+	get = State $ \s -> (s, s)
+	
+	put :: s -> State s ()
+	put s = State $ \_ -> ((), s)
+
+.. _using-the-state-monad-generating-random-values:
+
+使用State monad生成随机数
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+之前我们使用 ``Parse`` 解析二进制数据，当时我们把要管理的状态直接放在了 ``Parse`` 类型里面。
+
+其实 ``State`` monad可以接受任意的类型作为状态参数，我们可以提供这个状态类型，比如 ``State ByteString``.
+
+如果你有命令式编程语言的背景的话，相对于别的很多monad，你可能对 ``State`` 这个monad更加熟悉。毕竟命令式语言所做的就是携带和转移一些隐式的状态，比如读写某些部分，通过赋值修改一些东西；这正是State monad所做的。
+
+既然这样，我们不用费力地解释怎么使用State monad了，直接来个实际的例子就好：生成伪随机数。在命令式编程语言里面，通常有一些很方便使用的均匀分布的伪随机数源；比如在C语言标准库里面，有一个 ``rand`` 函数使用一个全局的状态生成伪随机数。
+
+Haskell标准库里面生成伪随机数的模块叫做 ``System.Random`` ，它可以生成任意类型的随机数，而不仅仅是数值类型。这个模块提供了一些非常实用的函数。比如与C语言里面 ``rand`` 等价的函数如下：
+
+::
+
+	-- file: ch14/Random.hs
+	import System.Random
+	
+	rand :: IO Int
+	rand = getStdRandom (randomR (0, maxBound))
+
+( ``randomR`` 函数接受一个希望生成的随机数所在范围的闭区间。）
+
+``System.Random`` 模块提供了一个 ``RandomGen`` 类型类，它允许我们自行定义一个新的随机整数源。 ``StdGen`` 类型是标准的 ``RandomGen`` 的实例，它可以生成伪随机数值。如果我们有一个外部的真实可靠的随机数源，我们可以创建一个 ``RandomGen`` 的实例来创建真实的随机数，而不是使用伪随机数。
+
+``Random`` 这个类型类展示了如何给特定的类型生成随机数值。这个模块给所有常见的简单类型创建了 ``Random`` 的实例。
+
+顺便说下，前面定义的 ``rand`` 函数也会读取和修改 ``IO`` monad中内置的全局随机数生成器。
+
+.. _a-first-attempt-at-purity:
+
+实用纯函数生成随机数的尝试
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+我们一直尽量避免使用 ``IO`` monad，如果仅仅是为了生成随机数就要打破这一点就有点不好意思了。实际上， ``System.Random`` 模块里面提供了一些纯函数来生成随机数。
+
+使用传统纯函数的缺点是，我们得获取或者手动创建一个随机数生成器，然后把它传递到需要得地方，最终调用这个纯函数的时候回传一个新的随机数生成器：要记住的是，我们是纯函数，所以不能修改已经存在的随机数生成器。
+
+如果我们不管不变性而是直接复用原来的随机数生成器，那么每次我们调用这个函数都会得到完全一样的“随机数”。
+
+::
+
+	-- file: ch14/Random.hs
+	twoBadRandoms :: RandomGen g => g -> (Int, Int)
+	twoBadRandoms gen = (fst $ random gen, fst $ random gen)
+
+::
+
+	ghci> twoBadRandoms `fmap` getStdGen
+	Loading package old-locale-1.0.0.0 ... linking ... done.
+	Loading package old-time-1.0.0.0 ... linking ... done.
+	Loading package random-1.0.0.0 ... linking ... done.
+	Loading package mtl-1.1.0.0 ... linking ... done.
+	(945769311181683171,945769311181683171)
+
+上面的 ``random`` 函数有一个默认的随机数生成范围，而不是像 ``randomR`` 一样接受用户传递的参数范围； ``getStdGen`` 函数从 ``IO`` monad里面获取全局的标准数据生成器的值。
+
+不幸的是，如果我们把第一个随机数生成之后新的生成器的值正确地传递给第二个随机数的生成过程，代码就不太可读了，下面是个简单的例子：
+
+::
+
+	-- file: ch14/Random.hs
+	twoGoodRandoms :: RandomGen g => g -> ((Int, Int), g)
+	twoGoodRandoms gen = let (a, gen') = random gen
+	                         (b, gen'') = random gen'
+	                     in ((a, b), gen'')
+
+现在我们学到了 ``State`` monad, 它好像是个比较好的解决办法。 state monad 允许我们整洁地管理可变的状态，并且保证这部分代码与任何诸如修改文件，连接网络等副作用操作分离开来；这样让我们能够更加容易滴思考代码的行为。
+
+.. _random-values-in-the-state-monad:
+
+state monad里面的随机数值 
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+下面是一个使用 ``StdGen`` 作为状态的state monad：
+
+::
+
+	-- file: ch14/Random.hs
+	type RandomState a = State StdGen a
+
+上面的类型别名不是必要的，但是很有用；其一它可以让我们少敲几个字符，其二，如果我们想使用别的随机数生成器而不是 ``StdGen`` ，我们可以少修改一些类型签名。
+
+有了 ``RandomState`` ，生成随机数值就是获取当前的随机数生成器，使用它然后用新的随机数生成器修改当前状态就行了。
+
+::
+
+	-- file: ch14/Random.hs
+	getRandom :: Random a => RandomState a
+	getRandom =
+	  get >>= \gen ->
+	  let (val, gen') = random gen in
+	  put gen' >>
+	  return val
+
+现在我们可以用之前学到的知识写一些monadic的代码来生成一对随机数：
+
+::
+
+	-- file: ch14/Random.hs
+	getTwoRandoms :: Random a => RandomState (a, a)
+	getTwoRandoms = liftM2 (,) getRandom getRandom
+
+.. _Exercises:
+练习
+^^^^
+1. 用 ``do`` 重写 ``getRandom`` 函数
+
+.. _running-the-state-monad:
+
+运行state monad
+^^^^^^^^^^^^^^^
+
+之前提到过，每个monad都有他自己的求值函数；在state monad里面，有几个求值函数可供选择。
+
+#. ``runState`` 返回求值结果和最终状态
+#. ``evalState`` 只返回结果
+#. ``execState`` 只返回最终状态
+
+ ``evalState`` 和 ``execState`` 函数其实就是 ``runState`` 和 ``fst`` , ``snd`` 函数的简单组合。所以三个里面最重要的是要记住 ``runState`` .
+
+下面是实现 ``getTwoRandoms`` 一个完整的例子：
+
+::
+
+	-- file: ch14/Random.hs
+	runTwoRandoms :: IO (Int, Int)
+	runTwoRandoms = do
+	  oldState <- getStdGen
+	  let (result, newState) = runState getTwoRandoms oldState
+	  setStdGen newState
+	  return result
+
+.. _what-about-a-bit-more-state
+
+管理更多的状态
+^^^^^^^^^^^^^^
+
+很难想象针对单个状态我们竟写了这么多有趣的代码，当我们想一次性纪录多个状态的时候，通常的办法是把这些状态放在一个数据结构里面管理。下面是一个纪录我们生成随机数数目的例子：
+
+::
+
+	-- file: ch14/Random.hs
+	data CountedRandom = CountedRandom {
+	      crGen :: StdGen
+	    , crCount :: Int
+	    }
+	
+	type CRState = State CountedRandom
+	
+	getCountedRandom :: Random a => CRState a
+	getCountedRandom = do
+	  st <- get
+	  let (val, gen') = random (crGen st)
+	  put CountedRandom { crGen = gen', crCount = crCount st + 1 }
+	  return val
+
+上面的函数每次被调用的时候都会处理状态的两个元素然后返回一个全新的状态；更常见的情况是我们只需要读写整个状态的某一部分；下面的函数可以获取当前生成过的随机数的数目：
+
+::
+
+	-- file: ch14/Random.hs
+	getCount :: CRState Int
+	getCount = crCount `liftM` get
+
+这个例子也说明了我们为什么要使用纪录语法定义 ``CountedRandom`` 状态；使用纪录函数提供的访问函数，把它与 ``get`` 函数结合起来可以很方便地读取状态的特定部分。
+
+如果想要更新整个状态的某一部分，下面的代码可能不是很吸引人：
+
+::
+
+	-- file: ch14/Random.hs
+	putCount :: Int -> CRState ()
+	putCount a = do
+	  st <- get
+	  put st { crCount = a }
+
+这一段代码我们使用了纪录更新语法而不是用一个函数。表达式 ``st { crCount = a }`` 会创建一个和 ``st`` 几乎完全相等的值，只是使用给定的 ``a`` 作为 ``crCount``  字段的值。由于这是个语法上的小技巧，因此它没有使用函数那么灵活。纪录语法可能并没有Haskell通常的语法那么优雅，但是至少它能完成我们的目的。
+
+函数 ``modify`` 组合了 ``get`` 和 ``put`` , 它接受一个状态转换函数，但是依然不太令人满意：还是需要使用纪录语法。
+
+::
+
+	-- file: ch14/Random.hs
+	putCountModify :: Int -> CRState ()
+	putCountModify a = modify $ \st -> st { crCount = a }
+
+.. _monad-and-functors:
+
+Monad和Functors
+----------------
+
+Functor和Monad之间有非常紧密的联系，这两个术语是从数学里面的范畴论引入的，但是又与数学定义不完全相同。
+
+在范畴论里面，monad通过functor构建出来。你可能希望在Haskell里面也是这样，也就是 ``Monad`` 这个类型类是 ``Functor`` 类型类的子类；但是在标准库的Prelude里面并不是这么定义的。这是个很不幸的疏忽。
+
+但是，Haskell库的作者们提供了一个变通方案：一旦他们写了一个 ``Monad`` 的实例，几乎总是也给 ``Functor`` 定义一个实例。所以对于任何monad你都可以使用 ``Functor`` 类型类的 ``fmap`` 函数。
+
+如果把 ``fmap`` 函数的类型签名与我们已经见到过标准库里面Monad的一些函数做比较，大致就知道在monad里面 ``fmap`` 函数是干什么的了。
+
+::
+
+	ghci> :type fmap
+	fmap :: (Functor f) => (a -> b) -> f a -> f b
+	ghci> :module +Control.Monad
+	ghci> :type liftM
+	liftM :: (Monad m) => (a1 -> r) -> m a1 -> m r
+
+可以看出， ``fmap`` 函数作用和 ``liftM`` 一样，它把一个纯函数lift到monad里面。
+
+换个角度看Monad
+^^^^^^^^^^^^^^^^
+
+我们已经知道了monad和functor之间的联系，如果回头再看看List这个monad，会发现一些有趣的东西；具体来说，是list的 ``(>>=)`` 定义。
+
+::
+
+	-- file: ch14/ListMonad.hs
+	instance Monad [] where
+	    return x = [x]
+	    xs >>= f = concat (map f xs)
+
+ ``f`` 的类型是 ``a -> [a]`` 我们调用 ``map f xs`` 的时候，我们会得到一个类型是 ``[[a]]`` 的值，然后我们必须使用 ``concat`` 把它“扁平化”（flatten).
+
+想一想如果 ``Monad`` 是 ``Functor`` 的子类的时候我们能做什么；由于list的 ``fmap`` 定义就是 ``map`` , 在 ``(>>=)`` 定义里面我们可以使用 ``fmap`` 替换 ``map`` .这个替换本身并没有什么特殊意义，我们再进一步探讨一下。
+
+ ``concat`` 函数的类型是 ``[[a]] -> [a]`` :正如我们提到的，它把一个嵌套的列表压平。我们可以把list的这函数的类型签名从list推广到所有monad，也就是一个“移除一层嵌套”的类型 ``m (m a) -> m a``; 具有这种类型前面的函数通常叫做 ``join`` .
+
+如果已经有了 ``join`` 和 ``fmap`` 的定义，我们就不需要为每一个monad定义一个 ``(>>=)`` 函数了，因为它完全可以由 ``join`` 和 ``fmap`` 定义出来。下面是 ``Monad`` 类型类另外一种定义方式。
+
+::
+
+	-- file: ch14/AltMonad.hs
+	import Prelude hiding ((>>=), return)
+	
+	class Functor m => AltMonad m where
+	    join :: m (m a) -> m a
+	    return :: a -> m a
+	
+	(>>=) :: AltMonad m => m a -> (a -> m b) -> m b
+	xs >>= f = join (fmap f xs)
+
+不能说哪一种定义比另外一种更好，因为有了 ``join`` 我们可以定义 ``(>>=)`` ，反之亦然。但是这两个不同的角度给了我们对Monad全新的认识。
+
+移除一层monadic包装实际上是非常有用的，在 ``Control.Monad`` 里面由一个标准的 ``join`` 定义。
+
+::
+
+	-- file: ch14/MonadJoin.hs
+	join :: Monad m => m (m a) -> m a
+	join x = x >>= id
+
+下面是一些使用 ``join`` 的例子。
+
+::
+
+	ghci> join (Just (Just 1))
+	Just 1
+	ghci> join Nothing
+	Nothing
+	ghci> join [[1],[2,3]]
+	[1,2,3]
+
+.. _the-monad-laws-and-good-coding-style:
+
+单子律以及代码风格
+--------------------
+
+在 :ref:`thinking-more-about-functors` 里面我们介绍了functors必须遵从的两条规则：
+
+::
+
+	-- file: ch14/MonadLaws.hs
+	fmap id        ==   id 
+	fmap (f . g)   ==   fmap f . fmap g
+
+monads也有它们必须遵从的规则。下面的三条规则被称为单子律。Haskell并不会强制检查这些规则： 完全由monad的作者保证。
+
+单子律就是简单而正式地表达“某个单子不会表现得让人惊讶”的意思。原则上讲，我们可以完全不管这些规则定义自己的monad，但是如果我们这么干会为人所不齿的；因为单子律有一些我们可能忽视的宝藏。
+
+.. note::
+
+	下面的每一条规则，``==`` 左边的表达式等价于右边的表达式。
+
+第一条规则说的是 ``return`` 是 ``(>>=)`` 的 *Left identity*.
+
+::
+
+	-- file: ch14/MonadLaws.hs
+	return x >>= f            ===   f x
+
+另外一种理解这条规则的方式是：如果我们仅仅是把一个纯值包装到monad里面然后使用 ``(>>=)`` 调用的话，我们就没有必要使用 ``return`` 了；使用monad的新手通常所犯的错误就是使用 ``return`` 把一个纯值包装为monadic的，然后接下来由使用 ``(>>=)`` 把这个值取出来。下面是使用do表示法表达这个规律的等价形式：
+
+::
+
+	-- file: ch14/MonadLaws.hs
+	do y <- return x
+	   f y                    ===   f x
+
+这条规则对于我们的代码风格有着实际上的指导意义：我们不想写一些不必要的代码；这条规则保证了简短的写法和冗余的写法是等价的。
+
+单子律的第二条说的是 ``return`` 是 ``(>>=)`` 的 *Right identity*.
+
+::
+
+	-- file: ch14/MonadLaws.hs
+	m >>= return              ===   m
+
+如果你以前使用命令式编程语言，那么这一条规则对风格也有好处：如果在一系列的action块里面，如果最后一句就是需要返回的正确结果，那么就不需要使用 ``return`` 了；看看使用 ``do`` 表示法如何表达这条规则：
+
+::
+
+	-- file: ch14/MonadLaws.hs
+	do y <- m
+	   return y               ===   m
+
+和第一条规则一样，这条规律也能帮助我们简化代码。
+
+单子律最后一条和结合性有关。
+
+::
+
+	-- file: ch14/MonadLaws.hs
+	m >>= (\x -> f x >>= g)   ===   (m >>= f) >>= g
+
+这条规则有点难理解，我们先看看等式两边括号里面的内容；等式左边可以重新表示成这样：
+
+::
+
+	-- file: ch14/MonadLaws.hs
+	m >>= s
+	  where s x = f x >>= g
+
+等式右边也做类似的处理：
+
+::
+
+	-- file: ch14/MonadLaws.hs
+	t >>= g
+	  where t = m >>= f
+
+现在我们可以把上述规律表达成如下等价形式：
+
+::
+
+	-- file: ch14/MonadLaws.hs
+	m >>= s                   ===   t >>= g
+
+这条规则的意思是，如果我们把一个大的action分解成一系列的子action，只要我们保证子action的顺序，把哪些子action提取出来组合成一个新action对求值结果是没有影响的。如果我们由三个action串联在一起，我们可以把前两个action替换为它们的组合然后串联第三个，也可以用第一个action串联后面两个cation的组合。
+
+这条较为复杂的规律对我们的代码风格也有一些意义。在软件重构里面，有一个专业术语叫做“提取方法”，它说的就是在一大段代码里面提取出一些代码片段然后组合成一个新的函数，在原始代码里面调用新的函数来取代提取出来的内容；第三条单子律保证了这种做法在Haskell的monadic代码里面也可以使用这种技术。
+
+三条单子律都能帮助我们写出更好的monadic代码；前两条规则指导我们如何避免使用不必要的 ``return`` , 第三条规则让我们能安全地把一个复杂的action冲构成一系列小的action。我们现在可以不管这些细节，通过直觉我们知道在一个实现良好的monad里面，这些规则是不会被违背的。
+
+顺便说一下，Haskell编译器并不并不能保证一个monad是否遵守单子律。monad的实现者必须确保自己的代码满足（最好是证明）单子律。
