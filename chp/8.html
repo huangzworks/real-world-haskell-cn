@@ -339,7 +339,7 @@ pack &quot;foo&quot; :: ByteString
 </div>
 </div>
 <div class="section" id="glob">
-<h2>将 glob 模式翻译为正则表达式<a class="headerlink" href="#glob" title="Permalink to this headline">¶</a></h2>
+<span id="translate-a-glob-pattern-into-a-regular-expression"></span><h2>将 glob 模式翻译为正则表达式<a class="headerlink" href="#glob" title="Permalink to this headline">¶</a></h2>
 <p>我们已经看到了用正则表达式匹配文本的多种方法，现在让我们将注意力回到 glob 模式。我们要编写一个函数，接收一个 glob 模式作为输入，返回其对应的正则表达式。glob 模式和正则表达式都以文本字符串表示，所以这个函数的类型应该已经清楚了。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch08/GlobRegex.hs</span>
 <span class="kr">module</span> <span class="nn">GlobRegex</span>

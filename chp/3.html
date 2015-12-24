@@ -1055,8 +1055,8 @@ data Maybe a = Just a
 <p>在使用诸如 Emacs 这种能够识别 Haskell 代码的编辑器时，通常的默认配置是使用空格来表示缩进。如果你的编辑器不能识别 Haskell，建议您手工设置使用空格来表示缩进。</p>
 <p>这么做的好处是可移植性。在一个使用等宽字体的编辑器里，类 Unix 系统和 Windows 系统对制表符的默认显示宽度并不一样，前者相当于 8 个字符宽度，而后者则相当于 4 个。这就意味着无论你自己认为制表符应该显示为多宽，你并不能保证别人的编辑器设置会尊重你的看法。使用制表符来表示缩进一定会在某些人的设置那里看起来一团糟。甚至还有可能导致编译错误，因为 Haskell 语言标准的实现是按照 Unix 风格制表符宽度来的。而使用空格则完全不用担心这个问题。</p>
 </div>
-<div class="section" id="id28">
-<h3>缩进规则并不是必需<a class="headerlink" href="#id28" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="the-offside-rule-is-not-mandatory">
+<span id="id28"></span><h3>缩进规则并不是必需<a class="headerlink" href="#the-offside-rule-is-not-mandatory" title="Permalink to this headline">¶</a></h3>
 <p>我们也可以使用显式的语法结构来代替排版，从而表达代码的意图。例如，我们先写一个左大括号，然后写几个赋值等式，每个等式之间用分号分隔，最后加上一个右大括号。下面这个两个例子所表达的意图是一模一样的。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/Braces.hs</span>
 <span class="nf">bar</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">a</span> <span class="ow">=</span> <span class="mi">1</span>

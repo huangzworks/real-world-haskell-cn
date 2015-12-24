@@ -144,7 +144,7 @@ Haskell程序中的所有I/O动作都是由从 <code class="docutils literal"><s
 <dt>只有当你有多于一个动作需要运行的时候才要用到 <code class="docutils literal"><span class="pre">do</span></code> 。</dt>
 <dd><code class="docutils literal"><span class="pre">do</span></code> 代码块的值是最后一个动作执行的结果。</dd>
 </dl>
-<p>想要看 <code class="docutils literal"><span class="pre">do</span></code> 语法的完整介绍，可以看 <a href="#id15"><span class="problematic" id="id16">`do代码块提取`_</span></a> .</p>
+<p>想要看 <code class="docutils literal"><span class="pre">do</span></code> 语法的完整介绍，可以看 <a href="#id16"><span class="problematic" id="id17">`do代码块提取`_</span></a> .</p>
 <p>我们来考虑一个在I/O动作中调用纯代码的一个例子：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch07/callingpure.hs</span>
 <span class="nf">name2reply</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
@@ -237,7 +237,7 @@ Haskell程序中的所有I/O动作都是由从 <code class="docutils literal"><s
 你总是可以确定程序中纯的部分不会有意想不到的结果。
 这样就帮助你思考程序，也帮助编译器思考程序。
 比如最新版本的 <strong>ghc</strong> 可以自动给你代码纯的部分提供一定程度的并行化 &#8211; 一个计算的神圣目标。</p>
-<p>对于这个主题，你可以在 <a class="reference internal" href="#id10">惰性I/O的副作用</a> 一节看更多的讨论。</p>
+<p>对于这个主题，你可以在 <a class="reference internal" href="#id11">惰性I/O的副作用</a> 一节看更多的讨论。</p>
 </div>
 </div>
 <div class="section" id="handle">
@@ -392,7 +392,7 @@ Haskell在这方面和其他语言没有什么不同。</p>
 然而在一些情况下Haskell可能不会帮你做这些。
 所以再一次强调，最好在任何时候都由你来负责调用 <code class="docutils literal"><span class="pre">hClose</span></code> 。</p>
 <p>Haskell给你提供了一些工具，不管出现什么错误，用来简单地确保这些工作。
-你可以阅读在 <a class="reference internal" href="#id6">扩展例子：函数式I/O和临时文件</a> 一节的 <code class="docutils literal"><span class="pre">finally</span></code> 和 <a href="#id17"><span class="problematic" id="id18">`获取-使用-回收 周期`_</span></a> 一节的 <code class="docutils literal"><span class="pre">bracket</span></code> 。</p>
+你可以阅读在 <a class="reference internal" href="#id6">扩展例子：函数式I/O和临时文件</a> 一节的 <code class="docutils literal"><span class="pre">finally</span></code> 和 <a href="#id18"><span class="problematic" id="id19">`获取-使用-回收 周期`_</span></a> 一节的 <code class="docutils literal"><span class="pre">bracket</span></code> 。</p>
 </div>
 <div class="section" id="seek-and-tell">
 <h3>Seek and Tell<a class="headerlink" href="#seek-and-tell" title="Permalink to this headline">¶</a></h3>
@@ -434,7 +434,7 @@ Haskell在这方面和其他语言没有什么不同。</p>
 <p class="first admonition-title">Tip</p>
 <p class="last">我们这里使用了局部应用。</p>
 </div>
-<p>如果不明白，可以参考 <a href="#id19"><span class="problematic" id="id20">`部分函数应用和柯里化`_</span></a></p>
+<p>如果不明白，可以参考 <a href="#id20"><span class="problematic" id="id21">`部分函数应用和柯里化`_</span></a></p>
 <p>之前我们告诉你这3个标准文件句柄一般对应什么。
 那是因为一些操作系统可以让你重定向这个文件句柄到不同的地方-文件，设备，甚至是其他程序。
 这个功能在POSIX（Linux，BSD，Mac）操作系统Shell编程中广泛使用，在Windows中也能使用。</p>
@@ -463,9 +463,9 @@ Haskell在这方面和其他语言没有什么不同。</p>
 在调用 <code class="docutils literal"><span class="pre">renameFile</span></code> 之前老的文件必须存在。
 如果新的文件已经存在了，它在重命名之前会被删除掉。</p>
 <p>像很多其他接受文件名的函数一样，如果老的文件名不存在， <code class="docutils literal"><span class="pre">renameFile</span></code> 会引发一个异常。
-更多关于异常处理的信息你可以在 <a href="#id21"><span class="problematic" id="id22">`第十九章，错误处理`_</span></a> 中找到。</p>
+更多关于异常处理的信息你可以在 <a href="#id22"><span class="problematic" id="id23">`第十九章，错误处理`_</span></a> 中找到。</p>
 <p>在 <code class="docutils literal"><span class="pre">System.Directory</span></code> 中有很多其他函数，用来创建和删除目录，查找目录中文件列表，和测试文件是否存在。
-它们在 <a href="#id23"><span class="problematic" id="id24">`目录和文件信息`_</span></a> 一节中讨论。</p>
+它们在 <a href="#id24"><span class="problematic" id="id25">`目录和文件信息`_</span></a> 一节中讨论。</p>
 </div>
 <div class="section" id="id5">
 <h3>临时文件<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
@@ -581,7 +581,7 @@ Lisp程序员可能看到我们的 <code class="docutils literal"><span class="p
 <p>为了让程序能够更好地处理错误，我们需要为它添加一些异常处理代码。
 你一般需要临时文件在处理完成之后被删除，就算有错误发生。
 所以我们要确保删除发生。
-关于异常处理的更多信息，请看 <a href="#id25"><span class="problematic" id="id26">`第十九章：错误处理`_</span></a> 。</p>
+关于异常处理的更多信息，请看 <a href="#id26"><span class="problematic" id="id27">`第十九章：错误处理`_</span></a> 。</p>
 <p>让我们回到这个程序的开头， <code class="docutils literal"><span class="pre">main</span></code> 被简单定义成 <code class="docutils literal"><span class="pre">withTempFile</span> <span class="pre">&quot;mytemp.txt&quot;</span> <span class="pre">myAction</span></code> 。
 然后, <code class="docutils literal"><span class="pre">myAction</span></code> 将会被调用，使用名字和这个临时文件的句柄作为参数。</p>
 <p><code class="docutils literal"><span class="pre">myAction</span></code> 显示一些信息到终端，写一些数据到文件，寻找文件的开头，并且使用 <code class="docutils literal"><span class="pre">hGetContents</span></code> 把数据读取回来。
@@ -645,7 +645,7 @@ Lisp程序员可能看到我们的 <code class="docutils literal"><span class="p
 <p>所有这些都是完全透明地发生的。
 因为函数的返回值是一个如假包换的纯 String ，所以它可以被传递给非 I/O 的纯代码。
 让我们快速看一个例子。
-回到 <a href="#id27"><span class="problematic" id="id28">`操作文件和句柄`_</span></a> 一节，你看到一个命令式的程序，它把整个文件内容转换成大写。
+回到 <a href="#id28"><span class="problematic" id="id29">`操作文件和句柄`_</span></a> 一节，你看到一个命令式的程序，它把整个文件内容转换成大写。
 它的命令式算法和你在其他语言看到的很类似。
 接下来展示的是一个利用了惰性求值实现的更简单的算法。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch07/toupper-lazy1.hs</span>
@@ -805,7 +805,7 @@ Lisp程序员可能看到我们的 <code class="docutils literal"><span class="p
 </div>
 <p>如果你想看看Haskell是否真的一接收到数据块就立即写出的话，运行 <code class="docutils literal"><span class="pre">runghc</span> <span class="pre">toupper-lazy4.hs</span></code> ，不要其他的命令行参数。
 你可以看到每一个你输入的字符都会立马回显，但是都变成大写了。
-缓冲区可能改变这种行为，更多关于缓冲区的看这一章后面的 <a href="#id29"><span class="problematic" id="id30">`缓冲区`_</span></a> 一节。
+缓冲区可能改变这种行为，更多关于缓冲区的看这一章后面的 <a href="#id30"><span class="problematic" id="id31">`缓冲区`_</span></a> 一节。
 如果你看到你输入的没一行都立马回显，或者甚至一段时间什么都没有，那就是缓冲区造成的。</p>
 <p>你也可以用 <code class="docutils literal"><span class="pre">interactive</span></code> 写一个简单的交互程序。
 让我们从一个简单的例子开始：</p>
@@ -817,7 +817,7 @@ Lisp程序员可能看到我们的 <code class="docutils literal"><span class="p
 </div>
 <div class="admonition tip">
 <p class="first admonition-title">Tip</p>
-<p class="last">如果 <code class="docutils literal"><span class="pre">.</span></code> 运算符不明白的话，你可以参考 <a href="#id31"><span class="problematic" id="id32">`使用组合来重用代码`_</span></a> 一节。</p>
+<p class="last">如果 <code class="docutils literal"><span class="pre">.</span></code> 运算符不明白的话，你可以参考 <a href="#id32"><span class="problematic" id="id33">`使用组合来重用代码`_</span></a> 一节。</p>
 </div>
 <p>这里我们在输出的开头添加了一个字符串。
 你可以发现这个问题吗？</p>
@@ -851,7 +851,7 @@ Lisp程序员可能看到我们的 <code class="docutils literal"><span class="p
 <span class="nf">elem</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
 </pre></div>
 </div>
-<p>你只是看它们的类型，你能猜到它们是干什么的吗？如果不能，你可以在 <a href="#id33"><span class="problematic" id="id34">`热身：快捷文本行分割`_</span></a> 一节和 <a href="#id35"><span class="problematic" id="id36">`特殊字符串处理函数`_</span></a> 一节找到解释。
+<p>你只是看它们的类型，你能猜到它们是干什么的吗？如果不能，你可以在 <a href="#id34"><span class="problematic" id="id35">`热身：快捷文本行分割`_</span></a> 一节和 <a href="#id36"><span class="problematic" id="id37">`特殊字符串处理函数`_</span></a> 一节找到解释。
 你会频繁看到 <code class="docutils literal"><span class="pre">lines</span></code> 和 <code class="docutils literal"><span class="pre">unlines</span></code> 和I/O一起使用。
 最后， <code class="docutils literal"><span class="pre">elem</span></code> 接受一个元素和一个列表，如果元素在列表中出现则返回 <code class="docutils literal"><span class="pre">True</span></code> 。</p>
 <p>试着用我们的标准输入例子来运行：</p>
@@ -886,7 +886,7 @@ Haskell的函数有数学上的意思：它们是纯粹的计算过程，并且�
 Haskell里的这个工具叫做动作（Actions）。
 动作类似于函数，它们在定义的时候不做任何事情，而在它们被调用时执行一些任务。
 I/O动作被定义在 <code class="docutils literal"><span class="pre">IO</span></code> Monad。
-Monad是一种强大的将函数链在一起的方法，在 <a href="#id37"><span class="problematic" id="id38">`第十四章：Monad`_</span></a> 会讲到。
+Monad是一种强大的将函数链在一起的方法，在 <a href="#id38"><span class="problematic" id="id39">`第十四章：Monad`_</span></a> 会讲到。
 为了理解I/O你不是一定要理解Monad，只要理解操作的返回类型都带有 <code class="docutils literal"><span class="pre">IO</span></code> 就行了。
 我们来看一些类型：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">putStrLn</span>
@@ -1000,7 +1000,7 @@ Monad是一种强大的将函数链在一起的方法，在 <a href="#id37"><spa
 </dl>
 </div>
 <div class="section" id="sequencing">
-<h3>串联化（Sequencing）<a class="headerlink" href="#sequencing" title="Permalink to this headline">¶</a></h3>
+<span id="id10"></span><h3>串联化（Sequencing）<a class="headerlink" href="#sequencing" title="Permalink to this headline">¶</a></h3>
 <p><code class="docutils literal"><span class="pre">do</span></code> 代码块实际上是把操作连接在一起的快捷记号。
 有两个运算符可以用来代替 <code class="docutils literal"><span class="pre">do</span></code> 代码块： <code class="docutils literal"><span class="pre">&gt;&gt;</span></code> 和 <code class="docutils literal"><span class="pre">&gt;&gt;=</span></code> 。
 在 <strong>ghci</strong> 看一下它们的类型：</p>
@@ -1038,11 +1038,11 @@ Monad是一种强大的将函数链在一起的方法，在 <a href="#id37"><spa
 <p>你定义 <code class="docutils literal"><span class="pre">do</span></code> 代码块的时候，Haskell编译器内部会把它翻译成像这样。</p>
 <div class="admonition tip">
 <p class="first admonition-title">Tip</p>
-<p class="last">忘记了怎么使用 <code class="docutils literal"><span class="pre">\</span></code> (lambda表达式)了吗？参见 <a href="#id39"><span class="problematic" id="id40">`匿名（lambda）函数`_</span></a> 一节。</p>
+<p class="last">忘记了怎么使用 <code class="docutils literal"><span class="pre">\</span></code> (lambda表达式)了吗？参见 <a href="#id40"><span class="problematic" id="id41">`匿名（lambda）函数`_</span></a> 一节。</p>
 </div>
 </div>
 <div class="section" id="return">
-<h3>Return的本色<a class="headerlink" href="#return" title="Permalink to this headline">¶</a></h3>
+<span id="the-nature-of-return"></span><h3>Return的本色<a class="headerlink" href="#return" title="Permalink to this headline">¶</a></h3>
 <p>在这一章的前面，我们提到 <code class="docutils literal"><span class="pre">return</span></code> 很可能不是它看起来的那样。
 很多语言有一个关键字叫做 <code class="docutils literal"><span class="pre">return</span></code> ，它取消函数的执行并立即给调用者一个返回值。</p>
 <p>Haskell的 <code class="docutils literal"><span class="pre">return</span></code> 函数很不一样。
@@ -1100,8 +1100,8 @@ Monad是一种强大的将函数链在一起的方法，在 <a href="#id37"><spa
 时常在需要给I/O串联操作的时候，是由一些工具完成的，这些工具就是Haskell的一部分。
 Haskell通过 <code class="docutils literal"><span class="pre">I/O</span></code> Monad实现了出色的I/O和语言剩余部分的分离。</p>
 </div>
-<div class="section" id="id10">
-<h2>惰性I/O的副作用<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id11">
+<h2>惰性I/O的副作用<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h2>
 <p>本章前面你看到了 <code class="docutils literal"><span class="pre">hGetContents</span></code> ，我们解释说它返回的 <code class="docutils literal"><span class="pre">String</span></code> 可以在纯代码中使用。</p>
 <p>关于副作用我们需要得到一些更具体的东西。
 当我们说Haskell没有副作用，这到底意味着什么？</p>
@@ -1128,8 +1128,8 @@ Haskell通过 <code class="docutils literal"><span class="pre">I/O</span></code>
 就是说，它们可能从操作系统请求一大块数据，就算底层代码是一次一个字节地处理数据的。
 通过这样，它们可以实现显著的性能提升，因为每次向操作系统的I/O请求带来一次处理开销。
 缓冲区允许我们以少得多的I/O请求次数去读取相同数量的数据。</p>
-<div class="section" id="id11">
-<h3>缓冲区模式<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id12">
+<h3>缓冲区模式<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
 <p>Haskell中有3种不同的缓冲区模式，它们定义成 <code class="docutils literal"><span class="pre">BufferMode</span></code> 类型： <code class="docutils literal"><span class="pre">NoBuffering</span></code> ， <code class="docutils literal"><span class="pre">LineBuffering</span></code> 和 <code class="docutils literal"><span class="pre">BlockBuffering</span></code> 。</p>
 <p><code class="docutils literal"><span class="pre">NoBuffering</span></code> 就和它听起来那样-没有缓冲区。
 通过像 <code class="docutils literal"><span class="pre">hGetLine</span></code> 这样的函数读取的数据是从操作系统一次一个字符读取的。
@@ -1149,16 +1149,16 @@ Haskell通过 <code class="docutils literal"><span class="pre">I/O</span></code>
 当前的模式可以通过 <code class="docutils literal"><span class="pre">hSetBuffering</span></code> 来设置，它接受一个 <code class="docutils literal"><span class="pre">Handle</span></code> 和 <code class="docutils literal"><span class="pre">BufferMode</span></code> 。
 例如，你可以写 <code class="docutils literal"><span class="pre">hSetBuffering</span> <span class="pre">stdin</span> <span class="pre">(BlockBuffering</span> <span class="pre">Nothing)</span></code> 。</p>
 </div>
-<div class="section" id="id12">
-<h3>刷新缓冲区<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id13">
+<h3>刷新缓冲区<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h3>
 <p>对于任何类型的缓冲区，你可能有时候需要强制Haskell去写出所有保存在缓冲区里的数据。
 有些时候这个会自动发生：比如，对 <code class="docutils literal"><span class="pre">hClose</span></code> 的调用。
 有时候你可能需要调用 <code class="docutils literal"><span class="pre">hFlush</span></code> 作为代替， <code class="docutils literal"><span class="pre">hFlush</span></code> 会强制所有等待的数据立即写入。
 这在句柄是一个网络套接字的时候，你想数据被立即传输，或者你想让磁盘的数据给其他程序使用，而其他程序也正在并发地读那些数据的时候都是有用的。</p>
 </div>
 </div>
-<div class="section" id="id13">
-<h2>读取命令行参数<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id14">
+<h2>读取命令行参数<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h2>
 <dl class="docutils">
 <dt>很多命令行程序喜欢通过命令行来传递参数。</dt>
 <dd><code class="docutils literal"><span class="pre">System.Environment.getArgs</span></code> 返回 <code class="docutils literal"><span class="pre">IO</span> <span class="pre">[String]</span></code> 列出每个参数。</dd>
@@ -1167,10 +1167,10 @@ Haskell通过 <code class="docutils literal"><span class="pre">I/O</span></code>
 程序的名字（C语言的 <code class="docutils literal"><span class="pre">argv[0]</span></code> ）用 <code class="docutils literal"><span class="pre">System.Environment.getProgName</span></code> 可以得到。</p>
 <p><code class="docutils literal"><span class="pre">System.Console.GetOpt</span></code> 模块提供了一些解析命令行选项的工具。
 如果你有一个程序，它有很复杂的选项，你会觉得它很有用。
-你可以在 <a href="#id41"><span class="problematic" id="id42">`命令行解析`_</span></a> 一节看到一个例子和使用方法。</p>
+你可以在 <a href="#id42"><span class="problematic" id="id43">`命令行解析`_</span></a> 一节看到一个例子和使用方法。</p>
 </div>
-<div class="section" id="id14">
-<h2>环境变量<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id15">
+<h2>环境变量<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h2>
 <dl class="docutils">
 <dt>如果你需要阅读环境变量，你可以使用 <code class="docutils literal"><span class="pre">System.Environment</span></code> 里面两个函数中的一个： <code class="docutils literal"><span class="pre">getEnv</span></code> 或者 <code class="docutils literal"><span class="pre">getEnvironment</span></code> 。</dt>
 <dd><code class="docutils literal"><span class="pre">getEnv</span></code> 查找指定的变量，如果不存在会抛出异常。

@@ -156,7 +156,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="chp/3.html#id26">表达式里的缩进规则和空白字符</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="chp/3.html#id27">对制表符和空格说两句</a></li>
-<li class="toctree-l3"><a class="reference internal" href="chp/3.html#id28">缩进规则并不是必需</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/3.html#the-offside-rule-is-not-mandatory">缩进规则并不是必需</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="chp/3.html#case">Case 表达式</a></li>
@@ -313,14 +313,14 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="chp/7.html#haskell">Haskell 实际上是命令式的吗？</a></li>
-<li class="toctree-l2"><a class="reference internal" href="chp/7.html#id10">惰性I/O的副作用</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/7.html#id11">惰性I/O的副作用</a></li>
 <li class="toctree-l2"><a class="reference internal" href="chp/7.html#buffering">缓冲区（Buffering）</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id11">缓冲区模式</a></li>
-<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id12">刷新缓冲区</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id12">缓冲区模式</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/7.html#id13">刷新缓冲区</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="chp/7.html#id13">读取命令行参数</a></li>
-<li class="toctree-l2"><a class="reference internal" href="chp/7.html#id14">环境变量</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/7.html#id14">读取命令行参数</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/7.html#id15">环境变量</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="chp/8.html">第 8 章：高效文件处理、正则表达式、文件名匹配</a><ul>
@@ -505,6 +505,64 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="chp/13.html#id9">通用序列</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="chp/14.html">第十四章：Monads</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#id1">简介</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#revisiting-earlier-code-examples">回顾之前代码</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#maybe">Maybe链</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#implicit-state">隐式状态</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#looking-for-shared-patterns">寻找共同特征</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#monad">Monad 类型类</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#and-now-a-jargon-moment">术语解释</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#using-a-new-monad-show-your-work">使用新的Monad</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#information-hiding">信息隐藏</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#controlled-escape">受控的Monad</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#leaving-a-trace">日志纪录</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#logger-monad">使用 Logger monad</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#puermonadic">同时使用puer和monadic代码</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#putting-a-few-misconceptions-to-rest">关于Monad的一些误解</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#building-the-logger-monad">创建Logger Monad</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#sequential-logging-not-sequential-evaluation">顺序的日志，而不是顺序的求值</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#writer-monad">Writer monad</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#maybe-monad">Maybe monad</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#executing-the-maybe-monad">执行Maybe monad</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#maybe-api">使用Maybe，以及好的API设计方式</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#list-monad">List Monad</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#understanding-the-list-monad">理解List monad</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#putting-the-list-monad-to-work">使用List Monad</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#do">还原do的本质</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#monads-as-a-programmable-semicolon">Monads: 可编程分号</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#sugar-free">为什么要sugar-free</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#the-state-monad">状态monad</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#state-monad">自己定义State monad</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#reading-and-modifying-the-state">读取和修改状态</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#will-the-real-state-monad-please-stand-up">真正的State monad定义</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#using-the-state-monad-generating-random-values">使用State monad生成随机数</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#a-first-attempt-at-purity">实用纯函数生成随机数的尝试</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#random-values-in-the-state-monad">state monad里面的随机数值</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#id25">练习</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#running-the-state-monad">运行state monad</a></li>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#id27">管理更多的状态</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#monadfunctors">Monad和Functors</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="chp/14.html#id28">换个角度看Monad</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="chp/14.html#the-monad-laws-and-good-coding-style">单子律以及代码风格</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="chp/16.html">第 16 章：使用Parsec</a><ul>
@@ -765,6 +823,7 @@
 <li><a class="reference external" href="https://github.com/Alaya-in-Matrix">Lvwenlong</a></li>
 <li><a class="reference external" href="https://github.com/sancao2">sancao2</a></li>
 <li><a class="reference external" href="https://github.com/se77en">Damon Zhao</a></li>
+<li><a class="reference external" href="https://github.com/tiann">tianws</a></li>
 </ul>
 <p>除了进行翻译之外，本文档还在原书的基础上做了以下改进：</p>
 <ul class="simple">
