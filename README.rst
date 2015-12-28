@@ -142,6 +142,8 @@
 
 - `sancao2`_
 
+- `Allan Zyne <https://github.com/DrsExplorer>`_
+
 - 还有更多待添加 ...
 
 
