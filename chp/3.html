@@ -557,7 +557,7 @@ In the expression:
 </div>
 <div class="section" id="id15">
 <h3>通配符模式匹配<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h3>
-<p>如果在匹配模式中我们不在乎某个值的类型，那么可以用下划线字符 “_” 作为符号来进行标识，它也叫做*通配符*。它的用法如下。</p>
+<p>如果在匹配模式中我们不在乎某个值的类型，那么可以用下划线字符 “_” 作为符号来进行标识，它也叫做<em>通配符</em>。它的用法如下。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch03/BookStore.hs</span>
 <span class="nf">nicerID</span>      <span class="p">(</span><span class="kt">Book</span> <span class="n">id</span> <span class="kr">_</span>     <span class="kr">_</span>      <span class="p">)</span> <span class="ow">=</span> <span class="n">id</span>
 <span class="nf">nicerTitle</span>   <span class="p">(</span><span class="kt">Book</span> <span class="kr">_</span>  <span class="n">title</span> <span class="kr">_</span>      <span class="p">)</span> <span class="ow">=</span> <span class="n">title</span>

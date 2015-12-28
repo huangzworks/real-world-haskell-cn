@@ -320,7 +320,7 @@ Haskell提供了像 <code class="docutils literal"><span class="pre">hPutStrLn</
 </div>
 <div class="section" id="openfile">
 <h3>关于 openFile 的更多信息<a class="headerlink" href="#openfile" title="Permalink to this headline">¶</a></h3>
-<p>我们用 <strong>ghci</strong> 来检查 <code class="docutils literal"><span class="pre">openFifle</span></code> 的类型：</p>
+<p>我们用 <strong>ghci</strong> 来检查 <code class="docutils literal"><span class="pre">openFile</span></code> 的类型：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">module</span> <span class="nn">System.IO</span>
 <span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">openFile</span>
 <span class="nf">openFile</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IOMode</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">Handle</span>
@@ -705,7 +705,7 @@ Lisp程序员可能看到我们的 <code class="docutils literal"><span class="p
 </pre></div>
 </div>
 <p>你在使用 <code class="docutils literal"><span class="pre">hGetContents</span></code> 的时候不要求去使用输入文件的所有数据。
-任何时候Haskell系统能决定整个 <code class="docutils literal"><span class="pre">hGgetContents</span></code> 返回的字符串能否被垃圾收集掉，意思就是它不会再被使用，文件会自动被关闭。
+任何时候Haskell系统能决定整个 <code class="docutils literal"><span class="pre">hGetContents</span></code> 返回的字符串能否被垃圾收集掉，意思就是它不会再被使用，文件会自动被关闭。
 同样的原理适用于从文件读取的数据。
 当给定的数据片不会再被使用的任何时候，Haskell会释放它保存的那块内存。
 严格意义上来讲，我们在这个例子中根本不必要去调用 <code class="docutils literal"><span class="pre">hClose</span></code> 。
