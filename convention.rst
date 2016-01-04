@@ -24,7 +24,7 @@
 
 陈述    statement
 
-分支    branche
+分支    branch
 
 严格求值    strict evaluation
 
@@ -158,6 +158,14 @@ monad栈      monad transformer stack / monad stack
 惰性求值 lazy evaluation
 
 
+第八章
+------------------
+
+字符类  character class
+
+多态    polymorphism
+
+
 第二十八章
 ------------------
 
@@ -173,6 +181,6 @@ monad栈      monad transformer stack / monad stack
 
 程序崩溃    corruption
 
-细粒度  fineo-grained
+细粒度  finer-grained
 
 簿记    book-keeping

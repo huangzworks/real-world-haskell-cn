@@ -4,3 +4,5 @@ _build/*
 *.iml
 *.o
 *.hi
+*.*~
+.DS_Store

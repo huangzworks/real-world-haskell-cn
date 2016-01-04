@@ -31,10 +31,17 @@ Real World Haskell 中文版
    chp/9
    chp/10
    chp/11
+   chp/12
    chp/13
+   chp/14
+   chp/16
    chp/18
    chp/19
    chp/20
+   chp/21
+   chp/22
+   chp/23
+   chp/24
    chp/27
    chp/28
 
@@ -68,6 +75,18 @@ Real World Haskell 中文版
 - `spectator <https://github.com/spectatorwatcher>`_
 
 - `tiancaiamao <https://github.com/tiancaiamao>`_
+
+- `Yao Lu <https://github.com/ruujoa>`_
+
+- `YenvY <https://github.com/YenvY>`_
+
+- `Lvwenlong <https://github.com/Alaya-in-Matrix>`_
+
+- `sancao2 <https://github.com/sancao2>`_
+
+- `Damon Zhao <https://github.com/se77en>`_
+
+- `tianws <https://github.com/tiann>`_
 
 除了进行翻译之外，本文档还在原书的基础上做了以下改进：
 

@@ -1,7 +1,6 @@
 -- file: ch06/Monomorphism.hs
-myShow = show
+-- myShow = show
 
--- file: ch06/Monomorphism.hs
 myShow2 value = show value
 
 myShow3 :: (Show a) => a -> String

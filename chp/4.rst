@@ -1,4 +1,4 @@
-第四章：函数式编程
+第 4 章：函数式编程
 ========================
 
 使用 Haskell 思考
@@ -55,14 +55,627 @@
 [译注：原书这里的执行过程少了写入内容到 ``hello-in.txt`` 的一步，导致执行会出错，所以这里加上 ``echo ...`` 这一步。另外原书执行的是 ``Interact`` 过程，也是错误的，正确的执行文件名应该是 ``InteractWith`` 。]
 
 
+热身： 方便地分离多行文本
+---------------------------------------------------
+
+Haskell提供一个内建函数，lines，让我们在行边界上分离一段文本字符串。它返回一个忽略了行终止字符的字符串列表。
+
+::
+
+    ghci> :type lines
+    lines :: String -> [String]
+    ghci> lines "line 1\nline 2"
+    ["line 1","line 2"]
+    ghci> lines "foo\n\nbar\n"
+    ["foo","","bar"]
+
+尽管lines看上去有用，但它要工作的话仰赖于我们用“文本模式”去读一个文件。文本模式对于很多编程语言来说是一个很普遍的功能：当我们在Windows系统上读和写文件的时候它提供一个特别的行为。当我们用文本模式读取一个文件的时候，文件I/O库把行终止序列“\r\n”（回车后跟着一个换行）转换成“\n”（单独一个换行），当我们写一个文件的时候，它（译注：文件I/O库）会做相反的事情。而在类Unix系统上，文本模式不会做任何的转换工作。这个不同之处会导致的结果是，如果我们在Windows系统上读取一个在类Unix系统上写入的文件，行终止符很可能会变得乱七八糟。（readFile和writeFile都在文本模式下操作的话）
+
+::
+
+	ghci> lines "a\r\nb"
+	["a\r","b"]
+
+lines函数仅仅在换行符处分离文本，留下回车跟在行的结尾处。如果我们在Linux或Unix上读取一个Windows生成的文本文件，我们将在每一行的结尾处得到尾随的回车。
+
+我们舒适地用了Python提供的“通用换行”支持很长时间了：它透明地为我们处理Unix和Windows的行终止惯例。我们也想要用Haskell提供类似的支持。
+
+因为到目前为止我们仅仅接触了少量的Haskell代码，所以我们将一步一步地讨论我们用Haskell实现上述支持的细节。
+
+::
+
+	-- file: ch04/SplitLines.hs
+	splitLines :: String -> [String]
+
+我们的函数类型签名标示它接受一个字符串，可能是具有某些未知的行终止惯例的文件的内容。它返回一个包含字符串的列表，列表的每一项代表文件中的每一行文本。
+
+::
+
+	-- file: ch04/SplitLines.hs
+	splitLines [] = []
+	splitLines cs =
+	    let (pre, suf) = break isLineTerminator cs
+	    in  pre : case suf of 
+	                ('\r':'\n':rest) -> splitLines rest
+	                ('\r':rest)      -> splitLines rest
+	                ('\n':rest)      -> splitLines rest
+	                _                -> []
+
+	isLineTerminator c = c == '\r' || c == '\n'
+
+在我们深入细节之前，首先注意我们是怎么组织我们的代码的。我们首先呈现重要的代码片段，而把isLineTerminator函数的定义放在后面。因为我们给了这个辅助函数一个易读的名称，所以即使在我们读它的定义之前我们就能知道它是做什么用的。
+
+Prelude定义了一个叫做break的函数，我们可以用它把一个列表分成两部分。它把一个函数作为它的第一个参数。这个函数必须去检查列表中的元素，并且返回一个Bool值来表示列表是否在那个元素处被一分为二。break函数返回一个对值（译注：即二元组），由一个谓词（译注：即一个返回Bool值的函数，下同）返回True（译注：第一次返回True）之前的元素构成的列表（前缀）和剩下的元素构成的列表组成（后缀）。
+
+::
+
+	ghci> break odd [2,4,5,6,8]
+	([2,4],[5,6,8])
+	ghci> :module +Data.Char
+	ghci> break isUpper "isUpper"
+	("is","Upper")
+
+因为我们一次只需要匹配单个的回车或换行，所以每次检查列表中的一个元素正是我们所需要的。
+
+splitLines的第一个算式标示如果我们匹配到一个空的字符串，我们就没有进一步的工作可做了。
+
+在第二个算式中，我们首先对输入的字符串应用break。前缀就是第一个行终止符之前的子字符串，后缀就是整个字符串余下的部分。这个后缀将包含可能存在的行终止符。
+
+“pre :”表达式告诉我们应该在这个代表文本行的列表的头部加上pre所表示的值。然后我们用一个case表达式去检查后缀，我们来决定下一步做什么。case表达式的结果将被用作(:)函数的的二个参数来构造结果列表。
+
+case表达式中的第一个模式匹配以一个回车紧接着一个换行符开始的字符串。变量rest被绑定到这个字符串余下的部分。其它的模式是相似的，因此它们应当容易理解。
+
+以上对Haskell函数的散文式的描述不一定是容易理解的。我们可以借助ghci，观察不同情况下这个函数的行为，以获得更好的理解。
+
+让我们从分割一个不包含任何行终止符的字符串开始。
+
+::
+
+	ghci> splitLines "foo"
+	["foo"]
+
+这里，我们的break没找到一个行终止符，所以它返回的后缀是空的。
+
+::
+
+	ghci> break isLineTerminator "foo"
+	("foo","")
+
+因此在splitLines函数中的case表达式一定是匹配上了第四个分支，然后完成了求值。
+再来一点儿更有趣的例子怎么样？
+
+::
+
+	ghci> splitLines "foo\r\nbar"
+	["foo","bar"]
+
+首先我们的break给我们一个非空的后缀。
+
+::
+
+	ghci> break isLineTerminator "foo\r\nbar"
+	("foo","\r\nbar")
+
+因为这个后缀以一个回车紧接着一个换行符开始，我们匹配上了case表达式的第一个分支。这个求值结果让我们把pre绑定到“foo”，suf绑定到“bar”。我们递归地应用splitLines，这一次匹配上单独的“bar”。
+
+::
+
+	ghci> splitLines "bar"
+	["bar"]
+
+结果是我们构造了一个头部的元素是“foo”，尾部的元素是“bar”的列表
+
+::
+
+	ghci> "foo" : ["bar"]
+	["foo","bar"]
+
+这种在ghci中的实验是一种有效的理解和调试一段代码的行为的方法。它甚至有一个更重要的好处就是非刻意的（译注：不是特别理解这句话在原英文语境中的意思，暂且按照网页中的批注直译过来，原句：It has an even more important benefit that is almost accidental in nature.）。从ghci测试复杂的代码是困难的，所以我们将倾向于写更小的函数。这能更进一步改善我们的代码的可读性。
+
+这种创建和复用小的、强大的代码片段的方式是函数式编程的基础。
+
+
+一个行终止转换程序
+^^^^^^^^^^^^^^^^^^^^
+
+让我们把我们的splitLines函数和早先我们写的一个小框架联系起来。首先制作一份Interact.hs源文件的拷贝；让我们叫这个新文件FixLines.hs。把splitLines加到新的源码文件中。因为我们的函数必须产出一个单独的字符串，所以我们必须把这个表示行的列表拼接起来。Prelude提供一个unlines函数，它把一个字符串组成的列表串联起来，并且在每个字符串元素的末尾加上一个换行符。
+
+::
+
+	-- file: ch04/SplitLines.hs
+	fixLines :: String -> String
+	fixLines input = unlines (splitLines input)
+
+如果我们用fixLines替换这个id函数（译注：是指拷贝自Interact.hs的FixLines.hs中的id函数），我们可以把FixLines.hs编译成一个将文本文件的行终止转换成系统特定的行终止的可执行程序。
+
+::
+
+	$ ghc --make FixLines
+	[1 of 1] Compiling Main             ( FixLines.hs, FixLines.o )
+	Linking FixLines ...
+
+如果你在一个Windows系统上面，找到并下载一个在Unix系统上创建的文本文件（比如 gpl-3.0.txt）。在记事本程序中打开它。里面的文本行应该都跑一起去了，导致它几乎不可读。用刚才你编译得到的FixLines命令处理这个文件，然后在记事本程序中打开此命令输出的文件。现在这个行终止符的问题应该被修正了。
+
+在类Unix的系统上，编辑器隐藏了Windows的行终止符。使得验证FixLines是否消除了它们更加困难。这里有一些命令应该能帮助你。
+
+::
+
+	$ file gpl-3.0.txt
+	gpl-3.0.txt: ASCII English text
+	$ unix2dos gpl-3.0.txt
+	unix2dos: converting file gpl-3.0.txt to DOS format ...
+	$ file gpl-3.0.txt
+	gpl-3.0.txt: ASCII English text, with CRLF line terminators
+
+
+中缀函数
+-------------------------
+
+通常，当我们在Haskell中定义和应用一个函数的时候，我们写这个函数的名称，紧接着它的参数。这种表示法作为前缀被提及，因为这个函数的名称位于它的参数前面。
+
+如果一个函数或构造器带两个或更多的参数，我们可以选择使用中缀形式，即我们把函数（名称）放在它的第一个和第二个参数之间。这允许我们把函数作为中缀操作符来使用。
+
+要用中缀表示法定义或应用一个函数或值构造器，我们用重音符（有时被称为反引号）包围它的名称。这里有简单的中缀函数和中缀类型的定义。
+
+::
+
+	-- file: ch04/Plus.hs
+	a `plus` b = a + b
+
+	data a `Pair` b = a `Pair` b
+	                  deriving (Show)
+
+	-- we can use the constructor either prefix or infix
+	foo = Pair 1 2
+	bar = True `Pair` "quux"
+
+因为中缀表示法纯粹是为了语法上的便利，因此它不会改变函数的行为。
+
+::
+
+    ghci> 1 `plus` 2
+    3
+    ghci> plus 1 2
+    3
+    ghci> True `Pair` "something"
+    True `Pair` "something"
+    ghci> Pair True "something"
+    True `Pair` "something"
+
+中缀表示法经常对代码可读性有帮助。比如，Prelude定义了一个elem函数，它标示一个给定的值是否出现在一个列表中。如果我们用前缀表示法来使用elem，它构成的代码相当易读。
+
+::
+
+    ghci> elem 'a' "camogie"
+    True
+
+如果我们换用中缀表示法，这段代码甚至会变得更容易理解。它清楚地标示我们正在检查左边的给定值是否出现在右边的列表里。
+
+::
+
+    ghci> 3 `elem` [1,2,4,8]
+    False
+
+我们在Data.List模块的一些有用的函数中看到了更明显的改进（译注：这里是指中缀表示法改进了代码可读性）。isPrefixOf函数告诉我们一个列表是否匹配另一个列表的开始部分。
+
+::
+
+    ghci> :module +Data.List
+    ghci> "foo" `isPrefixOf` "foobar"
+    True
+
+相应地，isInfixOf和isSuffixOf函数匹配一个列表的中间和结尾处的任何地方。
+
+::
+
+    ghci> "needle" `isInfixOf` "haystack full of needle thingies"
+    True
+    ghci> "end" `isSuffixOf` "the end"
+    True
+
+没有一个硬性的规则指示你什么时候应该用中缀表示法或是前缀表示法，尽管使用前缀表示法要普遍得多。在具体情况下选择使你的代码更可读的那一种表示法就是最好的。
+
+::
+	注意出现在不熟悉的语言中的常见符号
+	一些其它的编程语言使用反引号，但是尽管看起来像，反引号在Haskell中的用途还是和Perl、Python以及Unix脚本中的用途不太像。
+	在Haskell中，我们能用反引号做的唯一合法的事情是让它们包裹函数名称。我们不能，比如，用它们围绕一个值是一个函数的复杂表达式。
+	如果我们能做这个可能是方便的，但那不是这个语言今天的模样。
+
+
+和列表打交道
+-------------------------
+
+
+作为函数式编程的基本组件，列表应该得到足够的重视。Prelude定义了很多函数来处理列表。它们当中的许多是不可或缺的工具，所以及早学习它们是很重要的。
+
+不管怎样，这一节将学习很多函数。为什么要马上展示这么多函数？因为这些函数既容易学而且会经常使用。如果我们不知道有这样的工具箱，那么时间将浪费在编写那些在标准库中已经存在的简单函数上。因此深入学习列表模块中的函数是非常值得的。
+
+Data.List模块包含所有的列表函数。Prelude只不过重新导出了这些在Data.List模块中的函数的大部分。还有一些有用的函数并没有被Prelude重新导出。下面学习列表函数的时候，将明确地提到那些只在Data.List中出现的。
+
+::
+
+    ghci> :module +Data.List
+
+因为这些函数没有什么复杂的或者代码量超过三行的，所有我们对它们只做简单的描述。实际上，快速和有用的学习方法是记住它们是如何定义的。
+
+
+基本的列表操作
+^^^^^^^^^^^^^^^
+
+length函数告诉我们一个列表中包含多少个元素。
+
+::
+
+    ghci> :type length
+    length :: [a] -> Int
+    ghci> length []
+    0
+    ghci> length [1,2,3]
+    3
+    ghci> length "strings are lists, too"
+    22
+
+如果需要检查列表是不是空的，用null函数。
+
+::
+
+    ghci> :type null
+    null :: [a] -> Bool
+    ghci> null []
+    True
+    ghci> null "plugh"
+    False
+
+要访问列表的第一个元素，用head函数。
+
+::
+
+    ghci> :type head
+    head :: [a] -> a
+    ghci> head [1,2,3]
+    1
+
+相反，tail函数，返回列表中除了第一个其它所有的元素。
+
+::
+
+    ghci> :type tail
+    tail :: [a] -> [a]
+    ghci> tail "foo"
+    "oo"
+
+还有一个函数，last，返回列表的最后一个元素。
+
+::
+
+    ghci> :type last
+    last :: [a] -> a
+    ghci> last "bar"
+    'r'
+
+和last相反的是init，它返回列表中除了最后一个其它所有的元素。
+
+::
+
+    ghci> :type init
+    init :: [a] -> [a]
+    ghci> init "bar"
+    "ba"
+
+上面的一些函数应用在空列表上时会报错，因此当不知道一个列表是否为空的时候要小心了。它们会报告什么样的错误呢？
+
+::
+
+    ghci> head []
+    *** Exception: Prelude.head: empty list
+
+在ghci里试一试上面的每一个函数，看看哪些应用在空列表上时会崩溃？
+
+
+安全和明智地跟会崩溃的函数打交道
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+当我们想使用一个函数比如head时，如果我们传递一个空列表给它，很可能会破坏我们的工作，有效避免这个问题的方法是在使用head之前，检查传递给它的列表的长度。让我们举一个例子说明。
+
+::
+
+    -- file: ch04/EfficientList.hs
+    myDumbExample xs = if length xs > 0
+                       then head xs
+                       else 'Z'
+
+如果用过像Perl或者Python这样的编程语言，这段代码看起来就是一种很自然地编写测试的方式。在底层，Python和Perl中的列表都是数组。所以它们必定能通过调用len(foo)或者是scalar(@foo)得知列表（数组）的长度。但是基于很多别的原因，把这些假设照搬到Haskell中不是一个好主意。
+
+我们已经看过列表的数据类型定义好多次了，知道一个列表不会明确地存储它本身的长度。因此length函数的工作方式是遍历整个列表。
+
+所以当我们只关心一个列表是不是为空时，调用length不是一个好的策略。如果我们处理的是一个有限的列表，它潜在地做了比我们想象的更多的事情。因为Haskell很容易创建无限列表，所以不小心使用了length函数可能导致无限循环。
+
+一个更合适的替代方案是调用null函数，它执行的次数是确定不变的。更好的是，使用null能使我们的代码明确地标示出我们真正关心的列表的属性。下面举两个更好的例子。
+
+::
+
+    -- file: ch04/EfficientList.hs
+    mySmartExample xs = if not (null xs)
+                        then head xs
+                        else 'Z'
+
+    myOtherExample (x:_) = x
+    myOtherExample [] = 'Z'
+
+
+更多简单列表操作
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Haskell用(++)表示“追加”函数。
+
+::
+
+    ghci> :type (++)
+    (++) :: [a] -> [a] -> [a]
+    ghci> "foo" ++ "bar"
+    "foobar"
+    ghci> [] ++ [1,2,3]
+    [1,2,3]
+    ghci> [True] ++ []
+    [True]
+
+concat函数取一个包含列表的列表，这些列表中的元素具有相同的类型，它把这些列表连接在一起成为一个单一的列表。
+
+::
+
+    ghci> :type concat
+    concat :: [[a]] -> [a]
+    ghci> concat [[1,2,3], [4,5,6]]
+    [1,2,3,4,5,6]
+
+它会去掉一级的嵌套。（译注：每次调用concat会去除最外一层的方括号）
+
+::
+
+    ghci> concat [[[1,2],[3]], [[4],[5],[6]]]
+    [[1,2],[3],[4],[5],[6]]
+    ghci> concat (concat [[[1,2],[3]], [[4],[5],[6]]])
+    [1,2,3,4,5,6]
+
+reverse函数返回一个元素以相反的顺序排列的新列表。
+
+::
+
+    ghci> :type reverse
+    reverse :: [a] -> [a]
+    ghci> reverse "foo"
+    "oof"
+
+针对包含Bool值的列表，and和or函数相当于用&&和||遍历这个列表并两两求值
+
+::
+
+    ghci> :type and
+    and :: [Bool] -> Bool
+    ghci> and [True,False,True]
+    False
+    ghci> and []
+    True
+    ghci> :type or
+    or :: [Bool] -> Bool
+    ghci> or [False,False,False,True,False]
+    True
+    ghci> or []
+    False
+
+还有两个与and和or功能近似的函数，all和any，它们操作任何类型的列表。每一个带着一个谓词作为它的第一个参数；如果谓词对列表中的每个元素的判断都为真，all函数返回True，当对列表中的每个元素的谓词至少有一个成功了，any函数返回True。
+
+::
+
+    ghci> :type all
+    all :: (a -> Bool) -> [a] -> Bool
+    ghci> all odd [1,3,5]
+    True
+    ghci> all odd [3,1,4,1,5,9,2,6,5]
+    False
+    ghci> all odd []
+    True
+    ghci> :type any
+    any :: (a -> Bool) -> [a] -> Bool
+    ghci> any even [3,1,4,1,5,9,2,6,5]
+    True
+    ghci> any even []
+    False
+
+
+产生子列表
+^^^^^^^^^^^^
+
+take函数，在“函数应用”一节遇到过，返回一个由头k个元素组成的子列表。与它相反，drop，丢掉列表开头的k个元素。
+
+::
+
+    ghci> :type take
+    take :: Int -> [a] -> [a]
+    ghci> take 3 "foobar"
+    "foo"
+    ghci> take 2 [1]
+    [1]
+    ghci> :type drop
+    drop :: Int -> [a] -> [a]
+    ghci> drop 3 "xyzzy"
+    "zy"
+    ghci> drop 1 []
+    []
+
+splitAt函数组合了take和drop的功能，返回由一个列表产生的二元组，两部分是由原来的列表根据给定的索引分割而成。
+
+::
+
+    ghci> :type splitAt
+    splitAt :: Int -> [a] -> ([a], [a])
+    ghci> splitAt 3 "foobar"
+    ("foo","bar")
+
+takeWhile和dropWhile函数带着谓词：takeWhile从开头遍历一个列表，抽取使谓词返回True的元素组成一个新列表；dropWhile则是把使谓词返回True的元素丢掉。（译注：这里的表述容易引起歧义，实际上两个函数都是走到第一个使谓词返回False的元素处就停止操作了，即使这个元素后面还有使谓词返回True的元素，两个函数也不再take或drop了）
+
+::
+
+    ghci> :type takeWhile
+    takeWhile :: (a -> Bool) -> [a] -> [a]
+    ghci> takeWhile odd [1,3,5,6,8,9,11]
+    [1,3,5]
+    ghci> :type dropWhile
+    dropWhile :: (a -> Bool) -> [a] -> [a]
+    ghci> dropWhile even [2,4,6,7,9,10,12]
+    [7,9,10,12]
+
+正如splitAt函数利用take和drop的结果组成一个二元组一样，break（已经在“热身：方便地分离多行文本”一节中看到过）和span函数利用takeWhile和dropWhile的结果组成二元组。
+
+每个函数带着一个谓词，break提取列表中使谓词失败的元素组成二元组的首项，而span提取列表中使谓词成功的元素组成二元组的首项。
+
+::
+
+    ghci> :type span
+    span :: (a -> Bool) -> [a] -> ([a], [a])
+    ghci> span even [2,4,6,7,9,10,11]
+    ([2,4,6],[7,9,10,11])
+    ghci> :type break
+    break :: (a -> Bool) -> [a] -> ([a], [a])
+    ghci> break even [1,3,5,6,8,9,10]
+    ([1,3,5],[6,8,9,10])
+
+
+搜索列表
+^^^^^^^^^^
+
+正如我们已经看到的，elem函数标示一个值是否出现在一个列表中。它有一个伴生的函数，notElem。
+
+::
+
+    ghci> :type elem
+    elem :: (Eq a) => a -> [a] -> Bool
+    ghci> 2 `elem` [5,3,2,1,1]
+    True
+    ghci> 2 `notElem` [5,3,2,1,1]
+    False
+
+对于更普遍的搜索操作，filter函数带着一个谓词，返回列表中使谓词成功的每一个元素。
+
+::
+
+    ghci> :type filter
+    filter :: (a -> Bool) -> [a] -> [a]
+    ghci> filter odd [2,4,1,3,6,8,5,7]
+    [1,3,5,7]
+
+在Data.List模块中，有三个谓词方法，isPrefixOf、isInfixOf和isSuffixOf，能让我们测试一下子列表在一个更大的列表中出现的位置。最容易的方式是把它们作为中缀使用。
+
+isPrefixOf函数告诉我们左边的列表是否出现在右边的列表的开始处。
+
+::
+
+    ghci> :module +Data.List
+    ghci> :type isPrefixOf
+    isPrefixOf :: (Eq a) => [a] -> [a] -> Bool
+    ghci> "foo" `isPrefixOf` "foobar"
+    True
+    ghci> [1,2] `isPrefixOf` []
+    False
+
+isInfixOf函数标示左边的列表是否是右边的列表的一个子列表。
+
+::
+
+    ghci> :module +Data.List
+    ghci> [2,6] `isInfixOf` [3,1,4,1,5,9,2,6,5,3,5,8,9,7,9]
+    True
+    ghci> "funk" `isInfixOf` "sonic youth"
+    False
+
+isSuffixOf函数的功能不再赘述。
+
+::
+
+    ghci> :module +Data.List
+    ghci> ".c" `isSuffixOf` "crashme.c"
+    True
+
+
+一次性处理多个列表
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+zip函数把两个列表压缩成一个单一的由二元组组成的列表。结果列表和被处理的两个列表中较短的那个等长。（译注：言下之意是较长的那个列表中的多出来的元素会被丢弃）
+
+::
+
+    ghci> :type zip
+    zip :: [a] -> [b] -> [(a, b)]
+    ghci> zip [12,72,93] "zippity"
+    [(12,'z'),(72,'i'),(93,'p')]
+
+更有用的是zipWith函数，它带两个列表作为参数并为从每个列表中抽取一个元素而组成的二元组提供一个函数，最后生成与较短的那个列表等长的新列表。
+
+::
+
+    ghci> :type zipWith
+    zipWith :: (a -> b -> c) -> [a] -> [b] -> [c]
+    ghci> zipWith (+) [1,2,3] [4,5,6]
+    [5,7,9]
+
+Haskell的类型系统使编写带有可变数量的参数的函数成为一个有趣的挑战。（译注：不知道此句和后面的内容有什么联系）。所以如果想把三个列表压缩在一起，要调用zip3或者zipWith3，可以类推到zip7和zipWith7。
+
+
+特殊的字符串处理函数
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+我们已经在“热身：方便地分离多行文本”一节中遇到过lines函数，它有个对应的函数，unlines。注意unlines总是在它处理的结果（译注：列表中的每个元素）的尾部放一个换行符。
+
+::
+
+    ghci> lines "foo\nbar"
+    ["foo","bar"]
+    ghci> unlines ["foo", "bar"]
+    "foo\nbar\n"
+
+words函数利用任何空白字符分割一个字符串，它对应的函数，unwords，用一个空格字符把一个字符串构成的列表连接起来。
+
+::
+
+    ghci> words "the  \r  quick \t  brown\n\n\nfox"
+    ["the","quick","brown","fox"]
+    ghci> unwords ["jumps", "over", "the", "lazy", "dog"]
+    "jumps over the lazy dog"
+
+
+练习题
+^^^^^^^^
+
+1. 自己写一些安全的列表函数，确保它们不会出错。下面给一些类型定义的提示。
+
+::
+
+    -- file: ch04/ch04.exercises.hs
+    safeHead :: [a] -> Maybe a
+    safeTail :: [a] -> Maybe [a]
+    safeLast :: [a] -> Maybe a
+    safeInit :: [a] -> Maybe [a]
+
+2. 写一个和words功能近似的函数splitWith，要求带一个谓词和一个任意类型元素组成的列表，在使谓词返回False的元素处分割这个列表。
+
+::
+
+    -- file: ch04/ch04.exercises.hs
+    splitWith :: (a -> Bool) -> [a] -> [[a]]
+
+3. 利用在“一个简单的命令行框架”一节中创建的命令行框架，编写一个打印输入数据的每一行的第一个单词的程序。
+
+4. 编写一个转置一个文件中的文本的程序。比如，它应该把“hello\\nworld\\n”转换成“hw\\neo\\nlr\\nll\\nod\\n”。
+
+
 循环的表示
--------------
+-------------------
 
 和传统编程语言不同， Haskell 既没有 ``for`` 循环，也没有 ``while`` 循环。那么，如果有一大堆数据要处理，该用什么代替这些循环呢？这一节就会给出这个问题的几种可能的解决办法。
 
 
 显式递归
-^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 通过例子进行比对，可以很直观地认识有 loop 语言和没 loop 语言之间的区别。以下是一个 C 函数，它将字符串表示的数字转换成整数：
 
@@ -336,16 +949,16 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 稍后的章节会介绍如何定义 ``filter`` 。
 
 
-处理收集器并得出结果
+处理集合并得出结果
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-将一个收集器（collection）简化（reduce）为一个值也是收集器的常见操作之一。
+将一个集合（collection）缩减（reduce）为一个值也是集合的常见操作之一。
 
 对列表的所有元素求和，就是其中的一个例子：
 
 .. literalinclude:: /code/ch04/mySum.hs
 
-``helper`` 函数通过尾递归进行计算。 ``acc`` 是累积器参数，它记录了当前列表元素的总和。正如我们在 ``asInt`` 函数看到的那样，这种递归计算是纯函数语言里表示 loop 最自然的方式。
+``helper`` 函数通过尾递归进行计算。 ``acc`` 是累积器（accumulator）参数，它记录了当前列表元素的总和。正如我们在 ``asInt`` 函数看到的那样，这种递归计算是纯函数语言里表示 loop 最自然的方式。
 
 以下是一个稍微复杂一些的例子，它是一个 Adler-32 校验和的 JAVA 实现。Adler-32 是一个流行的校验和算法，它将两个 16 位校验和串联成一个 32 位校验和。第一个校验和是所有输入比特之和，加上一。而第二个校验和则是第一个校验和所有中间值之和。每次计算时，校验和都需要取模 ``65521`` 。（如果你不懂 JAVA ，直接跳过也没关系）：
 
@@ -458,6 +1071,12 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 
 可以通过观察括号的包围方式，以及累积器初始化值摆放的位置，来区分 ``foldl`` 和 ``foldr`` ：\ ``foldl`` 将处初始化值放在左边，括号也是从左边开始包围。另一方面，\ ``foldr`` 将初始化值放在右边，而括号也是从右边开始包围。
 
+这里有一种可爱的凭直觉性的关于foldr如何工作的解释: 他用zero初始值替代了空列表，并且调用step函数替代列表的每个值构造器．
+::
+    1 : (2 : (3 : []))
+    1 + (2 + (3 + 0 ))
+
+乍一看,比起foldl，foldr似乎不那么有用：一个从右边折叠的函数有什么用呢？
 还记得当年大明湖畔的 ``filter`` 函数吗？它可以用显式递归来定义：
 
 .. literalinclude:: /code/ch04/filter.hs
@@ -541,7 +1160,7 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 
 除非被显式地要求，否则最后的表达式不会被求值为 ``6`` 。在表达式被求值之前，它会被保存在块里面。保存一个块比保存单独一个数字要昂贵得多，而被块保存的表达式越复杂，这个块占用的空间就越多。对于数值计算这样的廉价操作来说，块保存这种表达式所需的计算量，比直接求值这个表达式所需的计算量还多。最终，我们既浪费了时间，又浪费了金钱。
 
-在 GHC 中，对块中表达式的求值在一个内部栈中进行。因为块中的表达式可能是无限大的，而 GHC 为栈设置了有限大的的容量，多得这个限制，我们可以在 ghci 里尝试求值一个大的块，而不必担心消耗掉全部内存。
+在 GHC 中，对块中表达式的求值在一个内部栈中进行。因为块中的表达式可能是无限大的，而 GHC 为栈设置了有限大的的容量，多亏这个限制，我们可以在 ghci 里尝试求值一个大的块，而不必担心消耗掉全部内存。
 
 [译注：使用栈来执行一些可能无限大的操作，是一种常见优化和保护技术。这种用法减少了操作系统显式的上下文切换，而且就算计算量超出栈可以容纳的范围，那么最坏的结果就是栈崩溃，而如果直接使用系统内存，一旦请求超出内存可以容纳的范围，可能会造成整个程序崩溃，甚至影响系统的稳定性。]
 
@@ -561,7 +1180,7 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
     ghci> foldl (+) 0 [1..1000000]
     *** Exception: stack overflow
 
-对于小的表达式来说， ``foldl`` 可以给出正确的答案，但是，因为过度的块资源占用，它运行非常缓慢。我们称这种现象为\ *内存泄漏*\ ：代码可以正确地执行，但它占用了比实际所需多得多的内存。
+对于小的表达式来说， ``foldl`` 可以给出正确的答案，但是，因为过度的块资源占用，它运行非常缓慢。我们称这种现象为\ *内存泄漏(space leak)*\ ：代码可以正确地执行，但它占用了比实际所需多得多的内存。
 
 对于大的表达式来说，带有内存泄漏的代码会造成运行失败，就像前面例子展示的那样。
 
@@ -601,6 +1220,84 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
     500000000500000000
 
 就是这样。]
+[我(github:sancao2)的电脑上面行为还是"Exception: stack overflow".
+::
+   ➜  ch04  uname -a
+   Linux centos 3.10.0-229.20.1.el7.x86_64 #1 SMP Tue Nov 3 19:10:07 UTC 2015 x86_64 x86_64 x86_64 GNU/Linux
+   ➜  ch04  ghci
+   GHCi, version 7.6.3: http://www.haskell.org/ghc/  :? for help
+   Loading package ghc-prim ... linking ... done.
+   Loading package integer-gmp ... linking ... done.
+   Loading package base ... linking ... done.
+   Prelude> foldl (+) 0 [1..100000000]
+   *** Exception: stack overflow
+]
+
+练习
+1.运用 ``fold`` （运用合适的fold将会是你的代码更简单）重写并扩展位于＂显式递归＂章节的 ``asInt`` 函数．
+::
+   -- file: ch04/ch04.exercises.hs
+   asInt_fold :: String -> Int
+   
+你函数的效果应该是这样的．
+::
+   ghci> asInt_fold "101"
+   101
+   ghci> asInt_fold "-31337"
+   -31337
+   ghci> asInt_fold "1798"
+   1798
+   
+扩展你的函数以处理下面当调用错误时候出现的异常的情况．
+::
+   ghci> asInt_fold ""
+   0
+   ghci> asInt_fold "-"
+   0
+   ghci> asInt_fold "-3"
+   -3
+   ghci> asInt_fold "2.7"
+   *** Exception: Char.digitToInt: not a digit '.'
+   ghci> asInt_fold "314159265358979323846"
+   564616105916946374
+   
+2. ``asInt_fold`` 函数使用 ``error``, 因而调用者不能处理这些错误．重写他来修复这个问题．
+::
+   -- file: ch04/ch04.exercises.hs
+   type ErrorMessage = String
+   asInt_either :: String -> Either ErrorMessage Int
+   ghci> asInt_either "33"
+   Right 33
+   ghci> asInt_either "foo"
+   Left "non-digit 'o'"
+   
+3.Prelude下面的函数 ``concat`` 将一个列表的列表连接成一个单独的列表．他的函数签名如下．
+::
+   --file: ch04/ch04.exercises.hs
+   concat :: [[a]] -> [a]
+   
+用foldr写出你自己山寨的concat．
+
+4.写出你自己山寨的 ``takeWhile`` 函数，首先用显式递归的手法，然后改成 ``foldr`` 形式．
+
+5. ``Data.List`` 模块定义了一个函数, ``groupBy``.其拥有如下签名．
+::
+   -- file: ch04/ch04.exercises.hs
+   groupBy :: (a -> a -> Bool) -> [a] -> [[a]]
+
+运用 ``ghci`` 加载 ``Data.List`` 模块以理解 ``groupBy`` 的行为，然后写出你自己山寨的 ``fold`` 实现．
+
+6. 下面Prelude函数能用 ``fold`` 系列函数重写的函数有多少？
+::
+   any
+
+   cycle
+
+   words
+
+   unlines
+
+这些函数你能用 ``foldl`` 或者 ``foldr`` 重写，请问那种情况更合适？
 
 
 延伸阅读
@@ -690,7 +1387,7 @@ Haskell 允许我们编写完全匿名的函数，这样就不必再费力地为
     Prelude Data.Char> :type dropWhile isSpace
     dropWhile isSpace :: [Char] -> [Char]
 
-表达式 ``dropWhile isSpace`` 的值是一个函数，这个函数移除一个字符串的所有前置空白。作为一个例子，可以将它应用到一个高阶函数：
+表达式 ``dropWhile isSpace`` 的值是一个函数，这个函数移除一个字符串的所有前缀空白。作为一个例子，可以将它应用到一个高阶函数：
 
 ::
 
@@ -867,7 +1564,7 @@ As-模式
 ::
 
     Prelude Data.List> tails ""
-    [""]
+    [[]]
 
 如果想要一个行为和 ``tails`` 类似，但是并不包含空列表后缀的函数，可以自己写一个：
 
@@ -1118,7 +1815,7 @@ seq 的用法
 
     chained x y z = x `seq` y `seq` someFunc z
 
-一个常见错误是，将 ``seq`` 用在没有关联的连个表达式上面：
+一个常见错误是，将 ``seq`` 用在没有关联的两个表达式上面：
 
 ::
 
@@ -1153,4 +1850,4 @@ seq 的用法
 
 即使不考虑性能的问题， ``seq`` 也不是处理内存泄漏的万能药。可以进行非严格求值，但并不意味着非用它不可。对 ``seq`` 的不小心使用可能对内存泄漏并没有帮助，在更糟糕的情况下，它还会造成新的内存泄漏。
 
-第二十五章会介绍关于性能和优化的内容，到时会说明跟多 ``seq`` 的用法和细节。
+第二十五章会介绍关于性能和优化的内容，到时会说明更多 ``seq`` 的用法和细节。
