@@ -97,7 +97,7 @@ Haskell程序性能分析
 然后用 ``time`` 执行它看看情况吧：
 
 ::
-    $ ghc --make -O2 A.hs
+    $ ghc --make -rtsopts -O2 A.hs
     [1 of 1] Compiling Main             ( A.hs, A.o )
     Linking A ...
     $ time ./A 1e5
@@ -109,7 +109,6 @@ Haskell程序性能分析
     $ time ./A 1e7
     5000000.5
     ./A 1e7  63.80s user 0.62s system 99% cpu 1:04.53 total
-
 
 ..
     It worked well for small numbers,
@@ -158,7 +157,6 @@ Haskell程序性能分析
 
 ::
     $ ./A 1e7 +RTS -sstderr
-    ./A 1e7 +RTS -sstderr
     5000000.5
     1,689,133,824 bytes allocated in the heap
     697,882,192 bytes copied during GC (scavenged)
@@ -181,7 +179,6 @@ Haskell程序性能分析
       Alloc rate    2,681,318,018 bytes per MUT second
 
       Productivity   3.1% of total user, 2.9% of total elapsed
-
 
 ..
     When using -sstderr, our program's performance numbers are printed to the standard
@@ -298,12 +295,18 @@ Haskell程序性能分析
 ..
     The program ran out of stack space! This is the main complication to
     be aware of when using profiling: adding cost centres to a program modifies
-    how it is optimized, possibly changing its runtime behavior,
-    as each expression now has additional code associated with it to track the evaluation steps.
-    In a sense, observing the program executing modifies how it executes. In this case,
-    it is simple to proceed -- we use the GHC runtime flag, -K, to set
-    a larger stack limit for our program (with the usual suffixes to indicate magnitude):
+    how it is optimized, possibly changing its runtime behavior, as each
+    expression now has additional code associated with it to track the
+    evaluation steps. In a sense, observing the program executing modifies
+    how it executes. In this case, it is simple to proceed
+    -- we use the GHC runtime flag, -K, to set a larger stack limit for
+    our program (with the usual suffixes to indicate magnitude):
 
+程序竟然把栈空间耗完了！这就是使用 profiling 时需要注意的主要影响：
+给程序加Cost Centre会使它的优化发生变化，甚至改变它的运行时行为，
+因为每一个表达式都被附加了额外代码来检测它们的执行情况。对于我们
+这样情况，修正起来很简单 —— 只需要用GHC运行时标记 ``-K`` 来增加
+栈空间上限即可（#todo）：
 
 
 ::
@@ -314,9 +317,15 @@ Haskell程序性能分析
 
 ..
     The runtime will dump its profiling information into a file,
-    A.prof (named after the binary that was executed) which contains the following information:
+    A.prof (named after the binary that was executed)
+    which contains the following information:
+
+运行时会将性能信息生成到一个名字为 ``A.prof`` （以程序本身名字命名） 的文件中。
+其中含有以下信息：
 
 ::
+    $ cat A.prof
+
     Time and Allocation Profiling Report  (Final)
 
            A +RTS -p -K100M -RTS 1e6
