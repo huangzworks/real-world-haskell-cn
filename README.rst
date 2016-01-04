@@ -144,6 +144,8 @@
 
 - `Allan Zyne <https://github.com/DrsExplorer>`_
 
+- `zhangkaizhao <https://github.com/zhangkaizhao>`_
+
 - 还有更多待添加 ...
 
 
