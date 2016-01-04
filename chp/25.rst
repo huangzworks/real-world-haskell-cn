@@ -374,27 +374,50 @@ Haskell程序性能分析
     assigned to top level CAFs.
 
 ..
-    What conclusions can we draw from this information? We can see that the majority of time is spent in two CAFs, one related to computing the sum, and another for floating point numbers. These alone account for nearly all allocations that occurred during the program run. Combined with our earlier observation about garbage collector stress, it begins to look like the list node allocations, containing floating point values, are causing a problem.
-
+    What conclusions can we draw from this information? We can see that the
+    majority of time is spent in two CAFs, one related to computing the sum,
+    and another for floating point numbers. These alone account for nearly
+    all allocations that occurred during the program run. Combined with our
+    earlier observation about garbage collector stress, it begins to look like
+    the list node allocations, containing floating point values,
+    are causing a problem.
 
 ..
-    For simple performance hot spot identification, particularly in large programs where we might have little idea where time is being spent, the initial time profile can highlight a particular problematic module and top level function, which is often enough to reveal the trouble spot. Once we've narrowed down the code to a problematic section, such as our example here, we can use more sophisticated profiling tools to extract more information.
-
+    For simple performance hot spot identification, particularly in large
+    programs where we might have little idea where time is being spent,
+    the initial time profile can highlight a particular problematic module
+    and top level function, which is often enough to reveal the trouble spot.
+    Once we've narrowed down the code to a problematic section,
+    such as our example here, we can use more sophisticated profiling
+    tools to extract more information.
 
 ..
     Space profiling
     +++++++++++++++
 
 ..
-    Beyond basic time and allocation statistics, GHC is able to generate graphs of memory usage of the heap, over the program's lifetime. This is perfect for revealing "space leaks", where memory is retained unnecessarily, leading to the kind of heavy garbage collector activity we see in our example.
+    Beyond basic time and allocation statistics, GHC is able to generate
+    graphs of memory usage of the heap, over the program's lifetime.
+    This is perfect for revealing "space leaks", where memory is retained
+    unnecessarily, leading to the kind of heavy garbage collector activity
+    we see in our example.
 
 
 ..
-    Constructing a heap profile follows the same steps as constructing a normal time profile, namely, compile with -prof -auto-all -caf-all, but when we execute the program, we'll ask the runtime system to gather more detailed heap use statistics. We can break down the heap use information in several ways: via cost-centre, via module, by constructor, by data type, each with its own insights. Heap profiling A.hs logs to a file A.hp, with raw data which is in turn processed by the tool hp2ps, which generates a PostScript-based, graphical visualization of the heap over time.
+    Constructing a heap profile follows the same steps as constructing
+    a normal time profile, namely, compile with -prof -auto-all -caf-all,
+    but when we execute the program, we'll ask the runtime system to gather
+    more detailed heap use statistics. We can break down the heap use
+    information in several ways: via cost-centre, via module, by constructor,
+    by data type, each with its own insights. Heap profiling A.hs logs
+    to a file A.hp, with raw data which is in turn processed by the tool
+    hp2ps, which generates a PostScript-based, graphical visualization
+    of the heap over time.
 
 
 ..
-    To extract a standard heap profile from our program, we run it with the -hc runtime flag:
+    To extract a standard heap profile from our program, we run it with
+    the -hc runtime flag:
 
 
 ::
@@ -404,7 +427,8 @@ Haskell程序性能分析
 
 
 ..
-    A heap profiling log, A.hp, was created, with the content in the following form:
+    A heap profiling log, A.hp, was created, with the content
+    in the following form:
 
 ::
     JOB "A 1e6 +RTS -hc -p -K100M"
@@ -422,7 +446,12 @@ Haskell程序性能分析
     END_SAMPLE 0.24
 
 ..
-    Samples are taken at regular intervals during the program run. We can increase the heap sampling frequency by using -iN, where N is the number of seconds (e.g. 0.01) between heap size samples. Obviously, the more we sample, the more accurate the results, but the slower our program will run. We can now render the heap profile as a graph, using the hp2ps tool:
+    Samples are taken at regular intervals during the program run.
+    We can increase the heap sampling frequency by using -iN, where N is
+    the number of seconds (e.g. 0.01) between heap size samples. Obviously,
+    the more we sample, the more accurate the results, but the slower
+    our program will run. We can now render the heap profile as a graph,
+    using the hp2ps tool:
 
 
 ::
@@ -436,7 +465,12 @@ Haskell程序性能分析
 
 
 ..
-    What does this graph tell us? For one, the program runs in two phases: spending its first half allocating increasingly large amounts of memory, while summing values, and the second half cleaning up those values. The initial allocation also coincides with sum, doing some work, allocating a lot of data. We get a slightly different presentation if we break down the allocation by type, using -hy profiling:
+    What does this graph tell us? For one, the program runs in two phases:
+    spending its first half allocating increasingly large amounts of memory,
+    while summing values, and the second half cleaning up those values.
+    The initial allocation also coincides with sum, doing some work,
+    allocating a lot of data. We get a slightly different presentation if
+    we break down the allocation by type, using -hy profiling:
 
 
 ::
@@ -453,7 +487,11 @@ Haskell程序性能分析
 
 
 ..
-    The most interesting things to notice here are large parts of the heap devoted to values of list type (the [] band), and heap-allocated Double values. There's also some heap allocated data of unknown type (represented as data of type "*"). Finally, let's break it down by what constructors are being allocated, using the -hd flag:
+    The most interesting things to notice here are large parts of the heap
+    devoted to values of list type (the [] band), and heap-allocated
+    Double values. There's also some heap allocated data of unknown type
+    (represented as data of type "*"). Finally, let's break it down by
+    what constructors are being allocated, using the -hd flag:
 
 
 ::
@@ -470,7 +508,14 @@ Haskell程序性能分析
     [img here]
 
 ..
-    A lot of work is going into allocating list nodes containing double-precision floating point values. Haskell lists are lazy, so the full million element list is built up over time. Crucially, though, it is not being deallocated as it is traversed, leading to increasingly large resident memory use. Finally, a bit over halfway through the program run, the program finally finishes summing the list, and starts calculating the length. If we look at the original fragment for mean, we can see exactly why that memory is being retained:
+    A lot of work is going into allocating list nodes containing
+    double-precision floating point values. Haskell lists are lazy,
+    so the full million element list is built up over time. Crucially,
+    though, it is not being deallocated as it is traversed, leading to
+    increasingly large resident memory use. Finally, a bit over halfway
+    through the program run, the program finally finishes summing the list,
+    and starts calculating the length. If we look at the original
+    fragment for mean, we can see exactly why that memory is being retained:
 
 
 ::
@@ -480,14 +525,25 @@ Haskell程序性能分析
 
 
 ..
-    At first we sum our list, which triggers the allocation of list nodes, but we're unable to release the list nodes once we're done, as the entire list is still needed by length. As soon as sum is done though, and length starts consuming the list, the garbage collector can chase it along, deallocating the list nodes, until we're done. These two phases of evaluation give two strikingly different phases of allocation and deallocation, and point at exactly what we need to do: traverse the list only once, summing and averaging it as we go.
+    At first we sum our list, which triggers the allocation of list nodes,
+    but we're unable to release the list nodes once we're done,
+    as the entire list is still needed by length. As soon as sum is
+    done though, and length starts consuming the list, the garbage
+    collector can chase it along, deallocating the list nodes,
+    until we're done. These two phases of evaluation give two strikingly
+    different phases of allocation and deallocation, and point at exactly
+    what we need to do: traverse the list only once, summing and averaging
+    it as we go.
 
 ..
     Controlling evaluation
     ----------------------
 
 ..
-    We have a number of options if we want to write our loop to traverse the list only once. For example, we can write the loop as a fold over the list, or via explicit recursion on the list structure. Sticking to the high level approaches, we'll try a fold first:
+    We have a number of options if we want to write our loop to traverse
+    the list only once. For example, we can write the loop as a fold over
+    the list, or via explicit recursion on the list structure. Sticking
+    to the high level approaches, we'll try a fold first:
 
 
 ::
@@ -499,11 +555,19 @@ Haskell程序性能分析
         k (n, s) x = (n+1, s+x)
 
 ..
-    Now, instead of taking the sum of the list, and retaining the list until we can take its length, we left-fold over the list, accumulating the intermediate sum and length values in a pair (and we must left-fold, since a right-fold would take us to the end of the list and work backwards, which is exactly what we're trying to avoid).
+    Now, instead of taking the sum of the list, and retaining the list
+    until we can take its length, we left-fold over the list,
+    accumulating the intermediate sum and length values in a pair
+    (and we must left-fold, since a right-fold would take us to the
+    end of the list and work backwards, which is exactly what we're
+    trying to avoid).
 
 
 ..
-    The body of our loop is the k function, which takes the intermediate loop state, and the current element, and returns a new state with the length increased by one, and the sum increased by the current element. When we run this, however, we get a stack overflow:
+    The body of our loop is the k function, which takes the intermediate
+    loop state, and the current element, and returns a new state with
+    the length increased by one, and the sum increased by the current
+    element. When we run this, however, we get a stack overflow:
 
 
 ::
@@ -515,7 +579,10 @@ Haskell程序性能分析
 
 
 ..
-    We traded wasted heap for wasted stack! In fact, if we increase the stack size to the size of the heap in our previous implementation, with the -K runtime flag, the program runs to completion, and has similar allocation figures:
+    We traded wasted heap for wasted stack! In fact, if we increase
+    the stack size to the size of the heap in our previous implementation,
+    with the -K runtime flag, the program runs to completion, and has
+    similar allocation figures:
 
 
 ::
@@ -534,7 +601,9 @@ Haskell程序性能分析
     [img here]
 
 ..
-    The question is: why are we building up more and more allocated state, when all we are doing is folding over the list? This, it turns out, is a classic space leak due to excessive laziness.
+    The question is: why are we building up more and more allocated state,
+    when all we are doing is folding over the list? This, it turns out,
+    is a classic space leak due to excessive laziness.
 
 
 ..
@@ -542,11 +611,21 @@ Haskell程序性能分析
     +++++++++++++++++++++++++++++
 
 ..
-    The problem is that our left-fold, foldl, is too lazy. What we want is a tail recursive loop, which can be implemented effectively as a goto, with no state left on the stack. In this case though, rather than fully reducing the tuple state at each step, a long chain of thunks is being created, that only towards the end of the program is evaluated. At no point do we demand reduction of the loop state, so the compiler is unable to infer any strictness, and must reduce the value purely lazily.
+    The problem is that our left-fold, foldl, is too lazy. What we want
+    is a tail recursive loop, which can be implemented effectively as
+    a goto, with no state left on the stack. In this case though, rather
+    than fully reducing the tuple state at each step, a long chain of
+    thunks is being created, that only towards the end of the program
+    is evaluated. At no point do we demand reduction of the loop state,
+    so the compiler is unable to infer any strictness, and must reduce
+    the value purely lazily.
 
 
 ..
-    What we need to do is to tune the evaluation strategy slightly: lazily unfolding the list, but strictly accumulating the fold state. The standard approach here is to replace foldl with foldl', from the Data.List module:
+    What we need to do is to tune the evaluation strategy slightly:
+    lazily unfolding the list, but strictly accumulating the fold state.
+    The standard approach here is to replace foldl with foldl', from the
+    Data.List module:
 
 
 ::
@@ -559,7 +638,8 @@ Haskell程序性能分析
 
 
 ..
-    However, if we run this implementation, we see we still haven't quite got it right:
+    However, if we run this implementation, we see we still haven't
+    quite got it right:
 
 
 ::
@@ -572,7 +652,9 @@ Haskell程序性能分析
     ./C 1e6  0.44s user 0.13s system 94% cpu 0.601 total
 
 ..
-    Still not strict enough! Our loop is continuing to accumulate unevaluated state on the stack. The problem here is that foldl' is only outermost strict:
+    Still not strict enough! Our loop is continuing to accumulate
+    unevaluated state on the stack. The problem here is that foldl'
+    is only outermost strict:
 
 
 ::
@@ -924,7 +1006,9 @@ Haskell程序性能分析
         k (Pair n s) x = Pair (n+1) (s+x)
 
 ..
-    After installing the uvector library, from Hackage, we can build our program, with -O2 -funbox-strict-fields, and inspect the Core that results:
+    After installing the uvector library, from Hackage, we can
+    build our program, with -O2 -funbox-strict-fields, and inspect
+    the Core that results:
 
 
 ::
@@ -936,7 +1020,11 @@ Haskell程序性能分析
 
 
 ..
-    This is really the optimal result! Our lists have been entirely fused away, yielding a tight loop where list generation is interleaved with accumulation, and all input and output variables are kept in registers. Running this, we see another improvement bump in performance, with runtime falling by another order of magnitude:
+    This is really the optimal result! Our lists have been entirely
+    fused away, yielding a tight loop where list generation is
+    interleaved with accumulation, and all input and output variables
+    are kept in registers. Running this, we see another improvement
+    bump in performance, with runtime falling by another order of magnitude:
 
 ::
     $ time ./I 1e7
@@ -948,10 +1036,22 @@ Haskell程序性能分析
     +++++++++++++++++++++++++++++
 
 ..
-    Given that our Core is now optimal, the only step left to take this program further is to look directly at the assembly. Of course, there are only small gains left to make at this point. To view the generated assembly, we can use a tool like ghc-core, or generate assembly to standard output with the -ddump-asm flag to GHC. We have few levers available to adjust the generated assembly, but we may choose between the C and native code backends to GHC, and, if we choose the C backend, which optimization flags to pass to GCC. Particularly with floating point code, it is sometimes useful to compile via C, and enable specific high performance C compiler optimizations.
+    Given that our Core is now optimal, the only step left to
+    take this program further is to look directly at the assembly.
+    Of course, there are only small gains left to make at this point.
+    To view the generated assembly, we can use a tool like ghc-core,
+    or generate assembly to standard output with the -ddump-asm flag to GHC.
+    We have few levers available to adjust the generated assembly,
+    but we may choose between the C and native code backends to GHC,
+    and, if we choose the C backend, which optimization flags to pass to GCC.
+    Particularly with floating point code, it is sometimes useful to
+    compile via C, and enable specific high performance C compiler optimizations.
 
 ..
-    For example, we can squeeze out the last drops of performance from our final fused loop code by using -funbox-strict-fields -fvia-C -optc-O2, which cuts the running time in half again (as the C compiler is able to optimize away some redundant move instructions in the program's inner loop):
+    For example, we can squeeze out the last drops of performance from our
+    final fused loop code by using -funbox-strict-fields -fvia-C -optc-O2,
+    which cuts the running time in half again (as the C compiler is able to
+    optimize away some redundant move instructions in the program's inner loop):
 
 ::
     $ ghc -fforce-recomp --make -O2 -funbox-strict-fields -fvia-C -optc-O2 I.hs
@@ -962,7 +1062,8 @@ Haskell程序性能分析
     ./I 1e7  0.04s user 0.00s system 98% cpu 0.047 total
 
 ..
-    Inspecting the final x86_64 assembly (via -keep-tmp-files), we see the generated loop contains only six instructions:
+    Inspecting the final x86_64 assembly (via -keep-tmp-files),
+    we see the generated loop contains only six instructions:
 
 ::
     go:
@@ -974,7 +1075,14 @@ Haskell程序性能分析
       jmp go
 
 ..
-    We've effectively massaged the program through multiple source-level optimizations, all the way to the final assembly. There's nowhere else to go from here. Optimising code to this level is very rarely necessary, of course, and typically only makes sense when writing low level libraries, or optimizing particularly important code, where all algorithm choices have already been determined. For day-to-day code, choosing better algorithms is always a more effective strategy, but it's useful to know we can optimize down to the metal if necessary.
+    We've effectively massaged the program through multiple
+    source-level optimizations, all the way to the final assembly.
+    There's nowhere else to go from here. Optimising code to this level
+    is very rarely necessary, of course, and typically only makes sense
+    when writing low level libraries, or optimizing particularly important code,
+    where all algorithm choices have already been determined. For
+    day-to-day code, choosing better algorithms is always a more effective
+    strategy, but it's useful to know we can optimize down to the metal if necessary.
 
 
 ..
@@ -982,7 +1090,17 @@ Haskell程序性能分析
     -----------
 
 ..
-    In this chapter we've looked at a suite of tools and techniques you can use to track down and identify problematic areas of your code, along with a variety of conventions that can go a long way towards keeping your code lean and efficient. The goal is really to program in such a way that you have good knowledge of what your code is doing, at all levels from source, through the compiler, to the metal, and be able to focus in on particular levels when requirements demand.
+    In this chapter we've looked at a suite of tools and techniques
+    you can use to track down and identify problematic areas of your code,
+    along with a variety of conventions that can go a long way towards
+    keeping your code lean and efficient. The goal is really to program
+    in such a way that you have good knowledge of what your code is doing,
+    at all levels from source, through the compiler, to the metal,
+    and be able to focus in on particular levels when requirements demand.
 
 ..
-    By sticking to simple rules, choosing the right data structures, and avoiding the traps of the unwary, it is perfectly possible to reliably achieve high performance from your Haskell code, while being able to develop at a very high level. The result is a sweet balance of productivity and ruthless efficiency. 
+    By sticking to simple rules, choosing the right data structures,
+    and avoiding the traps of the unwary, it is perfectly possible to
+    reliably achieve high performance from your Haskell code, while being
+    able to develop at a very high level. The result is a sweet balance
+    of productivity and ruthless efficiency. 
