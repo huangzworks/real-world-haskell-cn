@@ -362,6 +362,10 @@ Haskell程序性能分析
     of bytes allocated during the entire program run
     (not the maximum live memory, which was around 700MB).
 
+这些信息呈现给一些我们关于程序的运行时行为的情况。里面有程序的名字以及
+执行程序时用到的选项和参数。『total time』是运行时系统视角所见的程序运行
+的确切总时长。『Total allocation』是程序运行过程中分配的总字节数（不是
+程序运行时内存使用的峰值；那个峰值大概是700MB）
 
 ..
     The second section of the profiling report is the proportion of time and
@@ -373,6 +377,12 @@ Haskell程序性能分析
     (such as the floating point values in the large list, and the list itself)
     assigned to top level CAFs.
 
+报告中的第二小节是各个函数所消耗的时间和空间部分。第三小节是Cost Centre报告：
+其结构为调用关系树（比如我们可以看到 ``mean`` 是被 ``main`` 调用的）。
+"individual"和"inherited"列提供了每个Cost Centre其本身、其整体、以及其子节点
+所消耗的资源。最下面那些 ``CAF`` 是执行一些常量的一次性消耗（例如大列表中
+浮点数以及列表本身）。
+
 ..
     What conclusions can we draw from this information? We can see that the
     majority of time is spent in two CAFs, one related to computing the sum,
@@ -382,6 +392,10 @@ Haskell程序性能分析
     the list node allocations, containing floating point values,
     are causing a problem.
 
+我们能从这些信息得出什么结论呢？我们可以看出两个 ``CAF`` 占用了大多数时间。
+分别是计算总和相关和浮点数相关。这基本解释了所有程序运行的消耗。加上之前
+我们观察到的关于GC的压力，我们就可以推测出列表节点和浮点数值可能是问题之源。
+
 ..
     For simple performance hot spot identification, particularly in large
     programs where we might have little idea where time is being spent,
@@ -390,6 +404,11 @@ Haskell程序性能分析
     Once we've narrowed down the code to a problematic section,
     such as our example here, we can use more sophisticated profiling
     tools to extract more information.
+
+简单的性能热点检测，特别是对于我们难以知道时间花费点的大型程序，这个
+时间分析会突出一些特定的问题模块或高层函数。这往往足够显示出问题所在了。
+就像我们的程序，一旦我们窄化了问题所在，我们就可以用更加成熟的分析工具
+来拿到更多的信息。
 
 ..
     Space profiling
