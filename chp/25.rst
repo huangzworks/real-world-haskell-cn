@@ -414,6 +414,9 @@ Haskell程序性能分析
     Space profiling
     +++++++++++++++
 
+空间性能分析
+++++++++++++
+
 ..
     Beyond basic time and allocation statistics, GHC is able to generate
     graphs of memory usage of the heap, over the program's lifetime.
@@ -421,6 +424,9 @@ Haskell程序性能分析
     unnecessarily, leading to the kind of heavy garbage collector activity
     we see in our example.
 
+GHC除了可以进行基本的时间和空间分析外，还能为程序整个运行期间的堆的内存使用
+情况生成图表。这对检测内存泄露简直完美。内存泄露是指不再需要的内存不被释放，
+会对GC造成压力，就像我们在我们的例子程序中见到的那样。
 
 ..
     Constructing a heap profile follows the same steps as constructing
@@ -432,6 +438,7 @@ Haskell程序性能分析
     to a file A.hp, with raw data which is in turn processed by the tool
     hp2ps, which generates a PostScript-based, graphical visualization
     of the heap over time.
+
 
 
 ..
