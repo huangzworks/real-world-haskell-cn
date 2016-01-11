@@ -4,7 +4,8 @@
 ..
     Haskell is a high level language. A really high level language.
     We can spend our days programming entirely in abstractions, in monoids,
-    functors and hylomorphisms, far removed from any particular hardware model of computation.
+    functors and hylomorphisms, far removed from any particular hardware model
+    of computation.
     The language specification goes to great lengths to avoid prescribing
     any particular evaluation model.
     These layers of abstraction let us treat Haskell as a notation for computation itself,
@@ -14,9 +15,10 @@
 
 Haskell 是一门高级编程语言，一门真正的高级编程语言。 我们可以一直使用抽象概念、
 幺半群、函子、以及多态进行编程，而不必与任何特定的硬件模型打交道。
-这个语言的标准规范极力避免照症开药。这几层抽象使得我们可以把 Haskell
-作为计算本身的记号，让编程人员关心他们问题的关键点，而不用操心
-低层次的实现细节，使得人们可以心无旁骛地进行编程。
+Haskell 在语言规范方面下了很大的功夫，力求语言可以不受制于某个特定的求值模型。
+这几层抽象使得我们可以把 Haskell 作为计算本身的记号，
+让编程人员关心他们问题的关键点，而不用操心低层次的实现细节，
+使得人们可以心无旁骛地进行编程。
 
 ..
     However, this is a book about real world programming, and in the real world,
@@ -44,8 +46,8 @@ Haskell 是一门高级编程语言，一门真正的高级编程语言。 我�
 在这一章，我们将看到 Haskell 编程中可能遇到的典型空间和时间问题，并且如何有
 条理地分析、理解并解决它们。为此我们将研究使用一系列的技术：时间和空间使用
 分析，运行时统计，以及对严格求值和惰性求值。我们也会看下编译器优化对
-性能的影响，以及高级优化技术在纯函数式编程语言中的应用。那么，让
-我们用一个挑战开始吧：调查一个查找程序中不必要内存的使用问题。
+性能的影响，以及高级优化技术在纯函数式编程语言中的应用。那么，
+让我们用一个挑战开始吧：调查一个简单程序中不必要内存的使用问题。
 
 
 Haskell程序性能分析
