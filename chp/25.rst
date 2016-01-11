@@ -1,5 +1,5 @@
-第二十五章：性能分析与优化
-==========================
+第 25 章：性能分析与优化
+==============================
 
 ..
     Haskell is a high level language. A really high level language.
