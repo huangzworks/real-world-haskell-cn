@@ -70,6 +70,7 @@ Haskell程序性能分析
 这里也展示了几种因疏忽而易出现的性能问题。
 
 ::
+
     -- file: ch25/A.hs
     import System.Environment
     import Text.Printf
@@ -100,6 +101,7 @@ Haskell程序性能分析
 然后用 ``time`` 执行它看看情况吧：
 
 ::
+
     $ ghc --make -rtsopts -O2 A.hs
     [1 of 1] Compiling Main             ( A.hs, A.o )
     Linking A ...
@@ -159,6 +161,7 @@ Haskell程序性能分析
 那么让我们用 ``+RTS -sstderr`` 来运行程序收集我们所需要的结果吧。
 
 ::
+
     $ ./A 1e7 +RTS -sstderr
     5000000.5
     1,689,133,824 bytes allocated in the heap
@@ -238,6 +241,7 @@ Haskell程序性能分析
 会生成代码来计算这些地方的资源消耗。我们可以用 ``SCC`` 语法使得任何语句成为 cost centre。
 
 ::
+
     -- file: ch25/SCC.hs
     mean :: [Double] -> Double
     mean xs = {-# SCC "mean" #-} sum xs / fromIntegral (length xs)
@@ -278,6 +282,7 @@ Haskell程序性能分析
 那么以分析性能的方式来编译我们的程序吧（用 ``-fforce-recomp`` 选项来强制重新编译所有部分）：
 
 ::
+
     $ ghc -O2 --make A.hs -prof -auto-all -caf-all -fforce-recomp
     [1 of 1] Compiling Main             ( A.hs, A.o )
     Linking A ...
@@ -292,6 +297,7 @@ Haskell程序性能分析
 变慢，所以我们用一个较小的输入来执行）：
 
 ::
+
     $ time ./A  1e6 +RTS -p
     Stack space overflow: current size 8388608 bytes.
     Use `+RTS -Ksize' to increase it.
@@ -315,6 +321,7 @@ Haskell程序性能分析
 
 
 ::
+
     $ time ./A 1e6 +RTS -p -K100M
     500000.5
     ./A 1e6 +RTS -p -K100M  4.27s user 0.20s system 99% cpu 4.489 total
@@ -329,6 +336,7 @@ Haskell程序性能分析
 其中含有以下信息：
 
 ::
+
     $ cat A.prof
 
     Time and Allocation Profiling Report  (Final)
@@ -445,6 +453,7 @@ Haskell程序性能分析
 
 
 ::
+
     $ time ./A 1e6 +RTS -hc -p -K100M
     500000.5
     ./A 1e6 +RTS -hc -p -K100M  4.15s user 0.27s system 99% cpu 4.432 total
@@ -455,6 +464,7 @@ Haskell程序性能分析
     in the following form:
 
 ::
+
     JOB "A 1e6 +RTS -hc -p -K100M"
     SAMPLE_UNIT "seconds"
     VALUE_UNIT "bytes"
@@ -479,6 +489,7 @@ Haskell程序性能分析
 
 
 ::
+
     $ hp2ps -e8in -c A.hp
 
 ..
@@ -498,6 +509,7 @@ Haskell程序性能分析
 
 
 ::
+
     $ time ./A 1e6 +RTS -hy -p -K100M
     500000.5
     ./A 1e6 +RTS -i0.001 -hy -p -K100M  34.96s user 0.22s system 99% cpu 35.237 total
@@ -519,6 +531,7 @@ Haskell程序性能分析
 
 
 ::
+
     $ time ./A 1e6 +RTS -hd -p -K100M
     $ time ./A 1e6 +RTS -i0.001 -hd -p -K100M
     500000.5
@@ -543,6 +556,7 @@ Haskell程序性能分析
 
 
 ::
+
     -- file: ch25/Fragment.hs
     mean :: [Double] -> Double
     mean xs = sum xs / fromIntegral (length xs)
@@ -571,6 +585,7 @@ Haskell程序性能分析
 
 
 ::
+
     -- file: ch25/B.hs
     mean :: [Double] -> Double
     mean xs = s / fromIntegral n
@@ -595,6 +610,7 @@ Haskell程序性能分析
 
 
 ::
+
     $ ghc -O2 --make B.hs -fforce-recomp
     $ time ./B 1e6
     Stack space overflow: current size 8388608 bytes.
@@ -610,6 +626,7 @@ Haskell程序性能分析
 
 
 ::
+
     $ ghc -O2 --make B.hs -prof -auto-all -caf-all -fforce-recomp
     [1 of 1] Compiling Main             ( B.hs, B.o )
     Linking B ...
@@ -653,6 +670,7 @@ Haskell程序性能分析
 
 
 ::
+
     -- file: ch25/C.hs
     mean :: [Double] -> Double
     mean xs = s / fromIntegral n
@@ -667,6 +685,7 @@ Haskell程序性能分析
 
 
 ::
+
     $ ghc -O2 --make C.hs
     [1 of 1] Compiling Main             ( C.hs, C.o )
     Linking C ...
@@ -682,6 +701,7 @@ Haskell程序性能分析
 
 
 ::
+
     -- file: ch25/Foldl.hs
     foldl' :: (a -> b -> a) -> a -> [b] -> a
     foldl' f z xs = lgo z xs
@@ -701,6 +721,7 @@ Haskell程序性能分析
     There are a number of ways to make this function fully strict. We can, for example, add our own strictness hints to the internal state of the tuple, yielding a truly tail recursive loop:
 
 ::
+
     -- file: ch25/D.hs
     mean :: [Double] -> Double
     mean xs = s / fromIntegral n
@@ -713,6 +734,7 @@ Haskell程序性能分析
 
 
 ::
+
     $ ghc -O2 D.hs --make
     [1 of 1] Compiling Main             ( D.hs, D.o )
     Linking D ...
@@ -721,6 +743,7 @@ Haskell程序性能分析
     If we run this, with allocation statistics enabled, we get the satisfying result:
 
 ::
+
     $ time ./D 1e6 +RTS -sstderr
     ./D 1e6 +RTS -sstderr 
     500000.5
@@ -759,6 +782,7 @@ Haskell程序性能分析
     There are a number of other ways we could have addressed the strictness issue here. For deep strictness, we can use the rnf function, part of the parallel strategies library (along with using), which unlike seq reduces to the fully evaluated "normal form" (hence its name). Such a "deep seq" fold we can write as:
 
 ::
+
     -- file: ch25/E.hs
     import System.Environment
     import Text.Printf
@@ -794,6 +818,7 @@ Haskell程序性能分析
     Perhaps the cheapest way, syntactically, to add required strictness to code that's excessively lazy is via "bang patterns" (whose name comes from pronunciation of the "!" character as "bang"), a language extension introduced with the following pragma:
 
 ::
+
     -- file: ch25/F.hs
     {-# LANGUAGE BangPatterns #-}
 
@@ -801,6 +826,7 @@ Haskell程序性能分析
     With bang patterns, we can hint at strictness on any binding form, making the function strict in that variable. Much as explicit type annotations can guide type inference, bang patterns can help guide strictness inference. Bang patterns are a language extension, and are enabled with the BangPatterns language pragma. We can now rewrite the loop state to be simply:
 
 ::
+
     -- file: ch25/F.hs
     mean :: [Double] -> Double
     mean xs = s / fromIntegral n
@@ -813,6 +839,7 @@ Haskell程序性能分析
 
 
 ::
+
     $ ghc -O2 F.hs --make
     $ time ./F 1e6 +RTS -sstderr
     ./F 1e6 +RTS -sstderr 
@@ -853,6 +880,7 @@ Haskell程序性能分析
     Strict data types are another effective way to provide strictness information to the compiler. By default, Haskell data types are lazy, but it is easy enough to add strictness information to the fields of a data type that then propagate through the program. We can declare a new strict pair type, for example:
 
 ::
+
     -- file: ch25/G.hs
     data Pair a b = Pair !a !b
 
@@ -861,6 +889,7 @@ Haskell程序性能分析
 
 
 ::
+
     -- file: ch25/G.hs
     mean :: [Double] -> Double
     mean xs = s / fromIntegral n
@@ -885,6 +914,7 @@ Haskell程序性能分析
 
 
 ::
+
     $ ghc -O2 -ddump-simpl G.hs
 
 ..
@@ -892,6 +922,7 @@ Haskell程序性能分析
 
 
 ::
+
     lgo :: Integer -> [Double] -> Double# -> (# Integer, Double #)
 
     lgo = \ n xs s ->
@@ -920,6 +951,7 @@ Haskell程序性能分析
 
 
 ::
+
     -- file: ch25/H.hs
     data Pair = Pair !Int !Double
 
@@ -933,6 +965,7 @@ Haskell程序性能分析
     Compiling this with optimizations on, and -funbox-strict-fields -ddump-simpl, we get a tighter inner loop in Core:
 
 ::
+
     lgo :: Int# -> Double# -> [Double] -> (# Int#, Double# #)
     lgo = \ n s xs ->
         case xs of
@@ -946,6 +979,7 @@ Haskell程序性能分析
 
 
 ::
+
     $ time ./H 1e7 +RTS -sstderr
     ./H 1e7 +RTS -sstderr 
     5000000.5
@@ -1012,6 +1046,7 @@ Haskell程序性能分析
     We'll use the uvector library, which provides a suite of list-like operations that use stream fusion to remove intermediate data structures. Rewriting our program to use streams is straightforward:
 
 ::
+
     -- file: ch25/I.hs
     import System.Environment
     import Text.Printf
@@ -1036,6 +1071,7 @@ Haskell程序性能分析
 
 
 ::
+
     fold :: Int# -> Double# -> Double# -> (# Int#, Double# #)
     fold = \ n s t ->
         case >## t limit of {
@@ -1051,6 +1087,7 @@ Haskell程序性能分析
     bump in performance, with runtime falling by another order of magnitude:
 
 ::
+
     $ time ./I 1e7
     5000000.5
     ./I 1e7  0.06s user 0.00s system 72% cpu 0.083 total
@@ -1078,6 +1115,7 @@ Haskell程序性能分析
     optimize away some redundant move instructions in the program's inner loop):
 
 ::
+
     $ ghc -fforce-recomp --make -O2 -funbox-strict-fields -fvia-C -optc-O2 I.hs
     [1 of 1] Compiling Main             ( I.hs, I.o )
     Linking I ...
@@ -1090,6 +1128,7 @@ Haskell程序性能分析
     we see the generated loop contains only six instructions:
 
 ::
+
     go:
       ucomisd     5(%rbx), %xmm6
       ja  .L31
