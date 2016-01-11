@@ -1,0 +1,742 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>第二十五章：性能分析与优化 &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
+    <link rel="next" title="第 27 章：Socket 和 Syslog" href="27.html" />
+    <link rel="prev" title="第 24 章：并发和多核编程" href="24.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="24.html">第 24 章：并发和多核编程</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="27.html">第 27 章：Socket 和 Syslog</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="id1">
+<h1>第二十五章：性能分析与优化<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h1>
+<p>Haskell 是一门高级编程语言，一门真正的高级编程语言。 我们可以一直使用抽象概念、
+幺半群、函子、以及多态进行编程，而不必与任何特定的硬件模型打交道。
+Haskell 在语言规范方面下了很大的功夫，力求语言可以不受制于某个特定的求值模型。
+这几层抽象使得我们可以把 Haskell 作为计算本身的记号，
+让编程人员关心他们问题的关键点，而不用操心低层次的实现细节，
+使得人们可以心无旁骛地进行编程。</p>
+<p>但是，本书介绍的是真实世界中的编程行为，而真实世界中的代码都运行在资源有限的硬件之上，
+并且程序也会有时间和空间上的限制。因此，我们需要掌握好表达程序数据的方法，
+准确地理解使用惰性求值和严格求值策略带来的后果，并学会如何分析和控制程序
+在执行时的时间和空间。</p>
+<p>在这一章，我们将看到 Haskell 编程中可能遇到的典型空间和时间问题，并且如何有
+条理地分析、理解并解决它们。为此我们将研究使用一系列的技术：时间和空间使用
+分析，运行时统计，以及对严格求值和惰性求值。我们也会看下编译器优化对
+性能的影响，以及高级优化技术在纯函数式编程语言中的应用。那么，
+让我们用一个挑战开始吧：调查一个简单程序中不必要内存的使用问题。</p>
+<div class="section" id="haskell">
+<h2>Haskell程序性能分析<a class="headerlink" href="#haskell" title="Permalink to this headline">¶</a></h2>
+<p>请看下面这个列表处理程序，它用于计算某个大型列表的平均值。
+这里展示的只是程序的其中一部分代码（并且具体的实现算法我们并不关心），
+这是我们经常会在真实的 Haskell 程序中看到的典型的简单列表操作代码，
+这些代码大量地使用标准库函数，并且包含了一些因为疏忽大意而导致的性能问题。
+这里也展示了几种因疏忽而易出现的性能问题。</p>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">&#8211; file: ch25/A.hs
+import System.Environment
+import Text.Printf</p>
+<dl class="docutils">
+<dt>main = do</dt>
+<dd>[d] &lt;- map read <cite>fmap</cite> getArgs
+printf &#8220;%fn&#8221; (mean [1..d])</dd>
+</dl>
+<p class="last">mean :: [Double] -&gt; Double
+mean xs = sum xs / fromIntegral (length xs)</p>
+</dd>
+</dl>
+<p>这个程序非常简单：我们引用了访问系统环境的函数（即 <code class="docutils literal"><span class="pre">getArgs</span></code> ），
+和 Haskell 版的 <code class="docutils literal"><span class="pre">printf</span></code> 函数来格式化输出。接着这个程序从命令行
+读入一个数字来构建一个由浮点数组成的列表。我们用这个列表的和除以列表的
+长度得到平均值，然后以字符串的形式打印出来。我们来将此代码编译成机器代码（打开优化开关）
+然后用 <code class="docutils literal"><span class="pre">time</span></code> 执行它看看情况吧：</p>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ ghc &#8211;make -rtsopts -O2 A.hs
+[1 of 1] Compiling Main             ( A.hs, A.o )
+Linking A ...
+$ time ./A 1e5
+50000.5
+./A 1e5  0.05s user 0.01s system 102% cpu 0.059 total
+$ time ./A 1e6
+500000.5
+./A 1e6  0.26s user 0.04s system 99% cpu 0.298 total
+$ time ./A 1e7
+5000000.5
+./A 1e7  63.80s user 0.62s system 99% cpu 1:04.53 total</dd>
+</dl>
+<p>程序在处理少量输入时运行得非常好，但是当输入的列表元素数量达到一千万个时，
+程序的运行速度就会变得相当缓慢。从这点我们就能感觉到应该有什么地方做得不对，
+但我们并不清楚它的资源使用情况。 我们需要研究下。</p>
+<div class="section" id="id2">
+<h3>记录运行时统计数据<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<p>为了能收集这些情报，GHC支持传入 <code class="docutils literal"><span class="pre">+RTS</span></code> 和 <code class="docutils literal"><span class="pre">-RTS</span></code> 这些特殊选项。
+这些选项是传给 Haskell 运行时本身的，Haskell程序为会感知到它们的存在。</p>
+<p>特别地，我们可以用 <code class="docutils literal"><span class="pre">-s</span></code> 选项来让运行时系统收集内存和垃圾收集性能参数（并可以用 <code class="docutils literal"><span class="pre">-N</span></code>
+来控制系统线程的数量，或调整栈和堆的大小）。我们将用运行时选项来打开性能分析的
+几种不同变量。Haskell 运行时所能接受的所有选项列表可以参见GHC用户手册。</p>
+<p>那么让我们用 <code class="docutils literal"><span class="pre">+RTS</span> <span class="pre">-sstderr</span></code> 来运行程序收集我们所需要的结果吧。</p>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">$ ./A 1e7 +RTS -sstderr
+5000000.5
+1,689,133,824 bytes allocated in the heap
+697,882,192 bytes copied during GC (scavenged)
+465,051,008 bytes copied during GC (not scavenged)
+382,705,664 bytes maximum residency (10 sample(s))</p>
+<blockquote class="last">
+<div><blockquote>
+<div><dl class="docutils">
+<dt>3222 collections in generation 0 (  0.91s)</dt>
+<dd><blockquote class="first">
+<div>10 collections in generation 1 ( 18.69s)</div></blockquote>
+<p class="last">742 Mb total memory in use</p>
+</dd>
+</dl>
+</div></blockquote>
+<p>INIT  time    0.00s  (  0.00s elapsed)
+MUT   time    0.63s  (  0.71s elapsed)
+GC    time   19.60s  ( 20.73s elapsed)
+EXIT  time    0.00s  (  0.00s elapsed)
+Total time   20.23s  ( 21.44s elapsed)</p>
+<p>%GC time      96.9%  (96.7% elapsed)</p>
+<p>Alloc rate    2,681,318,018 bytes per MUT second</p>
+<p>Productivity   3.1% of total user, 2.9% of total elapsed</p>
+</div></blockquote>
+</dd>
+</dl>
+<p>当使用 <code class="docutils literal"><span class="pre">-sstderr</span></code> 时，程序的性能数字会输出到标准错误流里，告诉我们很多关于程序
+在具体做什么的信息。具体地说，它告诉我们GC用了多少时间以及最大活动内存使用情况。
+原来程序计算一千万个元素的平均值在堆上使用了多达742M的你内存，并且 96.9% 的时间是
+花费到垃圾收集上的！总共只有 3.1% 的时间是程序用来干正事的。</p>
+<p>那么为什么我们的程序运行情况这么差？我们如何来提高它呢？毕竟，Haskell是一个惰性语言：
+它不应该只用恒定的内存空间来处理列表吗？</p>
+</div>
+<div class="section" id="id3">
+<h3>时间消耗分析<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h3>
+<p>庆幸的是，GHC提供了几个工具可以分析程序的时间和空间使用情况。尤其是，
+我们可以在编写程序时打开性能调试选项，这样程序在执行时会得到每个函数
+所使用的资源使用的信息。性能调试过程分为三步：
+以性能调试方式编译程序；用性能调试模式执行程序；最后是分析收集到的结果数据。</p>
+<p>编译程序时，我们可以打开 <code class="docutils literal"><span class="pre">-prof</span></code> 选项来记录基本时间和空间性能信息。我们也需要给感兴趣的
+函数标记为 &#8220;cost centres&#8221; 以便让性能分析程序知晓。一个 cost centre 即是一个信息收集点。GHC
+会生成代码来计算这些地方的资源消耗。我们可以用 <code class="docutils literal"><span class="pre">SCC</span></code> 语法使得任何语句成为 cost centre。</p>
+<dl class="docutils">
+<dt>::</dt>
+<dd>&#8211; file: ch25/SCC.hs
+mean :: [Double] -&gt; Double
+mean xs = {-# SCC &#8220;mean&#8221; #-} sum xs / fromIntegral (length xs)</dd>
+</dl>
+<p>另外我们也可以用 <code class="docutils literal"><span class="pre">-auto-all</span></code> 选项来让编译器将所有顶级函数设为 cost centre。
+手动添加 cost centre 的能力作为自动 cost centre 性能调试的辅助，
+使得我们可以在发现某个热点（hot spot）有问题时，针对性地分析一个函数的资源消耗。</p>
+<p>另外需要注意的一个难点是：在 Haskell 这类惰性、纯函数式编程语言里，
+没有参数的值只会被计算一次（比如之前的程序展示过的巨大的列表），
+而计算的结果会被之后的所有其他计算所共享。这些值不是程序调用的其中一部分，
+因此它们不会每次都被计算。当然我们仍然需要评估它们的唯一一次计算的资源占用情况。
+这些只会计算一次的值被成为 CAF （Constant Applicative Forms），
+它们的确切数量可以通过 -caf-all 选项来得到。</p>
+<p>那么以分析性能的方式来编译我们的程序吧（用 <code class="docutils literal"><span class="pre">-fforce-recomp</span></code> 选项来强制重新编译所有部分）：</p>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ ghc -O2 &#8211;make A.hs -prof -auto-all -caf-all -fforce-recomp
+[1 of 1] Compiling Main             ( A.hs, A.o )
+Linking A ...</dd>
+</dl>
+<p>现在我们可以执行这个标记了性能分析点的程序了 （标记了性能分析的程序会
+变慢，所以我们用一个较小的输入来执行）：</p>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ time ./A  1e6 +RTS -p
+Stack space overflow: current size 8388608 bytes.
+Use <a href="#id4"><span class="problematic" id="id5">`</span></a>+RTS -Ksize&#8217; to increase it.
+./A 1e6 +RTS -p  1.11s user 0.15s system 95% cpu 1.319 total</dd>
+</dl>
+<p>程序竟然把栈空间耗完了！这就是使用 profiling 时需要注意的主要影响：
+给程序加Cost Centre会使它的优化发生变化，甚至改变它的运行时行为，
+因为每一个表达式都被附加了额外代码来检测它们的执行情况。对于我们
+这样情况，修正起来很简单 —— 只需要用GHC运行时标记 <code class="docutils literal"><span class="pre">-K</span></code> 来增加
+栈空间上限即可（#todo）：</p>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ time ./A 1e6 +RTS -p -K100M
+500000.5
+./A 1e6 +RTS -p -K100M  4.27s user 0.20s system 99% cpu 4.489 total</dd>
+</dl>
+<p>运行时会将性能信息生成到一个名字为 <code class="docutils literal"><span class="pre">A.prof</span></code> （以程序本身名字命名） 的文件中。
+其中含有以下信息：</p>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">$ cat A.prof</p>
+<p>Time and Allocation Profiling Report  (Final)</p>
+<blockquote>
+<div><blockquote>
+<div>A +RTS -p -K100M -RTS 1e6</div></blockquote>
+<p>total time  =        0.28 secs   (14 ticks &#64; 20 ms)
+total alloc = 224,041,656 bytes  (excludes profiling overheads)</p>
+</div></blockquote>
+<p>COST CENTRE  MODULE               %time %alloc</p>
+<p>CAF:sum      Main                  78.6   25.0
+CAF          GHC.Float             21.4   75.0</p>
+<blockquote>
+<div>individual    inherited</div></blockquote>
+<p>COST CENTRE MODULE         no.    entries  %time %alloc   %time %alloc</p>
+<dl class="last docutils">
+<dt>MAIN        MAIN            1           0   0.0    0.0   100.0  100.0</dt>
+<dd><dl class="first docutils">
+<dt>main       Main          166           2   0.0    0.0     0.0    0.0</dt>
+<dd>mean      Main          168           1   0.0    0.0     0.0    0.0</dd>
+</dl>
+<p>CAF:sum    Main          160           1  78.6   25.0    78.6   25.0
+CAF:lvl    Main          158           1   0.0    0.0     0.0    0.0</p>
+<blockquote>
+<div>main      Main          167           0   0.0    0.0     0.0    0.0</div></blockquote>
+<p class="last">CAF        Numeric       136           1   0.0    0.0     0.0    0.0
+CAF        Text.Read.Lex 135           9   0.0    0.0     0.0    0.0
+CAF        GHC.Read      130           1   0.0    0.0     0.0    0.0
+CAF        GHC.Float     129           1  21.4   75.0    21.4   75.0
+CAF        GHC.Handle    110           4   0.0    0.0     0.0    0.0</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>这些信息呈现给一些我们关于程序的运行时行为的情况。里面包含了程序的名字以及
+执行程序时用到的选项和参数。『total time』是运行时系统视角所见的程序运行
+的确切总时长。『Total allocation』是程序在运行过程中分配的内存总字节数（不是
+程序运行时内存使用的峰值；那个峰值大概是700MB）</p>
+<p>报告中的第二小节是各个函数所消耗的时间和空间部分。第三小节是Cost Centre报告：
+其结构为调用关系树（比如我们可以看到 <code class="docutils literal"><span class="pre">mean</span></code> 是被 <code class="docutils literal"><span class="pre">main</span></code> 调用的）。
+&#8220;individual&#8221;和&#8221;inherited&#8221;列提供了每个Cost Centre其本身、其整体、以及其子节点
+所消耗的资源。最下面那些 <code class="docutils literal"><span class="pre">CAF</span></code> 是执行一些常量的一次性消耗（例如大列表中
+浮点数以及列表本身）。</p>
+<p>我们能从这些信息得出什么结论呢？我们可以看出两个 <code class="docutils literal"><span class="pre">CAF</span></code> 占用了大多数时间。
+分别是计算总和相关和浮点数相关。这基本解释了所有程序运行的消耗。加上之前
+我们观察到的关于GC的压力，我们就可以推测出列表节点和浮点数值可能是问题之源。</p>
+<p>简单的性能热点检测，特别是对于我们难以知道时间花费点的大型程序，这个
+时间分析会突出一些特定的问题模块或高层函数。这往往足够显示出问题所在了。
+就像我们的程序，一旦我们窄化了问题所在，我们就可以用更加成熟的分析工具
+来拿到更多的信息。</p>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ time ./A 1e6 +RTS -hc -p -K100M
+500000.5
+./A 1e6 +RTS -hc -p -K100M  4.15s user 0.27s system 99% cpu 4.432 total</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>JOB &#8220;A 1e6 +RTS -hc -p -K100M&#8221;
+SAMPLE_UNIT &#8220;seconds&#8221;
+VALUE_UNIT &#8220;bytes&#8221;
+BEGIN_SAMPLE 0.00
+END_SAMPLE 0.00
+BEGIN_SAMPLE 0.24
+(167)main/CAF:lvl   48
+(136)Numeric.CAF    112
+(166)main   8384
+(110)GHC.Handle.CAF 8480
+(160)CAF:sum    10562000
+(129)GHC.Float.CAF  10562080
+END_SAMPLE 0.24</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ hp2ps -e8in -c A.hp</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ time ./A 1e6 +RTS -hy -p -K100M
+500000.5
+./A 1e6 +RTS -i0.001 -hy -p -K100M  34.96s user 0.22s system 99% cpu 35.237 total
+$ hp2ps -e8in -c A.hp</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ time ./A 1e6 +RTS -hd -p -K100M
+$ time ./A 1e6 +RTS -i0.001 -hd -p -K100M
+500000.5
+./A 1e6 +RTS -i0.001 -hd -p -K100M  27.85s user 0.31s system 99% cpu 28.222 total</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>&#8211; file: ch25/Fragment.hs
+mean :: [Double] -&gt; Double
+mean xs = sum xs / fromIntegral (length xs)</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">&#8211; file: ch25/B.hs
+mean :: [Double] -&gt; Double
+mean xs = s / fromIntegral n</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>where</dt>
+<dd>(n, s)     = foldl k (0, 0) xs
+k (n, s) x = (n+1, s+x)</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ ghc -O2 &#8211;make B.hs -fforce-recomp
+$ time ./B 1e6
+Stack space overflow: current size 8388608 bytes.
+Use <a href="#id6"><span class="problematic" id="id7">`</span></a>+RTS -Ksize&#8217; to increase it.
+./B 1e6  0.44s user 0.10s system 96% cpu 0.565 total</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ ghc -O2 &#8211;make B.hs -prof -auto-all -caf-all -fforce-recomp
+[1 of 1] Compiling Main             ( B.hs, B.o )
+Linking B ...
+$ time ./B 1e6 +RTS -i0.001 -hc -p -K100M
+500000.5
+./B 1e6 +RTS -i0.001 -hc -p -K100M  38.70s user 0.27s system 99% cpu 39.241 total</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">&#8211; file: ch25/C.hs
+mean :: [Double] -&gt; Double
+mean xs = s / fromIntegral n</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>where</dt>
+<dd>(n, s)     = foldl&#8217; k (0, 0) xs
+k (n, s) x = (n+1, s+x)</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ ghc -O2 &#8211;make C.hs
+[1 of 1] Compiling Main             ( C.hs, C.o )
+Linking C ...
+$ time ./C 1e6
+Stack space overflow: current size 8388608 bytes.
+Use <a href="#id8"><span class="problematic" id="id9">`</span></a>+RTS -Ksize&#8217; to increase it.
+./C 1e6  0.44s user 0.13s system 94% cpu 0.601 total</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">&#8211; file: ch25/Foldl.hs
+foldl&#8217; :: (a -&gt; b -&gt; a) -&gt; a -&gt; [b] -&gt; a
+foldl&#8217; f z xs = lgo z xs</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>where lgo z []     = z</dt>
+<dd>lgo z (x:xs) = let z&#8217; = f z x in z&#8217; <cite>seq</cite> lgo z&#8217; xs</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">&#8211; file: ch25/D.hs
+mean :: [Double] -&gt; Double
+mean xs = s / fromIntegral n</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>where</dt>
+<dd>(n, s)     = foldl&#8217; k (0, 0) xs
+k (n, s) x = n <cite>seq</cite> s <cite>seq</cite> (n+1, s+x)</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ ghc -O2 D.hs &#8211;make
+[1 of 1] Compiling Main             ( D.hs, D.o )
+Linking D ...</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">$ time ./D 1e6 +RTS -sstderr
+./D 1e6 +RTS -sstderr
+500000.5
+256,060,848 bytes allocated in the heap</p>
+<blockquote>
+<div><blockquote>
+<div><p>43,928 bytes copied during GC (scavenged)
+23,456 bytes copied during GC (not scavenged)
+45,056 bytes maximum residency (1 sample(s))</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>489 collections in generation 0 (  0.00s)</dt>
+<dd><p class="first">1 collections in generation 1 (  0.00s)</p>
+<p class="last">1 Mb total memory in use</p>
+</dd>
+</dl>
+</div></blockquote>
+</div></blockquote>
+<p>INIT  time    0.00s  (  0.00s elapsed)
+MUT   time    0.12s  (  0.13s elapsed)
+GC    time    0.00s  (  0.00s elapsed)
+EXIT  time    0.00s  (  0.00s elapsed)
+Total time    0.13s  (  0.13s elapsed)</p>
+<p>%GC time       2.6%  (2.6% elapsed)</p>
+<p>Alloc rate    2,076,309,329 bytes per MUT second</p>
+<p>Productivity  97.4% of total user, 94.8% of total elapsed</p>
+</div></blockquote>
+<p class="last">./D 1e6 +RTS -sstderr  0.13s user 0.00s system 95% cpu 0.133 total</p>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">&#8211; file: ch25/E.hs
+import System.Environment
+import Text.Printf
+import Control.Parallel.Strategies</p>
+<dl class="docutils">
+<dt>main = do</dt>
+<dd>[d] &lt;- map read <cite>fmap</cite> getArgs
+printf &#8220;%fn&#8221; (mean [1..d])</dd>
+</dl>
+<p>foldl&#8217;rnf :: NFData a =&gt; (a -&gt; b -&gt; a) -&gt; a -&gt; [b] -&gt; a
+foldl&#8217;rnf f z xs = lgo z xs</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>where</dt>
+<dd><p class="first">lgo z []     = z
+lgo z (x:xs) = lgo z&#8217; xs</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>where</dt>
+<dd>z&#8217; = f z x <cite>using</cite> rnf</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+</div></blockquote>
+<p>mean :: [Double] -&gt; Double
+mean xs = s / fromIntegral n</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>where</dt>
+<dd>(n, s)     = foldl&#8217;rnf k (0, 0) xs
+k (n, s) x = (n+1, s+x) :: (Int, Double)</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>&#8211; file: ch25/F.hs
+{-# LANGUAGE BangPatterns #-}</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">&#8211; file: ch25/F.hs
+mean :: [Double] -&gt; Double
+mean xs = s / fromIntegral n</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>where</dt>
+<dd>(n, s)       = foldl&#8217; k (0, 0) xs
+k (!n, !s) x = (n+1, s+x)</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">$ ghc -O2 F.hs &#8211;make
+$ time ./F 1e6 +RTS -sstderr
+./F 1e6 +RTS -sstderr
+500000.5
+256,060,848 bytes allocated in the heap</p>
+<blockquote>
+<div><blockquote>
+<div><p>43,928 bytes copied during GC (scavenged)
+23,456 bytes copied during GC (not scavenged)
+45,056 bytes maximum residency (1 sample(s))</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>489 collections in generation 0 (  0.00s)</dt>
+<dd><p class="first">1 collections in generation 1 (  0.00s)</p>
+<p class="last">1 Mb total memory in use</p>
+</dd>
+</dl>
+</div></blockquote>
+</div></blockquote>
+<p>INIT  time    0.00s  (  0.00s elapsed)
+MUT   time    0.14s  (  0.15s elapsed)
+GC    time    0.00s  (  0.00s elapsed)
+EXIT  time    0.00s  (  0.00s elapsed)
+Total time    0.14s  (  0.15s elapsed)</p>
+<p>%GC time       0.0%  (2.3% elapsed)</p>
+<p>Alloc rate    1,786,599,833 bytes per MUT second</p>
+<p>Productivity 100.0% of total user, 94.6% of total elapsed</p>
+</div></blockquote>
+<p class="last">./F 1e6 +RTS -sstderr  0.14s user 0.01s system 96% cpu 0.155 total</p>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>&#8211; file: ch25/G.hs
+data Pair a b = Pair !a !b</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">&#8211; file: ch25/G.hs
+mean :: [Double] -&gt; Double
+mean xs = s / fromIntegral n</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>where</dt>
+<dd>Pair n s       = foldl&#8217; k (Pair 0 0) xs
+k (Pair n s) x = Pair (n+1) (s+x)</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ ghc -O2 -ddump-simpl G.hs</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">lgo :: Integer -&gt; [Double] -&gt; Double# -&gt; (# Integer, Double #)</p>
+<dl class="last docutils">
+<dt>lgo = n xs s -&gt;</dt>
+<dd><dl class="first last docutils">
+<dt>case xs of</dt>
+<dd><p class="first">[]       -&gt; (# n, D# s #);
+(:) x ys -&gt;</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>case plusInteger n 1 of</dt>
+<dd><dl class="first last docutils">
+<dt>n&#8217; -&gt; case x of</dt>
+<dd>D# y -&gt; lgo n&#8217; ys (+## s y)</dd>
+</dl>
+</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">&#8211; file: ch25/H.hs
+data Pair = Pair !Int !Double</p>
+<p>mean :: [Double] -&gt; Double
+mean xs = s / fromIntegral n</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>where</dt>
+<dd>Pair n s       = foldl&#8217; k (Pair 0 0) xs
+k (Pair n s) x = Pair (n+1) (s+x)</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">lgo :: Int# -&gt; Double# -&gt; [Double] -&gt; (# Int#, Double# #)
+lgo = n s xs -&gt;</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>case xs of</dt>
+<dd><p class="first">[]       -&gt; (# n, s #)
+(:) x ys -&gt;</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>case x of</dt>
+<dd>D# y -&gt; lgo (+# n 1) (+## s y) ys</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">$ time ./H 1e7 +RTS -sstderr
+./H 1e7 +RTS -sstderr
+5000000.5
+1,689,133,824 bytes allocated in the heap</p>
+<blockquote>
+<div><blockquote>
+<div><dl class="docutils">
+<dt>284,432 bytes copied during GC (scavenged)</dt>
+<dd><blockquote class="first">
+<div>32 bytes copied during GC (not scavenged)</div></blockquote>
+<p>45,056 bytes maximum residency (1 sample(s))</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>3222 collections in generation 0 (  0.01s)</dt>
+<dd><p class="first">1 collections in generation 1 (  0.00s)</p>
+<p class="last">1 Mb total memory in use</p>
+</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+</div></blockquote>
+<p>INIT  time    0.00s  (  0.00s elapsed)
+MUT   time    0.63s  (  0.63s elapsed)
+GC    time    0.01s  (  0.02s elapsed)
+EXIT  time    0.00s  (  0.00s elapsed)
+Total time    0.64s  (  0.64s elapsed)</p>
+<p>%GC time       1.0%  (2.4% elapsed)</p>
+<p>Alloc rate    2,667,227,478 bytes per MUT second</p>
+<p>Productivity  98.4% of total user, 98.2% of total elapsed</p>
+</div></blockquote>
+<p class="last">./H 1e7 +RTS -sstderr  0.64s user 0.00s system 99% cpu 0.644 total</p>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">&#8211; file: ch25/I.hs
+import System.Environment
+import Text.Printf
+import Data.Array.Vector</p>
+<dl class="docutils">
+<dt>main = do</dt>
+<dd>[d] &lt;- map read <cite>fmap</cite> getArgs
+printf &#8220;%fn&#8221; (mean (enumFromToFracU 1 d))</dd>
+</dl>
+<p>data Pair = Pair !Int !Double</p>
+<p>mean :: UArr Double -&gt; Double
+mean xs = s / fromIntegral n</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>where</dt>
+<dd>Pair n s       = foldlU k (Pair 0 0) xs
+k (Pair n s) x = Pair (n+1) (s+x)</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><p class="first">fold :: Int# -&gt; Double# -&gt; Double# -&gt; (# Int#, Double# #)
+fold = n s t -&gt;</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>case &gt;## t limit of {</dt>
+<dd>False -&gt; fold (+# n 1) (+## s t) (+## t 1.0)
+True  -&gt; (# n, s #)</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ time ./I 1e7
+5000000.5
+./I 1e7  0.06s user 0.00s system 72% cpu 0.083 total</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd>$ ghc -fforce-recomp &#8211;make -O2 -funbox-strict-fields -fvia-C -optc-O2 I.hs
+[1 of 1] Compiling Main             ( I.hs, I.o )
+Linking I ...
+$ time ./I 1e7
+5000000.5
+./I 1e7  0.04s user 0.00s system 98% cpu 0.047 total</dd>
+</dl>
+<dl class="docutils">
+<dt>::</dt>
+<dd><dl class="first last docutils">
+<dt>go:</dt>
+<dd>ucomisd     5(%rbx), %xmm6
+ja  .L31
+addsd       %xmm6, %xmm5
+addq        $1, %rsi
+addsd       .LC0(%rip), %xmm6
+jmp go</dd>
+</dl>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="24.html">第 24 章：并发和多核编程</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="27.html">第 27 章：Socket 和 Syslog</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.3.
+    </div>
+  </body>
+</html>
