@@ -1,10 +1,11 @@
-第二十五章：性能分析与优化
-==========================
+第 25 章：性能分析与优化
+==============================
 
 ..
     Haskell is a high level language. A really high level language.
     We can spend our days programming entirely in abstractions, in monoids,
-    functors and hylomorphisms, far removed from any particular hardware model of computation.
+    functors and hylomorphisms, far removed from any particular hardware model
+    of computation.
     The language specification goes to great lengths to avoid prescribing
     any particular evaluation model.
     These layers of abstraction let us treat Haskell as a notation for computation itself,
@@ -12,11 +13,12 @@
     getting bogged down in low level implementation decisions.
     We get to program in pure thought.
 
-Haskell 是一门高级编程语言，一门真正的高级编程语言。我们可以整天整天地全部用
-抽象概念、幺半群、函子、以及hylomorphisms来编程，远非任何针对特定硬件模型
-的计算。这个语言的标准规范极力避免照症开药。这几层抽象使得我们可以把
-Haskell 作为计算本身的记号，让编程人员关心他们问题的关键点，而不用操心
-低层次的实现细节。人们得以以纯净的想法编程。
+Haskell 是一门高级编程语言，一门真正的高级编程语言。 我们可以一直使用抽象概念、
+幺半群、函子、以及多态进行编程，而不必与任何特定的硬件模型打交道。
+Haskell 在语言规范方面下了很大的功夫，力求语言可以不受制于某个特定的求值模型。
+这几层抽象使得我们可以把 Haskell 作为计算本身的记号，
+让编程人员关心他们问题的关键点，而不用操心低层次的实现细节，
+使得人们可以心无旁骛地进行编程。
 
 ..
     However, this is a book about real world programming, and in the real world,
@@ -26,10 +28,10 @@ Haskell 作为计算本身的记号，让编程人员关心他们问题的关键
     the precise consequences of using lazy or strict evaluation strategies,
     and techniques for analyzing and controlling space and time behavior.
 
-然而，我们本书讲的真实情况下的编程，而真实情况下代码运行在有限资源的硬件上。
-我们的程序将有时间和空间上的被动约束。因而，我们需要掌握好如何表达我们的数据
-用延后执行或立即执行策略的明确结果。我们需要掌握用来分析和控制空间、时间行为
-的技术。
+但是，本书介绍的是真实世界中的编程行为，而真实世界中的代码都运行在资源有限的硬件之上，
+并且程序也会有时间和空间上的限制。因此，我们需要掌握好表达程序数据的方法，
+准确地理解使用惰性求值和严格求值策略带来的后果，并学会如何分析和控制程序
+在执行时的时间和空间。
 
 ..
     In this chapter we'll look at typical space and time problems a Haskell programmer
@@ -41,11 +43,11 @@ Haskell 作为计算本身的记号，让编程人员关心他们问题的关键
     in a purely functional language. So let's begin with a challenge:
     squashing unexpected memory usage in some inoccuous looking code.
 
-在这一章，我们将看下 Haskell 编程中可能遇到的典型空间和时间问题，并且如何有
+在这一章，我们将看到 Haskell 编程中可能遇到的典型空间和时间问题，并且如何有
 条理地分析、理解并解决它们。为此我们将研究使用一系列的技术：时间和空间使用
-分析，运行时统计，以及对立即执行和延时执行的推理。我们也会看下编译器优化对
-性能的影响，和那些在纯函数式编程语言变得可行的高级优化技术的使用。那么，让
-我们用一个挑战开始吧：调查一个查找程序中不必要内存的使用问题。
+分析，运行时统计，以及对严格求值和惰性求值。我们也会看下编译器优化对
+性能的影响，以及高级优化技术在纯函数式编程语言中的应用。那么，
+让我们用一个挑战开始吧：调查一个简单程序中不必要内存的使用问题。
 
 
 Haskell程序性能分析
@@ -61,12 +63,14 @@ Haskell程序性能分析
     and heavy use of standard library functions.
     It also illustrates several common performance trouble spots that can catch out the unwary.
 
-考虑下面对列表进行操作的程序：用来计算某大型列表的平均值。这只是一个程序片断
-（我们将stress that我们这里实现的这个特定算法是不相关的），是我们可能在任何 Haskhell
-程序的真实代码中看到的：典型的简单列表操作代码，大量使用标准库函数。
+请看下面这个列表处理程序，它用于计算某个大型列表的平均值。
+这里展示的只是程序的其中一部分代码（并且具体的实现算法我们并不关心），
+这是我们经常会在真实的 Haskell 程序中看到的典型的简单列表操作代码，
+这些代码大量地使用标准库函数，并且包含了一些因为疏忽大意而导致的性能问题。
 这里也展示了几种因疏忽而易出现的性能问题。
 
 ::
+
     -- file: ch25/A.hs
     import System.Environment
     import Text.Printf
@@ -97,6 +101,7 @@ Haskell程序性能分析
 然后用 ``time`` 执行它看看情况吧：
 
 ::
+
     $ ghc --make -rtsopts -O2 A.hs
     [1 of 1] Compiling Main             ( A.hs, A.o )
     Linking A ...
@@ -116,9 +121,9 @@ Haskell程序性能分析
     From this alone we know something's not quite right,
     but it's unclear what resources are being used. Let's investigate.
 
-当数字很小时，程序运行的很好。但当到列表达到一千万时，程序就可能挣扎了。
-从这点我们就能感觉到应该有什么地方做得不对，但我们并不清楚它的资源使用情况。
-我们需要研究下。
+程序在处理少量输入时运行得非常好，但是当输入的列表元素数量达到一千万个时，
+程序的运行速度就会变得相当缓慢。从这点我们就能感觉到应该有什么地方做得不对，
+但我们并不清楚它的资源使用情况。 我们需要研究下。
 
 ..
     Collecting runtime statistics
@@ -156,6 +161,7 @@ Haskell程序性能分析
 那么让我们用 ``+RTS -sstderr`` 来运行程序收集我们所需要的结果吧。
 
 ::
+
     $ ./A 1e7 +RTS -sstderr
     5000000.5
     1,689,133,824 bytes allocated in the heap
@@ -200,7 +206,7 @@ Haskell程序性能分析
     After all, Haskell is a lazy language: shouldn't it be able to process the list
     in constant space?
 
-那么为什么我们的程序运行情况这么差？我们如何来提高它呢？毕竟，Haskell是一个Lazy语言：
+那么为什么我们的程序运行情况这么差？我们如何来提高它呢？毕竟，Haskell是一个惰性语言：
 它不应该只用恒定的内存空间来处理列表吗？
 
 ..
@@ -217,9 +223,10 @@ Haskell程序性能分析
     Profiling proceeds in three steps: compiling the program for profiling;
     running it with particular profiling modes enabled; and inspecting the resulting statistics.
 
-庆幸的是，GHC提供了几个工具可以分析程序的时间和空间使用情况。尤其是，我们可以在编写程序时
-打开profiling选项，这样程序在执行时会得到每个函数所使用的资源使用的信息。Profiling过程分为
-三步：以Profiling方式编译程序；用profiling模式执行程序；最后是分析收集到的结果数据。
+庆幸的是，GHC提供了几个工具可以分析程序的时间和空间使用情况。尤其是，
+我们可以在编写程序时打开性能调试选项，这样程序在执行时会得到每个函数
+所使用的资源使用的信息。性能调试过程分为三步：
+以性能调试方式编译程序；用性能调试模式执行程序；最后是分析收集到的结果数据。
 
 ..
     To compile our program for basic time and allocation profiling, we use the -prof flag.
@@ -234,6 +241,7 @@ Haskell程序性能分析
 会生成代码来计算这些地方的资源消耗。我们可以用 ``SCC`` 语法使得任何语句成为 cost centre。
 
 ::
+
     -- file: ch25/SCC.hs
     mean :: [Double] -> Double
     mean xs = {-# SCC "mean" #-} sum xs / fromIntegral (length xs)
@@ -245,9 +253,9 @@ Haskell程序性能分析
     as once a hot spot has been identified, we can precisely pin down the
     expensive sub-expressions of a function.
 
-另外我们也可以用 ``-auto-all`` 选项来让编译器将所有顶级函数设为 cost centre。手动
-添加做为一个额外的能力对我们，尤其是我们已经知道哪个特别的地方有问题时，非常有用，
-使得我们有针对性地精确分析一个函数的资源消耗。
+另外我们也可以用 ``-auto-all`` 选项来让编译器将所有顶级函数设为 cost centre。
+手动添加 cost centre 的能力作为自动 cost centre 性能调试的辅助，
+使得我们可以在发现某个热点（hot spot）有问题时，针对性地分析一个函数的资源消耗。
 
 ..
     One complication to be aware of: in a lazy, pure language like Haskell,
@@ -260,11 +268,12 @@ Haskell程序性能分析
     To get accurate numbers for these values, known as "constant applicative forms",
     or CAFs, we use the -caf-all flag.
 
-另一难点值得注意：在像 Haskell 这样的惰性、纯函数编程语言里，没有参数的值只会被计算
-一次（比如我们上面程序中的庞大列表），结果会被以后所有地方共享。这些值不是程序调用
-中的一部分，因为不是每次它们都被计算。当然我们仍然需要评估它们的唯一的那次计算所用
-的资源情况。这些值，也被称为CAF （Constant Applicative Forms），的确切数量可以用
-``-caf-all`` 选项来得到。
+另外需要注意的一个难点是：在 Haskell 这类惰性、纯函数式编程语言里，
+没有参数的值只会被计算一次（比如之前的程序展示过的巨大的列表），
+而计算的结果会被之后的所有其他计算所共享。这些值不是程序调用的其中一部分，
+因此它们不会每次都被计算。当然我们仍然需要评估它们的唯一一次计算的资源占用情况。
+这些只会计算一次的值被成为 CAF （Constant Applicative Forms），
+它们的确切数量可以通过 -caf-all 选项来得到。
 
 ..
     Compiling our example program for profiling then (using the -fforce-recomp flag
@@ -273,6 +282,7 @@ Haskell程序性能分析
 那么以分析性能的方式来编译我们的程序吧（用 ``-fforce-recomp`` 选项来强制重新编译所有部分）：
 
 ::
+
     $ ghc -O2 --make A.hs -prof -auto-all -caf-all -fforce-recomp
     [1 of 1] Compiling Main             ( A.hs, A.o )
     Linking A ...
@@ -287,6 +297,7 @@ Haskell程序性能分析
 变慢，所以我们用一个较小的输入来执行）：
 
 ::
+
     $ time ./A  1e6 +RTS -p
     Stack space overflow: current size 8388608 bytes.
     Use `+RTS -Ksize' to increase it.
@@ -310,6 +321,7 @@ Haskell程序性能分析
 
 
 ::
+
     $ time ./A 1e6 +RTS -p -K100M
     500000.5
     ./A 1e6 +RTS -p -K100M  4.27s user 0.20s system 99% cpu 4.489 total
@@ -324,6 +336,7 @@ Haskell程序性能分析
 其中含有以下信息：
 
 ::
+
     $ cat A.prof
 
     Time and Allocation Profiling Report  (Final)
@@ -362,9 +375,9 @@ Haskell程序性能分析
     of bytes allocated during the entire program run
     (not the maximum live memory, which was around 700MB).
 
-这些信息呈现给一些我们关于程序的运行时行为的情况。里面有程序的名字以及
+这些信息呈现给一些我们关于程序的运行时行为的情况。里面包含了程序的名字以及
 执行程序时用到的选项和参数。『total time』是运行时系统视角所见的程序运行
-的确切总时长。『Total allocation』是程序运行过程中分配的总字节数（不是
+的确切总时长。『Total allocation』是程序在运行过程中分配的内存总字节数（不是
 程序运行时内存使用的峰值；那个峰值大概是700MB）
 
 ..
@@ -447,6 +460,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     $ time ./A 1e6 +RTS -hc -p -K100M
     500000.5
     ./A 1e6 +RTS -hc -p -K100M  4.15s user 0.27s system 99% cpu 4.432 total
@@ -457,6 +471,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
     in the following form:
 
 ::
+
     JOB "A 1e6 +RTS -hc -p -K100M"
     SAMPLE_UNIT "seconds"
     VALUE_UNIT "bytes"
@@ -481,6 +496,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     $ hp2ps -e8in -c A.hp
 
 ..
@@ -500,6 +516,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     $ time ./A 1e6 +RTS -hy -p -K100M
     500000.5
     ./A 1e6 +RTS -i0.001 -hy -p -K100M  34.96s user 0.22s system 99% cpu 35.237 total
@@ -521,6 +538,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     $ time ./A 1e6 +RTS -hd -p -K100M
     $ time ./A 1e6 +RTS -i0.001 -hd -p -K100M
     500000.5
@@ -545,6 +563,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     -- file: ch25/Fragment.hs
     mean :: [Double] -> Double
     mean xs = sum xs / fromIntegral (length xs)
@@ -573,6 +592,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     -- file: ch25/B.hs
     mean :: [Double] -> Double
     mean xs = s / fromIntegral n
@@ -597,6 +617,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     $ ghc -O2 --make B.hs -fforce-recomp
     $ time ./B 1e6
     Stack space overflow: current size 8388608 bytes.
@@ -612,6 +633,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     $ ghc -O2 --make B.hs -prof -auto-all -caf-all -fforce-recomp
     [1 of 1] Compiling Main             ( B.hs, B.o )
     Linking B ...
@@ -655,6 +677,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     -- file: ch25/C.hs
     mean :: [Double] -> Double
     mean xs = s / fromIntegral n
@@ -669,6 +692,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     $ ghc -O2 --make C.hs
     [1 of 1] Compiling Main             ( C.hs, C.o )
     Linking C ...
@@ -684,6 +708,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     -- file: ch25/Foldl.hs
     foldl' :: (a -> b -> a) -> a -> [b] -> a
     foldl' f z xs = lgo z xs
@@ -703,6 +728,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
     There are a number of ways to make this function fully strict. We can, for example, add our own strictness hints to the internal state of the tuple, yielding a truly tail recursive loop:
 
 ::
+
     -- file: ch25/D.hs
     mean :: [Double] -> Double
     mean xs = s / fromIntegral n
@@ -715,6 +741,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     $ ghc -O2 D.hs --make
     [1 of 1] Compiling Main             ( D.hs, D.o )
     Linking D ...
@@ -723,6 +750,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
     If we run this, with allocation statistics enabled, we get the satisfying result:
 
 ::
+
     $ time ./D 1e6 +RTS -sstderr
     ./D 1e6 +RTS -sstderr 
     500000.5
@@ -761,6 +789,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
     There are a number of other ways we could have addressed the strictness issue here. For deep strictness, we can use the rnf function, part of the parallel strategies library (along with using), which unlike seq reduces to the fully evaluated "normal form" (hence its name). Such a "deep seq" fold we can write as:
 
 ::
+
     -- file: ch25/E.hs
     import System.Environment
     import Text.Printf
@@ -796,6 +825,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
     Perhaps the cheapest way, syntactically, to add required strictness to code that's excessively lazy is via "bang patterns" (whose name comes from pronunciation of the "!" character as "bang"), a language extension introduced with the following pragma:
 
 ::
+
     -- file: ch25/F.hs
     {-# LANGUAGE BangPatterns #-}
 
@@ -803,6 +833,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
     With bang patterns, we can hint at strictness on any binding form, making the function strict in that variable. Much as explicit type annotations can guide type inference, bang patterns can help guide strictness inference. Bang patterns are a language extension, and are enabled with the BangPatterns language pragma. We can now rewrite the loop state to be simply:
 
 ::
+
     -- file: ch25/F.hs
     mean :: [Double] -> Double
     mean xs = s / fromIntegral n
@@ -815,6 +846,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     $ ghc -O2 F.hs --make
     $ time ./F 1e6 +RTS -sstderr
     ./F 1e6 +RTS -sstderr 
@@ -855,6 +887,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
     Strict data types are another effective way to provide strictness information to the compiler. By default, Haskell data types are lazy, but it is easy enough to add strictness information to the fields of a data type that then propagate through the program. We can declare a new strict pair type, for example:
 
 ::
+
     -- file: ch25/G.hs
     data Pair a b = Pair !a !b
 
@@ -863,6 +896,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     -- file: ch25/G.hs
     mean :: [Double] -> Double
     mean xs = s / fromIntegral n
@@ -887,6 +921,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     $ ghc -O2 -ddump-simpl G.hs
 
 ..
@@ -894,6 +929,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     lgo :: Integer -> [Double] -> Double# -> (# Integer, Double #)
 
     lgo = \ n xs s ->
@@ -922,6 +958,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     -- file: ch25/H.hs
     data Pair = Pair !Int !Double
 
@@ -935,6 +972,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
     Compiling this with optimizations on, and -funbox-strict-fields -ddump-simpl, we get a tighter inner loop in Core:
 
 ::
+
     lgo :: Int# -> Double# -> [Double] -> (# Int#, Double# #)
     lgo = \ n s xs ->
         case xs of
@@ -948,6 +986,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     $ time ./H 1e7 +RTS -sstderr
     ./H 1e7 +RTS -sstderr 
     5000000.5
@@ -1014,6 +1053,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
     We'll use the uvector library, which provides a suite of list-like operations that use stream fusion to remove intermediate data structures. Rewriting our program to use streams is straightforward:
 
 ::
+
     -- file: ch25/I.hs
     import System.Environment
     import Text.Printf
@@ -1038,6 +1078,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
 
 
 ::
+
     fold :: Int# -> Double# -> Double# -> (# Int#, Double# #)
     fold = \ n s t ->
         case >## t limit of {
@@ -1053,6 +1094,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
     bump in performance, with runtime falling by another order of magnitude:
 
 ::
+
     $ time ./I 1e7
     5000000.5
     ./I 1e7  0.06s user 0.00s system 72% cpu 0.083 total
@@ -1080,6 +1122,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
     optimize away some redundant move instructions in the program's inner loop):
 
 ::
+
     $ ghc -fforce-recomp --make -O2 -funbox-strict-fields -fvia-C -optc-O2 I.hs
     [1 of 1] Compiling Main             ( I.hs, I.o )
     Linking I ...
@@ -1092,6 +1135,7 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
     we see the generated loop contains only six instructions:
 
 ::
+
     go:
       ucomisd     5(%rbx), %xmm6
       ja  .L31

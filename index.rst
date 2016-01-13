@@ -42,6 +42,7 @@ Real World Haskell 中文版
    chp/22
    chp/23
    chp/24
+   chp/25
    chp/27
    chp/28
 
@@ -87,6 +88,8 @@ Real World Haskell 中文版
 - `Damon Zhao <https://github.com/se77en>`_
 
 - `tianws <https://github.com/tiann>`_
+
+- `Hugo Wang <https://github.com/mitnk>`_
 
 除了进行翻译之外，本文档还在原书的基础上做了以下改进：
 
