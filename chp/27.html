@@ -1,0 +1,520 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>第 27 章：Socket 和 Syslog &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
+    <link rel="next" title="第 28 章：软件事务内存 (STM)" href="28.html" />
+    <link rel="prev" title="第 25 章：性能分析与优化" href="25.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="25.html">第 25 章：性能分析与优化</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="28.html">第 28 章：软件事务内存 (STM)</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="socket-syslog">
+<h1>第 27 章：Socket 和 Syslog<a class="headerlink" href="#socket-syslog" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="id1">
+<h2>基本网络<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>本书的前几章，我们讨论了在网络上进行操作的服务。其中两个例子是数据库客户端/服务器和 web 服务。当需要设计新的协议，或者使用没有现成 Haskell 库的协议通信时，将需要使用 Haskell 库函数提供的底层网络工具。</p>
+<p>本章中，我们将讨论这些底层工具。网络通讯是个大题目，可以用一整本书来讨论。本章中，我们将展示如何使用 Haskell 应用你已经掌握的底层网络知识。</p>
+<p>Haskell 的网络函数几乎始终与常见的 C 函数调用相符。像其他在 C 上层的语言一样，你将发现其接口很眼熟。</p>
+</div>
+<div class="section" id="udp">
+<h2>使用 UDP 通信<a class="headerlink" href="#udp" title="Permalink to this headline">¶</a></h2>
+<p>UDP 将数据拆散为数据包。其不保证数据到达目的地，也不确保同一个数据包到达的次数。其用校验和的方式确保到达的数据包没有损坏。 UDP 适合用在对性能和延迟敏感的应用中，此类场景中系统的整体性能比单个数据包更重要。也可以用在 TCP 表现性能不高的场景，比如发送互不相关的短消息。适合使用 UDP 的系统的例子包括音频和视频会议、时间同步、网络文件系统、以及日志系统。</p>
+<div class="section" id="udp-syslog">
+<span id="id2"></span><h3>UDP 客户端例子：syslog<a class="headerlink" href="#udp-syslog" title="Permalink to this headline">¶</a></h3>
+<p>传统 Unix syslog 服务允许程序通过网络向某个负责记录的中央服务器发送日志信息。某些程序对性能非常敏感，而且可能会生成大量日志消息。这样的程序，将日志的开销最小化比确保每条日志被记录更重要。此外，在日志服务器无法访问时，使程序依旧可以操作或许是一种可取的设计。因此，UDP 是一种 syslog 支持的日志传输协议。这种协议比较简单，这里有一个 Haskell 实现的客户端：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch27/syslogclient.hs</span>
+<span class="kr">import</span> <span class="nn">Data.Bits</span>
+<span class="kr">import</span> <span class="nn">Network.Socket</span>
+<span class="kr">import</span> <span class="nn">Network.BSD</span>
+<span class="kr">import</span> <span class="nn">Data.List</span>
+<span class="kr">import</span> <span class="nn">SyslogTypes</span>
+
+<span class="kr">data</span> <span class="kt">SyslogHandle</span> <span class="ow">=</span>
+    <span class="kt">SyslogHandle</span> <span class="p">{</span><span class="n">slSocket</span> <span class="ow">::</span> <span class="kt">Socket</span><span class="p">,</span>
+                  <span class="n">slProgram</span> <span class="ow">::</span> <span class="kt">String</span><span class="p">,</span>
+                  <span class="n">slAddress</span> <span class="ow">::</span> <span class="kt">SockAddr</span><span class="p">}</span>
+
+<span class="nf">openlog</span> <span class="ow">::</span> <span class="kt">HostName</span>             <span class="c1">-- ^ Remote hostname, or localhost</span>
+        <span class="ow">-&gt;</span> <span class="kt">String</span>               <span class="c1">-- ^ Port number or name; 514 is default</span>
+        <span class="ow">-&gt;</span> <span class="kt">String</span>               <span class="c1">-- ^ Name to log under</span>
+        <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">SyslogHandle</span>      <span class="c1">-- ^ Handle to use for logging</span>
+<span class="nf">openlog</span> <span class="n">hostname</span> <span class="n">port</span> <span class="n">progname</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="c1">-- Look up the hostname and port.  Either raises an exception</span>
+       <span class="c1">-- or returns a nonempty list.  First element in that list</span>
+       <span class="c1">-- is supposed to be the best option.</span>
+       <span class="n">addrinfos</span> <span class="ow">&lt;-</span> <span class="n">getAddrInfo</span> <span class="kt">Nothing</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">hostname</span><span class="p">)</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">port</span><span class="p">)</span>
+       <span class="kr">let</span> <span class="n">serveraddr</span> <span class="ow">=</span> <span class="n">head</span> <span class="n">addrinfos</span>
+
+       <span class="c1">-- Establish a socket for communication</span>
+       <span class="n">sock</span> <span class="ow">&lt;-</span> <span class="n">socket</span> <span class="p">(</span><span class="n">addrFamily</span> <span class="n">serveraddr</span><span class="p">)</span> <span class="kt">Datagram</span> <span class="n">defaultProtocol</span>
+
+       <span class="c1">-- Save off the socket, program name, and server address in a handle</span>
+       <span class="n">return</span> <span class="o">$</span> <span class="kt">SyslogHandle</span> <span class="n">sock</span> <span class="n">progname</span> <span class="p">(</span><span class="n">addrAddress</span> <span class="n">serveraddr</span><span class="p">)</span>
+
+<span class="nf">syslog</span> <span class="ow">::</span> <span class="kt">SyslogHandle</span> <span class="ow">-&gt;</span> <span class="kt">Facility</span> <span class="ow">-&gt;</span> <span class="kt">Priority</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">syslog</span> <span class="n">syslogh</span> <span class="n">fac</span> <span class="n">pri</span> <span class="n">msg</span> <span class="ow">=</span>
+    <span class="n">sendstr</span> <span class="n">sendmsg</span>
+    <span class="kr">where</span> <span class="n">code</span> <span class="ow">=</span> <span class="n">makeCode</span> <span class="n">fac</span> <span class="n">pri</span>
+          <span class="n">sendmsg</span> <span class="ow">=</span> <span class="s">&quot;&lt;&quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">code</span> <span class="o">++</span> <span class="s">&quot;&gt;&quot;</span> <span class="o">++</span> <span class="p">(</span><span class="n">slProgram</span> <span class="n">syslogh</span><span class="p">)</span> <span class="o">++</span>
+                    <span class="s">&quot;: &quot;</span> <span class="o">++</span> <span class="n">msg</span>
+
+          <span class="c1">-- Send until everything is done</span>
+          <span class="n">sendstr</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+          <span class="n">sendstr</span> <span class="kt">[]</span> <span class="ow">=</span> <span class="n">return</span> <span class="nb">()</span>
+          <span class="n">sendstr</span> <span class="n">omsg</span> <span class="ow">=</span> <span class="kr">do</span> <span class="n">sent</span> <span class="ow">&lt;-</span> <span class="n">sendTo</span> <span class="p">(</span><span class="n">slSocket</span> <span class="n">syslogh</span><span class="p">)</span> <span class="n">omsg</span>
+                                    <span class="p">(</span><span class="n">slAddress</span> <span class="n">syslogh</span><span class="p">)</span>
+                            <span class="n">sendstr</span> <span class="p">(</span><span class="n">genericDrop</span> <span class="n">sent</span> <span class="n">omsg</span><span class="p">)</span>
+
+<span class="nf">closelog</span> <span class="ow">::</span> <span class="kt">SyslogHandle</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">closelog</span> <span class="n">syslogh</span> <span class="ow">=</span> <span class="n">sClose</span> <span class="p">(</span><span class="n">slSocket</span> <span class="n">syslogh</span><span class="p">)</span>
+
+<span class="cm">{- | Convert a facility and a priority into a syslog code -}</span>
+<span class="nf">makeCode</span> <span class="ow">::</span> <span class="kt">Facility</span> <span class="ow">-&gt;</span> <span class="kt">Priority</span> <span class="ow">-&gt;</span> <span class="kt">Int</span>
+<span class="nf">makeCode</span> <span class="n">fac</span> <span class="n">pri</span> <span class="ow">=</span>
+    <span class="kr">let</span> <span class="n">faccode</span> <span class="ow">=</span> <span class="n">codeOfFac</span> <span class="n">fac</span>
+        <span class="n">pricode</span> <span class="ow">=</span> <span class="n">fromEnum</span> <span class="n">pri</span>
+        <span class="kr">in</span>
+          <span class="p">(</span><span class="n">faccode</span> <span class="p">`</span><span class="n">shiftL</span><span class="p">`</span> <span class="mi">3</span><span class="p">)</span> <span class="o">.|.</span> <span class="n">pricode</span>
+</pre></div>
+</div>
+<p>这段程序需要 <code class="docutils literal"><span class="pre">SyslogTypes.hs</span></code> ，代码如下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch27/SyslogTypes.hs</span>
+<span class="kr">module</span> <span class="nn">SyslogTypes</span> <span class="kr">where</span>
+<span class="cm">{- | Priorities define how important a log message is. -}</span>
+
+<span class="kr">data</span> <span class="kt">Priority</span> <span class="ow">=</span>
+            <span class="kt">DEBUG</span>                   <span class="c1">-- ^ Debug messages</span>
+          <span class="o">|</span> <span class="kt">INFO</span>                    <span class="c1">-- ^ Information</span>
+          <span class="o">|</span> <span class="kt">NOTICE</span>                  <span class="c1">-- ^ Normal runtime conditions</span>
+          <span class="o">|</span> <span class="kt">WARNING</span>                 <span class="c1">-- ^ General Warnings</span>
+          <span class="o">|</span> <span class="kt">ERROR</span>                   <span class="c1">-- ^ General Errors</span>
+          <span class="o">|</span> <span class="kt">CRITICAL</span>                <span class="c1">-- ^ Severe situations</span>
+          <span class="o">|</span> <span class="kt">ALERT</span>                   <span class="c1">-- ^ Take immediate action</span>
+          <span class="o">|</span> <span class="kt">EMERGENCY</span>               <span class="c1">-- ^ System is unusable</span>
+                    <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Show</span><span class="p">,</span> <span class="kt">Read</span><span class="p">,</span> <span class="kt">Enum</span><span class="p">)</span>
+
+<span class="cm">{- | Facilities are used by the system to determine where messages</span>
+<span class="cm">are sent. -}</span>
+
+<span class="kr">data</span> <span class="kt">Facility</span> <span class="ow">=</span>
+              <span class="kt">KERN</span>                      <span class="c1">-- ^ Kernel messages</span>
+              <span class="o">|</span> <span class="kt">USER</span>                    <span class="c1">-- ^ General userland messages</span>
+              <span class="o">|</span> <span class="kt">MAIL</span>                    <span class="c1">-- ^ E-Mail system</span>
+              <span class="o">|</span> <span class="kt">DAEMON</span>                  <span class="c1">-- ^ Daemon (server process) messages</span>
+              <span class="o">|</span> <span class="kt">AUTH</span>                    <span class="c1">-- ^ Authentication or security messages</span>
+              <span class="o">|</span> <span class="kt">SYSLOG</span>                  <span class="c1">-- ^ Internal syslog messages</span>
+              <span class="o">|</span> <span class="kt">LPR</span>                     <span class="c1">-- ^ Printer messages</span>
+              <span class="o">|</span> <span class="kt">NEWS</span>                    <span class="c1">-- ^ Usenet news</span>
+              <span class="o">|</span> <span class="kt">UUCP</span>                    <span class="c1">-- ^ UUCP messages</span>
+              <span class="o">|</span> <span class="kt">CRON</span>                    <span class="c1">-- ^ Cron messages</span>
+              <span class="o">|</span> <span class="kt">AUTHPRIV</span>                <span class="c1">-- ^ Private authentication messages</span>
+              <span class="o">|</span> <span class="kt">FTP</span>                     <span class="c1">-- ^ FTP messages</span>
+              <span class="o">|</span> <span class="kt">LOCAL0</span>
+              <span class="o">|</span> <span class="kt">LOCAL1</span>
+              <span class="o">|</span> <span class="kt">LOCAL2</span>
+              <span class="o">|</span> <span class="kt">LOCAL3</span>
+              <span class="o">|</span> <span class="kt">LOCAL4</span>
+              <span class="o">|</span> <span class="kt">LOCAL5</span>
+              <span class="o">|</span> <span class="kt">LOCAL6</span>
+              <span class="o">|</span> <span class="kt">LOCAL7</span>
+                <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Show</span><span class="p">,</span> <span class="kt">Read</span><span class="p">)</span>
+
+<span class="nf">facToCode</span> <span class="ow">=</span> <span class="p">[</span>
+                       <span class="p">(</span><span class="kt">KERN</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">USER</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">MAIL</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">DAEMON</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">AUTH</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">SYSLOG</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">LPR</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">NEWS</span><span class="p">,</span> <span class="mi">7</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">UUCP</span><span class="p">,</span> <span class="mi">8</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">CRON</span><span class="p">,</span> <span class="mi">9</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">AUTHPRIV</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">FTP</span><span class="p">,</span> <span class="mi">11</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">LOCAL0</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">LOCAL1</span><span class="p">,</span> <span class="mi">17</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">LOCAL2</span><span class="p">,</span> <span class="mi">18</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">LOCAL3</span><span class="p">,</span> <span class="mi">19</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">LOCAL4</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">LOCAL5</span><span class="p">,</span> <span class="mi">21</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">LOCAL6</span><span class="p">,</span> <span class="mi">22</span><span class="p">),</span>
+                       <span class="p">(</span><span class="kt">LOCAL7</span><span class="p">,</span> <span class="mi">23</span><span class="p">)</span>
+           <span class="p">]</span>
+
+<span class="nf">codeToFac</span> <span class="ow">=</span> <span class="n">map</span> <span class="p">(</span><span class="nf">\</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span> <span class="n">facToCode</span>
+
+
+<span class="cm">{- | We can&#39;t use enum here because the numbering is discontiguous -}</span>
+<span class="nf">codeOfFac</span> <span class="ow">::</span> <span class="kt">Facility</span> <span class="ow">-&gt;</span> <span class="kt">Int</span>
+<span class="nf">codeOfFac</span> <span class="n">f</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">lookup</span> <span class="n">f</span> <span class="n">facToCode</span> <span class="kr">of</span>
+                <span class="kt">Just</span> <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">x</span>
+                <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="ne">error</span> <span class="o">$</span> <span class="s">&quot;Internal error in codeOfFac&quot;</span>
+
+<span class="nf">facOfCode</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Facility</span>
+<span class="nf">facOfCode</span> <span class="n">f</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">lookup</span> <span class="n">f</span> <span class="n">codeToFac</span> <span class="kr">of</span>
+                <span class="kt">Just</span> <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">x</span>
+                <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="ne">error</span> <span class="o">$</span> <span class="s">&quot;Invalid code in facOfCode&quot;</span>
+</pre></div>
+</div>
+<p>可以用 ghci 向本地的 syslog 服务器发送消息。服务器可以使用本章实现的例子，也可以使用其它的在 Linux 或者 POSIX 系统中的 syslog 服务器。注意，这些服务器默认禁用了 UDP 端口，你需要启用 UDP 以使 syslog 接收 UDP 消息。</p>
+<p>可以使用下面这样的命令向本地 syslog 服务器发送一条消息：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="n">syslogclient</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">SyslogTypes</span>      <span class="p">(</span> <span class="kt">SyslogTypes</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="p">[</span><span class="mi">2</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">syslogclient</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">SyslogTypes</span><span class="p">,</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">h</span> <span class="ow">&lt;-</span> <span class="n">openlog</span> <span class="s">&quot;localhost&quot;</span> <span class="s">&quot;514&quot;</span> <span class="s">&quot;testprog&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">parsec</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">network</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">syslog</span> <span class="n">h</span> <span class="kt">USER</span> <span class="kt">INFO</span> <span class="s">&quot;This is my message&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">closelog</span> <span class="n">h</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id3">
+<h3>UDP Syslog 服务器<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h3>
+<p>UDP 服务器会在服务器上绑定某个端口。其接收直接发到这个端口的包，并处理它们。UDP 是无状态的，面向包的协议，程序员通常使用 <code class="docutils literal"><span class="pre">recvFrom</span></code> 这个调用接收消息和发送机信息，在发送响应时会用到发送机信息。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch27/syslogserver.hs</span>
+<span class="kr">import</span> <span class="nn">Data.Bits</span>
+<span class="kr">import</span> <span class="nn">Network.Socket</span>
+<span class="kr">import</span> <span class="nn">Network.BSD</span>
+<span class="kr">import</span> <span class="nn">Data.List</span>
+
+<span class="kr">type</span> <span class="kt">HandlerFunc</span> <span class="ow">=</span> <span class="kt">SockAddr</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+
+<span class="nf">serveLog</span> <span class="ow">::</span> <span class="kt">String</span>              <span class="c1">-- ^ Port number or name; 514 is default</span>
+         <span class="ow">-&gt;</span> <span class="kt">HandlerFunc</span>         <span class="c1">-- ^ Function to handle incoming messages</span>
+         <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">serveLog</span> <span class="n">port</span> <span class="n">handlerfunc</span> <span class="ow">=</span> <span class="n">withSocketsDo</span> <span class="o">$</span>
+    <span class="kr">do</span> <span class="c1">-- Look up the port.  Either raises an exception or returns</span>
+       <span class="c1">-- a nonempty list.</span>
+       <span class="n">addrinfos</span> <span class="ow">&lt;-</span> <span class="n">getAddrInfo</span>
+                    <span class="p">(</span><span class="kt">Just</span> <span class="p">(</span><span class="n">defaultHints</span> <span class="p">{</span><span class="n">addrFlags</span> <span class="ow">=</span> <span class="p">[</span><span class="kt">AI_PASSIVE</span><span class="p">]}))</span>
+                    <span class="kt">Nothing</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">port</span><span class="p">)</span>
+       <span class="kr">let</span> <span class="n">serveraddr</span> <span class="ow">=</span> <span class="n">head</span> <span class="n">addrinfos</span>
+
+       <span class="c1">-- Create a socket</span>
+       <span class="n">sock</span> <span class="ow">&lt;-</span> <span class="n">socket</span> <span class="p">(</span><span class="n">addrFamily</span> <span class="n">serveraddr</span><span class="p">)</span> <span class="kt">Datagram</span> <span class="n">defaultProtocol</span>
+
+       <span class="c1">-- Bind it to the address we&#39;re listening to</span>
+       <span class="n">bindSocket</span> <span class="n">sock</span> <span class="p">(</span><span class="n">addrAddress</span> <span class="n">serveraddr</span><span class="p">)</span>
+
+       <span class="c1">-- Loop forever processing incoming data.  Ctrl-C to abort.</span>
+       <span class="n">procMessages</span> <span class="n">sock</span>
+    <span class="kr">where</span> <span class="n">procMessages</span> <span class="n">sock</span> <span class="ow">=</span>
+              <span class="kr">do</span> <span class="c1">-- Receive one UDP packet, maximum length 1024 bytes,</span>
+                 <span class="c1">-- and save its content into msg and its source</span>
+                 <span class="c1">-- IP and port into addr</span>
+                 <span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="kr">_</span><span class="p">,</span> <span class="n">addr</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">recvFrom</span> <span class="n">sock</span> <span class="mi">1024</span>
+                 <span class="c1">-- Handle it</span>
+                 <span class="n">handlerfunc</span> <span class="n">addr</span> <span class="n">msg</span>
+                 <span class="c1">-- And process more messages</span>
+                 <span class="n">procMessages</span> <span class="n">sock</span>
+
+<span class="c1">-- A simple handler that prints incoming packets</span>
+<span class="nf">plainHandler</span> <span class="ow">::</span> <span class="kt">HandlerFunc</span>
+<span class="nf">plainHandler</span> <span class="n">addr</span> <span class="n">msg</span> <span class="ow">=</span>
+    <span class="n">putStrLn</span> <span class="o">$</span> <span class="s">&quot;From &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">addr</span> <span class="o">++</span> <span class="s">&quot;: &quot;</span> <span class="o">++</span> <span class="n">msg</span>
+</pre></div>
+</div>
+<p>这段程序可以在 ghci 中执行。执行 <code class="docutils literal"><span class="pre">serveLog</span> <span class="pre">&quot;1514&quot;</span> <span class="pre">plainHandler</span></code> 将建立一个监听 1514 端口的 UDP 服务器。其使用 <code class="docutils literal"><span class="pre">plainHandler</span></code> 将每条收到的 UDP 包打印出来。按下 <code class="docutils literal"><span class="pre">Ctrl-C</span></code> 可以终止这个程序。</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">处理错误。
+执行时收到了 <code class="docutils literal"><span class="pre">bind:</span> <span class="pre">permission</span> <span class="pre">denied</span></code> 消息？要确保端口值比 1024 大。某些操作系统不允许 root 之外的用户使用小于 1024 的端口。</p>
+</div>
+</div>
+</div>
+<div class="section" id="tcp">
+<h2>使用 TCP 通信<a class="headerlink" href="#tcp" title="Permalink to this headline">¶</a></h2>
+<p>TCP 被设计为确保互联网上的数据尽可能可靠地传输。 TCP 是数据流传输。虽然流在传输时会被操作系统拆散为一个个单独的包，但是应用程序并不需要关心包的边界。TCP 负责确保如果流被传送到应用程序，它就是完整的、无改动、仅传输一次且保证顺序。显然，如果线缆被破坏会导致流量无法送达，任何协议都无法克服这类限制。</p>
+<p>与 UDP 相比，这带来一些折衷。首先，在 TCP 会话开始必须传递一些包以建立连接。其次，对于每个短会话，UDP 将有性能优势。另外，TCP 会努力确保数据到达。如果会话的一端尝试向远端发送数据，但是没有收到响应，它将周期性的尝试重新传输数据直至放弃。这使得 TCP 面对丢包时比较健壮可靠。可是，它同样意味着 TCP 不是实时传输协议（如实况音频或视频传输）的最佳选择。</p>
+<div class="section" id="id4">
+<h3>处理多个 TCP 流<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h3>
+<p>TCP 的连接是有状态的。这意味着每个客户机和服务器之间都有一条专用的逻辑“频道”，而不是像 UDP 一样只是处理一次性的数据包。这简化了客户端开发者的工作。服务器端程序几乎总是需要同时处理多条 TCP 连接。如何做到这一点呢？</p>
+<p>在服务器端，首先需要创建一个 socket 并绑定到某个端口，就像 UDP 一样。但这回不是重复监听从任意地址发来的数据，取而代之，你的主循环将围绕 <code class="docutils literal"><span class="pre">accept</span></code> 调用编写。每当有一个客户机连接，服务器操作系统为其分配一个新的 socket 。所以我们的主 socket 只用来监听进来的连接，但从不发送数据。我们也获得了多个子 socket 可以同时使用，每个子 socket 从属于一个逻辑上的 TCP 会话。</p>
+<p>在 Haskell 中，通常使用 <code class="docutils literal"><span class="pre">forkIO</span></code> 创建一个单独的轻量级线程以处理与子 socket 的通信。对此， Haskell 拥有一个高效的内部实现，执行得非常好。</p>
+</div>
+<div class="section" id="tcp-syslog">
+<h3>TCP Syslog 服务器<a class="headerlink" href="#tcp-syslog" title="Permalink to this headline">¶</a></h3>
+<p>让我们使用 TCP 的实现来替换 UDP 的 syslog 服务器。假设一条消息并不是定义为单独的包，而是以一个尾部的字符 &#8216;n&#8217; 结束。任意客户端可以使用 TCP 连接向服务器发送 0 或多条消息。我们可以像下面这样实现：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch27/syslogtcpserver.hs</span>
+<span class="kr">import</span> <span class="nn">Data.Bits</span>
+<span class="kr">import</span> <span class="nn">Network.Socket</span>
+<span class="kr">import</span> <span class="nn">Network.BSD</span>
+<span class="kr">import</span> <span class="nn">Data.List</span>
+<span class="kr">import</span> <span class="nn">Control.Concurrent</span>
+<span class="kr">import</span> <span class="nn">Control.Concurrent.MVar</span>
+<span class="kr">import</span> <span class="nn">System.IO</span>
+
+<span class="kr">type</span> <span class="kt">HandlerFunc</span> <span class="ow">=</span> <span class="kt">SockAddr</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+
+<span class="nf">serveLog</span> <span class="ow">::</span> <span class="kt">String</span>              <span class="c1">-- ^ Port number or name; 514 is default</span>
+         <span class="ow">-&gt;</span> <span class="kt">HandlerFunc</span>         <span class="c1">-- ^ Function to handle incoming messages</span>
+         <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">serveLog</span> <span class="n">port</span> <span class="n">handlerfunc</span> <span class="ow">=</span> <span class="n">withSocketsDo</span> <span class="o">$</span>
+    <span class="kr">do</span> <span class="c1">-- Look up the port.  Either raises an exception or returns</span>
+       <span class="c1">-- a nonempty list.</span>
+       <span class="n">addrinfos</span> <span class="ow">&lt;-</span> <span class="n">getAddrInfo</span>
+                    <span class="p">(</span><span class="kt">Just</span> <span class="p">(</span><span class="n">defaultHints</span> <span class="p">{</span><span class="n">addrFlags</span> <span class="ow">=</span> <span class="p">[</span><span class="kt">AI_PASSIVE</span><span class="p">]}))</span>
+                    <span class="kt">Nothing</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">port</span><span class="p">)</span>
+       <span class="kr">let</span> <span class="n">serveraddr</span> <span class="ow">=</span> <span class="n">head</span> <span class="n">addrinfos</span>
+
+       <span class="c1">-- Create a socket</span>
+       <span class="n">sock</span> <span class="ow">&lt;-</span> <span class="n">socket</span> <span class="p">(</span><span class="n">addrFamily</span> <span class="n">serveraddr</span><span class="p">)</span> <span class="kt">Stream</span> <span class="n">defaultProtocol</span>
+
+       <span class="c1">-- Bind it to the address we&#39;re listening to</span>
+       <span class="n">bindSocket</span> <span class="n">sock</span> <span class="p">(</span><span class="n">addrAddress</span> <span class="n">serveraddr</span><span class="p">)</span>
+
+       <span class="c1">-- Start listening for connection requests.  Maximum queue size</span>
+       <span class="c1">-- of 5 connection requests waiting to be accepted.</span>
+       <span class="n">listen</span> <span class="n">sock</span> <span class="mi">5</span>
+
+       <span class="c1">-- Create a lock to use for synchronizing access to the handler</span>
+       <span class="n">lock</span> <span class="ow">&lt;-</span> <span class="n">newMVar</span> <span class="nb">()</span>
+
+       <span class="c1">-- Loop forever waiting for connections.  Ctrl-C to abort.</span>
+       <span class="n">procRequests</span> <span class="n">lock</span> <span class="n">sock</span>
+
+    <span class="kr">where</span>
+          <span class="c1">-- | Process incoming connection requests</span>
+          <span class="n">procRequests</span> <span class="ow">::</span> <span class="kt">MVar</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">Socket</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+          <span class="n">procRequests</span> <span class="n">lock</span> <span class="n">mastersock</span> <span class="ow">=</span>
+              <span class="kr">do</span> <span class="p">(</span><span class="n">connsock</span><span class="p">,</span> <span class="n">clientaddr</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">accept</span> <span class="n">mastersock</span>
+                 <span class="n">handle</span> <span class="n">lock</span> <span class="n">clientaddr</span>
+                    <span class="s">&quot;syslogtcpserver.hs: client connnected&quot;</span>
+                 <span class="n">forkIO</span> <span class="o">$</span> <span class="n">procMessages</span> <span class="n">lock</span> <span class="n">connsock</span> <span class="n">clientaddr</span>
+                 <span class="n">procRequests</span> <span class="n">lock</span> <span class="n">mastersock</span>
+
+          <span class="c1">-- | Process incoming messages</span>
+          <span class="n">procMessages</span> <span class="ow">::</span> <span class="kt">MVar</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">Socket</span> <span class="ow">-&gt;</span> <span class="kt">SockAddr</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+          <span class="n">procMessages</span> <span class="n">lock</span> <span class="n">connsock</span> <span class="n">clientaddr</span> <span class="ow">=</span>
+              <span class="kr">do</span> <span class="n">connhdl</span> <span class="ow">&lt;-</span> <span class="n">socketToHandle</span> <span class="n">connsock</span> <span class="kt">ReadMode</span>
+                 <span class="n">hSetBuffering</span> <span class="n">connhdl</span> <span class="kt">LineBuffering</span>
+                 <span class="n">messages</span> <span class="ow">&lt;-</span> <span class="n">hGetContents</span> <span class="n">connhdl</span>
+                 <span class="n">mapM_</span> <span class="p">(</span><span class="n">handle</span> <span class="n">lock</span> <span class="n">clientaddr</span><span class="p">)</span> <span class="p">(</span><span class="n">lines</span> <span class="n">messages</span><span class="p">)</span>
+                 <span class="n">hClose</span> <span class="n">connhdl</span>
+                 <span class="n">handle</span> <span class="n">lock</span> <span class="n">clientaddr</span>
+                    <span class="s">&quot;syslogtcpserver.hs: client disconnected&quot;</span>
+
+          <span class="c1">-- Lock the handler before passing data to it.</span>
+          <span class="n">handle</span> <span class="ow">::</span> <span class="kt">MVar</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">HandlerFunc</span>
+          <span class="c1">-- This type is the same as</span>
+          <span class="c1">-- handle :: MVar () -&gt; SockAddr -&gt; String -&gt; IO ()</span>
+          <span class="n">handle</span> <span class="n">lock</span> <span class="n">clientaddr</span> <span class="n">msg</span> <span class="ow">=</span>
+              <span class="n">withMVar</span> <span class="n">lock</span>
+                 <span class="p">(</span><span class="nf">\</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">handlerfunc</span> <span class="n">clientaddr</span> <span class="n">msg</span> <span class="o">&gt;&gt;</span> <span class="n">return</span> <span class="n">a</span><span class="p">)</span>
+
+<span class="c1">-- A simple handler that prints incoming packets</span>
+<span class="nf">plainHandler</span> <span class="ow">::</span> <span class="kt">HandlerFunc</span>
+<span class="nf">plainHandler</span> <span class="n">addr</span> <span class="n">msg</span> <span class="ow">=</span>
+    <span class="n">putStrLn</span> <span class="o">$</span> <span class="s">&quot;From &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">addr</span> <span class="o">++</span> <span class="s">&quot;: &quot;</span> <span class="o">++</span> <span class="n">msg</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">SyslogTypes</span></code> 的实现，见 <a class="reference internal" href="#udp-syslog"><span>UDP 客户端例子：syslog</span></a> 。</p>
+<p>让我们读一下源码。主循环是 <code class="docutils literal"><span class="pre">procRequests</span></code> ，这是一个死循环，用于等待来自客户端的新连接。 <code class="docutils literal"><span class="pre">accept</span></code> 调用将一直阻塞，直到一个客户端来连接。当有客户端连接，我们获得一个新 socket 和客户机地址。我们向处理函数发送一条关于新连接的消息，接着使用 <code class="docutils literal"><span class="pre">forkIO</span></code> 建立一个线程处理来自客户机的数据。这条线程执行 <code class="docutils literal"><span class="pre">procMessages</span></code> 。</p>
+<p>处理 TCP 数据时，为了方便，通常将 socket 转换为 Haskell 句柄。我们也同样处理，并明确设置了缓冲 &#8211; 一个 TCP 通信的要点。接着，设置惰性读取 socket 句柄。对每个传入的行，我们都将其传给 <code class="docutils literal"><span class="pre">handle</span></code> 。当没有更多数据时 &#8211; 远端已经关闭了 socket &#8211; 我们输出一条会话结束的消息。</p>
+<p>因为可能同时收到多条消息，我们需要确保没有将多条消息同时写入一个处理函数。那将导致混乱的输出。我们使用了一个简单的锁以序列化对处理函数的访问，并且编写了一个简单的 <code class="docutils literal"><span class="pre">handle</span></code> 函数处理它。</p>
+<p>你可以使用下面我们将展示的客户机代码测试，或者直接使用 <code class="docutils literal"><span class="pre">telnet</span></code> 程序来连接这个服务器。你向其发送的每一行输入都将被服务器原样返回。我们来试一下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="n">syslogtcpserver</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">syslogtcpserver</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">serveLog</span> <span class="s">&quot;10514&quot;</span> <span class="n">plainHandler</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">parsec</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">network</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>此处，服务器从 10514 端口监听新连接。在有某个客户机过来连接之前，它什么事儿都不做。我们可以使用 <code class="docutils literal"><span class="pre">telnet</span></code> 来连接这个服务器：</p>
+<div class="highlight-haskell"><div class="highlight"><pre>~$ telnet localhost 10514
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is &#39;^]&#39;.
+Test message
+^]
+telnet&gt; quit
+Connection closed.
+</pre></div>
+</div>
+<p>于此同时，在我们运行 TCP 服务器的终端上，你将看到如下输出：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">From</span> <span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="kt">:</span><span class="mi">38790</span><span class="kt">:</span> <span class="n">syslogtcpserver</span><span class="o">.</span><span class="n">hs</span><span class="kt">:</span> <span class="n">client</span> <span class="n">connnected</span>
+<span class="kt">From</span> <span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="kt">:</span><span class="mi">38790</span><span class="kt">:</span> <span class="kt">Test</span> <span class="n">message</span>
+<span class="kt">From</span> <span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="kt">:</span><span class="mi">38790</span><span class="kt">:</span> <span class="n">syslogtcpserver</span><span class="o">.</span><span class="n">hs</span><span class="kt">:</span> <span class="n">client</span> <span class="n">disconnected</span>
+</pre></div>
+</div>
+<p>其显示一个客户端从本机 (127.0.0.1) 的 38790 端口连上了主机。连接之后，它发送了一条消息，然后断开。当你扮演一个 TCP 客户端时，操作系统将分配一个未被使用的端口给你。通常这个端口在你每次运行程序时都不一样。</p>
+</div>
+<div class="section" id="id5">
+<h3>TCP Syslog 客户端<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
+<p>现在，为我们的 TCP syslog 协议编写一个客户端。这个客户端与 UDP 客户端类似，但是有一些变化。首先，因为 TCP 是流式协议，我们可以使用句柄传输数据而不需要使用底层的 socket 操作。其次，不在需要在 <code class="docutils literal"><span class="pre">SyslogHandle</span></code> 中保存目的地址，因为我们将使用 <code class="docutils literal"><span class="pre">connect</span></code> 建立 TCP 连接。最后，我们需要一个途径，以区分不同的消息。UDP 中，这很容易，因为每条消息都是不相关的逻辑包。TCP 中，我们将仅使用换行符 &#8216;n&#8217; 来作为消息结尾的标识，尽管这意味着不能在单条消息中发送多行信息。这是代码：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch27/syslogtcpclient.hs</span>
+<span class="kr">import</span> <span class="nn">Data.Bits</span>
+<span class="kr">import</span> <span class="nn">Network.Socket</span>
+<span class="kr">import</span> <span class="nn">Network.BSD</span>
+<span class="kr">import</span> <span class="nn">Data.List</span>
+<span class="kr">import</span> <span class="nn">SyslogTypes</span>
+<span class="kr">import</span> <span class="nn">System.IO</span>
+
+<span class="kr">data</span> <span class="kt">SyslogHandle</span> <span class="ow">=</span>
+    <span class="kt">SyslogHandle</span> <span class="p">{</span><span class="n">slHandle</span> <span class="ow">::</span> <span class="kt">Handle</span><span class="p">,</span>
+                  <span class="n">slProgram</span> <span class="ow">::</span> <span class="kt">String</span><span class="p">}</span>
+
+<span class="nf">openlog</span> <span class="ow">::</span> <span class="kt">HostName</span>             <span class="c1">-- ^ Remote hostname, or localhost</span>
+        <span class="ow">-&gt;</span> <span class="kt">String</span>               <span class="c1">-- ^ Port number or name; 514 is default</span>
+        <span class="ow">-&gt;</span> <span class="kt">String</span>               <span class="c1">-- ^ Name to log under</span>
+        <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">SyslogHandle</span>      <span class="c1">-- ^ Handle to use for logging</span>
+<span class="nf">openlog</span> <span class="n">hostname</span> <span class="n">port</span> <span class="n">progname</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="c1">-- Look up the hostname and port.  Either raises an exception</span>
+       <span class="c1">-- or returns a nonempty list.  First element in that list</span>
+       <span class="c1">-- is supposed to be the best option.</span>
+       <span class="n">addrinfos</span> <span class="ow">&lt;-</span> <span class="n">getAddrInfo</span> <span class="kt">Nothing</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">hostname</span><span class="p">)</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">port</span><span class="p">)</span>
+       <span class="kr">let</span> <span class="n">serveraddr</span> <span class="ow">=</span> <span class="n">head</span> <span class="n">addrinfos</span>
+
+       <span class="c1">-- Establish a socket for communication</span>
+       <span class="n">sock</span> <span class="ow">&lt;-</span> <span class="n">socket</span> <span class="p">(</span><span class="n">addrFamily</span> <span class="n">serveraddr</span><span class="p">)</span> <span class="kt">Stream</span> <span class="n">defaultProtocol</span>
+
+       <span class="c1">-- Mark the socket for keep-alive handling since it may be idle</span>
+       <span class="c1">-- for long periods of time</span>
+       <span class="n">setSocketOption</span> <span class="n">sock</span> <span class="kt">KeepAlive</span> <span class="mi">1</span>
+
+       <span class="c1">-- Connect to server</span>
+       <span class="n">connect</span> <span class="n">sock</span> <span class="p">(</span><span class="n">addrAddress</span> <span class="n">serveraddr</span><span class="p">)</span>
+
+       <span class="c1">-- Make a Handle out of it for convenience</span>
+       <span class="n">h</span> <span class="ow">&lt;-</span> <span class="n">socketToHandle</span> <span class="n">sock</span> <span class="kt">WriteMode</span>
+
+       <span class="c1">-- We&#39;re going to set buffering to BlockBuffering and then</span>
+       <span class="c1">-- explicitly call hFlush after each message, below, so that</span>
+       <span class="c1">-- messages get logged immediately</span>
+       <span class="n">hSetBuffering</span> <span class="n">h</span> <span class="p">(</span><span class="kt">BlockBuffering</span> <span class="kt">Nothing</span><span class="p">)</span>
+
+       <span class="c1">-- Save off the socket, program name, and server address in a handle</span>
+       <span class="n">return</span> <span class="o">$</span> <span class="kt">SyslogHandle</span> <span class="n">h</span> <span class="n">progname</span>
+
+<span class="nf">syslog</span> <span class="ow">::</span> <span class="kt">SyslogHandle</span> <span class="ow">-&gt;</span> <span class="kt">Facility</span> <span class="ow">-&gt;</span> <span class="kt">Priority</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">syslog</span> <span class="n">syslogh</span> <span class="n">fac</span> <span class="n">pri</span> <span class="n">msg</span> <span class="ow">=</span>
+    <span class="kr">do</span> <span class="n">hPutStrLn</span> <span class="p">(</span><span class="n">slHandle</span> <span class="n">syslogh</span><span class="p">)</span> <span class="n">sendmsg</span>
+       <span class="c1">-- Make sure that we send data immediately</span>
+       <span class="n">hFlush</span> <span class="p">(</span><span class="n">slHandle</span> <span class="n">syslogh</span><span class="p">)</span>
+    <span class="kr">where</span> <span class="n">code</span> <span class="ow">=</span> <span class="n">makeCode</span> <span class="n">fac</span> <span class="n">pri</span>
+          <span class="n">sendmsg</span> <span class="ow">=</span> <span class="s">&quot;&lt;&quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">code</span> <span class="o">++</span> <span class="s">&quot;&gt;&quot;</span> <span class="o">++</span> <span class="p">(</span><span class="n">slProgram</span> <span class="n">syslogh</span><span class="p">)</span> <span class="o">++</span>
+                    <span class="s">&quot;: &quot;</span> <span class="o">++</span> <span class="n">msg</span>
+
+<span class="nf">closelog</span> <span class="ow">::</span> <span class="kt">SyslogHandle</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">closelog</span> <span class="n">syslogh</span> <span class="ow">=</span> <span class="n">hClose</span> <span class="p">(</span><span class="n">slHandle</span> <span class="n">syslogh</span><span class="p">)</span>
+
+<span class="cm">{- | Convert a facility and a priority into a syslog code -}</span>
+<span class="nf">makeCode</span> <span class="ow">::</span> <span class="kt">Facility</span> <span class="ow">-&gt;</span> <span class="kt">Priority</span> <span class="ow">-&gt;</span> <span class="kt">Int</span>
+<span class="nf">makeCode</span> <span class="n">fac</span> <span class="n">pri</span> <span class="ow">=</span>
+    <span class="kr">let</span> <span class="n">faccode</span> <span class="ow">=</span> <span class="n">codeOfFac</span> <span class="n">fac</span>
+        <span class="n">pricode</span> <span class="ow">=</span> <span class="n">fromEnum</span> <span class="n">pri</span>
+        <span class="kr">in</span>
+          <span class="p">(</span><span class="n">faccode</span> <span class="p">`</span><span class="n">shiftL</span><span class="p">`</span> <span class="mi">3</span><span class="p">)</span> <span class="o">.|.</span> <span class="n">pricode</span>
+</pre></div>
+</div>
+<p>可以在 ghci 中试着运行它。如果还没有关闭之前的 TCP 服务器，你的会话看上去可能会像是这样：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="n">syslogtcpclient</span><span class="o">.</span><span class="n">hs</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">base</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">SyslogTypes</span>      <span class="p">(</span> <span class="kt">SyslogTypes</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="p">[</span><span class="mi">2</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">syslogtcpclient</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="p">,</span> <span class="kt">SyslogTypes</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">openlog</span> <span class="s">&quot;localhost&quot;</span> <span class="s">&quot;10514&quot;</span> <span class="s">&quot;tcptest&quot;</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">parsec</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">network</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">sl</span> <span class="ow">&lt;-</span> <span class="n">openlog</span> <span class="s">&quot;localhost&quot;</span> <span class="s">&quot;10514&quot;</span> <span class="s">&quot;tcptest&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">syslog</span> <span class="n">sl</span> <span class="kt">USER</span> <span class="kt">INFO</span> <span class="s">&quot;This is my TCP message&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">syslog</span> <span class="n">sl</span> <span class="kt">USER</span> <span class="kt">INFO</span> <span class="s">&quot;This is my TCP message again&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">closelog</span> <span class="n">sl</span>
+</pre></div>
+</div>
+<p>结束时，服务器上将看到这样的输出：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">From</span> <span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="kt">:</span><span class="mi">46319</span><span class="kt">:</span> <span class="n">syslogtcpserver</span><span class="o">.</span><span class="n">hs</span><span class="kt">:</span> <span class="n">client</span> <span class="n">connnected</span>
+<span class="kt">From</span> <span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="kt">:</span><span class="mi">46319</span><span class="kt">:</span> <span class="o">&lt;</span><span class="mi">9</span><span class="o">&gt;</span><span class="n">tcptest</span><span class="kt">:</span> <span class="kt">This</span> <span class="n">is</span> <span class="n">my</span> <span class="kt">TCP</span> <span class="n">message</span>
+<span class="kt">From</span> <span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="kt">:</span><span class="mi">46319</span><span class="kt">:</span> <span class="o">&lt;</span><span class="mi">9</span><span class="o">&gt;</span><span class="n">tcptest</span><span class="kt">:</span> <span class="kt">This</span> <span class="n">is</span> <span class="n">my</span> <span class="kt">TCP</span> <span class="n">message</span> <span class="n">again</span>
+<span class="kt">From</span> <span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="kt">:</span><span class="mi">46319</span><span class="kt">:</span> <span class="n">syslogtcpserver</span><span class="o">.</span><span class="n">hs</span><span class="kt">:</span> <span class="n">client</span> <span class="n">disconnected</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">&lt;9&gt;</span></code> 是优先级和设施代码，和之前 UDP 例子中的意思一样。</p>
+</div>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="25.html">第 25 章：性能分析与优化</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="28.html">第 28 章：软件事务内存 (STM)</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.3.
+    </div>
+  </body>
+</html>

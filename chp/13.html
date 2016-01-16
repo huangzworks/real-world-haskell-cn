@@ -1,0 +1,1236 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>第 13 章：数据结构 &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
+    <link rel="next" title="第 14 章：Monads" href="14.html" />
+    <link rel="prev" title="第 12 章：条形码识别" href="12.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="12.html">第 12 章：条形码识别</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="14.html">第 14 章：Monads</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="id1">
+<h1>第 13 章：数据结构<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="id2">
+<h2>关联列表<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
+<p>我们常常会跟一些以键为索引的无序数据打交道。</p>
+<p>举个例子，UNIX 管理猿可能需要这么一个列表，它包含系统中所有用户的 UID ，以及和这个 UID 相对应的用户名。这个列表根据 UID 而不是数据的位置来查找相应的用户名。换句话来说， UID 就是这个数据集的键。</p>
+<p>Haskell 里有几种不同的方法来处理这种结构的数据，最常用的两个是关联列表（association list）和 <code class="docutils literal"><span class="pre">Data.Map</span></code> 模块提供的 <code class="docutils literal"><span class="pre">Map</span></code> 类型。</p>
+<p>关联列表非常简单，易于使用。由于关联列表由 Haskell 列表构成，因此所有列表操作函数都可以用于处理关联列表。</p>
+<p>另一方面， <code class="docutils literal"><span class="pre">Map</span></code> 类型在处理大数据集时，性能比关联列表要好。</p>
+<p>本章将同时介绍这两种数据结构。</p>
+<p>关联列表就是包含一个或多个 <code class="docutils literal"><span class="pre">(key,</span> <span class="pre">value)</span></code> 元组的列表， <code class="docutils literal"><span class="pre">key</span></code> 和 <code class="docutils literal"><span class="pre">value</span></code> 可以是任意类型。一个处理 UID 和用户名映射的关联列表的类型可能是 <code class="docutils literal"><span class="pre">[(Integer,</span> <span class="pre">String)]</span></code> 。</p>
+<p>[注：关联列表的 <code class="docutils literal"><span class="pre">key</span></code> 必须是 <code class="docutils literal"><span class="pre">Eq</span></code> 类型的成员。]</p>
+<p>关联列表的构建方式和普通列表一样。Haskell 提供了一个 <code class="docutils literal"><span class="pre">Data.List.lookup</span></code> 函数，用于在关联列表中查找数据。这个函数的类型签名为 <code class="docutils literal"><span class="pre">Eq</span> <span class="pre">a</span> <span class="pre">=&gt;</span> <span class="pre">a</span> <span class="pre">-&gt;</span> <span class="pre">[(a,</span> <span class="pre">b)]</span> <span class="pre">-&gt;</span> <span class="pre">Maybe</span> <span class="pre">b</span></code> 。它的使用方式如下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">al</span> <span class="ow">=</span> <span class="p">[(</span><span class="mi">1</span><span class="p">,</span> <span class="s">&quot;one&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s">&quot;two&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s">&quot;three&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s">&quot;four&quot;</span><span class="p">)]</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">lookup</span> <span class="mi">1</span> <span class="n">al</span>
+<span class="kt">Just</span> <span class="s">&quot;one&quot;</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">lookup</span> <span class="mi">5</span> <span class="n">al</span>
+<span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">lookup</span></code> 函数的定义如下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/lookup.hs</span>
+<span class="nf">myLookup</span> <span class="ow">::</span> <span class="kt">Eq</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)]</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">b</span>
+<span class="nf">myLookup</span> <span class="kr">_</span> <span class="kt">[]</span> <span class="ow">=</span> <span class="kt">Nothing</span>
+<span class="nf">myLookup</span> <span class="n">key</span> <span class="p">((</span><span class="n">thiskey</span><span class="p">,</span> <span class="n">thisval</span><span class="p">)</span><span class="kt">:</span><span class="n">rest</span><span class="p">)</span> <span class="ow">=</span>
+    <span class="kr">if</span> <span class="n">key</span> <span class="o">==</span> <span class="n">thiskey</span>
+       <span class="kr">then</span> <span class="kt">Just</span> <span class="n">thisval</span>
+       <span class="kr">else</span> <span class="n">myLookup</span> <span class="n">key</span> <span class="n">rest</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">lookup</span></code> 在输入列表为空时返回 <code class="docutils literal"><span class="pre">Nothing</span></code> 。如果输入列表不为空，那么它检查当前列表元素的 <code class="docutils literal"><span class="pre">key</span></code> 是否就是我们要找的 <code class="docutils literal"><span class="pre">key</span></code> ，如果是的话就返回和这个 <code class="docutils literal"><span class="pre">key</span></code> 对应的 <code class="docutils literal"><span class="pre">value</span></code> ，否则就继续递归处理剩余的列表元素。</p>
+<p>再来看一个稍微复杂点的例子。在 Unix/Linux 系统中，有一个 <code class="docutils literal"><span class="pre">/etc/passwd</span></code> 文件，这个文件保存了用户名称， UID，用户的 HOME 目录位置，以及其他一些数据。文件以行分割每个用户的资料，每个数据域用冒号隔开：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">root</span><span class="kt">:</span><span class="n">x</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span><span class="n">root</span><span class="kt">:/</span><span class="n">root</span><span class="kt">:/</span><span class="n">bin</span><span class="o">/</span><span class="n">bash</span>
+<span class="nf">daemon</span><span class="kt">:</span><span class="n">x</span><span class="kt">:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">1</span><span class="kt">:</span><span class="n">daemon</span><span class="kt">:/</span><span class="n">usr</span><span class="o">/</span><span class="n">sbin</span><span class="kt">:/</span><span class="n">bin</span><span class="o">/</span><span class="n">sh</span>
+<span class="nf">bin</span><span class="kt">:</span><span class="n">x</span><span class="kt">:</span><span class="mi">2</span><span class="kt">:</span><span class="mi">2</span><span class="kt">:</span><span class="n">bin</span><span class="kt">:/</span><span class="n">bin</span><span class="kt">:/</span><span class="n">bin</span><span class="o">/</span><span class="n">sh</span>
+<span class="nf">sys</span><span class="kt">:</span><span class="n">x</span><span class="kt">:</span><span class="mi">3</span><span class="kt">:</span><span class="mi">3</span><span class="kt">:</span><span class="n">sys</span><span class="kt">:/</span><span class="n">dev</span><span class="kt">:/</span><span class="n">bin</span><span class="o">/</span><span class="n">sh</span>
+<span class="nf">sync</span><span class="kt">:</span><span class="n">x</span><span class="kt">:</span><span class="mi">4</span><span class="kt">:</span><span class="mi">65534</span><span class="kt">:</span><span class="n">sync</span><span class="kt">:/</span><span class="n">bin</span><span class="kt">:/</span><span class="n">bin</span><span class="o">/</span><span class="n">sync</span>
+<span class="nf">games</span><span class="kt">:</span><span class="n">x</span><span class="kt">:</span><span class="mi">5</span><span class="kt">:</span><span class="mi">60</span><span class="kt">:</span><span class="n">games</span><span class="kt">:/</span><span class="n">usr</span><span class="o">/</span><span class="n">games</span><span class="kt">:/</span><span class="n">bin</span><span class="o">/</span><span class="n">sh</span>
+<span class="nf">man</span><span class="kt">:</span><span class="n">x</span><span class="kt">:</span><span class="mi">6</span><span class="kt">:</span><span class="mi">12</span><span class="kt">:</span><span class="n">man</span><span class="kt">:/</span><span class="n">var</span><span class="o">/</span><span class="n">cache</span><span class="o">/</span><span class="n">man</span><span class="kt">:/</span><span class="n">bin</span><span class="o">/</span><span class="n">sh</span>
+<span class="nf">lp</span><span class="kt">:</span><span class="n">x</span><span class="kt">:</span><span class="mi">7</span><span class="kt">:</span><span class="mi">7</span><span class="kt">:</span><span class="n">lp</span><span class="kt">:/</span><span class="n">var</span><span class="o">/</span><span class="n">spool</span><span class="o">/</span><span class="n">lpd</span><span class="kt">:/</span><span class="n">bin</span><span class="o">/</span><span class="n">sh</span>
+<span class="nf">mail</span><span class="kt">:</span><span class="n">x</span><span class="kt">:</span><span class="mi">8</span><span class="kt">:</span><span class="mi">8</span><span class="kt">:</span><span class="n">mail</span><span class="kt">:/</span><span class="n">var</span><span class="o">/</span><span class="n">mail</span><span class="kt">:/</span><span class="n">bin</span><span class="o">/</span><span class="n">sh</span>
+<span class="nf">news</span><span class="kt">:</span><span class="n">x</span><span class="kt">:</span><span class="mi">9</span><span class="kt">:</span><span class="mi">9</span><span class="kt">:</span><span class="n">news</span><span class="kt">:/</span><span class="n">var</span><span class="o">/</span><span class="n">spool</span><span class="o">/</span><span class="n">news</span><span class="kt">:/</span><span class="n">bin</span><span class="o">/</span><span class="n">sh</span>
+<span class="nf">jgoerzen</span><span class="kt">:</span><span class="n">x</span><span class="kt">:</span><span class="mi">1000</span><span class="kt">:</span><span class="mi">1000</span><span class="kt">:John</span> <span class="kt">Goerzen</span><span class="p">,,,</span><span class="kt">:/</span><span class="n">home</span><span class="o">/</span><span class="n">jgoerzen</span><span class="kt">:/</span><span class="n">bin</span><span class="o">/</span><span class="n">bash</span>
+</pre></div>
+</div>
+<p>以下程序读入并处理 <code class="docutils literal"><span class="pre">/etc/passwd</span></code> 文件，它创建一个关联列表，使得我们可以根据给定 UID ，获取相应的用户名：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/passwd-al.hs</span>
+<span class="kr">import</span> <span class="nn">Data.List</span>
+<span class="kr">import</span> <span class="nn">System.IO</span>
+<span class="kr">import</span> <span class="nn">Control.Monad</span><span class="p">(</span><span class="n">when</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Exit</span>
+<span class="kr">import</span> <span class="nn">System.Environment</span><span class="p">(</span><span class="n">getArgs</span><span class="p">)</span>
+
+<span class="nf">main</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="c1">-- Load the command-line arguments</span>
+    <span class="n">args</span> <span class="ow">&lt;-</span> <span class="n">getArgs</span>
+
+    <span class="c1">-- If we don&#39;t have the right amount of args, give an error and abort</span>
+    <span class="n">when</span> <span class="p">(</span><span class="n">length</span> <span class="n">args</span> <span class="o">/=</span> <span class="mi">2</span><span class="p">)</span> <span class="o">$</span> <span class="kr">do</span>
+        <span class="n">putStrLn</span> <span class="s">&quot;Syntax: passwd-al filename uid&quot;</span>
+        <span class="n">exitFailure</span>
+
+    <span class="c1">-- Read the file lazily</span>
+    <span class="n">content</span> <span class="ow">&lt;-</span> <span class="n">readFile</span> <span class="p">(</span><span class="n">args</span> <span class="o">!!</span> <span class="mi">0</span><span class="p">)</span>
+
+    <span class="c1">-- Compute the username in pure code</span>
+    <span class="kr">let</span> <span class="n">username</span> <span class="ow">=</span> <span class="n">findByUID</span> <span class="n">content</span> <span class="p">(</span><span class="n">read</span> <span class="p">(</span><span class="n">args</span> <span class="o">!!</span> <span class="mi">1</span><span class="p">))</span>
+
+    <span class="c1">-- Display the result</span>
+    <span class="kr">case</span> <span class="n">username</span> <span class="kr">of</span>
+         <span class="kt">Just</span> <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">putStrLn</span> <span class="n">x</span>
+         <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">putStrLn</span> <span class="s">&quot;Could not find that UID&quot;</span>
+
+<span class="c1">-- Given the entire input and a UID, see if we can find a username.</span>
+<span class="nf">findByUID</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">String</span>
+<span class="nf">findByUID</span> <span class="n">content</span> <span class="n">uid</span> <span class="ow">=</span>
+    <span class="kr">let</span> <span class="n">al</span> <span class="ow">=</span> <span class="n">map</span> <span class="n">parseline</span> <span class="o">.</span> <span class="n">lines</span> <span class="o">$</span> <span class="n">content</span>
+        <span class="kr">in</span> <span class="n">lookup</span> <span class="n">uid</span> <span class="n">al</span>
+
+<span class="c1">-- Convert a colon-separated line into fields</span>
+<span class="nf">parseline</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="kt">Integer</span><span class="p">,</span> <span class="kt">String</span><span class="p">)</span>
+<span class="nf">parseline</span> <span class="n">input</span> <span class="ow">=</span> 
+    <span class="kr">let</span> <span class="n">fields</span> <span class="ow">=</span> <span class="n">split</span> <span class="sc">&#39;:&#39;</span> <span class="n">input</span>
+        <span class="kr">in</span> <span class="p">(</span><span class="n">read</span> <span class="p">(</span><span class="n">fields</span> <span class="o">!!</span> <span class="mi">2</span><span class="p">),</span> <span class="n">fields</span> <span class="o">!!</span> <span class="mi">0</span><span class="p">)</span>
+
+<span class="c1">-- Takes a delimiter and a list. </span>
+<span class="c1">-- Break up the list based on the delimiter.</span>
+<span class="nf">split</span> <span class="ow">::</span> <span class="kt">Eq</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[[</span><span class="n">a</span><span class="p">]]</span>
+
+<span class="c1">-- If the input is empty, the result is a list of empty lists.</span>
+<span class="nf">split</span> <span class="kr">_</span> <span class="kt">[]</span> <span class="ow">=</span> <span class="p">[</span><span class="kt">[]</span><span class="p">]</span>
+<span class="nf">split</span> <span class="n">delimiter</span> <span class="n">str</span> <span class="ow">=</span>
+    <span class="kr">let</span> <span class="c1">-- Find the part of the list before delimiter and put it in &quot;before&quot;.</span>
+        <span class="c1">-- The result of the list, including the leading delimiter, goes in &quot;remainder&quot;.</span>
+        <span class="p">(</span><span class="n">before</span><span class="p">,</span> <span class="n">remainder</span><span class="p">)</span> <span class="ow">=</span> <span class="n">span</span> <span class="p">(</span><span class="o">/=</span> <span class="n">delimiter</span><span class="p">)</span> <span class="n">str</span>
+        <span class="kr">in</span> <span class="n">before</span> <span class="kt">:</span> <span class="kr">case</span> <span class="n">remainder</span> <span class="kr">of</span>
+                         <span class="kt">[]</span> <span class="ow">-&gt;</span> <span class="kt">[]</span>
+                         <span class="n">x</span> <span class="ow">-&gt;</span> <span class="c1">-- If there is more data to process,</span>
+                              <span class="c1">-- call split recursively to process it</span>
+                              <span class="n">split</span> <span class="n">delimiter</span> <span class="p">(</span><span class="n">tail</span> <span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">findByUID</span></code> 是整个程序的核心，它逐行读入并处理输入，使用 <code class="docutils literal"><span class="pre">lookup</span></code> 从处理结果中查找给定 UID ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">findByUID</span> <span class="s">&quot;root:x:0:0:root:/root:/bin/bash&quot;</span> <span class="mi">0</span>
+<span class="kt">Just</span> <span class="s">&quot;root&quot;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">parseline</span></code> 读入并处理一个字符串，返回一个包含 UID 和用户名的元组：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">parseline</span> <span class="s">&quot;root:x:0:0:root:/root:/bin/bash&quot;</span>
+<span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="s">&quot;root&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">split</span></code> 函数根据给定分隔符 <code class="docutils literal"><span class="pre">delimiter</span></code> 将一个文本行分割为列表：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">split</span> <span class="sc">&#39;:&#39;</span> <span class="s">&quot;root:x:0:0:root:/root:/bin/bash&quot;</span>
+<span class="p">[</span><span class="s">&quot;root&quot;</span><span class="p">,</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="s">&quot;0&quot;</span><span class="p">,</span><span class="s">&quot;0&quot;</span><span class="p">,</span><span class="s">&quot;root&quot;</span><span class="p">,</span><span class="s">&quot;/root&quot;</span><span class="p">,</span><span class="s">&quot;/bin/bash&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>以下是在本机执行 <code class="docutils literal"><span class="pre">passwd-al.hs</span></code> 处理 <code class="docutils literal"><span class="pre">/etc/passwd</span></code> 的结果：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">runghc</span> <span class="n">passwd</span><span class="o">-</span><span class="n">al</span><span class="o">.</span><span class="n">hs</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">passwd</span> <span class="mi">0</span>
+<span class="nf">root</span>
+
+<span class="o">$</span> <span class="n">runghc</span> <span class="n">passwd</span><span class="o">-</span><span class="n">al</span><span class="o">.</span><span class="n">hs</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">passwd</span> <span class="mi">10086</span>
+<span class="kt">Could</span> <span class="n">not</span> <span class="n">find</span> <span class="n">that</span> <span class="kt">UID</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="map">
+<h2>Map 类型<a class="headerlink" href="#map" title="Permalink to this headline">¶</a></h2>
+<p><code class="docutils literal"><span class="pre">Data.Map</span></code> 模块提供的 <code class="docutils literal"><span class="pre">Map</span></code> 类型的行为和关联列表类似，但 <code class="docutils literal"><span class="pre">Map</span></code> 类型的性能更好。</p>
+<p><code class="docutils literal"><span class="pre">Map</span></code> 和其他语言提供的哈希表类似。不同的是， <code class="docutils literal"><span class="pre">Map</span></code> 的内部由平衡二叉树实现，在 Haskell 这种使用不可变数据的语言中，它是一个比哈希表更高效的表示。
+这是一个非常明显的例子，说明纯函数式语言是如何深入地影响我们编写程序的方式：对于一个给定的任务，我们总是选择合适的算法和数据结构，使得解决方案尽可能地简单和有效，但这些（纯函数式的）选择通常不同于命令式语言处理同样问题时的选择。</p>
+<p>因为 <code class="docutils literal"><span class="pre">Data.Map</span></code> 模块的一些函数和 <code class="docutils literal"><span class="pre">Prelude</span></code> 模块的函数重名，我们通过 <code class="docutils literal"><span class="pre">import</span> <span class="pre">qualified</span> <span class="pre">Data.Map</span> <span class="pre">as</span> <span class="pre">Map</span></code> 的方式引入模块，并使用 <code class="docutils literal"><span class="pre">Map.name</span></code> 的方式引用模块中的名字。</p>
+<p>先来看看如何用几种不同的方式构建 <code class="docutils literal"><span class="pre">Map</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/buildmap.hs</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.Map</span> <span class="k">as</span> <span class="n">Map</span>
+
+<span class="c1">-- Functions to generate a Map that represents an association list</span>
+<span class="c1">-- as a map</span>
+
+<span class="nf">al</span> <span class="ow">=</span> <span class="p">[(</span><span class="mi">1</span><span class="p">,</span> <span class="s">&quot;one&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s">&quot;two&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s">&quot;three&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s">&quot;four&quot;</span><span class="p">)]</span>
+
+<span class="c1">-- Create a map representation of &#39;al&#39; by converting the association </span>
+<span class="c1">-- list using Map.fromList</span>
+<span class="nf">mapFromAL</span> <span class="ow">=</span>
+    <span class="kt">Map</span><span class="o">.</span><span class="n">fromList</span> <span class="n">al</span>
+
+<span class="c1">-- Create a map representation of &#39;al&#39; by doing a fold</span>
+<span class="nf">mapFold</span> <span class="ow">=</span> 
+    <span class="n">foldl</span> <span class="p">(</span><span class="nf">\</span><span class="n">map</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Map</span><span class="o">.</span><span class="n">insert</span> <span class="n">k</span> <span class="n">v</span> <span class="n">map</span><span class="p">)</span> <span class="kt">Map</span><span class="o">.</span><span class="n">empty</span> <span class="n">al</span>
+
+<span class="c1">-- Manually create a map with the elements of &#39;al&#39; in it</span>
+<span class="nf">mapManual</span> <span class="ow">=</span>
+    <span class="kt">Map</span><span class="o">.</span><span class="n">insert</span> <span class="mi">2</span> <span class="s">&quot;two&quot;</span> <span class="o">.</span>
+    <span class="kt">Map</span><span class="o">.</span><span class="n">insert</span> <span class="mi">4</span> <span class="s">&quot;four&quot;</span> <span class="o">.</span>
+    <span class="kt">Map</span><span class="o">.</span><span class="n">insert</span> <span class="mi">1</span> <span class="s">&quot;one&quot;</span> <span class="o">.</span>
+    <span class="kt">Map</span><span class="o">.</span><span class="n">insert</span> <span class="mi">3</span> <span class="s">&quot;three&quot;</span> <span class="o">$</span> <span class="kt">Map</span><span class="o">.</span><span class="n">empty</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">Map.insert</span></code> 函数处理数据的方式非常『 Haskell 化』：它返回经过函数应用的输入数据的副本。这种处理数据的方式在操作多个 <code class="docutils literal"><span class="pre">Map</span></code> 时非常有用，它意味着你可以像前面代码中 <code class="docutils literal"><span class="pre">mapFold</span></code> 那样使用 <code class="docutils literal"><span class="pre">fold</span></code> 来构建一个 <code class="docutils literal"><span class="pre">Map</span></code> ，又或者像 <code class="docutils literal"><span class="pre">mapManual</span></code> 那样，串连起多个 <code class="docutils literal"><span class="pre">Map.insert</span></code> 调用。</p>
+<p>[译注：这里说『 Haskell 化』实际上就是『函数式化』，对于函数式语言来说，最常见的函数处理方式是接受一个输入，然后返回一个输出，输出是另一个独立的值，且原输入不会被修改。]</p>
+<p>现在，到 ghci 中验证一下是否所有定义都如我们所预期的那样工作：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="n">buildmap</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">buildmap</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">al</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">array</span><span class="o">-</span><span class="mf">0.4</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">deepseq</span><span class="o">-</span><span class="mf">1.3</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">containers</span><span class="o">-</span><span class="mf">0.4</span><span class="o">.</span><span class="mf">2.1</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="s">&quot;one&quot;</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="s">&quot;two&quot;</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="s">&quot;three&quot;</span><span class="p">),(</span><span class="mi">4</span><span class="p">,</span><span class="s">&quot;four&quot;</span><span class="p">)]</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">mapFromAL</span>
+<span class="nf">fromList</span> <span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="s">&quot;one&quot;</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="s">&quot;two&quot;</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="s">&quot;three&quot;</span><span class="p">),(</span><span class="mi">4</span><span class="p">,</span><span class="s">&quot;four&quot;</span><span class="p">)]</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">mapFold</span>
+<span class="nf">fromList</span> <span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="s">&quot;one&quot;</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="s">&quot;two&quot;</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="s">&quot;three&quot;</span><span class="p">),(</span><span class="mi">4</span><span class="p">,</span><span class="s">&quot;four&quot;</span><span class="p">)]</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">mapManual</span>
+<span class="nf">fromList</span> <span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="s">&quot;one&quot;</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="s">&quot;two&quot;</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="s">&quot;three&quot;</span><span class="p">),(</span><span class="mi">4</span><span class="p">,</span><span class="s">&quot;four&quot;</span><span class="p">)]</span>
+</pre></div>
+</div>
+<p>注意， <code class="docutils literal"><span class="pre">Map</span></code> 并不保证它的输出排列和原本的输入排列一致，对比 <code class="docutils literal"><span class="pre">mapManual</span></code> 的输入和输出可以看出这一点。</p>
+<p><code class="docutils literal"><span class="pre">Map</span></code> 的操作方式和关联列表类似。 <code class="docutils literal"><span class="pre">Data.Map</span></code> 模块提供了一组函数，用于增删 <code class="docutils literal"><span class="pre">Map</span></code> 元素，对 <code class="docutils literal"><span class="pre">Map</span></code> 进行过滤、修改和 fold ，以及在 <code class="docutils literal"><span class="pre">Map</span></code> 和关联列表之间进行转换。 <code class="docutils literal"><span class="pre">Data.Map</span></code> 模块本身的文档非常优秀，因此我们在这里不会详细讲解每个函数，而是在本章的后续内容中，通过例子来介绍这些概念。</p>
+</div>
+<div class="section" id="id3">
+<h2>函数也是数据<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<p>Haskell 语言的威力部分在于它可以让我们方便地创建并操作函数。</p>
+<p>以下示例展示了怎样将函数保存到记录的域中：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/funcrecs.hs</span>
+
+<span class="c1">-- Our usual CustomColor type to play with</span>
+<span class="kr">data</span> <span class="kt">CustomColor</span> <span class="ow">=</span>
+    <span class="kt">CustomColor</span> <span class="p">{</span><span class="n">red</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>
+                 <span class="n">green</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>
+                 <span class="n">blue</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">}</span>
+    <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Show</span><span class="p">,</span> <span class="kt">Read</span><span class="p">)</span>
+
+<span class="c1">-- A new type that stores a name and a function.</span>
+<span class="c1">-- The function takes an Int, applies some computation to it,</span>
+<span class="c1">-- and returns an Int along with a CustomColor</span>
+<span class="kr">data</span> <span class="kt">FuncRec</span> <span class="ow">=</span>
+    <span class="kt">FuncRec</span> <span class="p">{</span><span class="n">name</span> <span class="ow">::</span> <span class="kt">String</span><span class="p">,</span>
+             <span class="n">colorCalc</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="kt">CustomColor</span><span class="p">,</span> <span class="kt">Int</span><span class="p">)}</span>
+
+<span class="nf">plus5func</span> <span class="n">color</span> <span class="n">x</span> <span class="ow">=</span> <span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">x</span> <span class="o">+</span> <span class="mi">5</span><span class="p">)</span>
+
+<span class="nf">purple</span> <span class="ow">=</span> <span class="kt">CustomColor</span> <span class="mi">255</span> <span class="mi">0</span> <span class="mi">255</span>
+
+<span class="nf">plus5</span> <span class="ow">=</span> <span class="kt">FuncRec</span> <span class="p">{</span><span class="n">name</span> <span class="ow">=</span> <span class="s">&quot;plus5&quot;</span><span class="p">,</span> <span class="n">colorCalc</span> <span class="ow">=</span> <span class="n">plus5func</span> <span class="n">purple</span><span class="p">}</span>
+<span class="nf">always0</span> <span class="ow">=</span> <span class="kt">FuncRec</span> <span class="p">{</span><span class="n">name</span> <span class="ow">=</span> <span class="s">&quot;always0&quot;</span><span class="p">,</span> <span class="n">colorCalc</span> <span class="ow">=</span> <span class="nf">\</span><span class="kr">_</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">purple</span><span class="p">,</span> <span class="mi">0</span><span class="p">)}</span>
+</pre></div>
+</div>
+<p>注意 <code class="docutils literal"><span class="pre">colorCalc</span></code> 域的类型：它是一个函数，接受一个 <code class="docutils literal"><span class="pre">Int</span></code> 类型值作为参数，并返回一个 <code class="docutils literal"><span class="pre">(CustomColor,</span> <span class="pre">Int)</span></code> 元组。</p>
+<p>我们创建了两个 <code class="docutils literal"><span class="pre">FuncRec</span></code> 记录： <code class="docutils literal"><span class="pre">plus5</span></code> 和 <code class="docutils literal"><span class="pre">always0</span></code> ，这两个记录的 <code class="docutils literal"><span class="pre">colorCalc</span></code> 域都总是返回紫色（purple）。 <code class="docutils literal"><span class="pre">FuncRec</span></code> 自身并没有域去保存所使用的颜色，颜色的值被保存在函数当中 —— 我们称这种用法为<em>闭包</em>。</p>
+<p>以下是示例代码：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="n">funcrecs</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">funcrecs</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">plus5</span>
+<span class="nf">plus5</span> <span class="ow">::</span> <span class="kt">FuncRec</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">name</span> <span class="n">plus5</span>
+<span class="s">&quot;plus5&quot;</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">colorCalc</span> <span class="n">plus5</span>
+<span class="nf">colorCalc</span> <span class="n">plus5</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="kt">CustomColor</span><span class="p">,</span> <span class="kt">Int</span><span class="p">)</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">colorCalc</span> <span class="n">plus5</span><span class="p">)</span> <span class="mi">7</span>
+<span class="p">(</span><span class="kt">CustomColor</span> <span class="p">{</span><span class="n">red</span> <span class="ow">=</span> <span class="mi">255</span><span class="p">,</span> <span class="n">green</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">blue</span> <span class="ow">=</span> <span class="mi">255</span><span class="p">},</span><span class="mi">12</span><span class="p">)</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">colorCalc</span> <span class="n">always0</span>
+<span class="nf">colorCalc</span> <span class="n">always0</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="kt">CustomColor</span><span class="p">,</span> <span class="kt">Int</span><span class="p">)</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">colorCalc</span> <span class="n">always0</span><span class="p">)</span> <span class="mi">7</span>
+<span class="p">(</span><span class="kt">CustomColor</span> <span class="p">{</span><span class="n">red</span> <span class="ow">=</span> <span class="mi">255</span><span class="p">,</span> <span class="n">green</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">blue</span> <span class="ow">=</span> <span class="mi">255</span><span class="p">},</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>上面的程序工作得很好，但我们还想做一些更有趣的事，比如说，在多个域中使用同一段数据。可以使用一个类型构造函数来做到这一点：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/funcrecs2.hs</span>
+<span class="kr">data</span> <span class="kt">FuncRec</span> <span class="ow">=</span>
+    <span class="kt">FuncRec</span> <span class="p">{</span><span class="n">name</span> <span class="ow">::</span> <span class="kt">String</span><span class="p">,</span>
+             <span class="n">calc</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Int</span><span class="p">,</span>
+             <span class="n">namedCalc</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="kt">String</span><span class="p">,</span> <span class="kt">Int</span><span class="p">)}</span>
+
+<span class="nf">mkFuncRec</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Int</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">FuncRec</span>
+<span class="nf">mkFuncRec</span> <span class="n">name</span> <span class="n">calcfunc</span> <span class="ow">=</span>
+    <span class="kt">FuncRec</span> <span class="p">{</span><span class="n">name</span> <span class="ow">=</span> <span class="n">name</span><span class="p">,</span>
+             <span class="n">calc</span> <span class="ow">=</span> <span class="n">calcfunc</span><span class="p">,</span>
+             <span class="n">namedCalc</span> <span class="ow">=</span> <span class="nf">\</span><span class="n">x</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">calcfunc</span> <span class="n">x</span><span class="p">)}</span>
+
+<span class="nf">plus5</span> <span class="ow">=</span> <span class="n">mkFuncRec</span> <span class="s">&quot;plus5&quot;</span> <span class="p">(</span><span class="o">+</span> <span class="mi">5</span><span class="p">)</span>
+<span class="nf">always0</span> <span class="ow">=</span> <span class="n">mkFuncRec</span> <span class="s">&quot;always0&quot;</span> <span class="p">(</span><span class="nf">\</span><span class="kr">_</span> <span class="ow">-&gt;</span> <span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">mkFuncRecs</span></code> 函数接受一个字符串和一个函数作为参数，返回一个新的 <code class="docutils literal"><span class="pre">FuncRec</span></code> 记录。以下是对 <code class="docutils literal"><span class="pre">mkFuncRecs</span></code> 函数的测试：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="n">funcrecs2</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">funcrecs2</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">plus5</span>
+<span class="nf">plus5</span> <span class="ow">::</span> <span class="kt">FuncRec</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">name</span> <span class="n">plus5</span>
+<span class="s">&quot;plus5&quot;</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">calc</span> <span class="n">plus5</span><span class="p">)</span> <span class="mi">5</span>
+<span class="mi">10</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">namedCalc</span> <span class="n">plus5</span><span class="p">)</span> <span class="mi">5</span>
+<span class="p">(</span><span class="s">&quot;plus5&quot;</span><span class="p">,</span><span class="mi">10</span><span class="p">)</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">plus5a</span> <span class="ow">=</span> <span class="n">plus5</span> <span class="p">{</span><span class="n">name</span> <span class="ow">=</span> <span class="s">&quot;PLUS5A&quot;</span><span class="p">}</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">name</span> <span class="n">plus5a</span>
+<span class="s">&quot;PLUS5A&quot;</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">namedCalc</span> <span class="n">plus5a</span><span class="p">)</span> <span class="mi">5</span>
+<span class="p">(</span><span class="s">&quot;plus5&quot;</span><span class="p">,</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>注意 <code class="docutils literal"><span class="pre">plus5a</span></code> 的创建过程：我们改变了 <code class="docutils literal"><span class="pre">plus5</span></code> 的 <code class="docutils literal"><span class="pre">name</span></code> 域，但没有修改它的 <code class="docutils literal"><span class="pre">namedCalc</span></code> 域。这就是为什么调用 <code class="docutils literal"><span class="pre">name</span></code> 会返回新名字，而 <code class="docutils literal"><span class="pre">namedCalc</span></code> 依然返回原本使用 <code class="docutils literal"><span class="pre">mkFuncRecs</span></code> 创建时设置的名字 —— 除非我们显式地修改域，否则它们不会被改变。</p>
+</div>
+<div class="section" id="etc-password">
+<h2>扩展示例： /etc/password<a class="headerlink" href="#etc-password" title="Permalink to this headline">¶</a></h2>
+<p>以下是一个扩展示例，它展示了几种不同的数据结构的用法，根据 <code class="docutils literal"><span class="pre">/etc/passwd</span></code> 文件的格式，程序处理并保存它的实体（entry）：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/passwdmap.hs</span>
+<span class="kr">import</span> <span class="nn">Data.List</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.Map</span> <span class="k">as</span> <span class="n">Map</span>
+<span class="kr">import</span> <span class="nn">System.IO</span>
+<span class="kr">import</span> <span class="nn">Text.Printf</span><span class="p">(</span><span class="n">printf</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Environment</span><span class="p">(</span><span class="n">getArgs</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Exit</span>
+<span class="kr">import</span> <span class="nn">Control.Monad</span><span class="p">(</span><span class="n">when</span><span class="p">)</span>
+
+<span class="cm">{- | The primary piece of data this program will store.</span>
+<span class="cm">   It represents the fields in a POSIX /etc/passwd file -}</span>
+<span class="kr">data</span> <span class="kt">PasswdEntry</span> <span class="ow">=</span> <span class="kt">PasswdEntry</span> <span class="p">{</span>
+    <span class="n">userName</span> <span class="ow">::</span> <span class="kt">String</span><span class="p">,</span>
+    <span class="n">password</span> <span class="ow">::</span> <span class="kt">String</span><span class="p">,</span>
+    <span class="n">uid</span> <span class="ow">::</span> <span class="kt">Integer</span><span class="p">,</span>
+    <span class="n">gid</span> <span class="ow">::</span> <span class="kt">Integer</span><span class="p">,</span>
+    <span class="n">gecos</span> <span class="ow">::</span> <span class="kt">String</span><span class="p">,</span>
+    <span class="n">homeDir</span> <span class="ow">::</span> <span class="kt">String</span><span class="p">,</span>
+    <span class="n">shell</span> <span class="ow">::</span> <span class="kt">String</span><span class="p">}</span>
+    <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">)</span>
+
+<span class="cm">{- | Define how we get data to a &#39;PasswdEntry&#39;. -}</span>
+<span class="kr">instance</span> <span class="kt">Show</span> <span class="kt">PasswdEntry</span> <span class="kr">where</span>
+    <span class="n">show</span> <span class="n">pe</span> <span class="ow">=</span> <span class="n">printf</span> <span class="s">&quot;%s:%s:%d:%d:%s:%s:%s&quot;</span> 
+                <span class="p">(</span><span class="n">userName</span> <span class="n">pe</span><span class="p">)</span> <span class="p">(</span><span class="n">password</span> <span class="n">pe</span><span class="p">)</span> <span class="p">(</span><span class="n">uid</span> <span class="n">pe</span><span class="p">)</span> <span class="p">(</span><span class="n">gid</span> <span class="n">pe</span><span class="p">)</span>
+                <span class="p">(</span><span class="n">gecos</span> <span class="n">pe</span><span class="p">)</span> <span class="p">(</span><span class="n">homeDir</span> <span class="n">pe</span><span class="p">)</span> <span class="p">(</span><span class="n">shell</span> <span class="n">pe</span><span class="p">)</span>
+
+<span class="cm">{- | Converting data back out of a &#39;PasswdEntry&#39;. -}</span>
+<span class="kr">instance</span> <span class="kt">Read</span> <span class="kt">PasswdEntry</span> <span class="kr">where</span>
+    <span class="n">readsPrec</span> <span class="kr">_</span> <span class="n">value</span> <span class="ow">=</span>
+        <span class="kr">case</span> <span class="n">split</span> <span class="sc">&#39;:&#39;</span> <span class="n">value</span> <span class="kr">of</span>
+             <span class="p">[</span><span class="n">f1</span><span class="p">,</span> <span class="n">f2</span><span class="p">,</span> <span class="n">f3</span><span class="p">,</span> <span class="n">f4</span><span class="p">,</span> <span class="n">f5</span><span class="p">,</span> <span class="n">f6</span><span class="p">,</span> <span class="n">f7</span><span class="p">]</span> <span class="ow">-&gt;</span>
+                 <span class="c1">-- Generate a &#39;PasswdEntry&#39; the shorthand way:</span>
+                 <span class="c1">-- using the positional fields.  We use &#39;read&#39; to convert</span>
+                 <span class="c1">-- the numeric fields to Integers.</span>
+                 <span class="p">[(</span><span class="kt">PasswdEntry</span> <span class="n">f1</span> <span class="n">f2</span> <span class="p">(</span><span class="n">read</span> <span class="n">f3</span><span class="p">)</span> <span class="p">(</span><span class="n">read</span> <span class="n">f4</span><span class="p">)</span> <span class="n">f5</span> <span class="n">f6</span> <span class="n">f7</span><span class="p">,</span> <span class="kt">[]</span><span class="p">)]</span>
+             <span class="n">x</span> <span class="ow">-&gt;</span> <span class="ne">error</span> <span class="o">$</span> <span class="s">&quot;Invalid number of fields in input: &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">x</span>
+        <span class="kr">where</span> 
+        <span class="cm">{- | Takes a delimiter and a list.  Break up the list based on the</span>
+<span class="cm">        -  delimiter. -}</span>
+        <span class="n">split</span> <span class="ow">::</span> <span class="kt">Eq</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[[</span><span class="n">a</span><span class="p">]]</span>
+
+        <span class="c1">-- If the input is empty, the result is a list of empty lists.</span>
+        <span class="n">split</span> <span class="kr">_</span> <span class="kt">[]</span> <span class="ow">=</span> <span class="p">[</span><span class="kt">[]</span><span class="p">]</span>
+        <span class="n">split</span> <span class="n">delim</span> <span class="n">str</span> <span class="ow">=</span>
+            <span class="kr">let</span> <span class="c1">-- Find the part of the list before delim and put it in</span>
+                <span class="c1">-- &quot;before&quot;.  The rest of the list, including the leading </span>
+                <span class="c1">-- delim, goes in &quot;remainder&quot;.</span>
+                <span class="p">(</span><span class="n">before</span><span class="p">,</span> <span class="n">remainder</span><span class="p">)</span> <span class="ow">=</span> <span class="n">span</span> <span class="p">(</span><span class="o">/=</span> <span class="n">delim</span><span class="p">)</span> <span class="n">str</span>
+                <span class="kr">in</span>
+                <span class="n">before</span> <span class="kt">:</span> <span class="kr">case</span> <span class="n">remainder</span> <span class="kr">of</span>
+                              <span class="kt">[]</span> <span class="ow">-&gt;</span> <span class="kt">[]</span>
+                              <span class="n">x</span> <span class="ow">-&gt;</span> <span class="c1">-- If there is more data to process,</span>
+                                   <span class="c1">-- call split recursively to process it</span>
+                                   <span class="n">split</span> <span class="n">delim</span> <span class="p">(</span><span class="n">tail</span> <span class="n">x</span><span class="p">)</span>
+
+<span class="c1">-- Convenience aliases; we&#39;ll have two maps: one from UID to entries</span>
+<span class="c1">-- and the other from username to entries</span>
+<span class="kr">type</span> <span class="kt">UIDMap</span> <span class="ow">=</span> <span class="kt">Map</span><span class="o">.</span><span class="kt">Map</span> <span class="kt">Integer</span> <span class="kt">PasswdEntry</span>
+<span class="kr">type</span> <span class="kt">UserMap</span> <span class="ow">=</span> <span class="kt">Map</span><span class="o">.</span><span class="kt">Map</span> <span class="kt">String</span> <span class="kt">PasswdEntry</span>
+
+<span class="cm">{- | Converts input data to maps.  Returns UID and User maps. -}</span>
+<span class="nf">inputToMaps</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="kt">UIDMap</span><span class="p">,</span> <span class="kt">UserMap</span><span class="p">)</span>
+<span class="nf">inputToMaps</span> <span class="n">inp</span> <span class="ow">=</span>
+    <span class="p">(</span><span class="n">uidmap</span><span class="p">,</span> <span class="n">usermap</span><span class="p">)</span>
+    <span class="kr">where</span>
+    <span class="c1">-- fromList converts a [(key, value)] list into a Map</span>
+    <span class="n">uidmap</span> <span class="ow">=</span> <span class="kt">Map</span><span class="o">.</span><span class="n">fromList</span> <span class="o">.</span> <span class="n">map</span> <span class="p">(</span><span class="nf">\</span><span class="n">pe</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">uid</span> <span class="n">pe</span><span class="p">,</span> <span class="n">pe</span><span class="p">))</span> <span class="o">$</span> <span class="n">entries</span>
+    <span class="n">usermap</span> <span class="ow">=</span> <span class="kt">Map</span><span class="o">.</span><span class="n">fromList</span> <span class="o">.</span> 
+              <span class="n">map</span> <span class="p">(</span><span class="nf">\</span><span class="n">pe</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">userName</span> <span class="n">pe</span><span class="p">,</span> <span class="n">pe</span><span class="p">))</span> <span class="o">$</span> <span class="n">entries</span>
+    <span class="c1">-- Convert the input String to [PasswdEntry]</span>
+    <span class="n">entries</span> <span class="ow">=</span> <span class="n">map</span> <span class="n">read</span> <span class="p">(</span><span class="n">lines</span> <span class="n">inp</span><span class="p">)</span>
+
+<span class="nf">main</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="c1">-- Load the command-line arguments</span>
+    <span class="n">args</span> <span class="ow">&lt;-</span> <span class="n">getArgs</span>
+
+    <span class="c1">-- If we don&#39;t have the right number of args,</span>
+    <span class="c1">-- give an error and abort</span>
+
+    <span class="n">when</span> <span class="p">(</span><span class="n">length</span> <span class="n">args</span> <span class="o">/=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">$</span> <span class="kr">do</span>
+        <span class="n">putStrLn</span> <span class="s">&quot;Syntax: passwdmap filename&quot;</span>
+        <span class="n">exitFailure</span>
+
+    <span class="c1">-- Read the file lazily</span>
+    <span class="n">content</span> <span class="ow">&lt;-</span> <span class="n">readFile</span> <span class="p">(</span><span class="n">head</span> <span class="n">args</span><span class="p">)</span>
+    <span class="kr">let</span> <span class="n">maps</span> <span class="ow">=</span> <span class="n">inputToMaps</span> <span class="n">content</span>
+    <span class="n">mainMenu</span> <span class="n">maps</span>
+
+<span class="nf">mainMenu</span> <span class="n">maps</span><span class="o">@</span><span class="p">(</span><span class="n">uidmap</span><span class="p">,</span> <span class="n">usermap</span><span class="p">)</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">putStr</span> <span class="n">optionText</span>
+    <span class="n">hFlush</span> <span class="n">stdout</span>
+    <span class="n">sel</span> <span class="ow">&lt;-</span> <span class="n">getLine</span>
+    <span class="c1">-- See what they want to do.  For every option except 4,</span>
+    <span class="c1">-- return them to the main menu afterwards by calling</span>
+    <span class="c1">-- mainMenu recursively</span>
+    <span class="kr">case</span> <span class="n">sel</span> <span class="kr">of</span>
+         <span class="s">&quot;1&quot;</span> <span class="ow">-&gt;</span> <span class="n">lookupUserName</span> <span class="o">&gt;&gt;</span> <span class="n">mainMenu</span> <span class="n">maps</span>
+         <span class="s">&quot;2&quot;</span> <span class="ow">-&gt;</span> <span class="n">lookupUID</span> <span class="o">&gt;&gt;</span> <span class="n">mainMenu</span> <span class="n">maps</span>
+         <span class="s">&quot;3&quot;</span> <span class="ow">-&gt;</span> <span class="n">displayFile</span> <span class="o">&gt;&gt;</span> <span class="n">mainMenu</span> <span class="n">maps</span>
+         <span class="s">&quot;4&quot;</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="nb">()</span>
+         <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="n">putStrLn</span> <span class="s">&quot;Invalid selection&quot;</span> <span class="o">&gt;&gt;</span> <span class="n">mainMenu</span> <span class="n">maps</span>
+
+    <span class="kr">where</span> 
+    <span class="n">lookupUserName</span> <span class="ow">=</span> <span class="kr">do</span>
+        <span class="n">putStrLn</span> <span class="s">&quot;Username: &quot;</span>
+        <span class="n">username</span> <span class="ow">&lt;-</span> <span class="n">getLine</span>
+        <span class="kr">case</span> <span class="kt">Map</span><span class="o">.</span><span class="n">lookup</span> <span class="n">username</span> <span class="n">usermap</span> <span class="kr">of</span>
+             <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">putStrLn</span> <span class="s">&quot;Not found.&quot;</span>
+             <span class="kt">Just</span> <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">print</span> <span class="n">x</span>
+    <span class="n">lookupUID</span> <span class="ow">=</span> <span class="kr">do</span>
+        <span class="n">putStrLn</span> <span class="s">&quot;UID: &quot;</span>
+        <span class="n">uidstring</span> <span class="ow">&lt;-</span> <span class="n">getLine</span>
+        <span class="kr">case</span> <span class="kt">Map</span><span class="o">.</span><span class="n">lookup</span> <span class="p">(</span><span class="n">read</span> <span class="n">uidstring</span><span class="p">)</span> <span class="n">uidmap</span> <span class="kr">of</span>
+             <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">putStrLn</span> <span class="s">&quot;Not found.&quot;</span>
+             <span class="kt">Just</span> <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">print</span> <span class="n">x</span>
+    <span class="n">displayFile</span> <span class="ow">=</span> 
+        <span class="n">putStr</span> <span class="o">.</span> <span class="n">unlines</span> <span class="o">.</span> <span class="n">map</span> <span class="p">(</span><span class="n">show</span> <span class="o">.</span> <span class="n">snd</span><span class="p">)</span> <span class="o">.</span> <span class="kt">Map</span><span class="o">.</span><span class="n">toList</span> <span class="o">$</span> <span class="n">uidmap</span>
+    <span class="n">optionText</span> <span class="ow">=</span> 
+          <span class="s">&quot;</span><span class="se">\n</span><span class="s">passwdmap options:</span><span class="se">\n\</span>
+<span class="se">           \\n\</span>
+<span class="se">           \</span><span class="s">1   Look up a user name</span><span class="se">\n\</span>
+<span class="se">           \</span><span class="s">2   Look up a UID</span><span class="se">\n\</span>
+<span class="se">           \</span><span class="s">3   Display entire file</span><span class="se">\n\</span>
+<span class="se">           \</span><span class="s">4   Quit</span><span class="se">\n\n\</span>
+<span class="se">           \</span><span class="s">Your selection: &quot;</span>
+</pre></div>
+</div>
+<p>示例程序维持两个 <code class="docutils literal"><span class="pre">Map</span></code> ：一个从用户名映射到 <code class="docutils literal"><span class="pre">PasswdEntry</span></code> ，另一个从 UID 映射到 <code class="docutils literal"><span class="pre">PasswdEntry</span></code> 。有数据库使用经验的人可以将它们看作是两个不同数据域的索引。</p>
+<p>根据 <code class="docutils literal"><span class="pre">/etc/passwd</span></code> 文件的格式， <code class="docutils literal"><span class="pre">PasswdEntry</span></code> 的 <code class="docutils literal"><span class="pre">Show</span></code> 和 <code class="docutils literal"><span class="pre">Read</span></code> 实例分别用于显示（display）和处理（parse）工作。</p>
+</div>
+<div class="section" id="numeric-types">
+<span id="extended-example-numeric-types"></span><h2>扩展示例：数字类型（Numeric Types）<a class="headerlink" href="#numeric-types" title="Permalink to this headline">¶</a></h2>
+<p>我们已经讲过 Haskell 的类型系统有多强大，表达能力有多强。我们已经讲过很多利用这种能力的方法。
+现在我们来举一个实际的例子看看。</p>
+<p>在 <a class="reference internal" href="6.html#numeric-types"><span>数值类型</span></a> 一节中，我们展示了 Haskell 的数字类型类。现在，我们来定义一些类，然后用数字类型类把它们和 Haskell 的基本数学结合起来，看看能得到什么。</p>
+<p>我们先来想想我们想用这些新类型在 <strong>ghci</strong> 里干什么。首先，一个不错的选择是把数学表达式转成字符串，并确保它显示了正确的优先级。我们可以写一个 <code class="docutils literal"><span class="pre">prettyShow</span></code> 函数来实现。稍后我们就告诉你怎么写，先来看看怎么用它。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="n">num</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">num</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="mi">5</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">*</span> <span class="mi">3</span>
+<span class="mi">8</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">prettyShow</span> <span class="o">$</span> <span class="mi">5</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">*</span> <span class="mi">3</span>
+<span class="s">&quot;5+(1*3)&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">prettyShow</span> <span class="o">$</span> <span class="mi">5</span> <span class="o">*</span> <span class="mi">1</span> <span class="o">+</span> <span class="mi">3</span>
+<span class="s">&quot;(5*1)+3&quot;</span>
+</pre></div>
+</div>
+<p>看起来不错，但还不够聪明。我们可以很容易地把 <code class="docutils literal"><span class="pre">1</span> <span class="pre">*</span></code> 从表达式里拿掉。写个函数来简化怎么样？</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">prettyShow</span> <span class="o">$</span> <span class="n">simplify</span> <span class="o">$</span> <span class="mi">5</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">*</span> <span class="mi">3</span>
+<span class="s">&quot;5+3&quot;</span>
+</pre></div>
+</div>
+<p>把数学表达式转成逆波兰表达式（RPN）怎么样？RPN 是一种后缀表示法，它不要求括号，常见于 HP 计算器。
+RPN 是一种基于栈的表达式。我们把数字放进栈里，当碰到操作符时，栈顶的数字出栈，结果再被放回栈里。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">rpnShow</span> <span class="o">$</span> <span class="mi">5</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">*</span> <span class="mi">3</span>
+<span class="s">&quot;5 1 3 * +&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">rpnShow</span> <span class="o">$</span> <span class="n">simplify</span> <span class="o">$</span> <span class="mi">5</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">*</span> <span class="mi">3</span>
+<span class="s">&quot;5 3 +&quot;</span>
+</pre></div>
+</div>
+<p>能表示含有未知符号的简单表达式也很不错。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">prettyShow</span> <span class="o">$</span> <span class="mi">5</span> <span class="o">+</span> <span class="p">(</span><span class="kt">Symbol</span> <span class="s">&quot;x&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="mi">3</span>
+<span class="s">&quot;5+(x*3)&quot;</span>
+</pre></div>
+</div>
+<p>跟数字打交道时，单位常常很重要。例如，当你看见数字5时，它是5米，5英尺，还是5字节？
+当然，当你用5米除以2秒时，系统应该推出来正确的单位。而且，它应该阻止你用2秒加上5米。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="mi">5</span> <span class="o">/</span> <span class="mi">2</span>
+<span class="mf">2.5</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">units</span> <span class="mi">5</span> <span class="s">&quot;m&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">units</span> <span class="mi">2</span> <span class="s">&quot;s&quot;</span><span class="p">)</span>
+<span class="mf">2.5</span><span class="n">_m</span><span class="o">/</span><span class="n">s</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">units</span> <span class="mi">5</span> <span class="s">&quot;m&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">units</span> <span class="mi">2</span> <span class="s">&quot;s&quot;</span><span class="p">)</span>
+<span class="o">***</span> <span class="kt">Exception:</span> <span class="kt">Mis</span><span class="o">-</span><span class="n">matched</span> <span class="n">units</span> <span class="kr">in</span> <span class="n">add</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">units</span> <span class="mi">5</span> <span class="s">&quot;m&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">units</span> <span class="mi">2</span> <span class="s">&quot;m&quot;</span><span class="p">)</span>
+<span class="mi">7</span><span class="n">_m</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">units</span> <span class="mi">5</span> <span class="s">&quot;m&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+<span class="mf">2.5</span><span class="n">_m</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="mi">10</span> <span class="o">*</span> <span class="p">(</span><span class="n">units</span> <span class="mi">5</span> <span class="s">&quot;m&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">units</span> <span class="mi">2</span> <span class="s">&quot;s&quot;</span><span class="p">)</span>
+<span class="mf">25.0</span><span class="n">_m</span><span class="o">/</span><span class="n">s</span>
+</pre></div>
+</div>
+<p>如果我们定义的表达式或函数对所有数字都合法，那我们就应该能计算出结果，或者把表达式转成字符串。
+例如，如果我们定义 <code class="docutils literal"><span class="pre">test</span></code> 的类型为 <code class="docutils literal"><span class="pre">Num</span> <span class="pre">a</span> <span class="pre">=&gt;</span> <span class="pre">a</span></code>，并令 <code class="docutils literal"><span class="pre">test</span> <span class="pre">=</span> <span class="pre">2</span> <span class="pre">*</span> <span class="pre">5</span> <span class="pre">+</span> <span class="pre">3</span></code>，那我们应该可以：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">test</span>
+<span class="mi">13</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">rpnShow</span> <span class="n">test</span>
+<span class="s">&quot;2 5 * 3 +&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">prettyShow</span> <span class="n">test</span>
+<span class="s">&quot;(2*5)+3&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">test</span> <span class="o">+</span> <span class="mi">5</span>
+<span class="mi">18</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">prettyShow</span> <span class="p">(</span><span class="n">test</span> <span class="o">+</span> <span class="mi">5</span><span class="p">)</span>
+<span class="s">&quot;((2*5)+3)+5&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">rpnShow</span> <span class="p">(</span><span class="n">test</span> <span class="o">+</span> <span class="mi">5</span><span class="p">)</span>
+<span class="s">&quot;2 5 * 3 + 5 +&quot;</span>
+</pre></div>
+</div>
+<p>既然我们能处理单位，那我们也应该能处理一些基本的三角函数，其中很多操作都是关于角的。让我们确保角度和弧度都能被处理。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">sin</span> <span class="p">(</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
+<span class="mf">1.0</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">sin</span> <span class="p">(</span><span class="n">units</span> <span class="p">(</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="s">&quot;rad&quot;</span><span class="p">)</span>
+<span class="mf">1.0</span><span class="n">_1</span><span class="o">.</span><span class="mi">0</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">sin</span> <span class="p">(</span><span class="n">units</span> <span class="mi">90</span> <span class="s">&quot;deg&quot;</span><span class="p">)</span>
+<span class="mf">1.0</span><span class="n">_1</span><span class="o">.</span><span class="mi">0</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">units</span> <span class="mi">50</span> <span class="s">&quot;m&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="n">sin</span> <span class="p">(</span><span class="n">units</span> <span class="mi">90</span> <span class="s">&quot;deg&quot;</span><span class="p">)</span>
+<span class="mf">50.0</span><span class="n">_m</span>
+</pre></div>
+</div>
+<p>最后，我们应该能把这些都放在一起，把不同类型的表达式混合使用。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">((</span><span class="n">units</span> <span class="mi">50</span> <span class="s">&quot;m&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="n">sin</span> <span class="p">(</span><span class="n">units</span> <span class="mi">90</span> <span class="s">&quot;deg&quot;</span><span class="p">))</span> <span class="ow">::</span> <span class="kt">Units</span> <span class="p">(</span><span class="kt">SymbolicManip</span> <span class="kt">Double</span><span class="p">)</span>
+<span class="mf">50.0</span><span class="o">*</span><span class="n">sin</span><span class="p">(((</span><span class="mf">2.0</span><span class="o">*</span><span class="n">pi</span><span class="p">)</span><span class="o">*</span><span class="mf">90.0</span><span class="p">)</span><span class="o">/</span><span class="mf">360.0</span><span class="p">)</span><span class="n">_m</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">prettyShow</span> <span class="o">$</span> <span class="n">dropUnits</span> <span class="o">$</span> <span class="p">(</span><span class="n">units</span> <span class="mi">50</span> <span class="s">&quot;m&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="n">sin</span> <span class="p">(</span><span class="n">units</span> <span class="mi">90</span> <span class="s">&quot;deg&quot;</span><span class="p">)</span>
+<span class="s">&quot;50.0*sin(((2.0*pi)*90.0)/360.0)&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">rpnShow</span> <span class="o">$</span> <span class="n">dropUnits</span> <span class="o">$</span> <span class="p">(</span><span class="n">units</span> <span class="mi">50</span> <span class="s">&quot;m&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="n">sin</span> <span class="p">(</span><span class="n">units</span> <span class="mi">90</span> <span class="s">&quot;deg&quot;</span><span class="p">)</span>
+<span class="s">&quot;50.0 2.0 pi * 90.0 * 360.0 / sin *&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">units</span> <span class="p">(</span><span class="kt">Symbol</span> <span class="s">&quot;x&quot;</span><span class="p">)</span> <span class="s">&quot;m&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="n">sin</span> <span class="p">(</span><span class="n">units</span> <span class="mi">90</span> <span class="s">&quot;deg&quot;</span><span class="p">)</span>
+<span class="nf">x</span><span class="o">*</span><span class="n">sin</span><span class="p">(((</span><span class="mf">2.0</span><span class="o">*</span><span class="n">pi</span><span class="p">)</span><span class="o">*</span><span class="mf">90.0</span><span class="p">)</span><span class="o">/</span><span class="mf">360.0</span><span class="p">)</span><span class="n">_m</span>
+</pre></div>
+</div>
+<p>你刚才看到的一切都可以用 Haskell 的类型和类型类实现。实际上，你看到的正是我们马上要实现的 <code class="docutils literal"><span class="pre">num.hs</span></code>。</p>
+<div class="section" id="first-steps">
+<span id="id4"></span><h3>第一步<a class="headerlink" href="#first-steps" title="Permalink to this headline">¶</a></h3>
+<p>我们想想怎么实现上面提到的功能。首先，用 <strong>ghci</strong> 查看一下可知，<code class="docutils literal"><span class="pre">(+)</span></code> 的类型是 <code class="docutils literal"><span class="pre">Num</span> <span class="pre">a</span> <span class="pre">=&gt;</span> <span class="pre">a</span> <span class="pre">-&gt;</span> <span class="pre">a</span> <span class="pre">-&gt;</span> <span class="pre">a</span></code>。
+如果我们想给加号实现一些自定义行为，我们就必须定义一个新类型并声明它为 <code class="docutils literal"><span class="pre">Num</span></code> 的实例。这个类型得用符号的形式来存储表达式。
+我们可以从加法操作开始。我们需要存储操作符本身、左侧以及右侧内容。左侧和右侧内容本身又可以是表达式。</p>
+<p>我们可以把表达式想象成一棵树。让我们从一些简单类型开始。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/numsimple.hs</span>
+<span class="c1">-- 我们支持的操作符</span>
+<span class="kr">data</span> <span class="kt">Op</span> <span class="ow">=</span> <span class="kt">Plus</span> <span class="o">|</span> <span class="kt">Minus</span> <span class="o">|</span> <span class="kt">Mul</span> <span class="o">|</span> <span class="kt">Div</span> <span class="o">|</span> <span class="kt">Pow</span>
+        <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+
+<span class="cm">{- 核心符号操作类型（core symbolic manipulation type） -}</span>
+<span class="kr">data</span> <span class="kt">SymbolicManip</span> <span class="n">a</span> <span class="ow">=</span>
+          <span class="kt">Number</span> <span class="n">a</span>           <span class="c1">-- Simple number, such as 5</span>
+        <span class="o">|</span> <span class="kt">Arith</span> <span class="kt">Op</span> <span class="p">(</span><span class="kt">SymbolicManip</span> <span class="n">a</span><span class="p">)</span> <span class="p">(</span><span class="kt">SymbolicManip</span> <span class="n">a</span><span class="p">)</span>
+          <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+
+<span class="cm">{- SymbolicManip 是 Num 的实例。定义 SymbolicManip 实现 Num 的函数。如(+)等。 -}</span>
+<span class="kr">instance</span> <span class="kt">Num</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Num</span> <span class="p">(</span><span class="kt">SymbolicManip</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">a</span> <span class="o">+</span> <span class="n">b</span> <span class="ow">=</span> <span class="kt">Arith</span> <span class="kt">Plus</span> <span class="n">a</span> <span class="n">b</span>
+    <span class="n">a</span> <span class="o">-</span> <span class="n">b</span> <span class="ow">=</span> <span class="kt">Arith</span> <span class="kt">Minus</span> <span class="n">a</span> <span class="n">b</span>
+    <span class="n">a</span> <span class="o">*</span> <span class="n">b</span> <span class="ow">=</span> <span class="kt">Arith</span> <span class="kt">Mul</span> <span class="n">a</span> <span class="n">b</span>
+    <span class="n">negate</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Arith</span> <span class="kt">Mul</span> <span class="p">(</span><span class="kt">Number</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span> <span class="n">a</span>
+    <span class="n">abs</span> <span class="n">a</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;abs is unimplemented&quot;</span>
+    <span class="n">signum</span> <span class="kr">_</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;signum is unimplemented&quot;</span>
+    <span class="n">fromInteger</span> <span class="n">i</span> <span class="ow">=</span> <span class="kt">Number</span> <span class="p">(</span><span class="n">fromInteger</span> <span class="n">i</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>首先我们定义了 <code class="docutils literal"><span class="pre">Op</span></code> 类型。这个类型表示我们要支持的操作。接着，我们定义了 <code class="docutils literal"><span class="pre">SymbolicManip</span> <span class="pre">a</span></code>，
+由于 <code class="docutils literal"><span class="pre">Num</span> <span class="pre">a</span></code> 约束的存在，<code class="docutils literal"><span class="pre">a</span></code> 可替换为任何 <code class="docutils literal"><span class="pre">Num</span></code> 实例。我们可以有 <code class="docutils literal"><span class="pre">SymbolicManip</span> <span class="pre">Int</span></code> 这样的具体类型。</p>
+<p><code class="docutils literal"><span class="pre">SymbolicManip</span></code> 类型可以是数字，也可以是数学运算。<code class="docutils literal"><span class="pre">Arith</span></code> 构造器是递归的，这在 Haskell 里完全合法。
+<code class="docutils literal"><span class="pre">Arith</span></code> 用一个 <code class="docutils literal"><span class="pre">Op</span></code> 和两个 <code class="docutils literal"><span class="pre">SymbolicManip</span></code> 创建了一个 <code class="docutils literal"><span class="pre">SymbolicManip</span></code>。我们来看一个例子：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="n">numsimple</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">numsimple</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">Number</span> <span class="mi">5</span>
+<span class="kt">Number</span> <span class="mi">5</span>
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="kt">Number</span> <span class="mi">5</span>
+<span class="kt">Number</span> <span class="mi">5</span> <span class="ow">::</span> <span class="kt">Num</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">SymbolicManip</span> <span class="n">a</span>
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="kt">Number</span> <span class="p">(</span><span class="mi">5</span><span class="ow">::</span><span class="kt">Int</span><span class="p">)</span>
+<span class="kt">Number</span> <span class="p">(</span><span class="mi">5</span><span class="ow">::</span><span class="kt">Int</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">SymbolicManip</span> <span class="kt">Int</span>
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">Number</span> <span class="mi">5</span> <span class="o">*</span> <span class="kt">Number</span> <span class="mi">10</span>
+<span class="kt">Arith</span> <span class="kt">Mul</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">5</span><span class="p">)</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">10</span><span class="p">)</span>
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="p">(</span><span class="mi">5</span> <span class="o">*</span> <span class="mi">10</span><span class="p">)</span><span class="ow">::</span><span class="kt">SymbolicManip</span> <span class="kt">Int</span>
+<span class="kt">Arith</span> <span class="kt">Mul</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">5</span><span class="p">)</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">10</span><span class="p">)</span>
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="p">(</span><span class="mi">5</span> <span class="o">*</span> <span class="mi">10</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span><span class="ow">::</span><span class="kt">SymbolicManip</span> <span class="kt">Int</span>
+<span class="kt">Arith</span> <span class="kt">Plus</span> <span class="p">(</span><span class="kt">Arith</span> <span class="kt">Mul</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">5</span><span class="p">)</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">10</span><span class="p">))</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>可以看到，我们已经可以表示一些简单的表达式了。注意观察 Haskell 是如何把 <code class="docutils literal"><span class="pre">5</span> <span class="pre">*</span> <span class="pre">10</span> <span class="pre">+</span> <span class="pre">2</span></code> “转换”成 <code class="docutils literal"><span class="pre">SymbolicManip</span></code> 值的，
+它甚至还正确处理了求值顺序。事实上，这并不是真正意义上的转换，因为 <code class="docutils literal"><span class="pre">SymbolicManip</span></code> 已经是一等数字（first-class number）了。
+就算 <code class="docutils literal"><span class="pre">Integer</span></code> 类型的数字字面量（numeric literals）在内部也是被包装在 <code class="docutils literal"><span class="pre">fromInteger</span></code> 里的，
+所以 <code class="docutils literal"><span class="pre">5</span></code> 作为一个 <code class="docutils literal"><span class="pre">SymbolicManip</span> <span class="pre">Int</span></code> 和作为一个 <code class="docutils literal"><span class="pre">Int</span></code> 同样有效。</p>
+<p>从这儿开始，我们的任务就简单了：扩展 <code class="docutils literal"><span class="pre">SymbolicManip</span></code>，使它能表示所有我们想要的操作；把它声明为其它数字类型类的实例；
+为 <code class="docutils literal"><span class="pre">SymbolicManip</span></code> 实现我们自己的 <code class="docutils literal"><span class="pre">Show</span></code> 实例，使这棵树在显示时更友好。</p>
+</div>
+<div class="section" id="completed-code">
+<span id="id5"></span><h3>完整代码<a class="headerlink" href="#completed-code" title="Permalink to this headline">¶</a></h3>
+<p>这里是完整的 <code class="docutils literal"><span class="pre">num.hs</span></code>，我们在本节开始的 <strong>ghci</strong> 例子中用到了它。我们来一点一点分析这段代码。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/num.hs</span>
+<span class="kr">import</span> <span class="nn">Data.List</span>
+
+<span class="c1">--------------------------------------------------</span>
+<span class="c1">-- Symbolic/units manipulation</span>
+<span class="c1">--------------------------------------------------</span>
+
+<span class="c1">-- The &quot;operators&quot; that we&#39;re going to support</span>
+<span class="kr">data</span> <span class="kt">Op</span> <span class="ow">=</span> <span class="kt">Plus</span> <span class="o">|</span> <span class="kt">Minus</span> <span class="o">|</span> <span class="kt">Mul</span> <span class="o">|</span> <span class="kt">Div</span> <span class="o">|</span> <span class="kt">Pow</span>
+        <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+
+<span class="cm">{- The core symbolic manipulation type.  It can be a simple number,</span>
+<span class="cm">a symbol, a binary arithmetic operation (such as +), or a unary</span>
+<span class="cm">arithmetic operation (such as cos)</span>
+
+<span class="cm">Notice the types of BinaryArith and UnaryArith: it&#39;s a recursive</span>
+<span class="cm">type.  So, we could represent a (+) over two SymbolicManips. -}</span>
+<span class="kr">data</span> <span class="kt">SymbolicManip</span> <span class="n">a</span> <span class="ow">=</span>
+        <span class="kt">Number</span> <span class="n">a</span>           <span class="c1">-- Simple number, such as 5</span>
+      <span class="o">|</span> <span class="kt">Symbol</span> <span class="kt">String</span>      <span class="c1">-- A symbol, such as x</span>
+      <span class="o">|</span> <span class="kt">BinaryArith</span> <span class="kt">Op</span> <span class="p">(</span><span class="kt">SymbolicManip</span> <span class="n">a</span><span class="p">)</span> <span class="p">(</span><span class="kt">SymbolicManip</span> <span class="n">a</span><span class="p">)</span>
+      <span class="o">|</span> <span class="kt">UnaryArith</span> <span class="kt">String</span> <span class="p">(</span><span class="kt">SymbolicManip</span> <span class="n">a</span><span class="p">)</span>
+        <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>我们在这段代码中定义了 <code class="docutils literal"><span class="pre">Op</span></code>，和之前我们用到的一样。我们也定义了 <code class="docutils literal"><span class="pre">SymbolicManip</span></code>，它和我们之前用到的类似。
+在这个版本中，我们开始支持一元数学操作（unary arithmetic operations）（也就是接受一个参数的操作），
+例如 <code class="docutils literal"><span class="pre">abs</span></code> 和 <code class="docutils literal"><span class="pre">cos</span></code>。接下来我们来定义自己的 <code class="docutils literal"><span class="pre">Num</span></code> 实例。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/num.hs</span>
+<span class="cm">{- SymbolicManip will be an instance of Num.  Define how the Num</span>
+<span class="cm">operations are handled over a SymbolicManip.  This will implement things</span>
+<span class="cm">like (+) for SymbolicManip. -}</span>
+<span class="kr">instance</span> <span class="kt">Num</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Num</span> <span class="p">(</span><span class="kt">SymbolicManip</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">a</span> <span class="o">+</span> <span class="n">b</span> <span class="ow">=</span> <span class="kt">BinaryArith</span> <span class="kt">Plus</span> <span class="n">a</span> <span class="n">b</span>
+    <span class="n">a</span> <span class="o">-</span> <span class="n">b</span> <span class="ow">=</span> <span class="kt">BinaryArith</span> <span class="kt">Minus</span> <span class="n">a</span> <span class="n">b</span>
+    <span class="n">a</span> <span class="o">*</span> <span class="n">b</span> <span class="ow">=</span> <span class="kt">BinaryArith</span> <span class="kt">Mul</span> <span class="n">a</span> <span class="n">b</span>
+    <span class="n">negate</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">BinaryArith</span> <span class="kt">Mul</span> <span class="p">(</span><span class="kt">Number</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span> <span class="n">a</span>
+    <span class="n">abs</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;abs&quot;</span> <span class="n">a</span>
+    <span class="n">signum</span> <span class="kr">_</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;signum is unimplemented&quot;</span>
+    <span class="n">fromInteger</span> <span class="n">i</span> <span class="ow">=</span> <span class="kt">Number</span> <span class="p">(</span><span class="n">fromInteger</span> <span class="n">i</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>非常直观，和之前的代码很像。注意之前我们不支持 <code class="docutils literal"><span class="pre">abs</span></code>，但现在可以了，因为有了 <code class="docutils literal"><span class="pre">UnaryArith</span></code>。
+接下来，我们再定义几个实例。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/num.hs</span>
+<span class="cm">{- 定义 SymbolicManip 为 Fractional 实例 -}</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Fractional</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Fractional</span> <span class="p">(</span><span class="kt">SymbolicManip</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">a</span> <span class="o">/</span> <span class="n">b</span> <span class="ow">=</span> <span class="kt">BinaryArith</span> <span class="kt">Div</span> <span class="n">a</span> <span class="n">b</span>
+    <span class="n">recip</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">BinaryArith</span> <span class="kt">Div</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">1</span><span class="p">)</span> <span class="n">a</span>
+    <span class="n">fromRational</span> <span class="n">r</span> <span class="ow">=</span> <span class="kt">Number</span> <span class="p">(</span><span class="n">fromRational</span> <span class="n">r</span><span class="p">)</span>
+
+<span class="cm">{- 定义 SymbolicManip 为 Floating 实例 -}</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Floating</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Floating</span> <span class="p">(</span><span class="kt">SymbolicManip</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">pi</span> <span class="ow">=</span> <span class="kt">Symbol</span> <span class="s">&quot;pi&quot;</span>
+    <span class="n">exp</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;exp&quot;</span> <span class="n">a</span>
+    <span class="n">log</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;log&quot;</span> <span class="n">a</span>
+    <span class="n">sqrt</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;sqrt&quot;</span> <span class="n">a</span>
+    <span class="n">a</span> <span class="o">**</span> <span class="n">b</span> <span class="ow">=</span> <span class="kt">BinaryArith</span> <span class="kt">Pow</span> <span class="n">a</span> <span class="n">b</span>
+    <span class="n">sin</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;sin&quot;</span> <span class="n">a</span>
+    <span class="n">cos</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;cos&quot;</span> <span class="n">a</span>
+    <span class="n">tan</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;tan&quot;</span> <span class="n">a</span>
+    <span class="n">asin</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;asin&quot;</span> <span class="n">a</span>
+    <span class="n">acos</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;acos&quot;</span> <span class="n">a</span>
+    <span class="n">atan</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;atan&quot;</span> <span class="n">a</span>
+    <span class="n">sinh</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;sinh&quot;</span> <span class="n">a</span>
+    <span class="n">cosh</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;cosh&quot;</span> <span class="n">a</span>
+    <span class="n">tanh</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;tanh&quot;</span> <span class="n">a</span>
+    <span class="n">asinh</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;asinh&quot;</span> <span class="n">a</span>
+    <span class="n">acosh</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;acosh&quot;</span> <span class="n">a</span>
+    <span class="n">atanh</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="s">&quot;atanh&quot;</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>这段代码直观地定义了 <code class="docutils literal"><span class="pre">Fractional</span></code> 和 <code class="docutils literal"><span class="pre">Floating</span></code> 实例。接下来，我们把表达式转换字符串。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/num.hs</span>
+<span class="cm">{- 使用常规代数表示法，把 SymbolicManip 转换为字符串 -}</span>
+<span class="nf">prettyShow</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Show</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Num</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">SymbolicManip</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+
+<span class="c1">-- 显示字符或符号</span>
+<span class="nf">prettyShow</span> <span class="p">(</span><span class="kt">Number</span> <span class="n">x</span><span class="p">)</span> <span class="ow">=</span> <span class="n">show</span> <span class="n">x</span>
+<span class="nf">prettyShow</span> <span class="p">(</span><span class="kt">Symbol</span> <span class="n">x</span><span class="p">)</span> <span class="ow">=</span> <span class="n">x</span>
+
+<span class="nf">prettyShow</span> <span class="p">(</span><span class="kt">BinaryArith</span> <span class="n">op</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=</span>
+    <span class="kr">let</span> <span class="n">pa</span> <span class="ow">=</span> <span class="n">simpleParen</span> <span class="n">a</span>
+        <span class="n">pb</span> <span class="ow">=</span> <span class="n">simpleParen</span> <span class="n">b</span>
+        <span class="n">pop</span> <span class="ow">=</span> <span class="n">op2str</span> <span class="n">op</span>
+        <span class="kr">in</span> <span class="n">pa</span> <span class="o">++</span> <span class="n">pop</span> <span class="o">++</span> <span class="n">pb</span>
+<span class="nf">prettyShow</span> <span class="p">(</span><span class="kt">UnaryArith</span> <span class="n">opstr</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=</span>
+    <span class="n">opstr</span> <span class="o">++</span> <span class="s">&quot;(&quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">a</span> <span class="o">++</span> <span class="s">&quot;)&quot;</span>
+
+<span class="nf">op2str</span> <span class="ow">::</span> <span class="kt">Op</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">op2str</span> <span class="kt">Plus</span> <span class="ow">=</span> <span class="s">&quot;+&quot;</span>
+<span class="nf">op2str</span> <span class="kt">Minus</span> <span class="ow">=</span> <span class="s">&quot;-&quot;</span>
+<span class="nf">op2str</span> <span class="kt">Mul</span> <span class="ow">=</span> <span class="s">&quot;*&quot;</span>
+<span class="nf">op2str</span> <span class="kt">Div</span> <span class="ow">=</span> <span class="s">&quot;/&quot;</span>
+<span class="nf">op2str</span> <span class="kt">Pow</span> <span class="ow">=</span> <span class="s">&quot;**&quot;</span>
+
+<span class="cm">{- 在需要的地方添加括号。这个函数比较保守，有时候不需要也会加。</span>
+<span class="cm">Haskell 在构建 SymbolicManip 的时候已经处理好优先级了。-}</span>
+<span class="nf">simpleParen</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Show</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Num</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">SymbolicManip</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">simpleParen</span> <span class="p">(</span><span class="kt">Number</span> <span class="n">x</span><span class="p">)</span> <span class="ow">=</span> <span class="n">prettyShow</span> <span class="p">(</span><span class="kt">Number</span> <span class="n">x</span><span class="p">)</span>
+<span class="nf">simpleParen</span> <span class="p">(</span><span class="kt">Symbol</span> <span class="n">x</span><span class="p">)</span> <span class="ow">=</span> <span class="n">prettyShow</span> <span class="p">(</span><span class="kt">Symbol</span> <span class="n">x</span><span class="p">)</span>
+<span class="nf">simpleParen</span> <span class="n">x</span><span class="o">@</span><span class="p">(</span><span class="kt">BinaryArith</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">=</span> <span class="s">&quot;(&quot;</span> <span class="o">++</span> <span class="n">prettyShow</span> <span class="n">x</span> <span class="o">++</span> <span class="s">&quot;)&quot;</span>
+<span class="nf">simpleParen</span> <span class="n">x</span><span class="o">@</span><span class="p">(</span><span class="kt">UnaryArith</span> <span class="kr">_</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">=</span> <span class="n">prettyShow</span> <span class="n">x</span>
+
+<span class="cm">{- 调用 prettyShow 函数显示 SymbolicManip 值 -}</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Show</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Num</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Show</span> <span class="p">(</span><span class="kt">SymbolicManip</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">show</span> <span class="n">a</span> <span class="ow">=</span> <span class="n">prettyShow</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>首先我们定义了 <code class="docutils literal"><span class="pre">prettyShow</span></code> 函数。它把一个表达式转换成常规表达形式。
+算法相当简单：数字和符号不做处理；二元操作是转换后两侧的内容加上中间的操作符；当然我们也处理了一元操作。
+<code class="docutils literal"><span class="pre">op2str</span></code> 把 <code class="docutils literal"><span class="pre">Op</span></code> 转为 <code class="docutils literal"><span class="pre">String</span></code>。在 <code class="docutils literal"><span class="pre">simpleParen</span></code> 里，我们加括号的算法非常保守，以确保优先级在结果里清楚显示。
+最后，我们声明 <code class="docutils literal"><span class="pre">SymbolicManip</span></code> 为 <code class="docutils literal"><span class="pre">Show</span></code> 的实例然后用 <code class="docutils literal"><span class="pre">prettyShow</span></code> 来实现。
+现在，我们来设计一个算法把表达式转为 RPN 形式的字符串。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/num.hs</span>
+<span class="cm">{- Show a SymbolicManip using RPN.  HP calculator users may</span>
+<span class="cm">find this familiar. -}</span>
+<span class="nf">rpnShow</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Show</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Num</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">SymbolicManip</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">rpnShow</span> <span class="n">i</span> <span class="ow">=</span>
+    <span class="kr">let</span> <span class="n">toList</span> <span class="p">(</span><span class="kt">Number</span> <span class="n">x</span><span class="p">)</span> <span class="ow">=</span> <span class="p">[</span><span class="n">show</span> <span class="n">x</span><span class="p">]</span>
+        <span class="n">toList</span> <span class="p">(</span><span class="kt">Symbol</span> <span class="n">x</span><span class="p">)</span> <span class="ow">=</span> <span class="p">[</span><span class="n">x</span><span class="p">]</span>
+        <span class="n">toList</span> <span class="p">(</span><span class="kt">BinaryArith</span> <span class="n">op</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=</span> <span class="n">toList</span> <span class="n">a</span> <span class="o">++</span> <span class="n">toList</span> <span class="n">b</span> <span class="o">++</span>
+            <span class="p">[</span><span class="n">op2str</span> <span class="n">op</span><span class="p">]</span>
+        <span class="n">toList</span> <span class="p">(</span><span class="kt">UnaryArith</span> <span class="n">op</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=</span> <span class="n">toList</span> <span class="n">a</span> <span class="o">++</span> <span class="p">[</span><span class="n">op</span><span class="p">]</span>
+        <span class="n">join</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[[</span><span class="n">a</span><span class="p">]]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+        <span class="n">join</span> <span class="n">delim</span> <span class="n">l</span> <span class="ow">=</span> <span class="n">concat</span> <span class="p">(</span><span class="n">intersperse</span> <span class="n">delim</span> <span class="n">l</span><span class="p">)</span>
+    <span class="kr">in</span> <span class="n">join</span> <span class="s">&quot; &quot;</span> <span class="p">(</span><span class="n">toList</span> <span class="n">i</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>RPN 爱好者会发现，跟上面的算法相比，这个算法是多么简洁。
+尤其是，我们根本不用关心要从哪里加括号，因为 RPN 天生只能沿着一个方向求值。
+接下来，我们写个函数来实现一些基本的表达式化简。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/num.hs</span>
+<span class="cm">{- Perform some basic algebraic simplifications on a SymbolicManip. -}</span>
+<span class="nf">simplify</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Num</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">SymbolicManip</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">SymbolicManip</span> <span class="n">a</span>
+<span class="nf">simplify</span> <span class="p">(</span><span class="kt">BinaryArith</span> <span class="n">op</span> <span class="n">ia</span> <span class="n">ib</span><span class="p">)</span> <span class="ow">=</span>
+    <span class="kr">let</span> <span class="n">sa</span> <span class="ow">=</span> <span class="n">simplify</span> <span class="n">ia</span>
+        <span class="n">sb</span> <span class="ow">=</span> <span class="n">simplify</span> <span class="n">ib</span>
+        <span class="kr">in</span>
+        <span class="kr">case</span> <span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">sa</span><span class="p">,</span> <span class="n">sb</span><span class="p">)</span> <span class="kr">of</span>
+                <span class="p">(</span><span class="kt">Mul</span><span class="p">,</span> <span class="kt">Number</span> <span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">b</span>
+                <span class="p">(</span><span class="kt">Mul</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Number</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+                <span class="p">(</span><span class="kt">Mul</span><span class="p">,</span> <span class="kt">Number</span> <span class="mi">0</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Number</span> <span class="mi">0</span>
+                <span class="p">(</span><span class="kt">Mul</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Number</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Number</span> <span class="mi">0</span>
+                <span class="p">(</span><span class="kt">Div</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Number</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+                <span class="p">(</span><span class="kt">Plus</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Number</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+                <span class="p">(</span><span class="kt">Plus</span><span class="p">,</span> <span class="kt">Number</span> <span class="mi">0</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">b</span>
+                <span class="p">(</span><span class="kt">Minus</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Number</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+                <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="kt">BinaryArith</span> <span class="n">op</span> <span class="n">sa</span> <span class="n">sb</span>
+<span class="nf">simplify</span> <span class="p">(</span><span class="kt">UnaryArith</span> <span class="n">op</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">UnaryArith</span> <span class="n">op</span> <span class="p">(</span><span class="n">simplify</span> <span class="n">a</span><span class="p">)</span>
+<span class="nf">simplify</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">x</span>
+</pre></div>
+</div>
+<p>这个函数相当简单。我们很轻易地就能化简某些二元数学运算——例如，用1乘以任何值。我们首先得到操作符两侧操作数被化简之后的版本（在这儿用到了递归）然后再化简结果。
+对于一元操作符我们能做的不多，所以我们仅仅简化它们作用于的表达式。</p>
+<p>从现在开始，我们会增加对计量单位的支持。增加之后我们就能表示“5米”这种数量了。跟之前一样，我们先来定义一个类型：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/num.hs</span>
+<span class="cm">{- 新数据类型：Units。Units 类型包含一个数字和一个 SymbolicManip，也就是计量单位。</span>
+<span class="cm">计量单位符号可以是 (Symbol &quot;m&quot;) 这个样子。 -}</span>
+<span class="kr">data</span> <span class="kt">Units</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="n">a</span> <span class="p">(</span><span class="kt">SymbolicManip</span> <span class="n">a</span><span class="p">)</span>
+             <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>一个 <code class="docutils literal"><span class="pre">Units</span></code> 值包含一个数字和一个符号。符号本身是 <code class="docutils literal"><span class="pre">SymbolicManip</span></code> 类型。
+接下来，将 <code class="docutils literal"><span class="pre">Units</span></code> 声明为 <code class="docutils literal"><span class="pre">Num</span></code> 实例。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/num.hs</span>
+<span class="cm">{- 为 Units 实现 Num 实例。我们不知道如何转换任意单位，因此当不同单位的数字相加时，我们报告错误。</span>
+<span class="cm">对于乘法，我们生成对应的新单位。 -}</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Num</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Num</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xb</span> <span class="n">ub</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">ua</span> <span class="o">==</span> <span class="n">ub</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">xa</span> <span class="o">+</span> <span class="n">xb</span><span class="p">)</span> <span class="n">ua</span>
+        <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;Mis-matched units in add or subtract&quot;</span>
+    <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xb</span> <span class="n">ub</span><span class="p">)</span> <span class="ow">=</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="kt">Units</span> <span class="p">(</span><span class="n">xb</span> <span class="o">*</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span> <span class="n">ub</span><span class="p">)</span>
+    <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xb</span> <span class="n">ub</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">xa</span> <span class="o">*</span> <span class="n">xb</span><span class="p">)</span> <span class="p">(</span><span class="n">ua</span> <span class="o">*</span> <span class="n">ub</span><span class="p">)</span>
+    <span class="n">negate</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">negate</span> <span class="n">xa</span><span class="p">)</span> <span class="n">ua</span>
+    <span class="n">abs</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">abs</span> <span class="n">xa</span><span class="p">)</span> <span class="n">ua</span>
+    <span class="n">signum</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">signum</span> <span class="n">xa</span><span class="p">)</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">fromInteger</span> <span class="n">i</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">fromInteger</span> <span class="n">i</span><span class="p">)</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>现在，我们应该清楚为什么要用 <code class="docutils literal"><span class="pre">SymbolicManip</span></code> 而不是 <code class="docutils literal"><span class="pre">String</span></code> 来存储计量单位了。
+做乘法时，计量单位也会发生改变。例如，5米乘以2米会得到10平方米。我们要求加法运算的单位必须匹配，
+并用加法实现了减法。我们再来看几个 <code class="docutils literal"><span class="pre">Units</span></code> 的类型类实例。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/num.hs</span>
+<span class="cm">{- Make Units an instance of Fractional -}</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Fractional</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Fractional</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xb</span> <span class="n">ub</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">xa</span> <span class="o">/</span> <span class="n">xb</span><span class="p">)</span> <span class="p">(</span><span class="n">ua</span> <span class="o">/</span> <span class="n">ub</span><span class="p">)</span>
+    <span class="n">recip</span> <span class="n">a</span> <span class="ow">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">a</span>
+    <span class="n">fromRational</span> <span class="n">r</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">fromRational</span> <span class="n">r</span><span class="p">)</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">1</span><span class="p">)</span>
+
+<span class="cm">{- Floating implementation for Units.</span>
+
+<span class="cm">Use some intelligence for angle calculations: support deg and rad</span>
+<span class="cm">-}</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Floating</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Floating</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">pi</span> <span class="ow">=</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">pi</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">exp</span> <span class="kr">_</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;exp not yet implemented in Units&quot;</span>
+    <span class="n">log</span> <span class="kr">_</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;log not yet implemented in Units&quot;</span>
+    <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xb</span> <span class="n">ub</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">ub</span> <span class="o">==</span> <span class="kt">Number</span> <span class="mi">1</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">xa</span> <span class="o">**</span> <span class="n">xb</span><span class="p">)</span> <span class="p">(</span><span class="n">ua</span> <span class="o">**</span> <span class="kt">Number</span> <span class="n">xb</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;units for RHS of ** not supported&quot;</span>
+    <span class="n">sqrt</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">sqrt</span> <span class="n">xa</span><span class="p">)</span> <span class="p">(</span><span class="n">sqrt</span> <span class="n">ua</span><span class="p">)</span>
+    <span class="n">sin</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">ua</span> <span class="o">==</span> <span class="kt">Symbol</span> <span class="s">&quot;rad&quot;</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">sin</span> <span class="n">xa</span><span class="p">)</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">ua</span> <span class="o">==</span> <span class="kt">Symbol</span> <span class="s">&quot;deg&quot;</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">sin</span> <span class="p">(</span><span class="n">deg2rad</span> <span class="n">xa</span><span class="p">))</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;Units for sin must be deg or rad&quot;</span>
+    <span class="n">cos</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">ua</span> <span class="o">==</span> <span class="kt">Symbol</span> <span class="s">&quot;rad&quot;</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">cos</span> <span class="n">xa</span><span class="p">)</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">ua</span> <span class="o">==</span> <span class="kt">Symbol</span> <span class="s">&quot;deg&quot;</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">cos</span> <span class="p">(</span><span class="n">deg2rad</span> <span class="n">xa</span><span class="p">))</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;Units for cos must be deg or rad&quot;</span>
+    <span class="n">tan</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">ua</span> <span class="o">==</span> <span class="kt">Symbol</span> <span class="s">&quot;rad&quot;</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">tan</span> <span class="n">xa</span><span class="p">)</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">ua</span> <span class="o">==</span> <span class="kt">Symbol</span> <span class="s">&quot;deg&quot;</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">tan</span> <span class="p">(</span><span class="n">deg2rad</span> <span class="n">xa</span><span class="p">))</span> <span class="p">(</span><span class="kt">Number</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;Units for tan must be deg or rad&quot;</span>
+    <span class="n">asin</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">ua</span> <span class="o">==</span> <span class="kt">Number</span> <span class="mi">1</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">rad2deg</span> <span class="o">$</span> <span class="n">asin</span> <span class="n">xa</span><span class="p">)</span> <span class="p">(</span><span class="kt">Symbol</span> <span class="s">&quot;deg&quot;</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;Units for asin must be empty&quot;</span>
+    <span class="n">acos</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">ua</span> <span class="o">==</span> <span class="kt">Number</span> <span class="mi">1</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">rad2deg</span> <span class="o">$</span> <span class="n">acos</span> <span class="n">xa</span><span class="p">)</span> <span class="p">(</span><span class="kt">Symbol</span> <span class="s">&quot;deg&quot;</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;Units for acos must be empty&quot;</span>
+    <span class="n">atan</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">ua</span> <span class="o">==</span> <span class="kt">Number</span> <span class="mi">1</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="p">(</span><span class="n">rad2deg</span> <span class="o">$</span> <span class="n">atan</span> <span class="n">xa</span><span class="p">)</span> <span class="p">(</span><span class="kt">Symbol</span> <span class="s">&quot;deg&quot;</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;Units for atan must be empty&quot;</span>
+    <span class="n">sinh</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;sinh not yet implemented in Units&quot;</span>
+    <span class="n">cosh</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;cosh not yet implemented in Units&quot;</span>
+    <span class="n">tanh</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;tanh not yet implemented in Units&quot;</span>
+    <span class="n">asinh</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;asinh not yet implemented in Units&quot;</span>
+    <span class="n">acosh</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;acosh not yet implemented in Units&quot;</span>
+    <span class="n">atanh</span> <span class="ow">=</span> <span class="ne">error</span> <span class="s">&quot;atanh not yet implemented in Units&quot;</span>
+</pre></div>
+</div>
+<p>虽然没有实现所有函数，但大部分都定义了。现在我们来定义几个跟单位打交道的工具函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/num.hs</span>
+<span class="cm">{- A simple function that takes a number and a String and returns an</span>
+<span class="cm">appropriate Units type to represent the number and its unit of measure -}</span>
+<span class="nf">units</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Num</span> <span class="n">z</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">z</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Units</span> <span class="n">z</span>
+<span class="nf">units</span> <span class="n">a</span> <span class="n">b</span> <span class="ow">=</span> <span class="kt">Units</span> <span class="n">a</span> <span class="p">(</span><span class="kt">Symbol</span> <span class="n">b</span><span class="p">)</span>
+
+<span class="cm">{- Extract the number only out of a Units type -}</span>
+<span class="nf">dropUnits</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Num</span> <span class="n">z</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Units</span> <span class="n">z</span> <span class="ow">-&gt;</span> <span class="n">z</span>
+<span class="nf">dropUnits</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">x</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">=</span> <span class="n">x</span>
+
+<span class="cm">{- Utilities for the Unit implementation -}</span>
+<span class="nf">deg2rad</span> <span class="n">x</span> <span class="ow">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">pi</span> <span class="o">*</span> <span class="n">x</span> <span class="o">/</span> <span class="mi">360</span>
+<span class="nf">rad2deg</span> <span class="n">x</span> <span class="ow">=</span> <span class="mi">360</span> <span class="o">*</span> <span class="n">x</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">pi</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>首先我们定义了 <code class="docutils literal"><span class="pre">units</span></code>，使表达式更简洁。<code class="docutils literal"><span class="pre">units</span> <span class="pre">5</span> <span class="pre">&quot;m&quot;</span></code> 肯定要比 <code class="docutils literal"><span class="pre">Units</span> <span class="pre">5</span> <span class="pre">(Symbol</span> <span class="pre">&quot;m&quot;)</span></code> 省事。
+我们还定义了 <code class="docutils literal"><span class="pre">dropUnits</span></code>，它把单位去掉只返回 <code class="docutils literal"><span class="pre">Num</span></code>。最后，我们定义了两个函数，用来在角度和弧度之间转换。
+接下来，我们给 <code class="docutils literal"><span class="pre">Units</span></code> 定义 <code class="docutils literal"><span class="pre">Show</span></code> 实例。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/num.hs</span>
+<span class="cm">{- Showing units: we show the numeric component, an underscore,</span>
+<span class="cm">then the prettyShow version of the simplified units -}</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Show</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Num</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Show</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">show</span> <span class="p">(</span><span class="kt">Units</span> <span class="n">xa</span> <span class="n">ua</span><span class="p">)</span> <span class="ow">=</span> <span class="n">show</span> <span class="n">xa</span> <span class="o">++</span> <span class="s">&quot;_&quot;</span> <span class="o">++</span> <span class="n">prettyShow</span> <span class="p">(</span><span class="n">simplify</span> <span class="n">ua</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>很简单。最后我们定义 <code class="docutils literal"><span class="pre">test</span></code> 变量用来测试。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/num.hs</span>
+<span class="nf">test</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Num</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">a</span>
+<span class="nf">test</span> <span class="ow">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="mi">5</span> <span class="o">+</span> <span class="mi">3</span>
+</pre></div>
+</div>
+<p>回头看看这些代码，我们已经完成了既定目标：给 <code class="docutils literal"><span class="pre">SymbolicManip</span></code> 实现更多实例；
+我们引入了新类型 <code class="docutils literal"><span class="pre">Units</span></code>，它包含一个数字和一个单位；
+我们实现了几个 show 函数，以便用不同的方式来转换 <code class="docutils literal"><span class="pre">SymbolicManip</span></code> 和 <code class="docutils literal"><span class="pre">Units</span></code>。</p>
+<p>这个例子还给了我们另外一点启发。所有语言——即使那些包含对象和重载的——都有从某种角度看很独特的地方。
+在 Haskell 里，这个“特殊”的部分很小。我们刚刚开发了一种新的表示法用来表示像数字一样基本的东西，而且很容易就实现了。
+我们的新类型是一等类型，编译器在编译时就知道使用它哪个函数。Haskell 把代码复用和互换（interchangeability）发挥到了极致。
+写通用代码很容易，而且很方便就能把它们用于多种不同类型的东西上。同样容易的是创建新类型并使它们自动成为系统的一等功能（first-class features）。</p>
+<p>还记得本节开头的 <strong>ghci</strong> 例子吗？ 我们已经实现了它的全部功能。你可以自己试试，看看它们是怎么工作的。</p>
+</div>
+<div class="section" id="exercises">
+<span id="id6"></span><h3>练习<a class="headerlink" href="#exercises" title="Permalink to this headline">¶</a></h3>
+<ol class="arabic simple">
+<li>扩展 <code class="docutils literal"><span class="pre">prettyShow</span></code> 函数，去掉不必要的括号。</li>
+</ol>
+</div>
+</div>
+<div class="section" id="taking-advantage-of-functions-as-data">
+<span id="id7"></span><h2>把函数当成数据来用<a class="headerlink" href="#taking-advantage-of-functions-as-data" title="Permalink to this headline">¶</a></h2>
+<p>在命令式语言当中，拼接两个列表很容易。下面的 C 语言结构维护了指向列表头尾的指针：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">struct</span> <span class="n">list</span> <span class="p">{</span>
+    <span class="n">struct</span> <span class="n">node</span> <span class="o">*</span><span class="n">head</span><span class="p">,</span> <span class="o">*</span><span class="n">tail</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<p>当我们想把列表 B 拼接到列表 A 的尾部时，我们将 A 的最后一个节点指向 B 的 <code class="docutils literal"><span class="pre">head</span></code> 节点，再把 A 的 <code class="docutils literal"><span class="pre">tail</span></code> 指针指向 B 的 <code class="docutils literal"><span class="pre">tail</span></code> 节点。</p>
+<p>很显然，在 Haskell 里，如果我们想保持“纯”的话，这种方法是有局限性的。由于纯数据是不可变的，我们无法原地修改列表。
+Haskell 的 <code class="docutils literal"><span class="pre">(++)</span></code> 操作符通过生成一个新列表来拼接列表。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/Append.hs</span>
+<span class="p">(</span><span class="o">++</span><span class="p">)</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="o">++</span> <span class="n">ys</span> <span class="ow">=</span> <span class="n">x</span> <span class="kt">:</span> <span class="n">xs</span> <span class="o">++</span> <span class="n">ys</span>
+<span class="kr">_</span>      <span class="o">++</span> <span class="n">ys</span> <span class="ow">=</span> <span class="n">ys</span>
+</pre></div>
+</div>
+<p>从代码里可以看出，创建新列表的开销取决于第一个列表的长度。</p>
+<p>我们经常需要通过重复拼接列表来创建一个大列表。例如，在生成网页内容时我们可能想生成一个 <code class="docutils literal"><span class="pre">String</span></code>。
+每当有新内容添加到网页中时，我们会很自然地想到把它拼接到已有 <code class="docutils literal"><span class="pre">String</span></code> 的末尾。</p>
+<p>如果每一次拼接的开销都正比与初始列表的长度，每一次拼接都把初始列表加的更长，那么我们将会陷入一个很糟糕的情况：
+所有拼接的总开销将会正比于最终列表长度的平方。</p>
+<p>为了更好地理解，我们来研究一下。<code class="docutils literal"><span class="pre">(++)</span></code> 操作符是右结合的。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">info</span> <span class="p">(</span><span class="o">++</span><span class="p">)</span>
+<span class="p">(</span><span class="o">++</span><span class="p">)</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>   <span class="c1">-- Defined in GHC.Base</span>
+<span class="kr">infixr</span> <span class="mi">5</span> <span class="o">++</span>
+</pre></div>
+</div>
+<p>这意味着 Haskell 在求值表达式 <code class="docutils literal"><span class="pre">&quot;a&quot;</span> <span class="pre">++</span> <span class="pre">&quot;b&quot;</span> <span class="pre">++</span> <span class="pre">&quot;c&quot;</span></code> 时会从右向左进行，就像加了括号一样：<code class="docutils literal"><span class="pre">&quot;a&quot;</span> <span class="pre">++</span> <span class="pre">(&quot;b&quot;</span> <span class="pre">++</span> <span class="pre">&quot;c&quot;)</span></code>。
+这对于提高性能非常有好处，因为它会让左侧操作数始终保持最短。</p>
+<p>当我们重复向列表末尾拼接时，我们破坏了这种结合性。假设我们有一个列表 <code class="docutils literal"><span class="pre">&quot;a&quot;</span></code> 然后想把 <code class="docutils literal"><span class="pre">&quot;b&quot;</span></code> 拼接上去，我们把结果存储在一个新列表里。
+稍后如果我们想把 <code class="docutils literal"><span class="pre">&quot;c&quot;</span></code> 拼接上去时，这时的左操作数已经变成了 <code class="docutils literal"><span class="pre">&quot;ab&quot;</span></code>。在这种情况下，每次拼接都让左操作数变得更长。</p>
+<p>与此同时，命令式语言的程序员却在偷笑，因为他们重复拼接的开销只取决于操作的次数。他们的性能是线性的，我们的是平方的。</p>
+<p>当像重复拼接列表这种常见任务都暴露出如此严重的性能问题时，我们有必要从另一个角度来看看问题了。</p>
+<p>表达式 <code class="docutils literal"><span class="pre">(&quot;a&quot;++)</span></code> 是一个 <a class="reference internal" href="4.html#sections"><span>节</span></a> (section)，一个部分应用的函数。它的类型是什么呢？</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="s">&quot;a&quot;</span> <span class="o">++</span><span class="p">)</span>
+<span class="p">(</span><span class="s">&quot;a&quot;</span> <span class="o">++</span><span class="p">)</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Char</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Char</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>由于这是一个函数，我们可以用 <code class="docutils literal"><span class="pre">(.)</span></code> 操作符把它和另一个节组合起来，例如 <code class="docutils literal"><span class="pre">(&quot;b&quot;++)</span></code>。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="s">&quot;a&quot;</span> <span class="o">++</span><span class="p">)</span> <span class="o">.</span> <span class="p">(</span><span class="s">&quot;b&quot;</span> <span class="o">++</span><span class="p">)</span>
+<span class="p">(</span><span class="s">&quot;a&quot;</span> <span class="o">++</span><span class="p">)</span> <span class="o">.</span> <span class="p">(</span><span class="s">&quot;b&quot;</span> <span class="o">++</span><span class="p">)</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Char</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Char</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>新函数的类型和之前相同。当我们停止组合函数，并向我们创造的函数提供一个 <code class="docutils literal"><span class="pre">String</span></code> 会发生什么呢？</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">f</span> <span class="ow">=</span> <span class="p">(</span><span class="s">&quot;a&quot;</span> <span class="o">++</span><span class="p">)</span> <span class="o">.</span> <span class="p">(</span><span class="s">&quot;b&quot;</span> <span class="o">++</span><span class="p">)</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">f</span> <span class="kt">[]</span>
+<span class="s">&quot;ab&quot;</span>
+</pre></div>
+</div>
+<p>我们实现了字符串拼接！我们利用这些部分应用的函数来存储数据，并且只要提供一个空列表就可以把数据提取出来。
+每一个 <code class="docutils literal"><span class="pre">(++)</span></code> 和 <code class="docutils literal"><span class="pre">(.)</span></code> 部分应用都代表了一次拼接，但它们并没有真正完成拼接。</p>
+<p>这个方法有两点非常有趣。第一点是部分应用的开销是固定的，这样多次部分应用的开销就是线性的。
+第二点是当我们提供一个 <code class="docutils literal"><span class="pre">[]</span></code> 值来从部分应用链中提取最终列表时，求值会从右至左进行。
+这使得 <code class="docutils literal"><span class="pre">(++)</span></code> 的左操作数尽可能小，使得所有拼接的总开销是线性而不是平方。</p>
+<p>通过使用这种并不太熟悉的数据表示方式，我们避免了一个性能泥潭，并且对“把函数当成数据来用”有了新的认识。
+顺便说一下，这个技巧并不新鲜，它通常被称为<em>差异列表</em>（difference list）。</p>
+<p>还有一点没讲。尽管从理论上看差异列表非常吸引人，但如果在实际中把 <code class="docutils literal"><span class="pre">(++)</span></code>、<code class="docutils literal"><span class="pre">(.)</span></code> 和部分应用都暴露在外的话，它并不会非常好用。
+我们需要把它转成一种更好用的形式。</p>
+<div class="section" id="turning-difference-lists-into-a-proper-library">
+<span id="id8"></span><h3>把差异列表转成库<a class="headerlink" href="#turning-difference-lists-into-a-proper-library" title="Permalink to this headline">¶</a></h3>
+<p>第一步是用 <code class="docutils literal"><span class="pre">newtype</span></code> 声明把底层的类型隐藏起来。我们会创建一个 <code class="docutils literal"><span class="pre">DList</span></code> 类型。类似于普通列表，它是一个参数化类型。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/DList.hs</span>
+<span class="kr">newtype</span> <span class="kt">DList</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">DL</span> <span class="p">{</span>
+    <span class="n">unDL</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">unDL</span></code> 是我们的析构函数，它把 <code class="docutils literal"><span class="pre">DL</span></code> 构造器删除掉。
+我们最后导出模块函数时会忽略掉构造函数和析构函数，这样我们的用户就没必要知道 <code class="docutils literal"><span class="pre">DList</span></code> 类型的实现细节。他们只用我们导出的函数即可。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/DList.hs</span>
+<span class="nf">append</span> <span class="ow">::</span> <span class="kt">DList</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">DList</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">DList</span> <span class="n">a</span>
+<span class="nf">append</span> <span class="n">xs</span> <span class="n">ys</span> <span class="ow">=</span> <span class="kt">DL</span> <span class="p">(</span><span class="n">unDL</span> <span class="n">xs</span> <span class="o">.</span> <span class="n">unDL</span> <span class="n">ys</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>我们的 <code class="docutils literal"><span class="pre">append</span></code> 函数看起来可能有点复杂，但其实它仅仅是围绕着 <code class="docutils literal"><span class="pre">(.)</span></code> 操作符做了一些簿记工作，<code class="docutils literal"><span class="pre">(.)</span></code> 的用法和我们之前展示的完全一样。
+生成函数的时候，我们必须首先用 <code class="docutils literal"><span class="pre">unDL</span></code> 函数把它们从 <code class="docutils literal"><span class="pre">DL</span></code> 构造器中取出来。然后我们在把得到的结果重新用 <code class="docutils literal"><span class="pre">DL</span></code> 包装起来，确保它的类型正确。</p>
+<p>下面是相同函数的另一种写法，这种方法通过模式识别取出 <code class="docutils literal"><span class="pre">xs</span></code> 和 <code class="docutils literal"><span class="pre">ys</span></code>。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/DList.hs</span>
+<span class="nf">append&#39;</span> <span class="ow">::</span> <span class="kt">DList</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">DList</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">DList</span> <span class="n">a</span>
+<span class="nf">append&#39;</span> <span class="p">(</span><span class="kt">DL</span> <span class="n">xs</span><span class="p">)</span> <span class="p">(</span><span class="kt">DL</span> <span class="n">ys</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">DL</span> <span class="p">(</span><span class="n">xs</span> <span class="o">.</span> <span class="n">ys</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>我们需要在 <code class="docutils literal"><span class="pre">DList</span></code> 类型和普通列表之间来回转换。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/DList.hs</span>
+<span class="nf">fromList</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">DList</span> <span class="n">a</span>
+<span class="nf">fromList</span> <span class="n">xs</span> <span class="ow">=</span> <span class="kt">DL</span> <span class="p">(</span><span class="n">xs</span> <span class="o">++</span><span class="p">)</span>
+
+<span class="nf">toList</span> <span class="ow">::</span> <span class="kt">DList</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">toList</span> <span class="p">(</span><span class="kt">DL</span> <span class="n">xs</span><span class="p">)</span> <span class="ow">=</span> <span class="n">xs</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+<p>再次声明，跟这些函数最原始的版本相比，我们在这里做的只是一些簿记工作。</p>
+<p>如果我们想把 <code class="docutils literal"><span class="pre">DList</span></code> 作为普通列表的替代品，我们还需要提供一些常用的列表操作。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/DList.hs</span>
+<span class="nf">empty</span> <span class="ow">::</span> <span class="kt">DList</span> <span class="n">a</span>
+<span class="nf">empty</span> <span class="ow">=</span> <span class="kt">DL</span> <span class="n">id</span>
+
+<span class="c1">-- equivalent of the list type&#39;s (:) operator</span>
+<span class="nf">cons</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">DList</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">DList</span> <span class="n">a</span>
+<span class="nf">cons</span> <span class="n">x</span> <span class="p">(</span><span class="kt">DL</span> <span class="n">xs</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">DL</span> <span class="p">((</span><span class="n">x</span><span class="kt">:</span><span class="p">)</span> <span class="o">.</span> <span class="n">xs</span><span class="p">)</span>
+<span class="kr">infixr</span> <span class="p">`</span><span class="n">cons</span><span class="p">`</span>
+
+<span class="nf">dfoldr</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="kt">DList</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span>
+<span class="nf">dfoldr</span> <span class="n">f</span> <span class="n">z</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">foldr</span> <span class="n">f</span> <span class="n">z</span> <span class="p">(</span><span class="n">toList</span> <span class="n">xs</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>尽管 <code class="docutils literal"><span class="pre">DList</span></code> 使得拼接很廉价，但并不是所有的列表操作都容易实现。
+列表的 <code class="docutils literal"><span class="pre">head</span></code> 函数具有常数开销，而对应的 <code class="docutils literal"><span class="pre">DList</span></code> 实现却需要将整个 <code class="docutils literal"><span class="pre">DList</span></code> 转为普通列表，因此它比普通列表的实现昂贵得多：
+它的开销正比于构造 <code class="docutils literal"><span class="pre">DList</span></code> 所需的拼接次数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/DList.hs</span>
+<span class="nf">safeHead</span> <span class="ow">::</span> <span class="kt">DList</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">a</span>
+<span class="nf">safeHead</span> <span class="n">xs</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">toList</span> <span class="n">xs</span> <span class="kr">of</span>
+                <span class="p">(</span><span class="n">y</span><span class="kt">:</span><span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="n">y</span>
+                <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>为了实现对应的 <code class="docutils literal"><span class="pre">map</span></code> 函数，我们可以把 <code class="docutils literal"><span class="pre">DList</span></code> 类型声明为一个 Functor（函子）。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/DList.hs</span>
+<span class="nf">dmap</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">DList</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">DList</span> <span class="n">b</span>
+<span class="nf">dmap</span> <span class="n">f</span> <span class="ow">=</span> <span class="n">dfoldr</span> <span class="n">go</span> <span class="n">empty</span>
+    <span class="kr">where</span> <span class="n">go</span> <span class="n">x</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">cons</span> <span class="p">(</span><span class="n">f</span> <span class="n">x</span><span class="p">)</span> <span class="n">xs</span>
+
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">DList</span> <span class="kr">where</span>
+    <span class="n">fmap</span> <span class="ow">=</span> <span class="n">dmap</span>
+</pre></div>
+</div>
+<p>当我们实现了足够多的列表操作时，我们回到源文件顶部增加一个模块头。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/DList.hs</span>
+<span class="kr">module</span> <span class="nn">DList</span>
+    <span class="p">(</span>
+    <span class="kt">DList</span>
+    <span class="p">,</span> <span class="nf">fromList</span>
+    <span class="p">,</span> <span class="nf">toList</span>
+    <span class="p">,</span> <span class="nf">empty</span>
+    <span class="p">,</span> <span class="nf">append</span>
+    <span class="p">,</span> <span class="nf">cons</span>
+    <span class="p">,</span> <span class="nf">dfoldr</span>
+    <span class="p">)</span> <span class="kr">where</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="monoids">
+<span id="lists-difference-lists-and-monoids"></span><h3>列表、差异列表和幺半群（monoids）<a class="headerlink" href="#monoids" title="Permalink to this headline">¶</a></h3>
+<p>在抽象代数中，有一类简单的抽象结构被称为<em>幺半群</em>。许多数学结构都是幺半群，因为成为幺半群的要求非常低。
+一个结构只要满足两个性质便可称为幺半群：</p>
+<ul class="simple">
+<li>一个满足结合律的二元操作符。我们称之为 <code class="docutils literal"><span class="pre">(*)</span></code>：表达式 <code class="docutils literal"><span class="pre">a</span> <span class="pre">*</span> <span class="pre">(b</span> <span class="pre">*</span> <span class="pre">c)</span></code> 和 <code class="docutils literal"><span class="pre">(a</span> <span class="pre">*</span> <span class="pre">b)</span> <span class="pre">*</span> <span class="pre">c</span></code> 结果必须相同。</li>
+<li>一个单位元素。我们称之为 <code class="docutils literal"><span class="pre">e</span></code>，它必须遵守两条法则：<code class="docutils literal"><span class="pre">a</span> <span class="pre">*</span> <span class="pre">e</span> <span class="pre">==</span> <span class="pre">a</span></code> 和 <code class="docutils literal"><span class="pre">e</span> <span class="pre">*</span> <span class="pre">a</span> <span class="pre">==</span> <span class="pre">a</span></code>。</li>
+</ul>
+<p>幺半群并不要求这个二元操作符做什么，它只要求这个二元操作符必须存在。因此很多数学结构都是幺半群。
+如果我们把加号作为二元操作符，0作为单位元素，那么整数就是一个幺半群。把乘号作为二元操作符，1作为单位元素，整数就形成了另一个幺半群。</p>
+<p>Haskell 中幺半群无所不在。<code class="docutils literal"><span class="pre">Data.Monoid</span></code> 模块定义了 <code class="docutils literal"><span class="pre">Monoid</span></code> 类型类。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/Monoid.hs</span>
+<span class="kr">class</span> <span class="kt">Monoid</span> <span class="n">a</span> <span class="kr">where</span>
+    <span class="n">mempty</span>  <span class="ow">::</span> <span class="n">a</span>                <span class="c1">-- the identity</span>
+    <span class="n">mappend</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span>      <span class="c1">-- associative binary operator</span>
+</pre></div>
+</div>
+<p>如果我们把 <code class="docutils literal"><span class="pre">(++)</span></code> 当做二元操作符，<code class="docutils literal"><span class="pre">[]</span></code> 当做单位元素，列表就形成了一个幺半群。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/Monoid.hs</span>
+<span class="kr">instance</span> <span class="kt">Monoid</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="kr">where</span>
+    <span class="n">mempty</span>  <span class="ow">=</span> <span class="kt">[]</span>
+    <span class="n">mappend</span> <span class="ow">=</span> <span class="p">(</span><span class="o">++</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>由于列表和 <code class="docutils literal"><span class="pre">DLists</span></code> 关系如此紧密，<code class="docutils literal"><span class="pre">DList</span></code> 类型也必须是一个幺半群。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/DList.hs</span>
+<span class="kr">instance</span> <span class="kt">Monoid</span> <span class="p">(</span><span class="kt">DList</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+    <span class="n">mempty</span> <span class="ow">=</span> <span class="n">empty</span>
+    <span class="n">mappend</span> <span class="ow">=</span> <span class="n">append</span>
+</pre></div>
+</div>
+<p>在 <strong>ghci</strong> 里试试 <code class="docutils literal"><span class="pre">Monoid</span></code> 类型类的函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="s">&quot;foo&quot;</span> <span class="p">`</span><span class="n">mappend</span><span class="p">`</span> <span class="s">&quot;bar&quot;</span>
+<span class="s">&quot;foobar&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">toList</span> <span class="p">(</span><span class="n">fromList</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">]</span> <span class="p">`</span><span class="n">mappend</span><span class="p">`</span> <span class="n">fromList</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">])</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">mempty</span> <span class="p">`</span><span class="n">mappend</span><span class="p">`</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>尽管从数学的角度看，整数可以以两种不同的方式作为幺半群，但在 Haskell 里，我们却不能给 <code class="docutils literal"><span class="pre">Int</span></code> 写两个不同的 <code class="docutils literal"><span class="pre">Monoid</span></code> 实例：
+编译器会报告重复实例错误。</p>
+<p>如果我们真的需要在同一个类型上实现多个 <code class="docutils literal"><span class="pre">Monoid</span></code> 实例，我们可以用 <code class="docutils literal"><span class="pre">newtype</span></code> 创建不同的类型来达到目的。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch13/Monoid.hs</span>
+<span class="cm">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span>
+
+<span class="kr">newtype</span> <span class="kt">AInt</span> <span class="ow">=</span> <span class="kt">A</span> <span class="p">{</span> <span class="n">unA</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="p">}</span>
+    <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">,</span> <span class="kt">Eq</span><span class="p">,</span> <span class="kt">Num</span><span class="p">)</span>
+
+<span class="c1">-- monoid under addition</span>
+<span class="kr">instance</span> <span class="kt">Monoid</span> <span class="kt">AInt</span> <span class="kr">where</span>
+    <span class="n">mempty</span> <span class="ow">=</span> <span class="mi">0</span>
+    <span class="n">mappend</span> <span class="ow">=</span> <span class="p">(</span><span class="o">+</span><span class="p">)</span>
+
+<span class="kr">newtype</span> <span class="kt">MInt</span> <span class="ow">=</span> <span class="kt">M</span> <span class="p">{</span> <span class="n">unM</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="p">}</span>
+    <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">,</span> <span class="kt">Eq</span><span class="p">,</span> <span class="kt">Num</span><span class="p">)</span>
+
+<span class="c1">-- monoid under multiplication</span>
+<span class="kr">instance</span> <span class="kt">Monoid</span> <span class="kt">MInt</span> <span class="kr">where</span>
+    <span class="n">mempty</span> <span class="ow">=</span> <span class="mi">1</span>
+    <span class="n">mappend</span> <span class="ow">=</span> <span class="p">(</span><span class="o">*</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>这样，根据使用类型的不同，我们就能得到不同的行为。</p>
+<div class="last highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="mi">2</span> <span class="p">`</span><span class="n">mappend</span><span class="p">`</span> <span class="mi">5</span> <span class="ow">::</span> <span class="kt">MInt</span>
+<span class="kt">M</span> <span class="p">{</span><span class="n">unM</span> <span class="ow">=</span> <span class="mi">10</span><span class="p">}</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="mi">2</span> <span class="p">`</span><span class="n">mappend</span><span class="p">`</span> <span class="mi">5</span> <span class="ow">::</span> <span class="kt">AInt</span>
+<span class="kt">A</span> <span class="p">{</span><span class="n">unA</span> <span class="ow">=</span> <span class="mi">7</span><span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<p>在这一节（The writer monad and lists）中，我们还会继续讨论差异列表和它的幺半群性质。</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">跟 functor 规则一样，Haskell 没法替我们检查幺半群的规则。
+如果我们定义了一个 <code class="docutils literal"><span class="pre">Monoid</span></code> 实例，我们可以很容易地写一些 QuickCheck 性质来得到一个较高的统计推断，确保代码遵守了幺半群规则。</p>
+</div>
+</div>
+</div>
+<div class="section" id="id9">
+<h2>通用序列<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h2>
+<p>不论是 Haskell 内置的列表，还是我们前面定义的 <code class="docutils literal"><span class="pre">DList</span></code> ，这些数据结构在不同的地方都有自己的性能短板。为此， <code class="docutils literal"><span class="pre">Data.Sequence</span></code> 模块定义了 <code class="docutils literal"><span class="pre">Seq</span></code> 容器类型，对于大多数操作，这种类型能都提供良好的效率保证。</p>
+<p>为了避免命名冲突， <code class="docutils literal"><span class="pre">Data.Sequence</span></code> 模块通常以 <code class="docutils literal"><span class="pre">qualified</span></code> 的方式引入：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.Sequence</span> <span class="k">as</span> <span class="n">Seq</span>
+<span class="kt">Prelude</span> <span class="kt">Seq</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">empty</span></code> 函数用于创建一个空 <code class="docutils literal"><span class="pre">Seq</span></code> ， <code class="docutils literal"><span class="pre">singleton</span></code> 用于创建只包含单个元素的 <code class="docutils literal"><span class="pre">Seq</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">Seq</span><span class="o">&gt;</span> <span class="kt">Seq</span><span class="o">.</span><span class="n">empty</span>
+<span class="nf">fromList</span> <span class="kt">[]</span>
+
+<span class="kt">Prelude</span> <span class="kt">Seq</span><span class="o">&gt;</span> <span class="kt">Seq</span><span class="o">.</span><span class="n">singleton</span> <span class="mi">1</span>
+<span class="nf">fromList</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>还可以使用 <code class="docutils literal"><span class="pre">fromList</span></code> 函数，通过列表创建出相应的 <code class="docutils literal"><span class="pre">Seq</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">Seq</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Seq</span><span class="o">.</span><span class="n">fromList</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+
+<span class="kt">Prelude</span> <span class="kt">Seq</span><span class="o">&gt;</span> <span class="n">a</span>
+<span class="nf">fromList</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">Data.Sequence</span></code> 模块还提供了几种操作符形式的构造函数。但是，在使用 <code class="docutils literal"><span class="pre">qualified</span></code> 形式载入模块的情况下调用它们会非常难看：</p>
+<p>[译注：操作符形式指的是那种放在两个操作对象之间的函数，比如 <code class="docutils literal"><span class="pre">2</span> <span class="pre">*</span> <span class="pre">2</span></code> 中的 <code class="docutils literal"><span class="pre">*</span></code> 函数。]</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">Seq</span><span class="o">&gt;</span> <span class="mi">1</span> <span class="kt">Seq</span><span class="o">.&lt;|</span> <span class="kt">Seq</span><span class="o">.</span><span class="n">singleton</span> <span class="mi">2</span>
+<span class="nf">fromList</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>可以通过直接载入这几个函数来改善可读性：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">Seq</span><span class="o">&gt;</span> <span class="kr">import</span> <span class="nn">Data.Sequence</span><span class="p">((</span><span class="o">&gt;&lt;</span><span class="p">),</span> <span class="p">(</span><span class="o">&lt;|</span><span class="p">),</span> <span class="p">(</span><span class="o">|&gt;</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>现在好多了：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">Seq</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Sequence</span><span class="o">&gt;</span> <span class="kt">Seq</span><span class="o">.</span><span class="n">singleton</span> <span class="mi">1</span> <span class="o">|&gt;</span> <span class="mi">2</span>
+<span class="nf">fromList</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>一个帮助记忆 <code class="docutils literal"><span class="pre">(&lt;|)</span></code> 和 <code class="docutils literal"><span class="pre">(|&gt;)</span></code> 函数的方法是，函数的『箭头』总是指向被添加的元素： <code class="docutils literal"><span class="pre">(&lt;|)</span></code> 函数要添加的元素在左边，而 <code class="docutils literal"><span class="pre">(|&gt;)</span></code> 函数要添加的元素在右边：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">Seq</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Sequence</span><span class="o">&gt;</span> <span class="mi">1</span> <span class="o">&lt;|</span> <span class="kt">Seq</span><span class="o">.</span><span class="n">singleton</span> <span class="mi">2</span>
+<span class="nf">fromList</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">]</span>
+
+<span class="kt">Prelude</span> <span class="kt">Seq</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Sequence</span><span class="o">&gt;</span> <span class="kt">Seq</span><span class="o">.</span><span class="n">singleton</span> <span class="mi">1</span> <span class="o">|&gt;</span> <span class="mi">2</span>
+<span class="nf">fromList</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>不管是从左边添加元素，还是从右边添加元素，添加操作都可以在常数时间内完成。对两个 <code class="docutils literal"><span class="pre">Seq</span></code> 进行追加（append）操作同样非常廉价，复杂度等同于两个 <code class="docutils literal"><span class="pre">Seq</span></code> 中较短的那个 <code class="docutils literal"><span class="pre">Seq</span></code> 的长度的对数。</p>
+<p>追加操作由 <code class="docutils literal"><span class="pre">(&gt;&lt;)</span></code> 函数完成：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">Seq</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Sequence</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">left</span> <span class="ow">=</span> <span class="kt">Seq</span><span class="o">.</span><span class="n">fromList</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+
+<span class="kt">Prelude</span> <span class="kt">Seq</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Sequence</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">right</span> <span class="ow">=</span> <span class="kt">Seq</span><span class="o">.</span><span class="n">fromList</span> <span class="p">[</span><span class="mi">7</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+
+<span class="kt">Prelude</span> <span class="kt">Seq</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Sequence</span><span class="o">&gt;</span> <span class="n">left</span> <span class="o">&gt;&lt;</span> <span class="n">right</span>
+<span class="nf">fromList</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">7</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>反过来，如果我们想将 <code class="docutils literal"><span class="pre">Seq</span></code> 转换回列表，那么就需要 <code class="docutils literal"><span class="pre">Data.Foldable</span></code> 模块的帮助：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">Seq</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Sequence</span><span class="o">&gt;</span> <span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.Foldable</span> <span class="k">as</span> <span class="n">Foldable</span>
+<span class="kt">Prelude</span> <span class="kt">Seq</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Sequence</span> <span class="kt">Foldable</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>这个模块定义了一个类型， <code class="docutils literal"><span class="pre">Foldable</span></code> ，而 <code class="docutils literal"><span class="pre">Seq</span></code> 实现了这个类型：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">Seq</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Sequence</span> <span class="kt">Foldable</span><span class="o">&gt;</span> <span class="kt">Foldable</span><span class="o">.</span><span class="n">toList</span> <span class="p">(</span><span class="kt">Seq</span><span class="o">.</span><span class="n">fromList</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">Data.Foldable</span></code> 中的 fold 函数可以用于对 <code class="docutils literal"><span class="pre">Seq</span></code> 进行 fold 操作：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span> <span class="kt">Seq</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Sequence</span> <span class="kt">Foldable</span><span class="o">&gt;</span> <span class="kt">Foldable</span><span class="o">.</span><span class="n">foldl&#39;</span> <span class="p">(</span><span class="o">+</span><span class="p">)</span> <span class="mi">0</span> <span class="p">(</span><span class="kt">Seq</span><span class="o">.</span><span class="n">fromList</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+<span class="mi">6</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">Data.Sequence</span></code> 模块还提供了大量有用的函数，这些函数都和 Haskell 列表的函数类似。模块的文档也非常齐全，还提供了函数的时间复杂度信息。</p>
+<p>最后的疑问是，既然 <code class="docutils literal"><span class="pre">Seq</span></code> 的效率这么好，那为什么它不是 Haskell 默认的序列类型呢？答案是，列表类型更简单，消耗更低，对于大多数应用程序来说，列表已经足够满足需求了。除此之外，列表可以很好地处理惰性环境，而 <code class="docutils literal"><span class="pre">Seq</span></code> 在这方面做得还不够好。</p>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="12.html">第 12 章：条形码识别</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="14.html">第 14 章：Monads</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.3.
+    </div>
+  </body>
+</html>

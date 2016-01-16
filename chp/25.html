@@ -1,0 +1,600 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>第 25 章：性能分析与优化 &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
+    <link rel="next" title="第 27 章：Socket 和 Syslog" href="27.html" />
+    <link rel="prev" title="第 24 章：并发和多核编程" href="24.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="24.html">第 24 章：并发和多核编程</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="27.html">第 27 章：Socket 和 Syslog</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="id1">
+<h1>第 25 章：性能分析与优化<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h1>
+<p>Haskell 是一门高级编程语言，一门真正的高级编程语言。 我们可以一直使用抽象概念、
+幺半群、函子、以及多态进行编程，而不必与任何特定的硬件模型打交道。
+Haskell 在语言规范方面下了很大的功夫，力求语言可以不受制于某个特定的求值模型。
+这几层抽象使得我们可以把 Haskell 作为计算本身的记号，
+让编程人员关心他们问题的关键点，而不用操心低层次的实现细节，
+使得人们可以心无旁骛地进行编程。</p>
+<p>但是，本书介绍的是真实世界中的编程行为，而真实世界中的代码都运行在资源有限的硬件之上，
+并且程序也会有时间和空间上的限制。因此，我们需要掌握好表达程序数据的方法，
+准确地理解使用惰性求值和严格求值策略带来的后果，并学会如何分析和控制程序
+在执行时的时间和空间。</p>
+<p>在这一章，我们将看到 Haskell 编程中可能遇到的典型空间和时间问题，并且如何有
+条理地分析、理解并解决它们。为此我们将研究使用一系列的技术：时间和空间使用
+分析，运行时统计，以及对严格求值和惰性求值。我们也会看下编译器优化对
+性能的影响，以及高级优化技术在纯函数式编程语言中的应用。那么，
+让我们用一个挑战开始吧：调查一个简单程序中不必要内存的使用问题。</p>
+<div class="section" id="haskell">
+<h2>Haskell程序性能分析<a class="headerlink" href="#haskell" title="Permalink to this headline">¶</a></h2>
+<p>请看下面这个列表处理程序，它用于计算某个大型列表的平均值。
+这里展示的只是程序的其中一部分代码（并且具体的实现算法我们并不关心），
+这是我们经常会在真实的 Haskell 程序中看到的典型的简单列表操作代码，
+这些代码大量地使用标准库函数，并且包含了一些因为疏忽大意而导致的性能问题。
+这里也展示了几种因疏忽而易出现的性能问题。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/A.hs</span>
+<span class="kr">import</span> <span class="nn">System.Environment</span>
+<span class="kr">import</span> <span class="nn">Text.Printf</span>
+
+<span class="nf">main</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="ow">&lt;-</span> <span class="n">map</span> <span class="n">read</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="n">getArgs</span>
+    <span class="n">printf</span> <span class="s">&quot;%f</span><span class="se">\n</span><span class="s">&quot;</span> <span class="p">(</span><span class="n">mean</span> <span class="p">[</span><span class="mi">1</span><span class="o">..</span><span class="n">d</span><span class="p">])</span>
+
+<span class="nf">mean</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Double</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Double</span>
+<span class="nf">mean</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">sum</span> <span class="n">xs</span> <span class="o">/</span> <span class="n">fromIntegral</span> <span class="p">(</span><span class="n">length</span> <span class="n">xs</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>这个程序非常简单：我们引用了访问系统环境的函数（即 <code class="docutils literal"><span class="pre">getArgs</span></code> ），
+和 Haskell 版的 <code class="docutils literal"><span class="pre">printf</span></code> 函数来格式化输出。接着这个程序从命令行
+读入一个数字来构建一个由浮点数组成的列表。我们用这个列表的和除以列表的
+长度得到平均值，然后以字符串的形式打印出来。我们来将此代码编译成机器代码（打开优化开关）
+然后用 <code class="docutils literal"><span class="pre">time</span></code> 执行它看看情况吧：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="c1">--make -rtsopts -O2 A.hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">A</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="kt">A</span><span class="o">.</span><span class="n">o</span> <span class="p">)</span>
+<span class="kt">Linking</span> <span class="kt">A</span> <span class="o">...</span>
+<span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">A</span> <span class="mf">1e5</span>
+<span class="mf">50000.5</span>
+<span class="o">./</span><span class="kt">A</span> <span class="mf">1e5</span>  <span class="mf">0.05</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.01</span><span class="n">s</span> <span class="n">system</span> <span class="mi">102</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">0.059</span> <span class="n">total</span>
+<span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">A</span> <span class="mf">1e6</span>
+<span class="mf">500000.5</span>
+<span class="o">./</span><span class="kt">A</span> <span class="mf">1e6</span>  <span class="mf">0.26</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.04</span><span class="n">s</span> <span class="n">system</span> <span class="mi">99</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">0.298</span> <span class="n">total</span>
+<span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">A</span> <span class="mf">1e7</span>
+<span class="mf">5000000.5</span>
+<span class="o">./</span><span class="kt">A</span> <span class="mf">1e7</span>  <span class="mf">63.80</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.62</span><span class="n">s</span> <span class="n">system</span> <span class="mi">99</span><span class="o">%</span> <span class="n">cpu</span> <span class="mi">1</span><span class="kt">:</span><span class="mf">04.53</span> <span class="n">total</span>
+</pre></div>
+</div>
+<p>程序在处理少量输入时运行得非常好，但是当输入的列表元素数量达到一千万个时，
+程序的运行速度就会变得相当缓慢。从这点我们就能感觉到应该有什么地方做得不对，
+但我们并不清楚它的资源使用情况。 我们需要研究下。</p>
+<div class="section" id="id2">
+<h3>记录运行时统计数据<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<p>为了能收集这些情报，GHC支持传入 <code class="docutils literal"><span class="pre">+RTS</span></code> 和 <code class="docutils literal"><span class="pre">-RTS</span></code> 这些特殊选项。
+这些选项是传给 Haskell 运行时本身的，Haskell程序为会感知到它们的存在。</p>
+<p>特别地，我们可以用 <code class="docutils literal"><span class="pre">-s</span></code> 选项来让运行时系统收集内存和垃圾收集性能参数（并可以用 <code class="docutils literal"><span class="pre">-N</span></code>
+来控制系统线程的数量，或调整栈和堆的大小）。我们将用运行时选项来打开性能分析的
+几种不同变量。Haskell 运行时所能接受的所有选项列表可以参见GHC用户手册。</p>
+<p>那么让我们用 <code class="docutils literal"><span class="pre">+RTS</span> <span class="pre">-sstderr</span></code> 来运行程序收集我们所需要的结果吧。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="o">./</span><span class="kt">A</span> <span class="mf">1e7</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">sstderr</span>
+<span class="mf">5000000.5</span>
+<span class="mi">1</span><span class="p">,</span><span class="mi">689</span><span class="p">,</span><span class="mi">133</span><span class="p">,</span><span class="mi">824</span> <span class="n">bytes</span> <span class="n">allocated</span> <span class="kr">in</span> <span class="n">the</span> <span class="n">heap</span>
+<span class="mi">697</span><span class="p">,</span><span class="mi">882</span><span class="p">,</span><span class="mi">192</span> <span class="n">bytes</span> <span class="n">copied</span> <span class="n">during</span> <span class="kt">GC</span> <span class="p">(</span><span class="n">scavenged</span><span class="p">)</span>
+<span class="mi">465</span><span class="p">,</span><span class="mi">051</span><span class="p">,</span><span class="mi">008</span> <span class="n">bytes</span> <span class="n">copied</span> <span class="n">during</span> <span class="kt">GC</span> <span class="p">(</span><span class="n">not</span> <span class="n">scavenged</span><span class="p">)</span>
+<span class="mi">382</span><span class="p">,</span><span class="mi">705</span><span class="p">,</span><span class="mi">664</span> <span class="n">bytes</span> <span class="n">maximum</span> <span class="n">residency</span> <span class="p">(</span><span class="mi">10</span> <span class="n">sample</span><span class="p">(</span><span class="n">s</span><span class="p">))</span>
+
+       <span class="mi">3222</span> <span class="n">collections</span> <span class="kr">in</span> <span class="n">generation</span> <span class="mi">0</span> <span class="p">(</span>  <span class="mf">0.91</span><span class="n">s</span><span class="p">)</span>
+         <span class="mi">10</span> <span class="n">collections</span> <span class="kr">in</span> <span class="n">generation</span> <span class="mi">1</span> <span class="p">(</span> <span class="mf">18.69</span><span class="n">s</span><span class="p">)</span>
+
+        <span class="mi">742</span> <span class="kt">Mb</span> <span class="n">total</span> <span class="n">memory</span> <span class="kr">in</span> <span class="n">use</span>
+
+  <span class="kt">INIT</span>  <span class="n">time</span>    <span class="mf">0.00</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">MUT</span>   <span class="n">time</span>    <span class="mf">0.63</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.71</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">GC</span>    <span class="n">time</span>   <span class="mf">19.60</span><span class="n">s</span>  <span class="p">(</span> <span class="mf">20.73</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">EXIT</span>  <span class="n">time</span>    <span class="mf">0.00</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">Total</span> <span class="n">time</span>   <span class="mf">20.23</span><span class="n">s</span>  <span class="p">(</span> <span class="mf">21.44</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+
+  <span class="o">%</span><span class="kt">GC</span> <span class="n">time</span>      <span class="mf">96.9</span><span class="o">%</span>  <span class="p">(</span><span class="mf">96.7</span><span class="o">%</span> <span class="n">elapsed</span><span class="p">)</span>
+
+  <span class="kt">Alloc</span> <span class="n">rate</span>    <span class="mi">2</span><span class="p">,</span><span class="mi">681</span><span class="p">,</span><span class="mi">318</span><span class="p">,</span><span class="mi">018</span> <span class="n">bytes</span> <span class="n">per</span> <span class="kt">MUT</span> <span class="n">second</span>
+
+  <span class="kt">Productivity</span>   <span class="mf">3.1</span><span class="o">%</span> <span class="kr">of</span> <span class="n">total</span> <span class="n">user</span><span class="p">,</span> <span class="mf">2.9</span><span class="o">%</span> <span class="kr">of</span> <span class="n">total</span> <span class="n">elapsed</span>
+</pre></div>
+</div>
+<p>当使用 <code class="docutils literal"><span class="pre">-sstderr</span></code> 时，程序的性能数字会输出到标准错误流里，告诉我们很多关于程序
+在具体做什么的信息。具体地说，它告诉我们GC用了多少时间以及最大活动内存使用情况。
+原来程序计算一千万个元素的平均值在堆上使用了多达742M的你内存，并且 96.9% 的时间是
+花费到垃圾收集上的！总共只有 3.1% 的时间是程序用来干正事的。</p>
+<p>那么为什么我们的程序运行情况这么差？我们如何来提高它呢？毕竟，Haskell是一个惰性语言：
+它不应该只用恒定的内存空间来处理列表吗？</p>
+</div>
+<div class="section" id="id3">
+<h3>时间消耗分析<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h3>
+<p>庆幸的是，GHC提供了几个工具可以分析程序的时间和空间使用情况。尤其是，
+我们可以在编写程序时打开性能调试选项，这样程序在执行时会得到每个函数
+所使用的资源使用的信息。性能调试过程分为三步：
+以性能调试方式编译程序；用性能调试模式执行程序；最后是分析收集到的结果数据。</p>
+<p>编译程序时，我们可以打开 <code class="docutils literal"><span class="pre">-prof</span></code> 选项来记录基本时间和空间性能信息。我们也需要给感兴趣的
+函数标记为 &#8220;cost centres&#8221; 以便让性能分析程序知晓。一个 cost centre 即是一个信息收集点。GHC
+会生成代码来计算这些地方的资源消耗。我们可以用 <code class="docutils literal"><span class="pre">SCC</span></code> 语法使得任何语句成为 cost centre。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/SCC.hs</span>
+<span class="nf">mean</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Double</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Double</span>
+<span class="nf">mean</span> <span class="n">xs</span> <span class="ow">=</span> <span class="cm">{-# SCC &quot;mean&quot; #-}</span> <span class="n">sum</span> <span class="n">xs</span> <span class="o">/</span> <span class="n">fromIntegral</span> <span class="p">(</span><span class="n">length</span> <span class="n">xs</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>另外我们也可以用 <code class="docutils literal"><span class="pre">-auto-all</span></code> 选项来让编译器将所有顶级函数设为 cost centre。
+手动添加 cost centre 的能力作为自动 cost centre 性能调试的辅助，
+使得我们可以在发现某个热点（hot spot）有问题时，针对性地分析一个函数的资源消耗。</p>
+<p>另外需要注意的一个难点是：在 Haskell 这类惰性、纯函数式编程语言里，
+没有参数的值只会被计算一次（比如之前的程序展示过的巨大的列表），
+而计算的结果会被之后的所有其他计算所共享。这些值不是程序调用的其中一部分，
+因此它们不会每次都被计算。当然我们仍然需要评估它们的唯一一次计算的资源占用情况。
+这些只会计算一次的值被成为 CAF （Constant Applicative Forms），
+它们的确切数量可以通过 -caf-all 选项来得到。</p>
+<p>那么以分析性能的方式来编译我们的程序吧（用 <code class="docutils literal"><span class="pre">-fforce-recomp</span></code> 选项来强制重新编译所有部分）：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="kt">O2</span> <span class="c1">--make A.hs -prof -auto-all -caf-all -fforce-recomp</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">A</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="kt">A</span><span class="o">.</span><span class="n">o</span> <span class="p">)</span>
+<span class="kt">Linking</span> <span class="kt">A</span> <span class="o">...</span>
+</pre></div>
+</div>
+<p>现在我们可以执行这个标记了性能分析点的程序了 （标记了性能分析的程序会
+变慢，所以我们用一个较小的输入来执行）：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">A</span>  <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">p</span>
+<span class="kt">Stack</span> <span class="n">space</span> <span class="n">overflow</span><span class="kt">:</span> <span class="n">current</span> <span class="n">size</span> <span class="mi">8388608</span> <span class="n">bytes</span><span class="o">.</span>
+<span class="kt">Use</span> <span class="p">`</span><span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="kt">Ksize&#39;</span> <span class="n">to</span> <span class="n">increase</span> <span class="n">it</span><span class="o">.</span>
+<span class="o">./</span><span class="kt">A</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">p</span>  <span class="mf">1.11</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.15</span><span class="n">s</span> <span class="n">system</span> <span class="mi">95</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">1.319</span> <span class="n">total</span>
+</pre></div>
+</div>
+<p>程序竟然把栈空间耗完了！这就是使用 profiling 时需要注意的主要影响：
+给程序加Cost Centre会使它的优化发生变化，甚至改变它的运行时行为，
+因为每一个表达式都被附加了额外代码来检测它们的执行情况。对于我们
+这样情况，修正起来很简单 —— 只需要用GHC运行时标记 <code class="docutils literal"><span class="pre">-K</span></code> 来增加
+栈空间上限即可（#todo）：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">A</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">p</span> <span class="o">-</span><span class="kt">K100M</span>
+<span class="mf">500000.5</span>
+<span class="o">./</span><span class="kt">A</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">p</span> <span class="o">-</span><span class="kt">K100M</span>  <span class="mf">4.27</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.20</span><span class="n">s</span> <span class="n">system</span> <span class="mi">99</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">4.489</span> <span class="n">total</span>
+</pre></div>
+</div>
+<p>运行时会将性能信息生成到一个名字为 <code class="docutils literal"><span class="pre">A.prof</span></code> （以程序本身名字命名） 的文件中。
+其中含有以下信息：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">cat</span> <span class="kt">A</span><span class="o">.</span><span class="n">prof</span>
+
+<span class="kt">Time</span> <span class="n">and</span> <span class="kt">Allocation</span> <span class="kt">Profiling</span> <span class="kt">Report</span>  <span class="p">(</span><span class="kt">Final</span><span class="p">)</span>
+
+       <span class="kt">A</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">p</span> <span class="o">-</span><span class="kt">K100M</span> <span class="o">-</span><span class="kt">RTS</span> <span class="mf">1e6</span>
+
+    <span class="n">total</span> <span class="n">time</span>  <span class="ow">=</span>        <span class="mf">0.28</span> <span class="n">secs</span>   <span class="p">(</span><span class="mi">14</span> <span class="n">ticks</span> <span class="o">@</span> <span class="mi">20</span> <span class="n">ms</span><span class="p">)</span>
+    <span class="n">total</span> <span class="n">alloc</span> <span class="ow">=</span> <span class="mi">224</span><span class="p">,</span><span class="mi">041</span><span class="p">,</span><span class="mi">656</span> <span class="n">bytes</span>  <span class="p">(</span><span class="n">excludes</span> <span class="n">profiling</span> <span class="n">overheads</span><span class="p">)</span>
+
+<span class="kt">COST</span> <span class="kt">CENTRE</span>  <span class="kt">MODULE</span>               <span class="o">%</span><span class="n">time</span> <span class="o">%</span><span class="n">alloc</span>
+
+<span class="kt">CAF:</span><span class="n">sum</span>      <span class="kt">Main</span>                  <span class="mf">78.6</span>   <span class="mf">25.0</span>
+<span class="kt">CAF</span>          <span class="kt">GHC</span><span class="o">.</span><span class="kt">Float</span>             <span class="mf">21.4</span>   <span class="mf">75.0</span>
+
+                                            <span class="n">individual</span>    <span class="n">inherited</span>
+<span class="kt">COST</span> <span class="kt">CENTRE</span> <span class="kt">MODULE</span>         <span class="n">no</span><span class="o">.</span>    <span class="n">entries</span>  <span class="o">%</span><span class="n">time</span> <span class="o">%</span><span class="n">alloc</span>   <span class="o">%</span><span class="n">time</span> <span class="o">%</span><span class="n">alloc</span>
+
+<span class="kt">MAIN</span>        <span class="kt">MAIN</span>            <span class="mi">1</span>           <span class="mi">0</span>   <span class="mf">0.0</span>    <span class="mf">0.0</span>   <span class="mf">100.0</span>  <span class="mf">100.0</span>
+ <span class="n">main</span>       <span class="kt">Main</span>          <span class="mi">166</span>           <span class="mi">2</span>   <span class="mf">0.0</span>    <span class="mf">0.0</span>     <span class="mf">0.0</span>    <span class="mf">0.0</span>
+  <span class="n">mean</span>      <span class="kt">Main</span>          <span class="mi">168</span>           <span class="mi">1</span>   <span class="mf">0.0</span>    <span class="mf">0.0</span>     <span class="mf">0.0</span>    <span class="mf">0.0</span>
+ <span class="kt">CAF:</span><span class="n">sum</span>    <span class="kt">Main</span>          <span class="mi">160</span>           <span class="mi">1</span>  <span class="mf">78.6</span>   <span class="mf">25.0</span>    <span class="mf">78.6</span>   <span class="mf">25.0</span>
+ <span class="kt">CAF:</span><span class="n">lvl</span>    <span class="kt">Main</span>          <span class="mi">158</span>           <span class="mi">1</span>   <span class="mf">0.0</span>    <span class="mf">0.0</span>     <span class="mf">0.0</span>    <span class="mf">0.0</span>
+  <span class="n">main</span>      <span class="kt">Main</span>          <span class="mi">167</span>           <span class="mi">0</span>   <span class="mf">0.0</span>    <span class="mf">0.0</span>     <span class="mf">0.0</span>    <span class="mf">0.0</span>
+ <span class="kt">CAF</span>        <span class="kt">Numeric</span>       <span class="mi">136</span>           <span class="mi">1</span>   <span class="mf">0.0</span>    <span class="mf">0.0</span>     <span class="mf">0.0</span>    <span class="mf">0.0</span>
+ <span class="kt">CAF</span>        <span class="kt">Text</span><span class="o">.</span><span class="kt">Read</span><span class="o">.</span><span class="kt">Lex</span> <span class="mi">135</span>           <span class="mi">9</span>   <span class="mf">0.0</span>    <span class="mf">0.0</span>     <span class="mf">0.0</span>    <span class="mf">0.0</span>
+ <span class="kt">CAF</span>        <span class="kt">GHC</span><span class="o">.</span><span class="kt">Read</span>      <span class="mi">130</span>           <span class="mi">1</span>   <span class="mf">0.0</span>    <span class="mf">0.0</span>     <span class="mf">0.0</span>    <span class="mf">0.0</span>
+ <span class="kt">CAF</span>        <span class="kt">GHC</span><span class="o">.</span><span class="kt">Float</span>     <span class="mi">129</span>           <span class="mi">1</span>  <span class="mf">21.4</span>   <span class="mf">75.0</span>    <span class="mf">21.4</span>   <span class="mf">75.0</span>
+ <span class="kt">CAF</span>        <span class="kt">GHC</span><span class="o">.</span><span class="kt">Handle</span>    <span class="mi">110</span>           <span class="mi">4</span>   <span class="mf">0.0</span>    <span class="mf">0.0</span>     <span class="mf">0.0</span>    <span class="mf">0.0</span>
+</pre></div>
+</div>
+<p>这些信息呈现给一些我们关于程序的运行时行为的情况。里面包含了程序的名字以及
+执行程序时用到的选项和参数。『total time』是运行时系统视角所见的程序运行
+的确切总时长。『Total allocation』是程序在运行过程中分配的内存总字节数（不是
+程序运行时内存使用的峰值；那个峰值大概是700MB）</p>
+<p>报告中的第二小节是各个函数所消耗的时间和空间部分。第三小节是Cost Centre报告：
+其结构为调用关系树（比如我们可以看到 <code class="docutils literal"><span class="pre">mean</span></code> 是被 <code class="docutils literal"><span class="pre">main</span></code> 调用的）。
+&#8220;individual&#8221;和&#8221;inherited&#8221;列提供了每个Cost Centre其本身、其整体、以及其子节点
+所消耗的资源。最下面那些 <code class="docutils literal"><span class="pre">CAF</span></code> 是执行一些常量的一次性消耗（例如大列表中
+浮点数以及列表本身）。</p>
+<p>我们能从这些信息得出什么结论呢？我们可以看出两个 <code class="docutils literal"><span class="pre">CAF</span></code> 占用了大多数时间。
+分别是计算总和相关和浮点数相关。这基本解释了所有程序运行的消耗。加上之前
+我们观察到的关于GC的压力，我们就可以推测出列表节点和浮点数值可能是问题之源。</p>
+<p>简单的性能热点检测，特别是对于我们难以知道时间花费点的大型程序，这个
+时间分析会突出一些特定的问题模块或高层函数。这往往足够显示出问题所在了。
+就像我们的程序，一旦我们窄化了问题所在，我们就可以用更加成熟的分析工具
+来拿到更多的信息。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">A</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">hc</span> <span class="o">-</span><span class="n">p</span> <span class="o">-</span><span class="kt">K100M</span>
+<span class="mf">500000.5</span>
+<span class="o">./</span><span class="kt">A</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">hc</span> <span class="o">-</span><span class="n">p</span> <span class="o">-</span><span class="kt">K100M</span>  <span class="mf">4.15</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.27</span><span class="n">s</span> <span class="n">system</span> <span class="mi">99</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">4.432</span> <span class="n">total</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">JOB</span> <span class="s">&quot;A 1e6 +RTS -hc -p -K100M&quot;</span>
+<span class="kt">SAMPLE_UNIT</span> <span class="s">&quot;seconds&quot;</span>
+<span class="kt">VALUE_UNIT</span> <span class="s">&quot;bytes&quot;</span>
+<span class="kt">BEGIN_SAMPLE</span> <span class="mf">0.00</span>
+<span class="kt">END_SAMPLE</span> <span class="mf">0.00</span>
+<span class="kt">BEGIN_SAMPLE</span> <span class="mf">0.24</span>
+<span class="p">(</span><span class="mi">167</span><span class="p">)</span><span class="n">main</span><span class="o">/</span><span class="kt">CAF:</span><span class="n">lvl</span>   <span class="mi">48</span>
+<span class="p">(</span><span class="mi">136</span><span class="p">)</span><span class="kt">Numeric</span><span class="o">.</span><span class="kt">CAF</span>    <span class="mi">112</span>
+<span class="p">(</span><span class="mi">166</span><span class="p">)</span><span class="n">main</span>   <span class="mi">8384</span>
+<span class="p">(</span><span class="mi">110</span><span class="p">)</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Handle</span><span class="o">.</span><span class="kt">CAF</span> <span class="mi">8480</span>
+<span class="p">(</span><span class="mi">160</span><span class="p">)</span><span class="kt">CAF:</span><span class="n">sum</span>    <span class="mi">10562000</span>
+<span class="p">(</span><span class="mi">129</span><span class="p">)</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Float</span><span class="o">.</span><span class="kt">CAF</span>  <span class="mi">10562080</span>
+<span class="kt">END_SAMPLE</span> <span class="mf">0.24</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">hp2ps</span> <span class="o">-</span><span class="n">e8in</span> <span class="o">-</span><span class="n">c</span> <span class="kt">A</span><span class="o">.</span><span class="n">hp</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">A</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">hy</span> <span class="o">-</span><span class="n">p</span> <span class="o">-</span><span class="kt">K100M</span>
+<span class="mf">500000.5</span>
+<span class="o">./</span><span class="kt">A</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">i0</span><span class="o">.</span><span class="mi">001</span> <span class="o">-</span><span class="n">hy</span> <span class="o">-</span><span class="n">p</span> <span class="o">-</span><span class="kt">K100M</span>  <span class="mf">34.96</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.22</span><span class="n">s</span> <span class="n">system</span> <span class="mi">99</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">35.237</span> <span class="n">total</span>
+<span class="o">$</span> <span class="n">hp2ps</span> <span class="o">-</span><span class="n">e8in</span> <span class="o">-</span><span class="n">c</span> <span class="kt">A</span><span class="o">.</span><span class="n">hp</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">A</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">hd</span> <span class="o">-</span><span class="n">p</span> <span class="o">-</span><span class="kt">K100M</span>
+<span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">A</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">i0</span><span class="o">.</span><span class="mi">001</span> <span class="o">-</span><span class="n">hd</span> <span class="o">-</span><span class="n">p</span> <span class="o">-</span><span class="kt">K100M</span>
+<span class="mf">500000.5</span>
+<span class="o">./</span><span class="kt">A</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">i0</span><span class="o">.</span><span class="mi">001</span> <span class="o">-</span><span class="n">hd</span> <span class="o">-</span><span class="n">p</span> <span class="o">-</span><span class="kt">K100M</span>  <span class="mf">27.85</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.31</span><span class="n">s</span> <span class="n">system</span> <span class="mi">99</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">28.222</span> <span class="n">total</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/Fragment.hs</span>
+<span class="nf">mean</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Double</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Double</span>
+<span class="nf">mean</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">sum</span> <span class="n">xs</span> <span class="o">/</span> <span class="n">fromIntegral</span> <span class="p">(</span><span class="n">length</span> <span class="n">xs</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/B.hs</span>
+<span class="nf">mean</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Double</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Double</span>
+<span class="nf">mean</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">s</span> <span class="o">/</span> <span class="n">fromIntegral</span> <span class="n">n</span>
+  <span class="kr">where</span>
+    <span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>     <span class="ow">=</span> <span class="n">foldl</span> <span class="n">k</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="n">xs</span>
+    <span class="n">k</span> <span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="n">x</span> <span class="ow">=</span> <span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">s</span><span class="o">+</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="kt">O2</span> <span class="c1">--make B.hs -fforce-recomp</span>
+<span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">B</span> <span class="mf">1e6</span>
+<span class="kt">Stack</span> <span class="n">space</span> <span class="n">overflow</span><span class="kt">:</span> <span class="n">current</span> <span class="n">size</span> <span class="mi">8388608</span> <span class="n">bytes</span><span class="o">.</span>
+<span class="kt">Use</span> <span class="p">`</span><span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="kt">Ksize&#39;</span> <span class="n">to</span> <span class="n">increase</span> <span class="n">it</span><span class="o">.</span>
+<span class="o">./</span><span class="kt">B</span> <span class="mf">1e6</span>  <span class="mf">0.44</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.10</span><span class="n">s</span> <span class="n">system</span> <span class="mi">96</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">0.565</span> <span class="n">total</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="kt">O2</span> <span class="c1">--make B.hs -prof -auto-all -caf-all -fforce-recomp</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">B</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="kt">B</span><span class="o">.</span><span class="n">o</span> <span class="p">)</span>
+<span class="kt">Linking</span> <span class="kt">B</span> <span class="o">...</span>
+<span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">B</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">i0</span><span class="o">.</span><span class="mi">001</span> <span class="o">-</span><span class="n">hc</span> <span class="o">-</span><span class="n">p</span> <span class="o">-</span><span class="kt">K100M</span>
+<span class="mf">500000.5</span>
+<span class="o">./</span><span class="kt">B</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">i0</span><span class="o">.</span><span class="mi">001</span> <span class="o">-</span><span class="n">hc</span> <span class="o">-</span><span class="n">p</span> <span class="o">-</span><span class="kt">K100M</span>  <span class="mf">38.70</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.27</span><span class="n">s</span> <span class="n">system</span> <span class="mi">99</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">39.241</span> <span class="n">total</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/C.hs</span>
+<span class="nf">mean</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Double</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Double</span>
+<span class="nf">mean</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">s</span> <span class="o">/</span> <span class="n">fromIntegral</span> <span class="n">n</span>
+  <span class="kr">where</span>
+    <span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>     <span class="ow">=</span> <span class="n">foldl&#39;</span> <span class="n">k</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="n">xs</span>
+    <span class="n">k</span> <span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="n">x</span> <span class="ow">=</span> <span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">s</span><span class="o">+</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="kt">O2</span> <span class="c1">--make C.hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">C</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="kt">C</span><span class="o">.</span><span class="n">o</span> <span class="p">)</span>
+<span class="kt">Linking</span> <span class="kt">C</span> <span class="o">...</span>
+<span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">C</span> <span class="mf">1e6</span>
+<span class="kt">Stack</span> <span class="n">space</span> <span class="n">overflow</span><span class="kt">:</span> <span class="n">current</span> <span class="n">size</span> <span class="mi">8388608</span> <span class="n">bytes</span><span class="o">.</span>
+<span class="kt">Use</span> <span class="p">`</span><span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="kt">Ksize&#39;</span> <span class="n">to</span> <span class="n">increase</span> <span class="n">it</span><span class="o">.</span>
+<span class="o">./</span><span class="kt">C</span> <span class="mf">1e6</span>  <span class="mf">0.44</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.13</span><span class="n">s</span> <span class="n">system</span> <span class="mi">94</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">0.601</span> <span class="n">total</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/Foldl.hs</span>
+<span class="nf">foldl&#39;</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">a</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">b</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+<span class="nf">foldl&#39;</span> <span class="n">f</span> <span class="n">z</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">lgo</span> <span class="n">z</span> <span class="n">xs</span>
+    <span class="kr">where</span> <span class="n">lgo</span> <span class="n">z</span> <span class="kt">[]</span>     <span class="ow">=</span> <span class="n">z</span>
+          <span class="n">lgo</span> <span class="n">z</span> <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">z&#39;</span> <span class="ow">=</span> <span class="n">f</span> <span class="n">z</span> <span class="n">x</span> <span class="kr">in</span> <span class="n">z&#39;</span> <span class="p">`</span><span class="n">seq</span><span class="p">`</span> <span class="n">lgo</span> <span class="n">z&#39;</span> <span class="n">xs</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/D.hs</span>
+<span class="nf">mean</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Double</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Double</span>
+<span class="nf">mean</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">s</span> <span class="o">/</span> <span class="n">fromIntegral</span> <span class="n">n</span>
+  <span class="kr">where</span>
+    <span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>     <span class="ow">=</span> <span class="n">foldl&#39;</span> <span class="n">k</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="n">xs</span>
+    <span class="n">k</span> <span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">n</span> <span class="p">`</span><span class="n">seq</span><span class="p">`</span> <span class="n">s</span> <span class="p">`</span><span class="n">seq</span><span class="p">`</span> <span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">s</span><span class="o">+</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="kt">O2</span> <span class="kt">D</span><span class="o">.</span><span class="n">hs</span> <span class="c1">--make</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">D</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="kt">D</span><span class="o">.</span><span class="n">o</span> <span class="p">)</span>
+<span class="kt">Linking</span> <span class="kt">D</span> <span class="o">...</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">D</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">sstderr</span>
+<span class="o">./</span><span class="kt">D</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">sstderr</span>
+<span class="mf">500000.5</span>
+<span class="mi">256</span><span class="p">,</span><span class="mi">060</span><span class="p">,</span><span class="mi">848</span> <span class="n">bytes</span> <span class="n">allocated</span> <span class="kr">in</span> <span class="n">the</span> <span class="n">heap</span>
+     <span class="mi">43</span><span class="p">,</span><span class="mi">928</span> <span class="n">bytes</span> <span class="n">copied</span> <span class="n">during</span> <span class="kt">GC</span> <span class="p">(</span><span class="n">scavenged</span><span class="p">)</span>
+     <span class="mi">23</span><span class="p">,</span><span class="mi">456</span> <span class="n">bytes</span> <span class="n">copied</span> <span class="n">during</span> <span class="kt">GC</span> <span class="p">(</span><span class="n">not</span> <span class="n">scavenged</span><span class="p">)</span>
+     <span class="mi">45</span><span class="p">,</span><span class="mi">056</span> <span class="n">bytes</span> <span class="n">maximum</span> <span class="n">residency</span> <span class="p">(</span><span class="mi">1</span> <span class="n">sample</span><span class="p">(</span><span class="n">s</span><span class="p">))</span>
+
+        <span class="mi">489</span> <span class="n">collections</span> <span class="kr">in</span> <span class="n">generation</span> <span class="mi">0</span> <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span><span class="p">)</span>
+          <span class="mi">1</span> <span class="n">collections</span> <span class="kr">in</span> <span class="n">generation</span> <span class="mi">1</span> <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span><span class="p">)</span>
+
+          <span class="mi">1</span> <span class="kt">Mb</span> <span class="n">total</span> <span class="n">memory</span> <span class="kr">in</span> <span class="n">use</span>
+
+  <span class="kt">INIT</span>  <span class="n">time</span>    <span class="mf">0.00</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">MUT</span>   <span class="n">time</span>    <span class="mf">0.12</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.13</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">GC</span>    <span class="n">time</span>    <span class="mf">0.00</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">EXIT</span>  <span class="n">time</span>    <span class="mf">0.00</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">Total</span> <span class="n">time</span>    <span class="mf">0.13</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.13</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+
+  <span class="o">%</span><span class="kt">GC</span> <span class="n">time</span>       <span class="mf">2.6</span><span class="o">%</span>  <span class="p">(</span><span class="mf">2.6</span><span class="o">%</span> <span class="n">elapsed</span><span class="p">)</span>
+
+  <span class="kt">Alloc</span> <span class="n">rate</span>    <span class="mi">2</span><span class="p">,</span><span class="mi">076</span><span class="p">,</span><span class="mi">309</span><span class="p">,</span><span class="mi">329</span> <span class="n">bytes</span> <span class="n">per</span> <span class="kt">MUT</span> <span class="n">second</span>
+
+  <span class="kt">Productivity</span>  <span class="mf">97.4</span><span class="o">%</span> <span class="kr">of</span> <span class="n">total</span> <span class="n">user</span><span class="p">,</span> <span class="mf">94.8</span><span class="o">%</span> <span class="kr">of</span> <span class="n">total</span> <span class="n">elapsed</span>
+
+<span class="o">./</span><span class="kt">D</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">sstderr</span>  <span class="mf">0.13</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.00</span><span class="n">s</span> <span class="n">system</span> <span class="mi">95</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">0.133</span> <span class="n">total</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/E.hs</span>
+<span class="kr">import</span> <span class="nn">System.Environment</span>
+<span class="kr">import</span> <span class="nn">Text.Printf</span>
+<span class="kr">import</span> <span class="nn">Control.Parallel.Strategies</span>
+
+<span class="nf">main</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="ow">&lt;-</span> <span class="n">map</span> <span class="n">read</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="n">getArgs</span>
+    <span class="n">printf</span> <span class="s">&quot;%f</span><span class="se">\n</span><span class="s">&quot;</span> <span class="p">(</span><span class="n">mean</span> <span class="p">[</span><span class="mi">1</span><span class="o">..</span><span class="n">d</span><span class="p">])</span>
+
+<span class="nf">foldl&#39;rnf</span> <span class="ow">::</span> <span class="kt">NFData</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">a</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">b</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+<span class="nf">foldl&#39;rnf</span> <span class="n">f</span> <span class="n">z</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">lgo</span> <span class="n">z</span> <span class="n">xs</span>
+    <span class="kr">where</span>
+        <span class="n">lgo</span> <span class="n">z</span> <span class="kt">[]</span>     <span class="ow">=</span> <span class="n">z</span>
+        <span class="n">lgo</span> <span class="n">z</span> <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="ow">=</span> <span class="n">lgo</span> <span class="n">z&#39;</span> <span class="n">xs</span>
+            <span class="kr">where</span>
+                <span class="n">z&#39;</span> <span class="ow">=</span> <span class="n">f</span> <span class="n">z</span> <span class="n">x</span> <span class="p">`</span><span class="n">using</span><span class="p">`</span> <span class="n">rnf</span>
+
+<span class="nf">mean</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Double</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Double</span>
+<span class="nf">mean</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">s</span> <span class="o">/</span> <span class="n">fromIntegral</span> <span class="n">n</span>
+  <span class="kr">where</span>
+    <span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>     <span class="ow">=</span> <span class="n">foldl&#39;rnf</span> <span class="n">k</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="n">xs</span>
+    <span class="n">k</span> <span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="n">x</span> <span class="ow">=</span> <span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">s</span><span class="o">+</span><span class="n">x</span><span class="p">)</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Int</span><span class="p">,</span> <span class="kt">Double</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/F.hs</span>
+<span class="cm">{-# LANGUAGE BangPatterns #-}</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/F.hs</span>
+<span class="nf">mean</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Double</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Double</span>
+<span class="nf">mean</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">s</span> <span class="o">/</span> <span class="n">fromIntegral</span> <span class="n">n</span>
+  <span class="kr">where</span>
+    <span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>       <span class="ow">=</span> <span class="n">foldl&#39;</span> <span class="n">k</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="n">xs</span>
+    <span class="n">k</span> <span class="p">(</span><span class="o">!</span><span class="n">n</span><span class="p">,</span> <span class="o">!</span><span class="n">s</span><span class="p">)</span> <span class="n">x</span> <span class="ow">=</span> <span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">s</span><span class="o">+</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="kt">O2</span> <span class="kt">F</span><span class="o">.</span><span class="n">hs</span> <span class="c1">--make</span>
+<span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">F</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">sstderr</span>
+<span class="o">./</span><span class="kt">F</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">sstderr</span>
+<span class="mf">500000.5</span>
+<span class="mi">256</span><span class="p">,</span><span class="mi">060</span><span class="p">,</span><span class="mi">848</span> <span class="n">bytes</span> <span class="n">allocated</span> <span class="kr">in</span> <span class="n">the</span> <span class="n">heap</span>
+     <span class="mi">43</span><span class="p">,</span><span class="mi">928</span> <span class="n">bytes</span> <span class="n">copied</span> <span class="n">during</span> <span class="kt">GC</span> <span class="p">(</span><span class="n">scavenged</span><span class="p">)</span>
+     <span class="mi">23</span><span class="p">,</span><span class="mi">456</span> <span class="n">bytes</span> <span class="n">copied</span> <span class="n">during</span> <span class="kt">GC</span> <span class="p">(</span><span class="n">not</span> <span class="n">scavenged</span><span class="p">)</span>
+     <span class="mi">45</span><span class="p">,</span><span class="mi">056</span> <span class="n">bytes</span> <span class="n">maximum</span> <span class="n">residency</span> <span class="p">(</span><span class="mi">1</span> <span class="n">sample</span><span class="p">(</span><span class="n">s</span><span class="p">))</span>
+
+        <span class="mi">489</span> <span class="n">collections</span> <span class="kr">in</span> <span class="n">generation</span> <span class="mi">0</span> <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span><span class="p">)</span>
+          <span class="mi">1</span> <span class="n">collections</span> <span class="kr">in</span> <span class="n">generation</span> <span class="mi">1</span> <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span><span class="p">)</span>
+
+          <span class="mi">1</span> <span class="kt">Mb</span> <span class="n">total</span> <span class="n">memory</span> <span class="kr">in</span> <span class="n">use</span>
+
+  <span class="kt">INIT</span>  <span class="n">time</span>    <span class="mf">0.00</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">MUT</span>   <span class="n">time</span>    <span class="mf">0.14</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.15</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">GC</span>    <span class="n">time</span>    <span class="mf">0.00</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">EXIT</span>  <span class="n">time</span>    <span class="mf">0.00</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">Total</span> <span class="n">time</span>    <span class="mf">0.14</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.15</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+
+  <span class="o">%</span><span class="kt">GC</span> <span class="n">time</span>       <span class="mf">0.0</span><span class="o">%</span>  <span class="p">(</span><span class="mf">2.3</span><span class="o">%</span> <span class="n">elapsed</span><span class="p">)</span>
+
+  <span class="kt">Alloc</span> <span class="n">rate</span>    <span class="mi">1</span><span class="p">,</span><span class="mi">786</span><span class="p">,</span><span class="mi">599</span><span class="p">,</span><span class="mi">833</span> <span class="n">bytes</span> <span class="n">per</span> <span class="kt">MUT</span> <span class="n">second</span>
+
+  <span class="kt">Productivity</span> <span class="mf">100.0</span><span class="o">%</span> <span class="kr">of</span> <span class="n">total</span> <span class="n">user</span><span class="p">,</span> <span class="mf">94.6</span><span class="o">%</span> <span class="kr">of</span> <span class="n">total</span> <span class="n">elapsed</span>
+
+<span class="o">./</span><span class="kt">F</span> <span class="mf">1e6</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">sstderr</span>  <span class="mf">0.14</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.01</span><span class="n">s</span> <span class="n">system</span> <span class="mi">96</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">0.155</span> <span class="n">total</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/G.hs</span>
+<span class="kr">data</span> <span class="kt">Pair</span> <span class="n">a</span> <span class="n">b</span> <span class="ow">=</span> <span class="kt">Pair</span> <span class="o">!</span><span class="n">a</span> <span class="o">!</span><span class="n">b</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/G.hs</span>
+<span class="nf">mean</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Double</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Double</span>
+<span class="nf">mean</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">s</span> <span class="o">/</span> <span class="n">fromIntegral</span> <span class="n">n</span>
+  <span class="kr">where</span>
+    <span class="kt">Pair</span> <span class="n">n</span> <span class="n">s</span>       <span class="ow">=</span> <span class="n">foldl&#39;</span> <span class="n">k</span> <span class="p">(</span><span class="kt">Pair</span> <span class="mi">0</span> <span class="mi">0</span><span class="p">)</span> <span class="n">xs</span>
+    <span class="n">k</span> <span class="p">(</span><span class="kt">Pair</span> <span class="n">n</span> <span class="n">s</span><span class="p">)</span> <span class="n">x</span> <span class="ow">=</span> <span class="kt">Pair</span> <span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="n">s</span><span class="o">+</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="kt">O2</span> <span class="o">-</span><span class="n">ddump</span><span class="o">-</span><span class="n">simpl</span> <span class="kt">G</span><span class="o">.</span><span class="n">hs</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">lgo</span> <span class="ow">::</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Double</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Double</span><span class="o">#</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="o">#</span> <span class="kt">Integer</span><span class="p">,</span> <span class="kt">Double</span> <span class="o">#</span><span class="p">)</span>
+
+<span class="nf">lgo</span> <span class="ow">=</span> <span class="nf">\</span> <span class="n">n</span> <span class="n">xs</span> <span class="n">s</span> <span class="ow">-&gt;</span>
+    <span class="kr">case</span> <span class="n">xs</span> <span class="kr">of</span>
+      <span class="kt">[]</span>       <span class="ow">-&gt;</span> <span class="p">(</span><span class="o">#</span> <span class="n">n</span><span class="p">,</span> <span class="kt">D</span><span class="o">#</span> <span class="n">s</span> <span class="o">#</span><span class="p">);</span>
+      <span class="p">(</span><span class="kt">:</span><span class="p">)</span> <span class="n">x</span> <span class="n">ys</span> <span class="ow">-&gt;</span>
+        <span class="kr">case</span> <span class="n">plusInteger</span> <span class="n">n</span> <span class="mi">1</span> <span class="kr">of</span>
+            <span class="n">n&#39;</span> <span class="ow">-&gt;</span> <span class="kr">case</span> <span class="n">x</span> <span class="kr">of</span>
+                <span class="kt">D</span><span class="o">#</span> <span class="n">y</span> <span class="ow">-&gt;</span> <span class="n">lgo</span> <span class="n">n&#39;</span> <span class="n">ys</span> <span class="p">(</span><span class="o">+##</span> <span class="n">s</span> <span class="n">y</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/H.hs</span>
+<span class="kr">data</span> <span class="kt">Pair</span> <span class="ow">=</span> <span class="kt">Pair</span> <span class="o">!</span><span class="kt">Int</span> <span class="o">!</span><span class="kt">Double</span>
+
+<span class="nf">mean</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Double</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Double</span>
+<span class="nf">mean</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">s</span> <span class="o">/</span> <span class="n">fromIntegral</span> <span class="n">n</span>
+  <span class="kr">where</span>
+    <span class="kt">Pair</span> <span class="n">n</span> <span class="n">s</span>       <span class="ow">=</span> <span class="n">foldl&#39;</span> <span class="n">k</span> <span class="p">(</span><span class="kt">Pair</span> <span class="mi">0</span> <span class="mi">0</span><span class="p">)</span> <span class="n">xs</span>
+    <span class="n">k</span> <span class="p">(</span><span class="kt">Pair</span> <span class="n">n</span> <span class="n">s</span><span class="p">)</span> <span class="n">x</span> <span class="ow">=</span> <span class="kt">Pair</span> <span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="n">s</span><span class="o">+</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">lgo</span> <span class="ow">::</span> <span class="kt">Int</span><span class="o">#</span> <span class="ow">-&gt;</span> <span class="kt">Double</span><span class="o">#</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Double</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="o">#</span> <span class="kt">Int</span><span class="o">#</span><span class="p">,</span> <span class="kt">Double</span><span class="o">#</span> <span class="o">#</span><span class="p">)</span>
+<span class="nf">lgo</span> <span class="ow">=</span> <span class="nf">\</span> <span class="n">n</span> <span class="n">s</span> <span class="n">xs</span> <span class="ow">-&gt;</span>
+    <span class="kr">case</span> <span class="n">xs</span> <span class="kr">of</span>
+      <span class="kt">[]</span>       <span class="ow">-&gt;</span> <span class="p">(</span><span class="o">#</span> <span class="n">n</span><span class="p">,</span> <span class="n">s</span> <span class="o">#</span><span class="p">)</span>
+      <span class="p">(</span><span class="kt">:</span><span class="p">)</span> <span class="n">x</span> <span class="n">ys</span> <span class="ow">-&gt;</span>
+        <span class="kr">case</span> <span class="n">x</span> <span class="kr">of</span>
+            <span class="kt">D</span><span class="o">#</span> <span class="n">y</span> <span class="ow">-&gt;</span> <span class="n">lgo</span> <span class="p">(</span><span class="o">+#</span> <span class="n">n</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="o">+##</span> <span class="n">s</span> <span class="n">y</span><span class="p">)</span> <span class="n">ys</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">H</span> <span class="mf">1e7</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">sstderr</span>
+<span class="o">./</span><span class="kt">H</span> <span class="mf">1e7</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">sstderr</span>
+<span class="mf">5000000.5</span>
+<span class="mi">1</span><span class="p">,</span><span class="mi">689</span><span class="p">,</span><span class="mi">133</span><span class="p">,</span><span class="mi">824</span> <span class="n">bytes</span> <span class="n">allocated</span> <span class="kr">in</span> <span class="n">the</span> <span class="n">heap</span>
+    <span class="mi">284</span><span class="p">,</span><span class="mi">432</span> <span class="n">bytes</span> <span class="n">copied</span> <span class="n">during</span> <span class="kt">GC</span> <span class="p">(</span><span class="n">scavenged</span><span class="p">)</span>
+         <span class="mi">32</span> <span class="n">bytes</span> <span class="n">copied</span> <span class="n">during</span> <span class="kt">GC</span> <span class="p">(</span><span class="n">not</span> <span class="n">scavenged</span><span class="p">)</span>
+     <span class="mi">45</span><span class="p">,</span><span class="mi">056</span> <span class="n">bytes</span> <span class="n">maximum</span> <span class="n">residency</span> <span class="p">(</span><span class="mi">1</span> <span class="n">sample</span><span class="p">(</span><span class="n">s</span><span class="p">))</span>
+
+       <span class="mi">3222</span> <span class="n">collections</span> <span class="kr">in</span> <span class="n">generation</span> <span class="mi">0</span> <span class="p">(</span>  <span class="mf">0.01</span><span class="n">s</span><span class="p">)</span>
+          <span class="mi">1</span> <span class="n">collections</span> <span class="kr">in</span> <span class="n">generation</span> <span class="mi">1</span> <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span><span class="p">)</span>
+
+          <span class="mi">1</span> <span class="kt">Mb</span> <span class="n">total</span> <span class="n">memory</span> <span class="kr">in</span> <span class="n">use</span>
+
+  <span class="kt">INIT</span>  <span class="n">time</span>    <span class="mf">0.00</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">MUT</span>   <span class="n">time</span>    <span class="mf">0.63</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.63</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">GC</span>    <span class="n">time</span>    <span class="mf">0.01</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.02</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">EXIT</span>  <span class="n">time</span>    <span class="mf">0.00</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.00</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+  <span class="kt">Total</span> <span class="n">time</span>    <span class="mf">0.64</span><span class="n">s</span>  <span class="p">(</span>  <span class="mf">0.64</span><span class="n">s</span> <span class="n">elapsed</span><span class="p">)</span>
+
+  <span class="o">%</span><span class="kt">GC</span> <span class="n">time</span>       <span class="mf">1.0</span><span class="o">%</span>  <span class="p">(</span><span class="mf">2.4</span><span class="o">%</span> <span class="n">elapsed</span><span class="p">)</span>
+
+  <span class="kt">Alloc</span> <span class="n">rate</span>    <span class="mi">2</span><span class="p">,</span><span class="mi">667</span><span class="p">,</span><span class="mi">227</span><span class="p">,</span><span class="mi">478</span> <span class="n">bytes</span> <span class="n">per</span> <span class="kt">MUT</span> <span class="n">second</span>
+
+  <span class="kt">Productivity</span>  <span class="mf">98.4</span><span class="o">%</span> <span class="kr">of</span> <span class="n">total</span> <span class="n">user</span><span class="p">,</span> <span class="mf">98.2</span><span class="o">%</span> <span class="kr">of</span> <span class="n">total</span> <span class="n">elapsed</span>
+
+<span class="o">./</span><span class="kt">H</span> <span class="mf">1e7</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">sstderr</span>  <span class="mf">0.64</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.00</span><span class="n">s</span> <span class="n">system</span> <span class="mi">99</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">0.644</span> <span class="n">total</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch25/I.hs</span>
+<span class="kr">import</span> <span class="nn">System.Environment</span>
+<span class="kr">import</span> <span class="nn">Text.Printf</span>
+<span class="kr">import</span> <span class="nn">Data.Array.Vector</span>
+
+<span class="nf">main</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="ow">&lt;-</span> <span class="n">map</span> <span class="n">read</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="n">getArgs</span>
+    <span class="n">printf</span> <span class="s">&quot;%f</span><span class="se">\n</span><span class="s">&quot;</span> <span class="p">(</span><span class="n">mean</span> <span class="p">(</span><span class="n">enumFromToFracU</span> <span class="mi">1</span> <span class="n">d</span><span class="p">))</span>
+
+<span class="kr">data</span> <span class="kt">Pair</span> <span class="ow">=</span> <span class="kt">Pair</span> <span class="o">!</span><span class="kt">Int</span> <span class="o">!</span><span class="kt">Double</span>
+
+<span class="nf">mean</span> <span class="ow">::</span> <span class="kt">UArr</span> <span class="kt">Double</span> <span class="ow">-&gt;</span> <span class="kt">Double</span>
+<span class="nf">mean</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">s</span> <span class="o">/</span> <span class="n">fromIntegral</span> <span class="n">n</span>
+  <span class="kr">where</span>
+    <span class="kt">Pair</span> <span class="n">n</span> <span class="n">s</span>       <span class="ow">=</span> <span class="n">foldlU</span> <span class="n">k</span> <span class="p">(</span><span class="kt">Pair</span> <span class="mi">0</span> <span class="mi">0</span><span class="p">)</span> <span class="n">xs</span>
+    <span class="n">k</span> <span class="p">(</span><span class="kt">Pair</span> <span class="n">n</span> <span class="n">s</span><span class="p">)</span> <span class="n">x</span> <span class="ow">=</span> <span class="kt">Pair</span> <span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="n">s</span><span class="o">+</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">fold</span> <span class="ow">::</span> <span class="kt">Int</span><span class="o">#</span> <span class="ow">-&gt;</span> <span class="kt">Double</span><span class="o">#</span> <span class="ow">-&gt;</span> <span class="kt">Double</span><span class="o">#</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="o">#</span> <span class="kt">Int</span><span class="o">#</span><span class="p">,</span> <span class="kt">Double</span><span class="o">#</span> <span class="o">#</span><span class="p">)</span>
+<span class="nf">fold</span> <span class="ow">=</span> <span class="nf">\</span> <span class="n">n</span> <span class="n">s</span> <span class="n">t</span> <span class="ow">-&gt;</span>
+    <span class="kr">case</span> <span class="o">&gt;##</span> <span class="n">t</span> <span class="n">limit</span> <span class="kr">of</span> <span class="p">{</span>
+      <span class="kt">False</span> <span class="ow">-&gt;</span> <span class="n">fold</span> <span class="p">(</span><span class="o">+#</span> <span class="n">n</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="o">+##</span> <span class="n">s</span> <span class="n">t</span><span class="p">)</span> <span class="p">(</span><span class="o">+##</span> <span class="n">t</span> <span class="mf">1.0</span><span class="p">)</span>
+      <span class="kt">True</span>  <span class="ow">-&gt;</span> <span class="p">(</span><span class="o">#</span> <span class="n">n</span><span class="p">,</span> <span class="n">s</span> <span class="o">#</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">I</span> <span class="mf">1e7</span>
+<span class="mf">5000000.5</span>
+<span class="o">./</span><span class="kt">I</span> <span class="mf">1e7</span>  <span class="mf">0.06</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.00</span><span class="n">s</span> <span class="n">system</span> <span class="mi">72</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">0.083</span> <span class="n">total</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="n">fforce</span><span class="o">-</span><span class="n">recomp</span> <span class="c1">--make -O2 -funbox-strict-fields -fvia-C -optc-O2 I.hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">I</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="kt">I</span><span class="o">.</span><span class="n">o</span> <span class="p">)</span>
+<span class="kt">Linking</span> <span class="kt">I</span> <span class="o">...</span>
+<span class="o">$</span> <span class="n">time</span> <span class="o">./</span><span class="kt">I</span> <span class="mf">1e7</span>
+<span class="mf">5000000.5</span>
+<span class="o">./</span><span class="kt">I</span> <span class="mf">1e7</span>  <span class="mf">0.04</span><span class="n">s</span> <span class="n">user</span> <span class="mf">0.00</span><span class="n">s</span> <span class="n">system</span> <span class="mi">98</span><span class="o">%</span> <span class="n">cpu</span> <span class="mf">0.047</span> <span class="n">total</span>
+</pre></div>
+</div>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">go</span><span class="kt">:</span>
+  <span class="n">ucomisd</span>     <span class="mi">5</span><span class="p">(</span><span class="o">%</span><span class="n">rbx</span><span class="p">),</span> <span class="o">%</span><span class="n">xmm6</span>
+  <span class="n">ja</span>  <span class="o">.</span><span class="kt">L31</span>
+  <span class="n">addsd</span>       <span class="o">%</span><span class="n">xmm6</span><span class="p">,</span> <span class="o">%</span><span class="n">xmm5</span>
+  <span class="n">addq</span>        <span class="o">$</span><span class="mi">1</span><span class="p">,</span> <span class="o">%</span><span class="n">rsi</span>
+  <span class="n">addsd</span>       <span class="o">.</span><span class="kt">LC0</span><span class="p">(</span><span class="o">%</span><span class="n">rip</span><span class="p">),</span> <span class="o">%</span><span class="n">xmm6</span>
+  <span class="n">jmp</span> <span class="n">go</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="24.html">第 24 章：并发和多核编程</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="27.html">第 27 章：Socket 和 Syslog</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.3.
+    </div>
+  </body>
+</html>

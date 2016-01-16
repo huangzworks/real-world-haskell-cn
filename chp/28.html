@@ -1,0 +1,812 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>第 28 章：软件事务内存 (STM) &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
+    <link rel="next" title="翻译约定" href="../convention.html" />
+    <link rel="prev" title="第 27 章：Socket 和 Syslog" href="27.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="27.html">第 27 章：Socket 和 Syslog</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="../convention.html">翻译约定</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="stm">
+<h1>第 28 章：软件事务内存 (STM)<a class="headerlink" href="#stm" title="Permalink to this headline">¶</a></h1>
+<p>在并发编程的传统线程模型中，线程之间的数据共享需要通过锁来保持一致性(consistentBalance)，当数据产生变化时，还需要使用条件变量(condition variable)对各个线程进行通知。</p>
+<p>某种程度上，Haskell 的 <code class="docutils literal"><span class="pre">MVar</span></code> 机制对上面提到的工具进行了改进，但是，它仍然带有和这些工具一样的缺陷：</p>
+<ul class="simple">
+<li>因为忘记使用锁而导致条件竞争(race condition)</li>
+<li>因为不正确的加锁顺序而导致死锁(deadblock)</li>
+<li>因为未被捕捉的异常而造成程序崩溃(corruption)</li>
+<li>因为错误地忽略了通知，造成线程无法正常唤醒(lost wakeup)</li>
+</ul>
+<p>这些问题即使在很小的并发程序里也会经常发生，而在更加庞大的代码库或是高负载的情况下，这些问题会引发更加糟糕的难题。</p>
+<p>比如说，对一个只有几个大范围锁的程序进行编程并不难，只是一旦这个程序在高负载的环境下运行，锁之间的相互竞争就会变得非常严重。另一方面，如果采用细粒度(fineo-grained)的锁机制，保持软件正常工作将会变得非常困难。除此之外，就算在负载不高的情况下, 加锁带来的额外的簿记工作(book-keeping)也会对性能产生影响。</p>
+<div class="section" id="id1">
+<h2>基础知识<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>软件事务内存(Software transactional memory)提供了一些简单但强大的工具。通过这些工具我们可以解决前面提到的大多数问题。通过 <code class="docutils literal"><span class="pre">atomically</span></code> 组合器(combinator), 我们可以在一个事务内执行一批操作。当这一组操作开始执行的时候，其他线程是觉察不到这些操作所产生的任何修改，直到所有操作完成。同样的，当前线程也无法察觉其他线程的所产生的修改。这些性质表明的操作的隔离性(isolated)。</p>
+<p>当从一个事务退出的时候，只会发生以下情况中的一种:</p>
+<ul class="simple">
+<li>如果没有其他线程修改了同样的数据，当前线程产生的修改将会对所有其他线程可见。</li>
+<li>否则，当前线程的所产生的改动会被丢弃，然后这组操作会被重新执行。</li>
+</ul>
+<blockquote>
+<div><code class="docutils literal"><span class="pre">atomically</span></code> 这种全有或全无(all-or-nothing)的天性被称之为原子性(atomic)， <code class="docutils literal"><span class="pre">atomically</span></code> 也因为得名。如果你使用过支持事务的数据库，你会觉得STM使用起来非常熟悉。</div></blockquote>
+</div>
+<div class="section" id="id2">
+<h2>一些简单的例子<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
+<p>在多玩家角色扮演的游戏里， 一个玩家的角色会有许多属性，比如健康，财产以及金钱。让我们从基于游戏人物属性的一些简单的函数和类型开始去了解STM的精彩内容。随着学习的深入，我们也会不断地改进我们的代码。</p>
+<p>STM的API位于 <code class="docutils literal"><span class="pre">stm</span></code> 包，模块 <code class="docutils literal"><span class="pre">Control.Concurrent.STM</span></code> 。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="cm">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span>
+
+<span class="kr">import</span> <span class="nn">Control.Concurrent.STM</span>
+<span class="kr">import</span> <span class="nn">Control.Monad</span>
+
+<span class="kr">data</span> <span class="kt">Item</span> <span class="ow">=</span> <span class="kt">Scroll</span>
+          <span class="o">|</span> <span class="kt">Wand</span>
+          <span class="o">|</span> <span class="kt">Banjo</span>
+            <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+
+<span class="kr">newtype</span> <span class="kt">Gold</span> <span class="ow">=</span> <span class="kt">Gold</span> <span class="kt">Int</span>
+    <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Show</span><span class="p">,</span> <span class="kt">Num</span><span class="p">)</span>
+
+<span class="kr">newtype</span> <span class="kt">HitPoint</span> <span class="ow">=</span> <span class="kt">HitPoint</span> <span class="kt">Int</span>
+    <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Show</span><span class="p">,</span> <span class="kt">Num</span><span class="p">)</span>
+
+<span class="kr">type</span> <span class="kt">Inventory</span> <span class="ow">=</span> <span class="kt">TVar</span> <span class="p">[</span><span class="kt">Item</span><span class="p">]</span>
+<span class="kr">type</span> <span class="kt">Health</span> <span class="ow">=</span> <span class="kt">TVar</span> <span class="kt">HitPoint</span>
+<span class="kr">type</span> <span class="kt">Balance</span> <span class="ow">=</span> <span class="kt">TVar</span> <span class="kt">Gold</span>
+
+<span class="kr">data</span> <span class="kt">Player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="p">{</span>
+      <span class="n">balance</span> <span class="ow">::</span> <span class="kt">Balance</span><span class="p">,</span>
+      <span class="n">health</span> <span class="ow">::</span> <span class="kt">Health</span><span class="p">,</span>
+      <span class="n">inventory</span> <span class="ow">::</span> <span class="kt">Inventory</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>参数化类型 <code class="docutils literal"><span class="pre">TVar</span></code> 是一个可变量，可以在 <code class="docutils literal"><span class="pre">atomically</span></code> 块中读取或者修改。为了简单起见，我们把玩家的背包(Inventory)定义为物品的列表。同时注意到，我们用到了 <code class="docutils literal"><span class="pre">newtype</span></code> ，这样不会混淆财富和健康属性。</p>
+<p>当需要在两个账户(Balance)之间转账，我们所要的做的就只是调整下各自的 <code class="docutils literal"><span class="pre">Tvar</span></code> 。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">basicTransfer</span> <span class="n">qty</span> <span class="n">fromBal</span> <span class="n">toBal</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">fromQty</span> <span class="ow">&lt;-</span> <span class="n">readTVar</span> <span class="n">fromBal</span>
+  <span class="n">toQty</span>   <span class="ow">&lt;-</span> <span class="n">readTVar</span> <span class="n">toBal</span>
+  <span class="n">writeTVar</span> <span class="n">fromBal</span> <span class="p">(</span><span class="n">fromQty</span> <span class="o">-</span> <span class="n">qty</span><span class="p">)</span>
+  <span class="n">writeTVar</span> <span class="n">toBal</span>   <span class="p">(</span><span class="n">toQty</span> <span class="o">+</span> <span class="n">qty</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>让我们写个简单的测试函数</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">transferTest</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">alice</span> <span class="ow">&lt;-</span> <span class="n">newTVar</span> <span class="p">(</span><span class="mi">12</span> <span class="ow">::</span> <span class="kt">Gold</span><span class="p">)</span>
+  <span class="n">bob</span>   <span class="ow">&lt;-</span> <span class="n">newTVar</span> <span class="mi">4</span>
+  <span class="n">basicTransfer</span> <span class="mi">3</span> <span class="n">alice</span> <span class="n">bob</span>
+  <span class="n">liftM2</span> <span class="p">(,)</span> <span class="p">(</span><span class="n">readTVar</span> <span class="n">alice</span><span class="p">)</span> <span class="p">(</span><span class="n">readTVar</span> <span class="n">bob</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>如果我们在ghci里执行下这个函数，应该有如下的结果</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">GameInventory</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">GameInventory</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">atomically</span> <span class="n">transferTest</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">array</span><span class="o">-</span><span class="mf">0.4</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">stm</span><span class="o">-</span><span class="mf">2.3</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="p">(</span><span class="kt">Gold</span> <span class="mi">9</span><span class="p">,</span><span class="kt">Gold</span> <span class="mi">7</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>原子性和隔离性保证了当其他线程同时看到 <code class="docutils literal"><span class="pre">bob</span></code> 的账户和 <code class="docutils literal"><span class="pre">alice</span></code> 的账户被修改了。</p>
+<p>即使在并发程序里，我们也努力保持代码尽量的纯函数化。这使得我们的代码更加容易推导和测试。由于数据并没有事务性，这也让底层的STM做更少的事。以下的纯函数实现了从我们来表示玩家背包的数列里移除一个物品。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">removeInv</span> <span class="ow">::</span> <span class="kt">Eq</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">removeInv</span> <span class="n">x</span> <span class="n">xs</span> <span class="ow">=</span>
+    <span class="kr">case</span> <span class="n">takeWhile</span> <span class="p">(</span><span class="o">/=</span> <span class="n">x</span><span class="p">)</span> <span class="n">xs</span> <span class="kr">of</span>
+      <span class="p">(</span><span class="kr">_</span><span class="kt">:</span><span class="n">ys</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="n">ys</span>
+      <span class="kt">[]</span>     <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>这里返回值用了 <code class="docutils literal"><span class="pre">Maybe</span></code> 类型，它可以用来表示物品是否在玩家的背包里。</p>
+<p>下面这个事务性的函数实现了把一个物品给另外一个玩家。这个函数有一点点复杂因为需要判断给予者是否有这个物品。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">maybeGiveItem</span> <span class="n">item</span> <span class="n">fromInv</span> <span class="n">toInv</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">fromList</span> <span class="ow">&lt;-</span> <span class="n">readTVar</span> <span class="n">fromInv</span>
+  <span class="kr">case</span> <span class="n">removeInv</span> <span class="n">item</span> <span class="n">fromList</span> <span class="kr">of</span>
+    <span class="kt">Nothing</span>      <span class="ow">-&gt;</span> <span class="n">return</span> <span class="kt">False</span>
+    <span class="kt">Just</span> <span class="n">newList</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+      <span class="n">writeTVar</span> <span class="n">fromInv</span> <span class="n">newList</span>
+      <span class="n">destItems</span> <span class="ow">&lt;-</span> <span class="n">readTVar</span> <span class="n">toInv</span>
+      <span class="n">writeTVar</span> <span class="n">toInv</span> <span class="p">(</span><span class="n">item</span> <span class="kt">:</span> <span class="n">destItems</span><span class="p">)</span>
+      <span class="n">return</span> <span class="kt">True</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id3">
+<h2>STM的安全性<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<p>既然我们提供了有原子性和隔离型的事务，那么保证我们不能有意或是无意的从 <code class="docutils literal"><span class="pre">atomically</span></code> 执行块从脱离显得格外重要。借由 <code class="docutils literal"><span class="pre">STM</span></code> monad，Haskell的类型系统保证了我们这种行为。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">atomically</span>
+<span class="nf">atomically</span> <span class="ow">::</span> <span class="kt">STM</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">atomically</span></code> 接受一个 <code class="docutils literal"><span class="pre">STM</span></code> monad的动作， 然后执行并让我们可以从 <code class="docutils literal"><span class="pre">IO</span></code> monad里拿到这个结果。 <code class="docutils literal"><span class="pre">STM</span></code> monad是所有事务相关代码执行的地方。比如这些操作 <code class="docutils literal"><span class="pre">TVar</span></code> 值的函数都在 <code class="docutils literal"><span class="pre">STM</span></code> monad里被执行。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">newTVar</span>
+<span class="nf">newTVar</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="p">(</span><span class="kt">TVar</span> <span class="n">a</span><span class="p">)</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">readTVar</span>
+<span class="nf">readTVar</span> <span class="ow">::</span> <span class="kt">TVar</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="n">a</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">writeTVar</span>
+<span class="nf">writeTVar</span> <span class="ow">::</span> <span class="kt">TVar</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>我们之前定义的事务性函数也有这个特性</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">basicTransfer</span> <span class="ow">::</span> <span class="kt">Gold</span> <span class="ow">-&gt;</span> <span class="kt">Balance</span> <span class="ow">-&gt;</span> <span class="kt">Balance</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="nb">()</span>
+<span class="nf">maybeGiveItem</span> <span class="ow">::</span> <span class="kt">Item</span> <span class="ow">-&gt;</span> <span class="kt">Inventory</span> <span class="ow">-&gt;</span> <span class="kt">Inventory</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="kt">Bool</span>
+</pre></div>
+</div>
+<p>在 <code class="docutils literal"><span class="pre">STM</span></code> monad里是不允许执行I/O操作或者是修改非事务性的可变状态，比如 <code class="docutils literal"><span class="pre">MVar</span></code> 的值。这就使得我们可以避免那些违背事务完整的操作。</p>
+</div>
+<div class="section" id="id4">
+<h2>重试一个事务<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
+<p><code class="docutils literal"><span class="pre">maybeGiveItem</span></code> 这个函数看上去稍微有点怪异。只有当角色有这个物品时才会将它给另外一个角色，这看上去还算合理，然后返回一个 <code class="docutils literal"><span class="pre">Bool</span></code> 值使调用这个函数的代码变得复杂。下面这个函数调用了 <code class="docutils literal"><span class="pre">maybeGiveItem</span></code>, 它必须根据 <code class="docutils literal"><span class="pre">maybeGiveItem</span></code> 的返回结果来决定如何继续执行。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">maybeSellItem</span> <span class="ow">::</span> <span class="kt">Item</span> <span class="ow">-&gt;</span> <span class="kt">Gold</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="kt">Bool</span>
+<span class="nf">maybeSellItem</span> <span class="n">item</span> <span class="n">price</span> <span class="n">buyer</span> <span class="n">seller</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">given</span> <span class="ow">&lt;-</span> <span class="n">maybeGiveItem</span> <span class="n">item</span> <span class="p">(</span><span class="n">inventory</span> <span class="n">seller</span><span class="p">)</span> <span class="p">(</span><span class="n">inventory</span> <span class="n">buyer</span><span class="p">)</span>
+  <span class="kr">if</span> <span class="n">given</span>
+    <span class="kr">then</span> <span class="kr">do</span>
+      <span class="n">basicTransfer</span> <span class="n">price</span> <span class="p">(</span><span class="n">balance</span> <span class="n">buyer</span><span class="p">)</span> <span class="p">(</span><span class="n">balance</span> <span class="n">seller</span><span class="p">)</span>
+      <span class="n">return</span> <span class="kt">True</span>
+    <span class="kr">else</span> <span class="n">return</span> <span class="kt">False</span>
+</pre></div>
+</div>
+<p>我们不仅要检查物品是否给到了另一个玩家，而且还得把是否成功这个信号传递给调用者。这就意味了复杂性被延续到了更外层。</p>
+<p>下面我们来看看如何用更加优雅的方式处理事务无法成功进行的情况。 <code class="docutils literal"><span class="pre">STM</span></code> API 提供了一个 <code class="docutils literal"><span class="pre">retry</span></code> 函数，它可以立即中断一个 无法成功进行的 <code class="docutils literal"><span class="pre">atomically</span></code> 执行块。正如这个函数名本身所指明的意思，当它发生时，执行块会被重新执行，所有在这之前的操作都不会被记录。我们使用 <code class="docutils literal"><span class="pre">retry</span></code> 重新实现了 <code class="docutils literal"><span class="pre">maybeGiveItem</span></code> 。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">giveItem</span> <span class="ow">::</span> <span class="kt">Item</span> <span class="ow">-&gt;</span> <span class="kt">Inventory</span> <span class="ow">-&gt;</span> <span class="kt">Inventory</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="nb">()</span>
+
+<span class="nf">giveItem</span> <span class="n">item</span> <span class="n">fromInv</span> <span class="n">toInv</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">fromList</span> <span class="ow">&lt;-</span> <span class="n">readTVar</span> <span class="n">fromInv</span>
+    <span class="kr">case</span> <span class="n">removeInv</span> <span class="n">item</span> <span class="n">fromList</span> <span class="kr">of</span>
+        <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">retry</span>
+        <span class="kt">Just</span> <span class="n">newList</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+            <span class="n">writeTVar</span> <span class="n">fromInv</span> <span class="n">newList</span>
+            <span class="n">readTVar</span> <span class="n">toInv</span> <span class="o">&gt;&gt;=</span> <span class="n">writeTVar</span> <span class="n">toInv</span> <span class="o">.</span> <span class="p">(</span><span class="n">item</span> <span class="kt">:</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>我们之前实现的 <code class="docutils literal"><span class="pre">basicTransfer</span></code> 有一个缺陷：没有检查发送者的账户是否有足够的资金。我们可以使用 <code class="docutils literal"><span class="pre">retry</span></code> 来纠正这个问题并保持方法签名不变。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">transfer</span> <span class="ow">::</span> <span class="kt">Gold</span> <span class="ow">-&gt;</span> <span class="kt">Balance</span> <span class="ow">-&gt;</span> <span class="kt">Balance</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="nb">()</span>
+
+<span class="nf">transfer</span> <span class="n">qty</span> <span class="n">fromBal</span> <span class="n">toBal</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">fromQty</span> <span class="ow">&lt;-</span> <span class="n">readTVar</span> <span class="n">fromBal</span>
+  <span class="n">when</span> <span class="p">(</span><span class="n">qty</span> <span class="o">&gt;</span> <span class="n">fromQty</span><span class="p">)</span> <span class="o">$</span>
+    <span class="n">retry</span>
+  <span class="n">writeTVar</span> <span class="n">fromBal</span> <span class="p">(</span><span class="n">fromQty</span> <span class="o">-</span> <span class="n">qty</span><span class="p">)</span>
+  <span class="n">readTVar</span> <span class="n">toBal</span> <span class="o">&gt;&gt;=</span> <span class="n">writeTVar</span> <span class="n">toBal</span> <span class="o">.</span> <span class="p">(</span><span class="n">qty</span> <span class="o">+</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>使用 <code class="docutils literal"><span class="pre">retry</span></code> 后，销售物品的函数就显得简单很多。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">sellItem</span> <span class="ow">::</span> <span class="kt">Item</span> <span class="ow">-&gt;</span> <span class="kt">Gold</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="nb">()</span>
+<span class="nf">sellItem</span> <span class="n">item</span> <span class="n">price</span> <span class="n">buyer</span> <span class="n">seller</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">giveItem</span> <span class="n">item</span> <span class="p">(</span><span class="n">inventory</span> <span class="n">seller</span><span class="p">)</span> <span class="p">(</span><span class="n">inventory</span> <span class="n">buyer</span><span class="p">)</span>
+  <span class="n">transfer</span> <span class="n">price</span> <span class="p">(</span><span class="n">balance</span> <span class="n">buyer</span><span class="p">)</span> <span class="p">(</span><span class="n">balance</span> <span class="n">seller</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>这个实现和之前的稍微有点不同。如果有必要会会阻塞以至卖家有东西可卖并且买家有足够的余额支付，而不是在发现卖家没这个物品可销售时马上返回 <code class="docutils literal"><span class="pre">False</span></code> 。</p>
+<div class="section" id="retry">
+<h3><code class="docutils literal"><span class="pre">retry</span></code> 时到底发生了什么?<a class="headerlink" href="#retry" title="Permalink to this headline">¶</a></h3>
+<p><code class="docutils literal"><span class="pre">retry</span></code> 不仅仅使得代码更加简洁：它似乎有魔力般的内部实现。当我们调用 <code class="docutils literal"><span class="pre">retry</span></code> 的时候，它并不是马上重启事务，而是会先阻塞线程，一直到那些在 <code class="docutils literal"><span class="pre">retry</span></code> 之前被访问过的变量被其他线程修改。</p>
+<p>比如，如果我们调用 <code class="docutils literal"><span class="pre">transfer</span></code> 而发现余额不足， <code class="docutils literal"><span class="pre">retry</span></code> 会自发的等待，直到账户余额的变动，然后会重新启动事务。 同样的，对于函数 <code class="docutils literal"><span class="pre">giveItem</span></code> ， 如果卖家没有那个物品，线程就会阻塞直到他有了那个物品。</p>
+</div>
+</div>
+<div class="section" id="id5">
+<h2>选择替代方案<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h2>
+<p>有时候我们并不总是希望重启 <code class="docutils literal"><span class="pre">atomically</span></code> 操作即使调用了 <code class="docutils literal"><span class="pre">retry</span></code> 或者由于其他线程的同步修改而导致的失败。比如函数 <code class="docutils literal"><span class="pre">sellItem</span></code> 会不断地重试，只要没有满足其条件：要有物品并且余额足够。然而我们可能更希望只重试一次。</p>
+<p><code class="docutils literal"><span class="pre">orElse</span></code> 组合器允许我们在主操作失败的情况下，执行一个&#8221;备用&#8221;操作。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">orElse</span>
+<span class="nf">orElse</span> <span class="ow">::</span> <span class="kt">STM</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>我们对 <code class="docutils literal"><span class="pre">sellItem</span></code> 做了一点修改：如果 <code class="docutils literal"><span class="pre">sellItem</span></code> 失败， 则 <code class="docutils literal"><span class="pre">orElse</span></code> 执行 <code class="docutils literal"><span class="pre">return</span> <span class="pre">False</span></code> 的动作从而使这个sale函数立即返回。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">trySellItem</span> <span class="ow">::</span> <span class="kt">Item</span> <span class="ow">-&gt;</span> <span class="kt">Gold</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="kt">Bool</span>
+<span class="nf">trySellItem</span> <span class="n">item</span> <span class="n">price</span> <span class="n">buyer</span> <span class="n">seller</span> <span class="ow">=</span>
+   <span class="n">sellItem</span> <span class="n">item</span> <span class="n">price</span> <span class="n">buyer</span> <span class="n">seller</span> <span class="o">&gt;&gt;</span> <span class="n">return</span> <span class="kt">True</span>
+  <span class="p">`</span><span class="n">orElse</span><span class="p">`</span>
+   <span class="n">return</span> <span class="kt">False</span>
+</pre></div>
+</div>
+<div class="section" id="id6">
+<h3>在事务中使用高阶代码<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h3>
+<p>假设我们想做稍微有挑战的事情，从一系列的物品中，选取第一个卖家拥有的并且买家能承担费用的物品进行购买，如果没有这样的物品则什么都不做。显然我们可以很直观的给出实现。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">crummyList</span> <span class="ow">::</span> <span class="p">[(</span><span class="kt">Item</span><span class="p">,</span> <span class="kt">Gold</span><span class="p">)]</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">Player</span>
+             <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="p">(</span><span class="kt">Item</span><span class="p">,</span> <span class="kt">Gold</span><span class="p">))</span>
+<span class="nf">crummyList</span> <span class="n">list</span> <span class="n">buyer</span> <span class="n">seller</span> <span class="ow">=</span> <span class="n">go</span> <span class="n">list</span>
+    <span class="kr">where</span> <span class="n">go</span> <span class="kt">[]</span>                         <span class="ow">=</span> <span class="n">return</span> <span class="kt">Nothing</span>
+          <span class="n">go</span> <span class="p">(</span><span class="n">this</span><span class="o">@</span><span class="p">(</span><span class="n">item</span><span class="p">,</span><span class="n">price</span><span class="p">)</span> <span class="kt">:</span> <span class="n">rest</span><span class="p">)</span> <span class="ow">=</span> <span class="kr">do</span>
+              <span class="n">sellItem</span> <span class="n">item</span> <span class="n">price</span> <span class="n">buyer</span> <span class="n">seller</span>
+              <span class="n">return</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">this</span><span class="p">)</span>
+           <span class="p">`</span><span class="n">orElse</span><span class="p">`</span>
+              <span class="n">go</span> <span class="n">rest</span>
+</pre></div>
+</div>
+<p>在这个实现里，我们有碰到了一个熟悉的问题：把我们的需求和如果实现混淆在一个。再深入一点观察，则会发现两个可重复使用的模式。</p>
+<p>第一个就是让事务失败而不是重试。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">maybeSTM</span> <span class="ow">::</span> <span class="kt">STM</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">a</span><span class="p">)</span>
+<span class="nf">maybeSTM</span> <span class="n">m</span> <span class="ow">=</span> <span class="p">(</span><span class="kt">Just</span> <span class="p">`</span><span class="n">liftM</span><span class="p">`</span> <span class="n">m</span><span class="p">)</span> <span class="p">`</span><span class="n">orElse</span><span class="p">`</span> <span class="n">return</span> <span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>第二个，我们要对一系列的对象执行否一个操作，直到有一个成功为止。如果全部都失败，则执行 <code class="docutils literal"><span class="pre">retry</span></code> 操作。由于 <code class="docutils literal"><span class="pre">STM</span></code> 是 <code class="docutils literal"><span class="pre">MonadPlus</span></code> 类型类的一个实例，所以显得很方便。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/STMPlus.hs</span>
+<span class="kr">instance</span> <span class="kt">MonadPlus</span> <span class="kt">STM</span> <span class="kr">where</span>
+  <span class="n">mzero</span> <span class="ow">=</span> <span class="n">retry</span>
+  <span class="n">mplus</span> <span class="ow">=</span> <span class="n">orElse</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">Control.Monad</span></code> 模块定义了一个 <code class="docutils literal"><span class="pre">msum</span></code> 函数，而它就是我们所需要的。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/STMPlus.hs</span>
+<span class="nf">msum</span> <span class="ow">::</span> <span class="kt">MonadPlus</span> <span class="n">m</span> <span class="ow">=&gt;</span> <span class="p">[</span><span class="n">m</span> <span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">a</span>
+<span class="nf">msum</span> <span class="ow">=</span>  <span class="n">foldr</span> <span class="n">mplus</span> <span class="n">mzero</span>
+</pre></div>
+</div>
+<p>有了这些重要的工具，我们就可以写出更加简洁的实现了。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">shoppingList</span> <span class="ow">::</span> <span class="p">[(</span><span class="kt">Item</span><span class="p">,</span> <span class="kt">Gold</span><span class="p">)]</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">Player</span>
+             <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="p">(</span><span class="kt">Item</span><span class="p">,</span> <span class="kt">Gold</span><span class="p">))</span>
+<span class="nf">shoppingList</span> <span class="n">list</span> <span class="n">buyer</span> <span class="n">seller</span> <span class="ow">=</span> <span class="n">maybeSTM</span> <span class="o">.</span> <span class="n">msum</span> <span class="o">$</span> <span class="n">map</span> <span class="n">sellOne</span> <span class="n">list</span>
+    <span class="kr">where</span> <span class="n">sellOne</span> <span class="n">this</span><span class="o">@</span><span class="p">(</span><span class="n">item</span><span class="p">,</span><span class="n">price</span><span class="p">)</span> <span class="ow">=</span> <span class="kr">do</span>
+            <span class="n">sellItem</span> <span class="n">item</span> <span class="n">price</span> <span class="n">buyer</span> <span class="n">seller</span>
+            <span class="n">return</span> <span class="n">this</span>
+</pre></div>
+</div>
+<p>既然 <code class="docutils literal"><span class="pre">STM</span></code> 是 <code class="docutils literal"><span class="pre">MonadPlus</span></code> 类型类的实例，我们可以改进 <code class="docutils literal"><span class="pre">maybeSTM</span></code> ，这样就可以适用于任何 <code class="docutils literal"><span class="pre">MonadPlus</span></code> 的实例。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">maybeM</span> <span class="ow">::</span> <span class="kt">MonadPlus</span> <span class="n">m</span> <span class="ow">=&gt;</span> <span class="n">m</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">a</span><span class="p">)</span>
+<span class="nf">maybeM</span> <span class="n">m</span> <span class="ow">=</span> <span class="p">(</span><span class="kt">Just</span> <span class="p">`</span><span class="n">liftM</span><span class="p">`</span> <span class="n">m</span><span class="p">)</span> <span class="p">`</span><span class="n">mplus</span><span class="p">`</span> <span class="n">return</span> <span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>这个函数会在很多不同情况下显得非常有用。</p>
+</div>
+</div>
+<div class="section" id="i-o-stm">
+<h2>I/O 和 STM<a class="headerlink" href="#i-o-stm" title="Permalink to this headline">¶</a></h2>
+<p><code class="docutils literal"><span class="pre">STM</span></code> monad 禁止任意的I/O操作，因为I/O操作会破坏原子性和隔离性。当然I/O的操作还是需要的，只是我们需要非常的谨慎。</p>
+<p>大多数时候，我们会执行I/O操作是由于我们在 <code class="docutils literal"><span class="pre">atomically</span></code> 块中产生的一个结果。在这些情况下，正确的做法通常是 <code class="docutils literal"><span class="pre">atomically</span></code> 返回一些数据，在I/O monad里的调用者则根据这些数据知道如何继续下一步动作。我们甚至可以返回需要被操作的动作 (action)， 因为他们是第一类值(First Class vaules)。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/STMIO.hs</span>
+<span class="nf">someAction</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="n">a</span>
+
+<span class="nf">stmTransaction</span> <span class="ow">::</span> <span class="kt">STM</span> <span class="p">(</span><span class="kt">IO</span> <span class="n">a</span><span class="p">)</span>
+<span class="nf">stmTransaction</span> <span class="ow">=</span> <span class="n">return</span> <span class="n">someAction</span>
+
+<span class="nf">doSomething</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="n">a</span>
+<span class="nf">doSomething</span> <span class="ow">=</span> <span class="n">join</span> <span class="p">(</span><span class="n">atomically</span> <span class="n">stmTransaction</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>我们偶尔也需要在 <code class="docutils literal"><span class="pre">STM</span></code> 里进行I/O操作。比如从一个肯定存在的文件里读取一些非可变数据，这样的操作并不会违背 <code class="docutils literal"><span class="pre">STM</span></code> 保证原子性和隔离性的原则。在这些情况，我们可以使用 <code class="docutils literal"><span class="pre">unsafeIOToSTM</span></code> 来执行一个 <code class="docutils literal"><span class="pre">IO</span></code> 操作。这个函数位于偏底层的一个模块 <code class="docutils literal"><span class="pre">GHC.Conc</span></code> ，所以要谨慎使用。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="o">+</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Conc</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">unsafeIOToSTM</span>
+<span class="nf">unsafeIOToSTM</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>我们所执行的这个 <code class="docutils literal"><span class="pre">IO</span></code> 动作绝对不能打开另外一个 <code class="docutils literal"><span class="pre">atomically</span></code> 事务。如果一个线程尝试嵌套的事务，系统就会抛出异常。</p>
+<p>由于类型系统无法帮助我们确保 <code class="docutils literal"><span class="pre">IO</span></code> 代码没有执行一些敏感动作，最安全的做法就是我们尽量的限制使用 <code class="docutils literal"><span class="pre">unsafeIOToSTM</span></code> 。下面的例子展示了在 <code class="docutils literal"><span class="pre">atomically</span></code> 中执行 <code class="docutils literal"><span class="pre">IO</span></code> 的典型错误。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/STMIO.hs</span>
+<span class="nf">launchTorpedoes</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="nb">()</span>
+
+<span class="nf">notActuallyAtomic</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">doStuff</span>
+  <span class="n">unsafeIOToSTM</span> <span class="n">launchTorpedoes</span>
+  <span class="n">mightRetry</span>
+</pre></div>
+</div>
+<p>如果 <code class="docutils literal"><span class="pre">mightRetry</span></code> 会引发事务的重启，那么 <code class="docutils literal"><span class="pre">launchTorpedoes</span></code> 会被调用多次。事实上，我们无法预见它会被调用多少次， 因为重试是由运行时系统所处理的。解决方案就是在事务中不要有这种类型的non-idempotent I/O操作。</p>
+</div>
+<div class="section" id="id7">
+<h2>线程之间的通讯<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h2>
+<p>正如基础类型 <code class="docutils literal"><span class="pre">TVar</span></code> 那样， <code class="docutils literal"><span class="pre">stm</span></code> 包也提供了两个更有用的类型用于线程之间的通讯， <code class="docutils literal"><span class="pre">TMVar</span></code> 和 <code class="docutils literal"><span class="pre">TChan</span></code> 。 <code class="docutils literal"><span class="pre">TMVar</span></code> 是STM世界的 <code class="docutils literal"><span class="pre">MVar</span></code> ， 它可以保存一个 <code class="docutils literal"><span class="pre">Maybe</span></code> 类型的值， 即 <code class="docutils literal"><span class="pre">Just</span></code> 值或者 <code class="docutils literal"><span class="pre">Nothing</span></code> 。 <code class="docutils literal"><span class="pre">TChan</span></code> 则是 <code class="docutils literal"><span class="pre">STM</span></code> 世界里的 <code class="docutils literal"><span class="pre">Chan</span></code> ，它实现了一个有类型的先进先出(FIFO)通道。</p>
+<p>[译者注：为何说 <code class="docutils literal"><span class="pre">TMVar</span></code> 是STM世界的 <code class="docutils literal"><span class="pre">MVar</span></code> 而不是 <code class="docutils literal"><span class="pre">TVar</span></code> ？是因为从实践意义上理解的。 <code class="docutils literal"><span class="pre">MVar</span></code> 的特性是要么有值要么为空的一个容器，所以当线程去读这个容器时，要么读到值继续执行，要么读不到值就等待。 而 <code class="docutils literal"><span class="pre">TVar</span></code> 并没有这样的特性，所以引入了 <code class="docutils literal"><span class="pre">TMVar</span></code> 。 它的实现是这样的， <code class="docutils literal"><span class="pre">newtype</span> <span class="pre">TMVar</span> <span class="pre">a</span> <span class="pre">=</span> <span class="pre">TMVar</span> <span class="pre">(TVar</span> <span class="pre">(Maybe</span> <span class="pre">a))</span></code> ， 正是由于它包含了一个 <code class="docutils literal"><span class="pre">Maybe</span></code> 类型的值，这样就有了&#8221;要么有值要么为空&#8221;这样的特性，也就是 <code class="docutils literal"><span class="pre">MVar</span></code> 所拥有的特性。]</p>
+</div>
+<div class="section" id="id8">
+<h2>并发网络链接检查器<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h2>
+<p>作为一个使用 <code class="docutils literal"><span class="pre">STM</span></code> 的实际例子， 我们将开发一个检查HTML文件里不正确链接的程序，这里不正确的链接是指那些链接指向了一个错误的网页或是无法访问到其指向的服务器。用并发的方式解决这个问题非常得合适：如果我们尝试和已经下线的服务器(dead server)通讯，需要有两分钟的超时时间。如果使用多线程，即使有一两个线程由于和响应很慢或者下线的服务器通讯而停住(stuck)，
+我们还是可以继续进行一些有用的事情。</p>
+<p>我们不能简单直观的给每一个URL新建一个线程，因为由于（也是我们预想的）大多数链接是正确的，那么这样做就会导致CPU或是网络连接超负荷。因此，我们只会创建固定数量的线程，这些线程会从一个队列里拿URL做检查。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/Check.hs</span>
+<span class="cm">{-# LANGUAGE FlexibleContexts, GeneralizedNewtypeDeriving,</span>
+<span class="cm">             PatternGuards #-}</span>
+
+<span class="kr">import</span> <span class="nn">Control.Concurrent</span> <span class="p">(</span><span class="nf">forkIO</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Control.Concurrent.STM</span>
+<span class="kr">import</span> <span class="nn">Control.Exception</span> <span class="p">(</span><span class="nf">catch</span><span class="p">,</span> <span class="nf">finally</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Control.Monad.Error</span>
+<span class="kr">import</span> <span class="nn">Control.Monad.State</span>
+<span class="kr">import</span> <span class="nn">Data.Char</span> <span class="p">(</span><span class="nf">isControl</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Data.List</span> <span class="p">(</span><span class="nf">nub</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Network.URI</span>
+<span class="kr">import</span> <span class="nn">Prelude</span> <span class="k">hiding</span> <span class="p">(</span><span class="nf">catch</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Console.GetOpt</span>
+<span class="kr">import</span> <span class="nn">System.Environment</span> <span class="p">(</span><span class="nf">getArgs</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Exit</span> <span class="p">(</span><span class="kt">ExitCode</span><span class="p">(</span><span class="o">..</span><span class="p">),</span> <span class="nf">exitWith</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.IO</span> <span class="p">(</span><span class="nf">hFlush</span><span class="p">,</span> <span class="nf">hPutStrLn</span><span class="p">,</span> <span class="nf">stderr</span><span class="p">,</span> <span class="nf">stdout</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Text.Printf</span> <span class="p">(</span><span class="nf">printf</span><span class="p">)</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.ByteString.Lazy.Char8</span> <span class="k">as</span> <span class="n">B</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.Set</span> <span class="k">as</span> <span class="n">S</span>
+
+<span class="c1">-- 这里需要HTTP包, 它并不是GHC自带的.</span>
+<span class="kr">import</span> <span class="nn">Network.HTTP</span>
+
+<span class="kr">type</span> <span class="kt">URL</span> <span class="ow">=</span> <span class="kt">B</span><span class="o">.</span><span class="kt">ByteString</span>
+
+<span class="kr">data</span> <span class="kt">Task</span> <span class="ow">=</span> <span class="kt">Check</span> <span class="kt">URL</span> <span class="o">|</span> <span class="kt">Done</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">main</span></code> 函数显示了这个程序的主体脚手架(scaffolding)。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/Check.hs</span>
+<span class="nf">main</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">main</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="p">(</span><span class="n">files</span><span class="p">,</span><span class="n">k</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">parseArgs</span>
+    <span class="kr">let</span> <span class="n">n</span> <span class="ow">=</span> <span class="n">length</span> <span class="n">files</span>
+
+    <span class="c1">-- count of broken links</span>
+    <span class="n">badCount</span> <span class="ow">&lt;-</span> <span class="n">newTVarIO</span> <span class="p">(</span><span class="mi">0</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">)</span>
+
+    <span class="c1">-- for reporting broken links</span>
+    <span class="n">badLinks</span> <span class="ow">&lt;-</span> <span class="n">newTChanIO</span>
+
+    <span class="c1">-- for sending jobs to workers</span>
+    <span class="n">jobs</span> <span class="ow">&lt;-</span> <span class="n">newTChanIO</span>
+
+    <span class="c1">-- the number of workers currently running</span>
+    <span class="n">workers</span> <span class="ow">&lt;-</span> <span class="n">newTVarIO</span> <span class="n">k</span>
+
+    <span class="c1">-- one thread reports bad links to stdout</span>
+    <span class="n">forkIO</span> <span class="o">$</span> <span class="n">writeBadLinks</span> <span class="n">badLinks</span>
+
+    <span class="c1">-- start worker threads</span>
+    <span class="n">forkTimes</span> <span class="n">k</span> <span class="n">workers</span> <span class="p">(</span><span class="n">worker</span> <span class="n">badLinks</span> <span class="n">jobs</span> <span class="n">badCount</span><span class="p">)</span>
+
+    <span class="c1">-- read links from files, and enqueue them as jobs</span>
+    <span class="n">stats</span> <span class="ow">&lt;-</span> <span class="n">execJob</span> <span class="p">(</span><span class="n">mapM_</span> <span class="n">checkURLs</span> <span class="n">files</span><span class="p">)</span>
+                     <span class="p">(</span><span class="kt">JobState</span> <span class="kt">S</span><span class="o">.</span><span class="n">empty</span> <span class="mi">0</span> <span class="n">jobs</span><span class="p">)</span>
+
+    <span class="c1">-- enqueue &quot;please finish&quot; messages</span>
+    <span class="n">atomically</span> <span class="o">$</span> <span class="n">replicateM_</span> <span class="n">k</span> <span class="p">(</span><span class="n">writeTChan</span> <span class="n">jobs</span> <span class="kt">Done</span><span class="p">)</span>
+
+    <span class="n">waitFor</span> <span class="n">workers</span>
+
+    <span class="n">broken</span> <span class="ow">&lt;-</span> <span class="n">atomically</span> <span class="o">$</span> <span class="n">readTVar</span> <span class="n">badCount</span>
+
+    <span class="n">printf</span> <span class="n">fmt</span> <span class="n">broken</span>
+               <span class="p">(</span><span class="n">linksFound</span> <span class="n">stats</span><span class="p">)</span>
+               <span class="p">(</span><span class="kt">S</span><span class="o">.</span><span class="n">size</span> <span class="p">(</span><span class="n">linksSeen</span> <span class="n">stats</span><span class="p">))</span>
+               <span class="n">n</span>
+  <span class="kr">where</span>
+    <span class="n">fmt</span>   <span class="ow">=</span> <span class="s">&quot;Found %d broken links. &quot;</span> <span class="o">++</span>
+            <span class="s">&quot;Checked %d links (%d unique) in %d files.</span><span class="se">\n</span><span class="s">&quot;</span>
+</pre></div>
+</div>
+<p>当我们处于 <code class="docutils literal"><span class="pre">IO</span></code> monad时，可以使用 <code class="docutils literal"><span class="pre">newTVarIO</span></code> 函数新建一个 <code class="docutils literal"><span class="pre">TVar</span></code> 值。同样的，也有类似的函数可以新建 <code class="docutils literal"><span class="pre">TMVar</span></code> 和 <code class="docutils literal"><span class="pre">TChan</span></code> 值。</p>
+<p>在程序用了 <code class="docutils literal"><span class="pre">printf</span></code> 函数打印出最后的结果。和C语言里类似函数 <code class="docutils literal"><span class="pre">printf</span></code> 不同的是Haskell这个版本会在运行时检查参数的个数以及其类型。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="o">+</span><span class="kt">Text</span><span class="o">.</span><span class="kt">Printf</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">printf</span> <span class="s">&quot;%d and %d</span><span class="se">\n</span><span class="s">&quot;</span> <span class="p">(</span><span class="mi">3</span><span class="ow">::</span><span class="kt">Int</span><span class="p">)</span>
+<span class="mi">3</span> <span class="n">and</span> <span class="o">***</span> <span class="kt">Exception:</span> <span class="kt">Printf</span><span class="o">.</span><span class="n">printf</span><span class="kt">:</span> <span class="n">argument</span> <span class="n">list</span> <span class="n">ended</span> <span class="n">prematurely</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">printf</span> <span class="s">&quot;%s and %d</span><span class="se">\n</span><span class="s">&quot;</span> <span class="s">&quot;foo&quot;</span> <span class="p">(</span><span class="mi">3</span><span class="ow">::</span><span class="kt">Int</span><span class="p">)</span>
+<span class="nf">foo</span> <span class="n">and</span> <span class="mi">3</span>
+</pre></div>
+</div>
+<p>在 <strong>ghci</strong> 里试试 <code class="docutils literal"><span class="pre">printf</span> <span class="pre">&quot;%d&quot;</span> <span class="pre">True</span></code> ,看看会得到什么结果。</p>
+<p>支持 <code class="docutils literal"><span class="pre">main</span></code> 函数的是几个短小的函数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/Check.hs</span>
+<span class="nf">modifyTVar_</span> <span class="ow">::</span> <span class="kt">TVar</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="nb">()</span>
+<span class="nf">modifyTVar_</span> <span class="n">tv</span> <span class="n">f</span> <span class="ow">=</span> <span class="n">readTVar</span> <span class="n">tv</span> <span class="o">&gt;&gt;=</span> <span class="n">writeTVar</span> <span class="n">tv</span> <span class="o">.</span> <span class="n">f</span>
+
+<span class="nf">forkTimes</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">TVar</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">forkTimes</span> <span class="n">k</span> <span class="n">alive</span> <span class="n">act</span> <span class="ow">=</span>
+  <span class="n">replicateM_</span> <span class="n">k</span> <span class="o">.</span> <span class="n">forkIO</span> <span class="o">$</span>
+    <span class="n">act</span>
+    <span class="p">`</span><span class="n">finally</span><span class="p">`</span>
+    <span class="p">(</span><span class="n">atomically</span> <span class="o">$</span> <span class="n">modifyTVar_</span> <span class="n">alive</span> <span class="p">(</span><span class="n">subtract</span> <span class="mi">1</span><span class="p">))</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">forkTimes</span></code> 函数新建特定数量的相同的工作线程，每当一个线程推出时，则&#8221;活动&#8221;线程的计数器相应的减一。我们使用 <code class="docutils literal"><span class="pre">finally</span></code> 组合器确保无论线程是如何终止的，都会减少&#8221;活动&#8221;线程的数量。</p>
+<p>下一步， <code class="docutils literal"><span class="pre">writeBadLinks</span></code> 会把每个失效或者死亡(dead)的链接打印到 <code class="docutils literal"><span class="pre">stdout</span></code> 。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/Check.hs</span>
+<span class="nf">writeBadLinks</span> <span class="ow">::</span> <span class="kt">TChan</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">writeBadLinks</span> <span class="n">c</span> <span class="ow">=</span>
+  <span class="n">forever</span> <span class="o">$</span>
+    <span class="n">atomically</span> <span class="p">(</span><span class="n">readTChan</span> <span class="n">c</span><span class="p">)</span> <span class="o">&gt;&gt;=</span> <span class="n">putStrLn</span> <span class="o">&gt;&gt;</span> <span class="n">hFlush</span> <span class="n">stdout</span>
+</pre></div>
+</div>
+<p>上面我们使用了 <code class="docutils literal"><span class="pre">forever</span></code> 组合器使一个操作永远的执行。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="o">+</span><span class="kt">Control</span><span class="o">.</span><span class="kt">Monad</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">forever</span>
+<span class="nf">forever</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Monad</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">m</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">waitFor</span></code> 函数使用了 <code class="docutils literal"><span class="pre">check</span></code> ， 当它的参数是 <code class="docutils literal"><span class="pre">False</span></code> 时会调用 <code class="docutils literal"><span class="pre">retry</span></code> 。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/Check.hs</span>
+<span class="nf">waitFor</span> <span class="ow">::</span> <span class="kt">TVar</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">waitFor</span> <span class="n">alive</span> <span class="ow">=</span> <span class="n">atomically</span> <span class="o">$</span> <span class="kr">do</span>
+  <span class="n">count</span> <span class="ow">&lt;-</span> <span class="n">readTVar</span> <span class="n">alive</span>
+  <span class="n">check</span> <span class="p">(</span><span class="n">count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="section" id="id9">
+<h3>检查一个链接<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h3>
+<p>这个原生的函数实现了如何检查一个链接的状态。 代码和 [第二十二章  Chapter 22, Extended Example: Web Client Programming] 里的 <code class="docutils literal"><span class="pre">podcatcher</span></code> 相似但有一点不同。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/Check.hs</span>
+<span class="nf">getStatus</span> <span class="ow">::</span> <span class="kt">URI</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">(</span><span class="kt">Either</span> <span class="kt">String</span> <span class="kt">Int</span><span class="p">)</span>
+<span class="nf">getStatus</span> <span class="ow">=</span> <span class="n">chase</span> <span class="p">(</span><span class="mi">5</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">)</span>
+  <span class="kr">where</span>
+    <span class="n">chase</span> <span class="mi">0</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">bail</span> <span class="s">&quot;too many redirects&quot;</span>
+    <span class="n">chase</span> <span class="n">n</span> <span class="n">u</span> <span class="ow">=</span> <span class="kr">do</span>
+      <span class="n">resp</span> <span class="ow">&lt;-</span> <span class="n">getHead</span> <span class="n">u</span>
+      <span class="kr">case</span> <span class="n">resp</span> <span class="kr">of</span>
+        <span class="kt">Left</span> <span class="n">err</span> <span class="ow">-&gt;</span> <span class="n">bail</span> <span class="p">(</span><span class="n">show</span> <span class="n">err</span><span class="p">)</span>
+        <span class="kt">Right</span> <span class="n">r</span> <span class="ow">-&gt;</span>
+          <span class="kr">case</span> <span class="n">rspCode</span> <span class="n">r</span> <span class="kr">of</span>
+            <span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="kr">_</span><span class="p">,</span><span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span>
+               <span class="kr">case</span> <span class="n">findHeader</span> <span class="kt">HdrLocation</span> <span class="n">r</span> <span class="kr">of</span>
+                 <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">bail</span> <span class="p">(</span><span class="n">show</span> <span class="n">r</span><span class="p">)</span>
+                 <span class="kt">Just</span> <span class="n">u&#39;</span> <span class="ow">-&gt;</span>
+                   <span class="kr">case</span> <span class="n">parseURI</span> <span class="n">u&#39;</span> <span class="kr">of</span>
+                     <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">bail</span> <span class="s">&quot;bad URL&quot;</span>
+                     <span class="kt">Just</span> <span class="n">url</span> <span class="ow">-&gt;</span> <span class="n">chase</span> <span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="n">url</span>
+            <span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">,</span><span class="n">c</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="o">.</span> <span class="kt">Right</span> <span class="o">$</span> <span class="n">a</span> <span class="o">*</span> <span class="mi">100</span> <span class="o">+</span> <span class="n">b</span> <span class="o">*</span> <span class="mi">10</span> <span class="o">+</span> <span class="n">c</span>
+
+    <span class="n">bail</span> <span class="ow">=</span> <span class="n">return</span> <span class="o">.</span> <span class="kt">Left</span>
+
+<span class="nf">getHead</span> <span class="ow">::</span> <span class="kt">URI</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">(</span><span class="kt">Result</span> <span class="kt">Response</span><span class="p">)</span>
+<span class="nf">getHead</span> <span class="n">uri</span> <span class="ow">=</span> <span class="n">simpleHTTP</span> <span class="kt">Request</span> <span class="p">{</span> <span class="n">rqURI</span> <span class="ow">=</span> <span class="n">uri</span><span class="p">,</span>
+                                   <span class="n">rqMethod</span> <span class="ow">=</span> <span class="kt">HEAD</span><span class="p">,</span>
+                                   <span class="n">rqHeaders</span> <span class="ow">=</span> <span class="kt">[]</span><span class="p">,</span>
+                                   <span class="n">rqBody</span> <span class="ow">=</span> <span class="s">&quot;&quot;</span> <span class="p">}</span>
+</pre></div>
+</div>
+<p>为了避免无尽的重定向相应，我们只允许固定次数的重定向请求。我们通过查看HTTP标准HEAD信息来确认链接的有效性， 比起一个完整的GET请求，这样做可以减少网络流量。</p>
+<p>这个代码是典型的&#8221;marching off the left of the screen&#8221;风格。正如之前我们提到的，需要谨慎使用这样的风格。下面我们用 <code class="docutils literal"><span class="pre">ErrorT</span></code> monad transformer 和几个通用一点的方法进行了重新实现，它看上去简洁了很多。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/Check.hs</span>
+<span class="nf">getStatusE</span> <span class="ow">=</span> <span class="n">runErrorT</span> <span class="o">.</span> <span class="n">chase</span> <span class="p">(</span><span class="mi">5</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">)</span>
+  <span class="kr">where</span>
+    <span class="n">chase</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">URI</span> <span class="ow">-&gt;</span> <span class="kt">ErrorT</span> <span class="kt">String</span> <span class="kt">IO</span> <span class="kt">Int</span>
+    <span class="n">chase</span> <span class="mi">0</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">throwError</span> <span class="s">&quot;too many redirects&quot;</span>
+    <span class="n">chase</span> <span class="n">n</span> <span class="n">u</span> <span class="ow">=</span> <span class="kr">do</span>
+      <span class="n">r</span> <span class="ow">&lt;-</span> <span class="n">embedEither</span> <span class="n">show</span> <span class="o">=&lt;&lt;</span> <span class="n">liftIO</span> <span class="p">(</span><span class="n">getHead</span> <span class="n">u</span><span class="p">)</span>
+      <span class="kr">case</span> <span class="n">rspCode</span> <span class="n">r</span> <span class="kr">of</span>
+        <span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="kr">_</span><span class="p">,</span><span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+            <span class="n">u&#39;</span>  <span class="ow">&lt;-</span> <span class="n">embedMaybe</span> <span class="p">(</span><span class="n">show</span> <span class="n">r</span><span class="p">)</span>  <span class="o">$</span> <span class="n">findHeader</span> <span class="kt">HdrLocation</span> <span class="n">r</span>
+            <span class="n">url</span> <span class="ow">&lt;-</span> <span class="n">embedMaybe</span> <span class="s">&quot;bad URL&quot;</span> <span class="o">$</span> <span class="n">parseURI</span> <span class="n">u&#39;</span>
+            <span class="n">chase</span> <span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="n">url</span>
+        <span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">,</span><span class="n">c</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="o">$</span> <span class="n">a</span><span class="o">*</span><span class="mi">100</span> <span class="o">+</span> <span class="n">b</span><span class="o">*</span><span class="mi">10</span> <span class="o">+</span> <span class="n">c</span>
+
+<span class="c1">-- Some handy embedding functions.</span>
+<span class="nf">embedEither</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">MonadError</span> <span class="n">e</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">(</span><span class="n">s</span> <span class="ow">-&gt;</span> <span class="n">e</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="n">s</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">a</span>
+<span class="nf">embedEither</span> <span class="n">f</span> <span class="ow">=</span> <span class="n">either</span> <span class="p">(</span><span class="n">throwError</span> <span class="o">.</span> <span class="n">f</span><span class="p">)</span> <span class="n">return</span>
+
+<span class="nf">embedMaybe</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">MonadError</span> <span class="n">e</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">e</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">a</span>
+<span class="nf">embedMaybe</span> <span class="n">err</span> <span class="ow">=</span> <span class="n">maybe</span> <span class="p">(</span><span class="n">throwError</span> <span class="n">err</span><span class="p">)</span> <span class="n">return</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id10">
+<h3>工作者线程<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
+<p>每个工作者线程(Worker Thread)从一个共享队列里拿一个任务，这个任务要么检查链接有效性，要么让线程推出。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/Check.hs</span>
+<span class="nf">worker</span> <span class="ow">::</span> <span class="kt">TChan</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">TChan</span> <span class="kt">Task</span> <span class="ow">-&gt;</span> <span class="kt">TVar</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">worker</span> <span class="n">badLinks</span> <span class="n">jobQueue</span> <span class="n">badCount</span> <span class="ow">=</span> <span class="n">loop</span>
+  <span class="kr">where</span>
+    <span class="c1">-- Consume jobs until we are told to exit.</span>
+    <span class="n">loop</span> <span class="ow">=</span> <span class="kr">do</span>
+        <span class="n">job</span> <span class="ow">&lt;-</span> <span class="n">atomically</span> <span class="o">$</span> <span class="n">readTChan</span> <span class="n">jobQueue</span>
+        <span class="kr">case</span> <span class="n">job</span> <span class="kr">of</span>
+            <span class="kt">Done</span>  <span class="ow">-&gt;</span> <span class="n">return</span> <span class="nb">()</span>
+            <span class="kt">Check</span> <span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">checkOne</span> <span class="p">(</span><span class="kt">B</span><span class="o">.</span><span class="n">unpack</span> <span class="n">x</span><span class="p">)</span> <span class="o">&gt;&gt;</span> <span class="n">loop</span>
+
+    <span class="c1">-- Check a single link.</span>
+    <span class="n">checkOne</span> <span class="n">url</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">parseURI</span> <span class="n">url</span> <span class="kr">of</span>
+        <span class="kt">Just</span> <span class="n">uri</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+            <span class="n">code</span> <span class="ow">&lt;-</span> <span class="n">getStatus</span> <span class="n">uri</span> <span class="p">`</span><span class="n">catch</span><span class="p">`</span> <span class="p">(</span><span class="n">return</span> <span class="o">.</span> <span class="kt">Left</span> <span class="o">.</span> <span class="n">show</span><span class="p">)</span>
+            <span class="kr">case</span> <span class="n">code</span> <span class="kr">of</span>
+                <span class="kt">Right</span> <span class="mi">200</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="nb">()</span>
+                <span class="kt">Right</span> <span class="n">n</span>   <span class="ow">-&gt;</span> <span class="n">report</span> <span class="p">(</span><span class="n">show</span> <span class="n">n</span><span class="p">)</span>
+                <span class="kt">Left</span> <span class="n">err</span>  <span class="ow">-&gt;</span> <span class="n">report</span> <span class="n">err</span>
+        <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="n">report</span> <span class="s">&quot;invalid URL&quot;</span>
+
+        <span class="kr">where</span> <span class="n">report</span> <span class="n">s</span> <span class="ow">=</span> <span class="n">atomically</span> <span class="o">$</span> <span class="kr">do</span>
+                           <span class="n">modifyTVar_</span> <span class="n">badCount</span> <span class="p">(</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+                           <span class="n">writeTChan</span> <span class="n">badLinks</span> <span class="p">(</span><span class="n">url</span> <span class="o">++</span> <span class="s">&quot; &quot;</span> <span class="o">++</span> <span class="n">s</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id11">
+<h3>查找链接<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
+<p>我们构造了基于 <code class="docutils literal"><span class="pre">IO</span></code> monad 的 状态 monad transformer栈用于查找链接。这个状态会记录我们已经找到过的链接(避免重复)、链接的数量以及一个队列，我们会把需要做检查的链接放到这个队列里。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/Check.hs</span>
+<span class="kr">data</span> <span class="kt">JobState</span> <span class="ow">=</span> <span class="kt">JobState</span> <span class="p">{</span> <span class="n">linksSeen</span> <span class="ow">::</span> <span class="kt">S</span><span class="o">.</span><span class="kt">Set</span> <span class="kt">URL</span><span class="p">,</span>
+                           <span class="n">linksFound</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>
+                           <span class="n">linkQueue</span> <span class="ow">::</span> <span class="kt">TChan</span> <span class="kt">Task</span> <span class="p">}</span>
+
+<span class="kr">newtype</span> <span class="kt">Job</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Job</span> <span class="p">{</span> <span class="n">runJob</span> <span class="ow">::</span> <span class="kt">StateT</span> <span class="kt">JobState</span> <span class="kt">IO</span> <span class="n">a</span> <span class="p">}</span>
+    <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Monad</span><span class="p">,</span> <span class="kt">MonadState</span> <span class="kt">JobState</span><span class="p">,</span> <span class="kt">MonadIO</span><span class="p">)</span>
+
+<span class="nf">execJob</span> <span class="ow">::</span> <span class="kt">Job</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">JobState</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">JobState</span>
+<span class="nf">execJob</span> <span class="ow">=</span> <span class="n">execStateT</span> <span class="o">.</span> <span class="n">runJob</span>
+</pre></div>
+</div>
+<p>严格来说，对于对立运行的小型程序，我们并不需要用到 <code class="docutils literal"><span class="pre">newtype</span></code> ，然后我们还是将它作为一个好的编码实践的例子放在这里。(毕竟也只多了几行代码)</p>
+<p><code class="docutils literal"><span class="pre">main</span></code> 函数实现了对每个输入文件调用一次 <code class="docutils literal"><span class="pre">checkURLs</span></code> 方法，所以 <code class="docutils literal"><span class="pre">checkURLs</span></code> 的参数就是单个文件。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/Check.hs</span>
+<span class="nf">checkURLs</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">Job</span> <span class="nb">()</span>
+<span class="nf">checkURLs</span> <span class="n">f</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">src</span> <span class="ow">&lt;-</span> <span class="n">liftIO</span> <span class="o">$</span> <span class="kt">B</span><span class="o">.</span><span class="n">readFile</span> <span class="n">f</span>
+    <span class="kr">let</span> <span class="n">urls</span> <span class="ow">=</span> <span class="n">extractLinks</span> <span class="n">src</span>
+    <span class="n">filterM</span> <span class="n">seenURI</span> <span class="n">urls</span> <span class="o">&gt;&gt;=</span> <span class="n">sendJobs</span>
+    <span class="n">updateStats</span> <span class="p">(</span><span class="n">length</span> <span class="n">urls</span><span class="p">)</span>
+
+<span class="nf">updateStats</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Job</span> <span class="nb">()</span>
+<span class="nf">updateStats</span> <span class="n">a</span> <span class="ow">=</span> <span class="n">modify</span> <span class="o">$</span> <span class="nf">\</span><span class="n">s</span> <span class="ow">-&gt;</span>
+    <span class="n">s</span> <span class="p">{</span> <span class="n">linksFound</span> <span class="ow">=</span> <span class="n">linksFound</span> <span class="n">s</span> <span class="o">+</span> <span class="n">a</span> <span class="p">}</span>
+
+<span class="c1">-- | Add a link to the set we have seen.</span>
+<span class="nf">insertURI</span> <span class="ow">::</span> <span class="kt">URL</span> <span class="ow">-&gt;</span> <span class="kt">Job</span> <span class="nb">()</span>
+<span class="nf">insertURI</span> <span class="n">c</span> <span class="ow">=</span> <span class="n">modify</span> <span class="o">$</span> <span class="nf">\</span><span class="n">s</span> <span class="ow">-&gt;</span>
+    <span class="n">s</span> <span class="p">{</span> <span class="n">linksSeen</span> <span class="ow">=</span> <span class="kt">S</span><span class="o">.</span><span class="n">insert</span> <span class="n">c</span> <span class="p">(</span><span class="n">linksSeen</span> <span class="n">s</span><span class="p">)</span> <span class="p">}</span>
+
+<span class="c1">-- | If we have seen a link, return False.  Otherwise, record that we</span>
+<span class="c1">-- have seen it, and return True.</span>
+<span class="nf">seenURI</span> <span class="ow">::</span> <span class="kt">URL</span> <span class="ow">-&gt;</span> <span class="kt">Job</span> <span class="kt">Bool</span>
+<span class="nf">seenURI</span> <span class="n">url</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">seen</span> <span class="ow">&lt;-</span> <span class="p">(</span><span class="n">not</span> <span class="o">.</span> <span class="kt">S</span><span class="o">.</span><span class="n">member</span> <span class="n">url</span><span class="p">)</span> <span class="p">`</span><span class="n">liftM</span><span class="p">`</span> <span class="n">gets</span> <span class="n">linksSeen</span>
+    <span class="n">insertURI</span> <span class="n">url</span>
+    <span class="n">return</span> <span class="n">seen</span>
+
+<span class="nf">sendJobs</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">URL</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Job</span> <span class="nb">()</span>
+<span class="nf">sendJobs</span> <span class="n">js</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">c</span> <span class="ow">&lt;-</span> <span class="n">gets</span> <span class="n">linkQueue</span>
+    <span class="n">liftIO</span> <span class="o">.</span> <span class="n">atomically</span> <span class="o">$</span> <span class="n">mapM_</span> <span class="p">(</span><span class="n">writeTChan</span> <span class="n">c</span> <span class="o">.</span> <span class="kt">Check</span><span class="p">)</span> <span class="n">js</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">extractLinks</span></code> 函数并没有尝试去准确的去解析一个HTMP或是文本文件，而只是匹配那些看上去像URL的字符串。我们认为这样做就够了。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/Check.hs</span>
+<span class="nf">extractLinks</span> <span class="ow">::</span> <span class="kt">B</span><span class="o">.</span><span class="kt">ByteString</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">URL</span><span class="p">]</span>
+<span class="nf">extractLinks</span> <span class="ow">=</span> <span class="n">concatMap</span> <span class="n">uris</span> <span class="o">.</span> <span class="kt">B</span><span class="o">.</span><span class="n">lines</span>
+  <span class="kr">where</span> <span class="n">uris</span> <span class="n">s</span>      <span class="ow">=</span> <span class="n">filter</span> <span class="n">looksOkay</span> <span class="p">(</span><span class="kt">B</span><span class="o">.</span><span class="n">splitWith</span> <span class="n">isDelim</span> <span class="n">s</span><span class="p">)</span>
+        <span class="n">isDelim</span> <span class="n">c</span>   <span class="ow">=</span> <span class="n">isControl</span> <span class="n">c</span> <span class="o">||</span> <span class="n">c</span> <span class="p">`</span><span class="n">elem</span><span class="p">`</span> <span class="s">&quot; &lt;&gt;</span><span class="se">\&quot;</span><span class="s">{}|</span><span class="se">\\</span><span class="s">^[]`&quot;</span>
+        <span class="n">looksOkay</span> <span class="n">s</span> <span class="ow">=</span> <span class="n">http</span> <span class="p">`</span><span class="kt">B</span><span class="o">.</span><span class="n">isPrefixOf</span><span class="p">`</span> <span class="n">s</span>
+        <span class="n">http</span>        <span class="ow">=</span> <span class="kt">B</span><span class="o">.</span><span class="n">pack</span> <span class="s">&quot;http:&quot;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id12">
+<h3>命令行的实现<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
+<p>我们使用了 <code class="docutils literal"><span class="pre">System.Console.GetOpt</span></code> 模块来解析命令行参数。这个模块提供了很多解析命令行参数的很有用的方法，不过使用起来稍微有点繁琐。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/Check.hs</span>
+<span class="kr">data</span> <span class="kt">Flag</span> <span class="ow">=</span> <span class="kt">Help</span> <span class="o">|</span> <span class="kt">N</span> <span class="kt">Int</span>
+            <span class="kr">deriving</span> <span class="kt">Eq</span>
+
+<span class="nf">parseArgs</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="p">([</span><span class="kt">String</span><span class="p">],</span> <span class="kt">Int</span><span class="p">)</span>
+<span class="nf">parseArgs</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">argv</span> <span class="ow">&lt;-</span> <span class="n">getArgs</span>
+    <span class="kr">case</span> <span class="n">parse</span> <span class="n">argv</span> <span class="kr">of</span>
+        <span class="p">(</span><span class="kt">[]</span><span class="p">,</span> <span class="n">files</span><span class="p">,</span> <span class="kt">[]</span><span class="p">)</span>                     <span class="ow">-&gt;</span> <span class="n">return</span> <span class="p">(</span><span class="n">nub</span> <span class="n">files</span><span class="p">,</span> <span class="mi">16</span><span class="p">)</span>
+        <span class="p">(</span><span class="n">opts</span><span class="p">,</span> <span class="n">files</span><span class="p">,</span> <span class="kt">[]</span><span class="p">)</span>
+            <span class="o">|</span> <span class="kt">Help</span> <span class="p">`</span><span class="n">elem</span><span class="p">`</span> <span class="n">opts</span>              <span class="ow">-&gt;</span> <span class="n">help</span>
+            <span class="o">|</span> <span class="p">[</span><span class="kt">N</span> <span class="n">n</span><span class="p">]</span> <span class="ow">&lt;-</span> <span class="n">filter</span> <span class="p">(</span><span class="o">/=</span><span class="kt">Help</span><span class="p">)</span> <span class="n">opts</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="p">(</span><span class="n">nub</span> <span class="n">files</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+        <span class="p">(</span><span class="kr">_</span><span class="p">,</span><span class="kr">_</span><span class="p">,</span><span class="n">errs</span><span class="p">)</span>                          <span class="ow">-&gt;</span> <span class="n">die</span> <span class="n">errs</span>
+  <span class="kr">where</span>
+    <span class="n">parse</span> <span class="n">argv</span> <span class="ow">=</span> <span class="n">getOpt</span> <span class="kt">Permute</span> <span class="n">options</span> <span class="n">argv</span>
+    <span class="n">header</span>     <span class="ow">=</span> <span class="s">&quot;Usage: urlcheck [-h] [-n n] [file ...]&quot;</span>
+    <span class="n">info</span>       <span class="ow">=</span> <span class="n">usageInfo</span> <span class="n">header</span> <span class="n">options</span>
+    <span class="n">dump</span>       <span class="ow">=</span> <span class="n">hPutStrLn</span> <span class="n">stderr</span>
+    <span class="n">die</span> <span class="n">errs</span>   <span class="ow">=</span> <span class="n">dump</span> <span class="p">(</span><span class="n">concat</span> <span class="n">errs</span> <span class="o">++</span> <span class="n">info</span><span class="p">)</span> <span class="o">&gt;&gt;</span> <span class="n">exitWith</span> <span class="p">(</span><span class="kt">ExitFailure</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">help</span>       <span class="ow">=</span> <span class="n">dump</span> <span class="n">info</span>                  <span class="o">&gt;&gt;</span> <span class="n">exitWith</span> <span class="kt">ExitSuccess</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">getOpt</span></code> 函数接受三个参数</p>
+<blockquote>
+<div><ul class="simple">
+<li>参数顺序的定义。 它定义了选项(Option)是否可以和其他参数混淆使用(就是我们上面用到的 <code class="docutils literal"><span class="pre">Permute</span></code> )或者是选项必须出现在参数之前。</li>
+<li>选项的定义。 每个选项有这四个部分组成： 简称，全称，选项的描述(比如是否接受参数) 以及用户说明。</li>
+<li>参数和选项数组，类似于 <code class="docutils literal"><span class="pre">getArgs</span></code> 的返回值。</li>
+</ul>
+</div></blockquote>
+<p>这个函数返回一个三元组，包括用户输入的选项，参数以及错误信息(如果有的话)。</p>
+<p>我们使用 <code class="docutils literal"><span class="pre">Flag</span></code> 代数类型(Algebraic Data Type)表示程序所能接收的选项。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/Check.hs</span>
+<span class="nf">options</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">OptDescr</span> <span class="kt">Flag</span><span class="p">]</span>
+<span class="nf">options</span> <span class="ow">=</span> <span class="p">[</span> <span class="kt">Option</span> <span class="p">[</span><span class="sc">&#39;h&#39;</span><span class="p">]</span> <span class="p">[</span><span class="s">&quot;help&quot;</span><span class="p">]</span> <span class="p">(</span><span class="kt">NoArg</span> <span class="kt">Help</span><span class="p">)</span>
+                   <span class="s">&quot;Show this help message&quot;</span><span class="p">,</span>
+            <span class="kt">Option</span> <span class="p">[</span><span class="sc">&#39;n&#39;</span><span class="p">]</span> <span class="kt">[]</span>       <span class="p">(</span><span class="kt">ReqArg</span> <span class="p">(</span><span class="nf">\</span><span class="n">s</span> <span class="ow">-&gt;</span> <span class="kt">N</span> <span class="p">(</span><span class="n">read</span> <span class="n">s</span><span class="p">))</span> <span class="s">&quot;N&quot;</span><span class="p">)</span>
+                   <span class="s">&quot;Number of concurrent connections (default 16)&quot;</span> <span class="p">]</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">options</span></code> 列表保存了每个程序能接收选项的描述。每个描述必须要生成一个 <code class="docutils literal"><span class="pre">Flag</span></code> 值。参考上面例子中是如何使用 <code class="docutils literal"><span class="pre">NoArg</span></code> 和 <code class="docutils literal"><span class="pre">ReqArg</span></code> 。 <code class="docutils literal"><span class="pre">GetOpt</span></code> 模块的 <code class="docutils literal"><span class="pre">ArgDescr</span></code> 类型有很多构造函数(Constructors)。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GetOpt.hs</span>
+<span class="kr">data</span> <span class="kt">ArgDescr</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">NoArg</span> <span class="n">a</span>
+                <span class="o">|</span> <span class="kt">ReqArg</span> <span class="p">(</span><span class="kt">String</span> <span class="ow">-&gt;</span> <span class="n">a</span><span class="p">)</span> <span class="kt">String</span>
+                <span class="o">|</span> <span class="kt">OptArg</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="n">a</span><span class="p">)</span> <span class="kt">String</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><code class="docutils literal"><span class="pre">NoArg</span></code> 接受一个参数用来表示这个选项。在我们这个例子中，如果用户在调用程序时输入 <code class="docutils literal"><span class="pre">-h</span></code> 或者 <code class="docutils literal"><span class="pre">--help</span></code> , 我们就用 <code class="docutils literal"><span class="pre">Help</span></code> 值表示。</li>
+<li><code class="docutils literal"><span class="pre">ReqArg</span></code> 的第一个函数作为参数，这个函数把用户输入的参数转化成相应的值；第二个参数是用来说明的。 这里我们是将字符串转换为数值(integer)，然后再给类型 <code class="docutils literal"><span class="pre">Flag</span></code> 的构造函数 <code class="docutils literal"><span class="pre">N</span></code> 。</li>
+<li><code class="docutils literal"><span class="pre">OptArg</span></code> 和 <code class="docutils literal"><span class="pre">ReqArg</span></code> 很相似，但它允许选项没有对应的参数。</li>
+</ul>
+</div>
+<div class="section" id="pattern-guards">
+<h3>模式守卫 (Pattern guards)<a class="headerlink" href="#pattern-guards" title="Permalink to this headline">¶</a></h3>
+<p>函数 <code class="docutils literal"><span class="pre">parseArgs</span></code> 的定义里其实潜在了一个语言扩展(Language Extension), Pattern guards。用它可以写出更加简要的guard expressions. 它通过语言扩展 <code class="docutils literal"><span class="pre">PatternGuards</span></code> 来使用。</p>
+<p>一个Pattern Guard有三个组成部分： 一个模式(Pattern)， 一个 <code class="docutils literal"><span class="pre">&lt;-</span></code> 符号以及一个表达式。
+表达式会被解释然后和模式相匹配。 如果成功，在模式中定义的变量会被赋值。我们可以在一个guard里同时使用pattern guards和普通的 <code class="docutils literal"><span class="pre">Bool</span></code> guard expressions。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/PatternGuard.hs</span>
+<span class="cm">{-# LANGUAGE PatternGuards #-}</span>
+
+<span class="nf">testme</span> <span class="n">x</span> <span class="n">xs</span> <span class="o">|</span> <span class="kt">Just</span> <span class="n">y</span> <span class="ow">&lt;-</span> <span class="n">lookup</span> <span class="n">x</span> <span class="n">xs</span><span class="p">,</span> <span class="n">y</span> <span class="o">&gt;</span> <span class="mi">3</span> <span class="ow">=</span> <span class="n">y</span>
+            <span class="o">|</span> <span class="n">otherwise</span>                    <span class="ow">=</span> <span class="mi">0</span>
+</pre></div>
+</div>
+<p>在上面的例子中，当关键字 <code class="docutils literal"><span class="pre">x</span></code> 存在于alist <code class="docutils literal"><span class="pre">xs</span></code> 并且大于等于3，则返回它所对应的值。下面的定义实现了同样的功能。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/PatternGuard.hs</span>
+<span class="nf">testme_noguards</span> <span class="n">x</span> <span class="n">xs</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">lookup</span> <span class="n">x</span> <span class="n">xs</span> <span class="kr">of</span>
+                         <span class="kt">Just</span> <span class="n">y</span> <span class="o">|</span> <span class="n">y</span> <span class="o">&gt;</span> <span class="mi">3</span> <span class="ow">-&gt;</span> <span class="n">y</span>
+                         <span class="kr">_</span>              <span class="ow">-&gt;</span> <span class="mi">0</span>
+</pre></div>
+</div>
+<p>Pattern guards 使得我们可以把一系列的guards和 <code class="docutils literal"><span class="pre">case</span></code> 表达式组合到单个guard，从而写出更加简洁并容易理解的guards。</p>
+</div>
+</div>
+<div class="section" id="id13">
+<h2>STM的实践意义<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h2>
+<p>至此我们还并未提及STM所提供的特别优越的地方。比如它在做组合(<em>composes</em>)方面就表现的很好：当需要向一个事务中增加逻辑时，只需要用到常见的函数 <code class="docutils literal"><span class="pre">(&gt;&gt;=)</span></code> 和 <code class="docutils literal"><span class="pre">(&gt;&gt;)</span></code> 。</p>
+<p>组合的概念在构建模块化软件是显得格外重要。如果我们把俩段都没有问题的代码组合在一起，也应该是能很好工作的。常规的线程编程技术无法实现组合，然而由于STM提供了一些很关键的前提，从而使在线程编程时使用组合变得可能。</p>
+<p>STM monad防止了我们意外的非事务性的I/O。我们不再需要关心锁的顺序，因为代码里根本没有锁机制。我们可以忘记丢失唤醒，因为不再有条件变量了。如果有异常发生，我们则可以用函数 <code class="docutils literal"><span class="pre">catchSTM</span></code> 捕捉到，或者是往上级传递。 最后，我们可以用 <code class="docutils literal"><span class="pre">retry</span></code> 和 <code class="docutils literal"><span class="pre">orElse</span></code> 以更加漂亮的方式组织代码。</p>
+<p>采用STM机制的代码不会死锁，但是导致饥饿还是有可能的。一个长事务导致另外一个事务不停的 <code class="docutils literal"><span class="pre">retry</span></code> 。为了解决这样的问题，需要尽量的短事务并保持数据一致性。</p>
+<div class="section" id="id14">
+<h3>合理的放弃控制权<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h3>
+<p>无论是同步管理还是内存管理，经常会遇到保留控制权的情况：一些软件需要对延时或是内存使用记录有很强的保证，因此就必须花很多时间和精力去管理和调试显式的代码。然后对于软件的大多数实际情况，垃圾回收(Garbage Collection)和STM已经做的足够好了。</p>
+<p>STM并不是一颗完美的灵丹妙药。当我们选择垃圾回收而不是显式的内存管理， 我们是放弃了控制权从而获得更加安全的代码。 同样的，当使用STM时，我们放弃了底层的细节，从而希望代码可读性更好，更加容易理解。</p>
+</div>
+<div class="section" id="id15">
+<h3>使用不变量<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h3>
+<p>STM并不能消除某些类型的bug。比如，我们在一个 <code class="docutils literal"><span class="pre">atomically</span></code> 事务中从某个账号中取钱，然后返回到 <code class="docutils literal"><span class="pre">IO</span></code> monad，然后在另一个 <code class="docutils literal"><span class="pre">atomically</span></code> 事务中把钱存到另一个账号，那么代码就会产生不一致性，因为会在某个特定时刻，这部分钱不会出现的任意一个账号里。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">bogusTransfer</span> <span class="n">qty</span> <span class="n">fromBal</span> <span class="n">toBal</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">fromQty</span> <span class="ow">&lt;-</span> <span class="n">atomically</span> <span class="o">$</span> <span class="n">readTVar</span> <span class="n">fromBal</span>
+  <span class="c1">-- window of inconsistency</span>
+  <span class="n">toQty</span>   <span class="ow">&lt;-</span> <span class="n">atomically</span> <span class="o">$</span> <span class="n">readTVar</span> <span class="n">toBal</span>
+  <span class="n">atomically</span> <span class="o">$</span> <span class="n">writeTVar</span> <span class="n">fromBal</span> <span class="p">(</span><span class="n">fromQty</span> <span class="o">-</span> <span class="n">qty</span><span class="p">)</span>
+  <span class="c1">-- window of inconsistency</span>
+  <span class="n">atomically</span> <span class="o">$</span> <span class="n">writeTVar</span> <span class="n">toBal</span>   <span class="p">(</span><span class="n">toQty</span> <span class="o">+</span> <span class="n">qty</span><span class="p">)</span>
+
+<span class="nf">bogusSale</span> <span class="ow">::</span> <span class="kt">Item</span> <span class="ow">-&gt;</span> <span class="kt">Gold</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">bogusSale</span> <span class="n">item</span> <span class="n">price</span> <span class="n">buyer</span> <span class="n">seller</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">atomically</span> <span class="o">$</span> <span class="n">giveItem</span> <span class="n">item</span> <span class="p">(</span><span class="n">inventory</span> <span class="n">seller</span><span class="p">)</span> <span class="p">(</span><span class="n">inventory</span> <span class="n">buyer</span><span class="p">)</span>
+  <span class="n">bogusTransfer</span> <span class="n">price</span> <span class="p">(</span><span class="n">balance</span> <span class="n">buyer</span><span class="p">)</span> <span class="p">(</span><span class="n">balance</span> <span class="n">seller</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>在同步程序中，这类问题显然很难而且不容易重现。比如上述例子中的不一致性问题通常只存在一段很短的时间内。在开发阶段通常不会出现这类问题，而往往只有在负载很高的产品环境才有可能发生。</p>
+<p>我们可以用函数 <code class="docutils literal"><span class="pre">alwaysSucceeds</span></code> 定义一个不变量，它是永远为真的一个数据属性。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">alwaysSucceeds</span>
+<span class="nf">alwaysSucceeds</span> <span class="ow">::</span> <span class="kt">STM</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>当创建一个不变量时，它马上会被检查。如果要失败，那么这个不变量会抛出异常。更有意思的是，不变量会在经后每个事务完成时自动被检查。如果在任何一个点上失败，事务就会推出，不变量抛出的异常也会被传递下去。这就意味着当不变量的条件被违反时，我们就可以马上得到反馈。</p>
+<p>比如，下面两个函数给本章开始时定义的游戏世界增加玩家</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">newPlayer</span> <span class="ow">::</span> <span class="kt">Gold</span> <span class="ow">-&gt;</span> <span class="kt">HitPoint</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Item</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="kt">Player</span>
+<span class="nf">newPlayer</span> <span class="n">balance</span> <span class="n">health</span> <span class="n">inventory</span> <span class="ow">=</span>
+    <span class="kt">Player</span> <span class="p">`</span><span class="n">liftM</span><span class="p">`</span> <span class="n">newTVar</span> <span class="n">balance</span>
+              <span class="p">`</span><span class="n">ap</span><span class="p">`</span> <span class="n">newTVar</span> <span class="n">health</span>
+              <span class="p">`</span><span class="n">ap</span><span class="p">`</span> <span class="n">newTVar</span> <span class="n">inventory</span>
+
+<span class="nf">populateWorld</span> <span class="ow">::</span> <span class="kt">STM</span> <span class="p">[</span><span class="kt">Player</span><span class="p">]</span>
+<span class="nf">populateWorld</span> <span class="ow">=</span> <span class="n">sequence</span> <span class="p">[</span> <span class="n">newPlayer</span> <span class="mi">20</span> <span class="mi">20</span> <span class="p">[</span><span class="kt">Wand</span><span class="p">,</span> <span class="kt">Banjo</span><span class="p">],</span>
+                           <span class="n">newPlayer</span> <span class="mi">10</span> <span class="mi">12</span> <span class="p">[</span><span class="kt">Scroll</span><span class="p">]</span> <span class="p">]</span>
+</pre></div>
+</div>
+<p>下面的函数则返回了一个不变量，通过它我们可以保证整个游戏世界资金总是平衡的：即任何时候的资金总量和游戏建立时的总量是一样的。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">consistentBalance</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Player</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">STM</span> <span class="p">(</span><span class="kt">STM</span> <span class="nb">()</span><span class="p">)</span>
+<span class="nf">consistentBalance</span> <span class="n">players</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">initialTotal</span> <span class="ow">&lt;-</span> <span class="n">totalBalance</span>
+    <span class="n">return</span> <span class="o">$</span> <span class="kr">do</span>
+      <span class="n">curTotal</span> <span class="ow">&lt;-</span> <span class="n">totalBalance</span>
+      <span class="n">when</span> <span class="p">(</span><span class="n">curTotal</span> <span class="o">/=</span> <span class="n">initialTotal</span><span class="p">)</span> <span class="o">$</span>
+        <span class="ne">error</span> <span class="s">&quot;inconsistent global balance&quot;</span>
+  <span class="kr">where</span> <span class="n">totalBalance</span>   <span class="ow">=</span> <span class="n">foldM</span> <span class="n">addBalance</span> <span class="mi">0</span> <span class="n">players</span>
+        <span class="n">addBalance</span> <span class="n">a</span> <span class="n">b</span> <span class="ow">=</span> <span class="p">(</span><span class="n">a</span><span class="o">+</span><span class="p">)</span> <span class="p">`</span><span class="n">liftM</span><span class="p">`</span> <span class="n">readTVar</span> <span class="p">(</span><span class="n">balance</span> <span class="n">b</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>下面我们写个函数来试验下。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch28/GameInventory.hs</span>
+<span class="nf">tryBogusSale</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">players</span><span class="o">@</span><span class="p">(</span><span class="n">alice</span><span class="kt">:</span><span class="n">bob</span><span class="kt">:</span><span class="kr">_</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">atomically</span> <span class="n">populateWorld</span>
+  <span class="n">atomically</span> <span class="o">$</span> <span class="n">alwaysSucceeds</span> <span class="o">=&lt;&lt;</span> <span class="n">consistentBalance</span> <span class="n">players</span>
+  <span class="n">bogusSale</span> <span class="kt">Wand</span> <span class="mi">5</span> <span class="n">alice</span> <span class="n">bob</span>
+</pre></div>
+</div>
+<p>由于在函数 <code class="docutils literal"><span class="pre">bogusTransfer</span></code> 中不正确地使用了 <code class="docutils literal"><span class="pre">atomically</span></code> 而会导致不一致性， 当我们在 <strong>ghci</strong> 里运行这个方法时则会检测到这个不一致性。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">tryBogusSale</span>
+<span class="o">***</span> <span class="kt">Exception:</span> <span class="n">inconsistent</span> <span class="n">global</span> <span class="n">balance</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="27.html">第 27 章：Socket 和 Syslog</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="../convention.html">翻译约定</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.3.
+    </div>
+  </body>
+</html>

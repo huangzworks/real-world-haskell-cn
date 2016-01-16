@@ -1,0 +1,820 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>第 2 章：类型和函数 &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" />
+    <link rel="next" title="第 3 章：定义类型并简化函数" href="3.html" />
+    <link rel="prev" title="第 1 章：入门" href="1.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="1.html">第 1 章：入门</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="3.html">第 3 章：定义类型并简化函数</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="types-and-functions">
+<span id="id1"></span><h1>第 2 章：类型和函数<a class="headerlink" href="#types-and-functions" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="why-care-about-types">
+<span id="id2"></span><h2>类型是干什么用的？<a class="headerlink" href="#why-care-about-types" title="Permalink to this headline">¶</a></h2>
+<p>Haskell 中的每个函数和表达式都带有各自的类型，通常称一个表达式拥有类型 <code class="docutils literal"><span class="pre">T</span></code> ，或者说这个表达式的类型为 <code class="docutils literal"><span class="pre">T</span></code> 。举个例子，布尔值 <code class="docutils literal"><span class="pre">True</span></code> 的类型为 <code class="docutils literal"><span class="pre">Bool</span></code> ，而字符串 <code class="docutils literal"><span class="pre">&quot;foo&quot;</span></code> 的类型为 <code class="docutils literal"><span class="pre">String</span></code> 。一个值的类型标识了它和该类型的其他值所共有的一簇属性（property），比如我们可以对数字进行相加，对列表进行拼接，诸如此类。</p>
+<p>在对 Haskell 的类型系统进行更深入的探讨之前，不妨先来了解下，我们为什么要关心类型 —— 也即是，它们是干什么用的？</p>
+<p>在计算机的最底层，处理的都是没有任何附加结构的字节（byte）。而类型系统在这个基础上提供了<em>抽象</em>：它为那些单纯的字节加上了意义，使得我们可以说“这些字节是文本”，“那些字节是机票预约数据”，等等。</p>
+<p>通常情况下，类型系统还会在标识类型的基础上更进一步：它会阻止我们混合使用不同的类型，避免程序错误。比如说，类型系统通常不会允许将一个酒店预约数据当作汽车租凭数据来使用。</p>
+<p>引入抽象的使得我们可以忽略底层细节。举个例子，如果程序中的某个值是一个字符串，那么我不必考虑这个字符串在内部是如何实现的，只要像操作其他字符串一样，操作这个字符串就可以了。</p>
+<p>类型系统的一个有趣的地方是，不同的类型系统的表现并不完全相同。实际上，不同类型系统有时候处理的还是不同种类的问题。</p>
+<p>除此之外，一门语言的类型系统，还会深切地影响这门语言的使用者思考和编写程序的方式。而 Haskell 的类型系统则允许程序员以非常抽象的层次思考，并写出简洁、高效、健壮的代码。</p>
+</div>
+<div class="section" id="haskell">
+<span id="haskell-s-type-system"></span><h2>Haskell 的类型系统<a class="headerlink" href="#haskell" title="Permalink to this headline">¶</a></h2>
+<p>Haskell 中的类型有三个有趣的方面：首先，它们是强（strong）类型的；其次，它们是静态（static）的；第三，它们可以通过自动推导（automatically inferred）得出。</p>
+<p>后面的三个小节会分别讨论这三个方面，介绍它们的长处和短处，并列举 Haskell 类型系统的概念和其他语言里相关构思之间的相似性。</p>
+<div class="section" id="strong-types">
+<span id="id3"></span><h3>强类型<a class="headerlink" href="#strong-types" title="Permalink to this headline">¶</a></h3>
+<p>Haskell 的强类型系统会拒绝执行任何无意义的表达式，保证程序不会因为这些表达式而引起错误：比如将整数当作函数来使用，或者将一个字符串传给一个只接受整数参数的函数，等等。</p>
+<p>遵守类型规则的表达式被称为是“类型正确的”（well typed），而不遵守类型规则、会引起类型错误的表达式被称为是“类型不正确的”（ill typed）。</p>
+<p>Haskell 强类型系统的另一个作用是，它不会自动地将值从一个类型转换到另一个类型（转换有时又称为强制或变换）。举个例子，如果将一个整数值作为参数传给了一个接受浮点数的函数，C 编译器会自动且静默（silently）地将参数从整数类型转换为浮点类型，而 Haskell 编译器则会引发一个编译错误。</p>
+<p>要在 Haskell 中进行类型转换，必须显式地使用类型转换函数。</p>
+<p>有些时候，强类型会让某种类型代码的编写变得困难。比如说，一种编写底层 C 代码的典型方式就是将一系列字节数组当作复杂的数据结构来操作。这种做法的效率非常高，因为它避免了对字节的复制操作。因为 Haskell 不允许这种形式的转换，所以要获得同等结构形式的数据，可能需要进行一些复制操作，这可能会对性能造成细微影响。</p>
+<p>强类型的最大好处是可以让 bug 在代码实际运行之前浮现出来。比如说，在强类型的语言中，“不小心将整数当成了字符串来使用”这样的情况不可能出现。</p>
+<p>[注意：这里说的“bug”指的是类型错误，和我们常说的、通常意义上的 bug 有一些区别。]</p>
+</div>
+<div class="section" id="static-types">
+<span id="id4"></span><h3>静态类型<a class="headerlink" href="#static-types" title="Permalink to this headline">¶</a></h3>
+<p>静态类型系统指的是，编译器可以在编译期（而不是执行期）知道每个值和表达式的类型。Haskell 编译器或解释器会察觉出类型不正确的表达式，并拒绝这些表达式的执行：</p>
+<div class="highlight-haskell"><div class="highlight"><pre>Prelude&gt; True &amp;&amp; &quot;False&quot;
+
+&lt;interactive&gt;:2:9:
+    Couldn&#39;t match expected type `Bool&#39; with actual type `[Char]&#39;
+    In the second argument of `(&amp;&amp;)&#39;, namely `&quot;False&quot;&#39;
+    In the expression: True &amp;&amp; &quot;False&quot;
+    In an equation for `it&#39;: it = True &amp;&amp; &quot;False&quot;
+</pre></div>
+</div>
+<p>类似的类型错误在之前已经看过了：编译器发现值 <code class="docutils literal"><span class="pre">&quot;False&quot;</span></code> 的类型为 <code class="docutils literal"><span class="pre">[Char]</span></code> ，而 <code class="docutils literal"><span class="pre">(&amp;&amp;)</span></code> 操作符要求两个操作对象的类型都为 <code class="docutils literal"><span class="pre">Bool</span></code> ，虽然左边的操作对象 <code class="docutils literal"><span class="pre">True</span></code> 满足类型要求，但右边的操作对象 <code class="docutils literal"><span class="pre">&quot;False&quot;</span></code> 却不能匹配指定的类型，因此编译器以“类型不正确”为由，拒绝执行这个表达式。</p>
+<p>静态类型有时候会让某种有用代码的编写变得困难。在 Python 这类语言里， duck typing 非常流行， 只要两个对象的行为足够相似，那么就可以在它们之间进行互换。 幸运的是， Haskell 提供的 typeclass 机制以一种安全、方便、实用的方式提供了大部分动态类型的优点。Haskell 也提供了一部分对全动态类型（truly dynamic types）编程的支持，尽管用起来没有专门支持这种功能的语言那么方便。</p>
+<p>Haskell 对强类型和静态类型的双重支持使得程序不可能发生运行时类型错误，这也有助于捕捉那些轻微但难以发现的小错误，作为代价，在编程的时候就要付出更多的努力[译注：比如纠正类型错误和编写类型签名]。Haskell 社区有一种说法，一旦程序编译通过，那么这个程序的正确性就会比用其他语言来写要好得多。（一种更现实的说法是，Haskell 程序的小错误一般都很少。）</p>
+<p>使用动态类型语言编写的程序，常常需要通过大量的测试来预防类型错误的发生，然而，测试通常很难做到巨细无遗：一些常见的任务，比如重构，非常容易引入一些测试没覆盖到的新类型错误。</p>
+<p>另一方面，在 Haskell 里，编译器负责检查类型错误：编译通过的 Haskell 程序是不可能带有类型错误的。而重构 Haskell 程序通常只是移动一些代码块，编译，修复编译错误，并重复以上步骤直到编译无错为止。</p>
+<p>要理解静态类型的好处，可以用玩拼图的例子来打比方：在 Haskell 里，如果一块拼图的形状不正确，那么它就不能被使用。另一方面，动态类型的拼图全部都是 1 x 1 大小的正方形，这些拼图无论放在那里都可以匹配，为了验证这些拼图被放到了正确的地方，必须使用测试来进行检查。</p>
+</div>
+<div class="section" id="type-inference">
+<span id="id5"></span><h3>类型推导<a class="headerlink" href="#type-inference" title="Permalink to this headline">¶</a></h3>
+<p>关于类型系统，最后要说的是，Haskell 编译器可以自动推断出程序中几乎所有表达式的类型[注：有时候要提供一些信息，帮助编译器理解程序代码]。这个过程被称为类型推导（type inference）。</p>
+<p>虽然 Haskell 允许我们显式地为任何值指定类型，但类型推导使得这种工作通常是可选的，而不是非做不可的事。</p>
+</div>
+</div>
+<div class="section" id="what-to-expect-from-type-system">
+<span id="id6"></span><h2>正确理解类型系统<a class="headerlink" href="#what-to-expect-from-type-system" title="Permalink to this headline">¶</a></h2>
+<p>对 Haskell 类型系统能力和好处的探索会花费好几个章节。在刚开始的时候，处理 Haskell 的类型可能会让你觉得有些麻烦。</p>
+<p>比如说，在 Python 和 Ruby 里，你只要写下程序，然后测试一下程序的执行结果是否正确就够了，但是在 Haskell ，你还要先确保程序能通过类型检查。那么，为什么要多走这些弯路呢？</p>
+<p>答案是，静态、强类型检查使得 Haskell 更安全，而类型推导则让它更精炼、简洁。这样得出的的结果是，比起其他流行的静态语言，Haskell 要来得更安全，而比起其他流行的动态语言， Haskell 的表现力又更胜一筹。</p>
+<p>这并不是吹牛，等你看完这本书之后就会了解这一点。</p>
+<p>修复编译时的类型错误刚开始会让人觉得增加了不必要的工作量，但是，换个角度来看，这不过是提前完成了调试工作：编译器在处理程序时，会将代码中的逻辑错误一一展示出来，而不是一声不吭，任由代码在运行时出错。</p>
+<p>更进一步来说，因为 Haskell 里值和函数的类型都可以通过自动推导得出，所以 Haskell 程序既可以获得静态类型带来的所有好处，而又不必像传统的静态类型语言那样，忙于添加各种各样的类型签名[译注：比如 C 语言的函数原型声明] ——</p>
+<p>在其他语言里，类型系统为编译器服务；而在 Haskell 里，类型系统为你服务。唯一的要求是，你需要学习如何在类型系统提供的框架下工作。</p>
+<p>对 Haskell 类型的运用将遍布整本书，这些技术将帮助我们编写和测试实用的代码。</p>
+</div>
+<div class="section" id="some-common-basic-types">
+<span id="id7"></span><h2>一些常用的基本类型<a class="headerlink" href="#some-common-basic-types" title="Permalink to this headline">¶</a></h2>
+<p>以下是 Haskell 里最常用的一些基本类型，其中有些在之前的章节里已经看过了：</p>
+<p><code class="docutils literal"><span class="pre">Char</span></code></p>
+<p>单个 Unicode 字符。</p>
+<p><code class="docutils literal"><span class="pre">Bool</span></code></p>
+<p>表示一个布尔逻辑值。这个类型只有两个值： <code class="docutils literal"><span class="pre">True</span></code> 和 <code class="docutils literal"><span class="pre">False</span></code> 。</p>
+<p><code class="docutils literal"><span class="pre">Int</span></code></p>
+<p>带符号的定长（fixed-width）整数。这个值的准确范围由机器决定：在 32 位机器里， <code class="docutils literal"><span class="pre">Int</span></code> 为 32 位宽，在 64 位机器里， <code class="docutils literal"><span class="pre">Int</span></code> 为 64 位宽。Haskell 保证 <code class="docutils literal"><span class="pre">Int</span></code> 的宽度不少于 28 位。（数值类型还可以是 8 位、16 位，等等，也可以是带符号和无符号的，以后会介绍。）</p>
+<p><code class="docutils literal"><span class="pre">Integer</span></code></p>
+<p>不限长度的带符号整数。 <code class="docutils literal"><span class="pre">Integer</span></code> 并不像 <code class="docutils literal"><span class="pre">Int</span></code> 那么常用，因为它们需要更多的内存和更大的计算量。另一方面，对 <code class="docutils literal"><span class="pre">Integer</span></code> 的计算不会造成溢出，因此使用 <code class="docutils literal"><span class="pre">Integer</span></code> 的计算结果更可靠。</p>
+<p><code class="docutils literal"><span class="pre">Double</span></code></p>
+<p>用于表示浮点数。长度由机器决定，通常是 64 位。（Haskell 也有 <code class="docutils literal"><span class="pre">Float</span></code> 类型，但是并不推荐使用，因为编译器都是针对 <code class="docutils literal"><span class="pre">Double</span></code> 来进行优化的，而 <code class="docutils literal"><span class="pre">Float</span></code> 类型值的计算要慢得多。）</p>
+<p>在前面的章节里，我们已经见到过 <code class="docutils literal"><span class="pre">::</span></code> 符号。除了用来表示类型之外，它还可以用于进行<em>类型签名</em>。比如说， <code class="docutils literal"><span class="pre">exp</span> <span class="pre">::</span> <span class="pre">T</span></code> 就是向 Haskell 表示， <code class="docutils literal"><span class="pre">exp</span></code> 的类型是 <code class="docutils literal"><span class="pre">T</span></code> ，而 <code class="docutils literal"><span class="pre">::</span> <span class="pre">T</span></code> 就是表达式 <code class="docutils literal"><span class="pre">exp</span></code> 的类型签名。如果一个表达式没有显式地指名类型的话，那么它的类型就通过自动推导来决定：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="sc">&#39;a&#39;</span>
+<span class="sc">&#39;a&#39;</span> <span class="ow">::</span> <span class="kt">Char</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="sc">&#39;a&#39;</span>            <span class="c1">-- 自动推导</span>
+<span class="sc">&#39;a&#39;</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="sc">&#39;a&#39;</span> <span class="ow">::</span> <span class="kt">Char</span>    <span class="c1">-- 显式签名</span>
+<span class="sc">&#39;a&#39;</span>
+</pre></div>
+</div>
+<p>当然了，类型签名必须正确，否则 Haskell 编译器就会产生错误：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="sc">&#39;a&#39;</span> <span class="ow">::</span> <span class="kt">Int</span>     <span class="c1">-- 试图将一个字符值标识为 Int 类型</span>
+
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">7</span><span class="kt">:</span><span class="mi">1</span><span class="kt">:</span>
+    <span class="kt">Couldn&#39;t</span> <span class="n">match</span> <span class="n">expected</span> <span class="kr">type</span> <span class="p">`</span><span class="kt">Int&#39;</span> <span class="n">with</span> <span class="n">actual</span> <span class="kr">type</span> <span class="p">`</span><span class="kt">Char&#39;</span>
+    <span class="kt">In</span> <span class="n">the</span> <span class="n">expression</span><span class="kt">:</span> <span class="sc">&#39;a&#39;</span> <span class="ow">::</span> <span class="kt">Int</span>
+    <span class="kt">In</span> <span class="n">an</span> <span class="n">equation</span> <span class="n">for</span> <span class="p">`</span><span class="n">it&#39;</span><span class="kt">:</span> <span class="n">it</span> <span class="ow">=</span> <span class="sc">&#39;a&#39;</span> <span class="ow">::</span> <span class="kt">Int</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="function-application">
+<span id="id8"></span><h2>调用函数<a class="headerlink" href="#function-application" title="Permalink to this headline">¶</a></h2>
+<p>要调用一个函数，先写出它的名字，后接函数的参数：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">odd</span> <span class="mi">3</span>
+<span class="kt">True</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">odd</span> <span class="mi">6</span>
+<span class="kt">False</span>
+</pre></div>
+</div>
+<p>注意，函数的参数不需要用括号来包围，参数和参数之间也不需要用逗号来隔开[译注：使用空格就可以了]：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">compare</span> <span class="mi">2</span> <span class="mi">3</span>
+<span class="kt">LT</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">compare</span> <span class="mi">3</span> <span class="mi">3</span>
+<span class="kt">EQ</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">compare</span> <span class="mi">3</span> <span class="mi">2</span>
+<span class="kt">GT</span>
+</pre></div>
+</div>
+<p>Haskell 函数的应用方式和其他语言差不多，但是格式要来得更简单。</p>
+<p>因为函数应用的优先级比操作符要高，因此以下两个表达式是相等的：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">compare</span> <span class="mi">2</span> <span class="mi">3</span><span class="p">)</span> <span class="o">==</span> <span class="kt">LT</span>
+<span class="kt">True</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">compare</span> <span class="mi">2</span> <span class="mi">3</span> <span class="o">==</span> <span class="kt">LT</span>
+<span class="kt">True</span>
+</pre></div>
+</div>
+<p>有时候，为了可读性考虑，添加一些额外的括号也是可以理解的，上面代码的第一个表达式就是这样一个例子。另一方面，在某些情况下，我们<em>必须</em>使用括号来让编译器知道，该如何处理一个复杂的表达式：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">compare</span> <span class="p">(</span><span class="n">sqrt</span> <span class="mi">3</span><span class="p">)</span> <span class="p">(</span><span class="n">sqrt</span> <span class="mi">6</span><span class="p">)</span>
+<span class="kt">LT</span>
+</pre></div>
+</div>
+<p>这个表达式将 <code class="docutils literal"><span class="pre">sqrt</span> <span class="pre">3</span></code> 和 <code class="docutils literal"><span class="pre">sqrt</span> <span class="pre">6</span></code> 的计算结果分别传给 <code class="docutils literal"><span class="pre">compare</span></code> 函数。如果将括号移走， Haskell 编译器就会产生一个编译错误，因为它认为我们将四个参数传给了只需要两个参数的 <code class="docutils literal"><span class="pre">compare</span></code> 函数：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">compare</span> <span class="n">sqrt</span> <span class="mi">3</span> <span class="n">sqrt</span> <span class="mi">6</span>
+
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">17</span><span class="kt">:</span><span class="mi">1</span><span class="kt">:</span>
+    <span class="kt">The</span> <span class="n">function</span> <span class="p">`</span><span class="n">compare&#39;</span> <span class="n">is</span> <span class="n">applied</span> <span class="n">to</span> <span class="n">four</span> <span class="n">arguments</span><span class="p">,</span>
+    <span class="n">but</span> <span class="n">its</span> <span class="kr">type</span> <span class="p">`</span><span class="n">a0</span> <span class="ow">-&gt;</span> <span class="n">a0</span> <span class="ow">-&gt;</span> <span class="kt">Ordering&#39;</span> <span class="n">has</span> <span class="n">only</span> <span class="n">two</span>
+    <span class="kt">In</span> <span class="n">the</span> <span class="n">expression</span><span class="kt">:</span> <span class="n">compare</span> <span class="n">sqrt</span> <span class="mi">3</span> <span class="n">sqrt</span> <span class="mi">6</span>
+    <span class="kt">In</span> <span class="n">an</span> <span class="n">equation</span> <span class="n">for</span> <span class="p">`</span><span class="n">it&#39;</span><span class="kt">:</span> <span class="n">it</span> <span class="ow">=</span> <span class="n">compare</span> <span class="n">sqrt</span> <span class="mi">3</span> <span class="n">sqrt</span> <span class="mi">6</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="useful-composite-data-types-lists-and-tuples">
+<span id="id9"></span><h2>复合数据类型：列表和元组<a class="headerlink" href="#useful-composite-data-types-lists-and-tuples" title="Permalink to this headline">¶</a></h2>
+<p>复合类型通过其他类型构建得出。列表和元组是 Haskell 中最常用的复合数据类型。</p>
+<p>在前面介绍字符串的时候，我们就已经见到过列表类型了： <code class="docutils literal"><span class="pre">String</span></code> 是 <code class="docutils literal"><span class="pre">[Char]</span></code> 的别名，而 <code class="docutils literal"><span class="pre">[Char]</span></code> 则表示由 <code class="docutils literal"><span class="pre">Char</span></code> 类型组成的列表。</p>
+<p><code class="docutils literal"><span class="pre">head</span></code> 函数取出列表的第一个元素：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">head</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+<span class="mi">1</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">head</span> <span class="p">[</span><span class="sc">&#39;a&#39;</span><span class="p">,</span> <span class="sc">&#39;b&#39;</span><span class="p">,</span> <span class="sc">&#39;c&#39;</span><span class="p">]</span>
+<span class="sc">&#39;a&#39;</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">head</span> <span class="kt">[]</span>
+<span class="o">***</span> <span class="kt">Exception:</span> <span class="kt">Prelude</span><span class="o">.</span><span class="n">head</span><span class="kt">:</span> <span class="n">empty</span> <span class="n">list</span>
+</pre></div>
+</div>
+<p>和 <code class="docutils literal"><span class="pre">head</span></code> 相反， <code class="docutils literal"><span class="pre">tail</span></code> 取出列表里除了第一个元素之外的其他元素：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">tail</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">]</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">tail</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">]</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">tail</span> <span class="p">[</span><span class="kt">True</span><span class="p">,</span> <span class="kt">False</span><span class="p">]</span>
+<span class="p">[</span><span class="kt">False</span><span class="p">]</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">tail</span> <span class="s">&quot;list&quot;</span>
+<span class="s">&quot;ist&quot;</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">tail</span> <span class="kt">[]</span>
+<span class="o">***</span> <span class="kt">Exception:</span> <span class="kt">Prelude</span><span class="o">.</span><span class="n">tail</span><span class="kt">:</span> <span class="n">empty</span> <span class="n">list</span>
+</pre></div>
+</div>
+<p>正如前面的例子所示， <code class="docutils literal"><span class="pre">head</span></code> 和 <code class="docutils literal"><span class="pre">tail</span></code> 函数可以处理不同类型的列表。将 <code class="docutils literal"><span class="pre">head</span></code> 应用于 <code class="docutils literal"><span class="pre">[Char]</span></code> 类型的列表，结果为一个 <code class="docutils literal"><span class="pre">Char</span></code> 类型的值，而将它应用于 <code class="docutils literal"><span class="pre">[Bool]</span></code> 类型的值，结果为一个 <code class="docutils literal"><span class="pre">Bool</span></code> 类型的值。 <code class="docutils literal"><span class="pre">head</span></code> 函数并不关心它处理的是何种类型的列表。</p>
+<p>因为列表中的值可以是任意类型，所以我们可以称列表为类型<em>多态</em>（polymorphic）的。当需要编写带有多态类型的代码时，需要使用<em>类型变量</em>。这些类型变量以小写字母开头，作为一个占位符，最终被一个具体的类型替换。</p>
+<p>比如说， <code class="docutils literal"><span class="pre">[a]</span></code> 用一个方括号包围一个类型变量 <code class="docutils literal"><span class="pre">a</span></code> ，表示一个“类型为 <code class="docutils literal"><span class="pre">a</span></code> 的列表”。这也就是说“我不在乎列表是什么类型，尽管给我一个列表就是了”。</p>
+<p>当需要一个带有具体类型的列表时，就需要用一个具体的类型去替换类型变量。比如说， <code class="docutils literal"><span class="pre">[Int]</span></code> 表示一个包含 <code class="docutils literal"><span class="pre">Int</span></code> 类型值的列表，它用 <code class="docutils literal"><span class="pre">Int</span></code> 类型替换了类型变量 <code class="docutils literal"><span class="pre">a</span></code> 。又比如， <code class="docutils literal"><span class="pre">[MyPersonalType]</span></code> 表示一个包含 <code class="docutils literal"><span class="pre">MyPersonalType</span></code> 类型值的列表，它用 <code class="docutils literal"><span class="pre">MyPersonalType</span></code> 替换了类型变量 <code class="docutils literal"><span class="pre">a</span></code> 。</p>
+<p>这种替换还还可以递归地进行： <code class="docutils literal"><span class="pre">[[Int]]</span></code> 是一个包含 <code class="docutils literal"><span class="pre">[Int]</span></code> 类型值的列表，而 <code class="docutils literal"><span class="pre">[Int]</span></code> 又是一个包含 <code class="docutils literal"><span class="pre">Int</span></code> 类型值的列表。以下例子展示了一个包含 <code class="docutils literal"><span class="pre">Bool</span></code> 类型的列表的列表：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">[[</span><span class="kt">True</span><span class="p">],</span> <span class="p">[</span><span class="kt">False</span><span class="p">,</span> <span class="kt">False</span><span class="p">]]</span>
+<span class="p">[[</span><span class="kt">True</span><span class="p">],</span> <span class="p">[</span><span class="kt">False</span><span class="p">,</span> <span class="kt">False</span><span class="p">]]</span> <span class="ow">::</span> <span class="p">[[</span><span class="kt">Bool</span><span class="p">]]</span>
+</pre></div>
+</div>
+<p>假设现在要用一个数据结构，分别保存一本书的出版年份 —— 一个整数，以及这本书的书名 —— 一个字符串。很明显，列表不能保存这样的信息，因为列表只能接受类型相同的值。这时，我们就需要使用元组：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="p">(</span><span class="mi">1964</span><span class="p">,</span> <span class="s">&quot;Labyrinths&quot;</span><span class="p">)</span>
+<span class="p">(</span><span class="mi">1964</span><span class="p">,</span><span class="s">&quot;Labyrinths&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>元组和列表非常不同，它们的两个属性刚刚相反：列表可以任意长，且只能包含类型相同的值；元组的长度是固定的，但可以包含不同类型的值。</p>
+<p>元组的两边用括号包围，元素之间用逗号分割。元组的类型信息也使用同样的格式：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="kt">True</span><span class="p">,</span> <span class="s">&quot;hello&quot;</span><span class="p">)</span>
+<span class="p">(</span><span class="kt">True</span><span class="p">,</span> <span class="s">&quot;hello&quot;</span><span class="p">)</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Bool</span><span class="p">,</span> <span class="p">[</span><span class="kt">Char</span><span class="p">])</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="p">[</span><span class="sc">&#39;a&#39;</span><span class="p">,</span> <span class="sc">&#39;m&#39;</span><span class="p">],</span> <span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="kt">True</span><span class="p">))</span>
+<span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="s">&quot;am&quot;</span><span class="p">,(</span><span class="mi">16</span><span class="p">,</span><span class="kt">True</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Haskell 有一个特殊的类型 <code class="docutils literal"><span class="pre">()</span></code> ，这种类型只有一个值 <code class="docutils literal"><span class="pre">()</span></code> ，它的作用相当于包含零个元素的元组，类似于 C 语言中的 <code class="docutils literal"><span class="pre">void</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="nb">()</span>
+<span class="nb">()</span> <span class="ow">::</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>通常用元组中元素的数量作为称呼元组的前缀，比如“2-元组”用于称呼包含两个元素的元组，“5-元组”用于称呼包含五个元素的元组，诸如此类。Haskell 不能创建 1-元组，因为 Haskell 没有相应的创建 1-元组的语法（notion）。另外，在实际编程中，元组的元素太多会让代码变得混乱，因此元组通常只包含几个元素。</p>
+<p>元组的类型由它所包含元素的数量、位置和类型决定。这意味着，如果两个元组里都包含着同样类型的元素，而这些元素的摆放位置不同，那么它们的类型就不相等，就像这样：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="kt">False</span><span class="p">,</span> <span class="sc">&#39;a&#39;</span><span class="p">)</span>
+<span class="p">(</span><span class="kt">False</span><span class="p">,</span> <span class="sc">&#39;a&#39;</span><span class="p">)</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Bool</span><span class="p">,</span> <span class="kt">Char</span><span class="p">)</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="sc">&#39;a&#39;</span><span class="p">,</span> <span class="kt">False</span><span class="p">)</span>
+<span class="p">(</span><span class="sc">&#39;a&#39;</span><span class="p">,</span> <span class="kt">False</span><span class="p">)</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Char</span><span class="p">,</span> <span class="kt">Bool</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>除此之外，即使两个元组之间有一部分元素的类型相同，位置也一致，但是，如果它们的元素数量不同，那么它们的类型也不相等：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="kt">False</span><span class="p">,</span> <span class="sc">&#39;a&#39;</span><span class="p">)</span>
+<span class="p">(</span><span class="kt">False</span><span class="p">,</span> <span class="sc">&#39;a&#39;</span><span class="p">)</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Bool</span><span class="p">,</span> <span class="kt">Char</span><span class="p">)</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="kt">False</span><span class="p">,</span> <span class="sc">&#39;a&#39;</span><span class="p">,</span> <span class="sc">&#39;b&#39;</span><span class="p">)</span>
+<span class="p">(</span><span class="kt">False</span><span class="p">,</span> <span class="sc">&#39;a&#39;</span><span class="p">,</span> <span class="sc">&#39;b&#39;</span><span class="p">)</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Bool</span><span class="p">,</span> <span class="kt">Char</span><span class="p">,</span> <span class="kt">Char</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>只有元组中的数量、位置和类型都完全相同，这两个元组的类型才是相同的：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="p">(</span><span class="kt">False</span><span class="p">,</span> <span class="sc">&#39;a&#39;</span><span class="p">)</span>
+<span class="p">(</span><span class="kt">False</span><span class="p">,</span> <span class="sc">&#39;a&#39;</span><span class="p">)</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Bool</span><span class="p">,</span> <span class="kt">Char</span><span class="p">)</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="p">(</span><span class="kt">True</span><span class="p">,</span> <span class="sc">&#39;b&#39;</span><span class="p">)</span>
+<span class="p">(</span><span class="kt">True</span><span class="p">,</span> <span class="sc">&#39;b&#39;</span><span class="p">)</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Bool</span><span class="p">,</span> <span class="kt">Char</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>元组通常用于以下两个地方：</p>
+<ul class="simple">
+<li>如果一个函数需要返回多个值，那么可以将这些值都包装到一个元组中，然后返回元组作为函数的值。</li>
+<li>当需要使用定长容器，但又没有必要使用自定义类型的时候，就可以使用元组来对值进行包装。</li>
+</ul>
+</div>
+<div class="section" id="functions-over-lists-and-tuples">
+<span id="id10"></span><h2>处理列表和元组的函数<a class="headerlink" href="#functions-over-lists-and-tuples" title="Permalink to this headline">¶</a></h2>
+<p>前面的内容介绍了如何构造列表和元组，现在来看看处理这两种数据结构的函数。</p>
+<p>函数 <code class="docutils literal"><span class="pre">take</span></code> 和 <code class="docutils literal"><span class="pre">drop</span></code> 接受两个参数，一个数字 <code class="docutils literal"><span class="pre">n</span></code> 和一个列表 <code class="docutils literal"><span class="pre">l</span></code> 。</p>
+<p><code class="docutils literal"><span class="pre">take</span></code> 返回一个包含 <code class="docutils literal"><span class="pre">l</span></code> 前 <code class="docutils literal"><span class="pre">n</span></code> 个元素的列表：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">take</span> <span class="mi">2</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">]</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">drop</span></code> 则返回一个包含 <code class="docutils literal"><span class="pre">l</span></code> 丢弃了前 <code class="docutils literal"><span class="pre">n</span></code> 个元素之后，剩余元素的列表：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">drop</span> <span class="mi">2</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>函数 <code class="docutils literal"><span class="pre">fst</span></code> 和 <code class="docutils literal"><span class="pre">snd</span></code> 接受一个元组作为参数，返回该元组的第一个元素和第二个元素：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">fst</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="sc">&#39;a&#39;</span><span class="p">)</span>
+<span class="mi">1</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">snd</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="sc">&#39;a&#39;</span><span class="p">)</span>
+<span class="sc">&#39;a&#39;</span>
+</pre></div>
+</div>
+<div class="section" id="passing-an-expression-to-function">
+<span id="id11"></span><h3>将表达式传给函数<a class="headerlink" href="#passing-an-expression-to-function" title="Permalink to this headline">¶</a></h3>
+<p>Haskell 的函数应用是左关联的。比如说，表达式 <code class="docutils literal"><span class="pre">a</span> <span class="pre">b</span> <span class="pre">c</span> <span class="pre">d</span></code> 等同于 <code class="docutils literal"><span class="pre">(((a</span> <span class="pre">b)</span> <span class="pre">c)</span> <span class="pre">d)</span></code> 。要将一个表达式用作另一个表达式的参数，那么就必须显式地使用括号来包围它，这样编译器才会知道我们的真正意思：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">head</span> <span class="p">(</span><span class="n">drop</span> <span class="mi">4</span> <span class="s">&quot;azety&quot;</span><span class="p">)</span>
+<span class="sc">&#39;y&#39;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">drop</span> <span class="pre">4</span> <span class="pre">&quot;azety&quot;</span></code> 这个表达式被一对括号显式地包围，作为参数传入 <code class="docutils literal"><span class="pre">head</span></code> 函数。</p>
+<p>如果将括号移走，那么编译器就会认为我们试图将三个参数传给 <code class="docutils literal"><span class="pre">head</span></code> 函数，于是它引发一个错误：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">head</span> <span class="n">drop</span> <span class="mi">4</span> <span class="s">&quot;azety&quot;</span>
+
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">26</span><span class="kt">:</span><span class="mi">6</span><span class="kt">:</span>
+    <span class="kt">Couldn&#39;t</span> <span class="n">match</span> <span class="n">expected</span> <span class="kr">type</span> <span class="p">`[</span><span class="n">t1</span> <span class="ow">-&gt;</span> <span class="n">t2</span> <span class="ow">-&gt;</span> <span class="n">t0</span><span class="p">]</span><span class="sc">&#39;</span>
+    <span class="n">with</span> <span class="n">actual</span> <span class="kr">type</span> <span class="p">`</span><span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a0</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a0</span><span class="p">]</span><span class="sc">&#39;</span>
+    <span class="kt">In</span> <span class="n">the</span> <span class="n">first</span> <span class="n">argument</span> <span class="kr">of</span> <span class="p">`</span><span class="n">head&#39;</span><span class="p">,</span> <span class="n">namely</span> <span class="p">`</span><span class="n">drop&#39;</span>
+    <span class="kt">In</span> <span class="n">the</span> <span class="n">expression</span><span class="kt">:</span> <span class="n">head</span> <span class="n">drop</span> <span class="mi">4</span> <span class="s">&quot;azety&quot;</span>
+    <span class="kt">In</span> <span class="n">an</span> <span class="n">equation</span> <span class="n">for</span> <span class="p">`</span><span class="n">it&#39;</span><span class="kt">:</span> <span class="n">it</span> <span class="ow">=</span> <span class="n">head</span> <span class="n">drop</span> <span class="mi">4</span> <span class="s">&quot;azety&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="function-types">
+<span id="id12"></span><h2>函数类型<a class="headerlink" href="#function-types" title="Permalink to this headline">¶</a></h2>
+<p>使用 <code class="docutils literal"><span class="pre">:type</span></code> 命令可以查看函数的类型[译注：缩写形式为 <code class="docutils literal"><span class="pre">:t</span></code> ]：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">lines</span>
+<span class="nf">lines</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>符号 <code class="docutils literal"><span class="pre">-&gt;</span></code> 可以读作“映射到”，或者（稍微不太精确地），读作“返回”。函数的类型签名显示， <code class="docutils literal"><span class="pre">lines</span></code> 函数接受单个字符串，并返回包含字符串值的列表：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">lines</span> <span class="s">&quot;the quick</span><span class="se">\n</span><span class="s">brown fox</span><span class="se">\n</span><span class="s">jumps&quot;</span>
+<span class="p">[</span><span class="s">&quot;the quick&quot;</span><span class="p">,</span><span class="s">&quot;brown fox&quot;</span><span class="p">,</span><span class="s">&quot;jumps&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>结果表示， <code class="docutils literal"><span class="pre">lines</span></code> 函数接受一个字符串作为输入，并将这个字符串按行转义符号分割成多个字符串。</p>
+<p>从 <code class="docutils literal"><span class="pre">lines</span></code> 函数的这个例子可以看出：函数的类型签名对于函数自身的功能有很大的提示作用，这种属性对于函数式语言的类型来说，意义重大。</p>
+<p>[译注： <code class="docutils literal"><span class="pre">String</span> <span class="pre">-&gt;</span> <span class="pre">[String]</span></code> 的实际意思是指 <code class="docutils literal"><span class="pre">lines</span></code> 函数定义了一个从 <code class="docutils literal"><span class="pre">String</span></code> 到 <code class="docutils literal"><span class="pre">[String]</span></code> 的函数映射，因此，这里将 <code class="docutils literal"><span class="pre">-&gt;</span></code> 的读法 <code class="docutils literal"><span class="pre">to</span></code> 翻译成“映射到”。]</p>
+</div>
+<div class="section" id="purity">
+<span id="id13"></span><h2>纯度<a class="headerlink" href="#purity" title="Permalink to this headline">¶</a></h2>
+<p><em>副作用</em>指的是，函数的行为受系统的全局状态所影响。</p>
+<p>举个命令式语言的例子：假设有某个函数，它读取并返回某个全局变量，如果程序中的其他代码可以修改这个全局变量的话，那么这个函数的返回值就取决于这个全局变量在某一时刻的值。我们说这个函数带有副作用，尽管它并不亲自修改全局变量。</p>
+<p>副作用本质上是函数的一种不可见的（invisible）输入或输出。Haskell 的函数在默认情况下都是无副作用的：函数的结果只取决于显式传入的参数。</p>
+<p>我们将带副作用的函数称为“不纯（impure）函数”，而将不带副作用的函数称为“纯（pure）函数”。</p>
+<p>从类型签名可以看出一个 Haskell 函数是否带有副作用 —— 不纯函数的类型签名都以 <code class="docutils literal"><span class="pre">IO</span></code> 开头：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">readFile</span>
+<span class="nf">readFile</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">String</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="haskell-source-files-and-writing-simple-function">
+<span id="id14"></span><h2>Haskell 源码，以及简单函数的定义<a class="headerlink" href="#haskell-source-files-and-writing-simple-function" title="Permalink to this headline">¶</a></h2>
+<p>既然我们已经学会了如何应用函数，那么是时候回过头来，学习怎样去编写函数。</p>
+<p>因为 ghci 只支持 Haskell 特性的一个非常受限的子集，因此，尽管可以在 ghci 里面定义函数，但那里并不是编写函数最适当的环境。更关键的是， ghci 里面定义函数的语法和 Haskell 源码里定义函数的语法并不相同。综上所述，我们选择将代码写在源码文件里。</p>
+<p>Haskell 源码通常以 <em>.hs</em> 作为后缀。我们创建一个 <code class="docutils literal"><span class="pre">add.hs</span></code> 文件，并将以下定义添加到文件中：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch02/add.hs</span>
+<span class="nf">add</span> <span class="n">a</span> <span class="n">b</span> <span class="ow">=</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>[译注：原书代码里的路径为 <code class="docutils literal"><span class="pre">ch03/add.hs</span></code> ，是错误的。]</p>
+<p><code class="docutils literal"><span class="pre">=</span></code> 号左边的 <code class="docutils literal"><span class="pre">add</span> <span class="pre">a</span> <span class="pre">b</span></code> 是函数名和函数参数，而右边的 <code class="docutils literal"><span class="pre">a</span> <span class="pre">+</span> <span class="pre">b</span></code> 则是函数体，符号 <code class="docutils literal"><span class="pre">=</span></code> 表示将左边的名字（函数名和函数参数）定义为右边的表达式（函数体）。</p>
+<p>将 <code class="docutils literal"><span class="pre">add.hs</span></code> 保存之后，就可以在 ghci 里通过 <code class="docutils literal"><span class="pre">:load</span></code> 命令（缩写为 <code class="docutils literal"><span class="pre">:l</span></code> ）载入它，接着就可以像使用其他函数一样，调用 <code class="docutils literal"><span class="pre">add</span></code> 函数了：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="n">add</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">add</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">add</span> <span class="mi">1</span> <span class="mi">2</span>  <span class="c1">-- 包载入成功之后 ghci 的提示符会发生变化</span>
+<span class="mi">3</span>
+</pre></div>
+</div>
+<p>[译注：你的当前文件夹（CWD）必须是 <code class="docutils literal"><span class="pre">ch02</span></code> 文件夹，否则直接载入 <code class="docutils literal"><span class="pre">add.hs</span></code> 会失败]</p>
+<p>当以 <code class="docutils literal"><span class="pre">1</span></code> 和 <code class="docutils literal"><span class="pre">2</span></code> 作为参数应用 <code class="docutils literal"><span class="pre">add</span></code> 函数的时候，它们分别被赋值给（或者说，绑定到）函数定义中的变量 <code class="docutils literal"><span class="pre">a</span></code> 和 <code class="docutils literal"><span class="pre">b</span></code> ，因此得出的结果表达式为 <code class="docutils literal"><span class="pre">1</span> <span class="pre">+</span> <span class="pre">2</span></code> ，而这个表达式的值 <code class="docutils literal"><span class="pre">3</span></code> 就是本次函数应用的结果。</p>
+<p>Haskell 不使用 <code class="docutils literal"><span class="pre">return</span></code> 关键字来返回函数值：因为一个函数就是一个单独的表达式（expression），而不是一组陈述（statement），求值表达式所得的结果就是函数的返回值。（实际上，Haskell 有一个名为 <code class="docutils literal"><span class="pre">return</span></code> 的函数，但它和命令式语言里的 <code class="docutils literal"><span class="pre">return</span></code> 不是同一回事。）</p>
+<div class="section" id="just-what-is-a-variable-anyway">
+<span id="id15"></span><h3>变量<a class="headerlink" href="#just-what-is-a-variable-anyway" title="Permalink to this headline">¶</a></h3>
+<p>在 Haskell 里，可以使用变量来赋予表达式名字：一旦变量绑定了（也即是，关联起）某个表达式，那么这个变量的值就不会改变 —— 我们总能用这个变量来指代它所关联的表达式，并且每次都会得到同样的结果。</p>
+<p>如果你曾经用过命令式语言，就会发现 Haskell 的变量和命令式语言的变量很不同：在命令式语言里，一个变量通常用于标识一个内存位置（或者其他类似的东西），并且在任何时候，都可以随意修改这个变量的值。因此在不同时间点上，访问这个变量得出的值可能是完全不同的。</p>
+<p>对变量的这两种不同的处理方式产生了巨大的差别：
+在 Haskell 程序里面，
+当变量和表达式绑定之后，
+我们总能将变量替换成相应的表达式。
+但是在声明式语言里面就没有办法做这样的替换，因为变量的值可能无时不刻都处在改变当中。</p>
+<p>举个例子，以下 Python 脚本打印出值 <code class="docutils literal"><span class="pre">11</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">x</span> <span class="ow">=</span> <span class="mi">10</span>
+<span class="nf">x</span> <span class="ow">=</span> <span class="mi">11</span>
+<span class="nf">print</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>[译注：这里将原书的代码从 <code class="docutils literal"><span class="pre">print</span> <span class="pre">x</span></code> 改为 <code class="docutils literal"><span class="pre">print(x)</span></code> ，确保代码在 Python 2 和 Python 3 都可以顺利执行。]</p>
+<p>然后，试着在 Haskell 里做同样的事：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch02/Assign.hs</span>
+<span class="nf">x</span> <span class="ow">=</span> <span class="mi">10</span>
+<span class="nf">x</span> <span class="ow">=</span> <span class="mi">11</span>
+</pre></div>
+</div>
+<p>但是 Haskell 并不允许做这样的多次赋值：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">Assign</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">Assign</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+
+<span class="kt">Assign</span><span class="o">.</span><span class="n">hs</span><span class="kt">:</span><span class="mi">3</span><span class="kt">:</span><span class="mi">1</span><span class="kt">:</span>
+    <span class="kt">Multiple</span> <span class="n">declarations</span> <span class="kr">of</span> <span class="p">`</span><span class="n">x&#39;</span>
+    <span class="kt">Declared</span> <span class="n">at</span><span class="kt">:</span> <span class="kt">Assign</span><span class="o">.</span><span class="n">hs</span><span class="kt">:</span><span class="mi">2</span><span class="kt">:</span><span class="mi">1</span>
+                 <span class="kt">Assign</span><span class="o">.</span><span class="n">hs</span><span class="kt">:</span><span class="mi">3</span><span class="kt">:</span><span class="mi">1</span>
+<span class="kt">Failed</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="n">none</span><span class="o">.</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="conditional-evaluation">
+<span id="id16"></span><h3>条件求值<a class="headerlink" href="#conditional-evaluation" title="Permalink to this headline">¶</a></h3>
+<p>和很多语言一样，Haskell 也有自己的 <code class="docutils literal"><span class="pre">if</span></code> 表达式。本节先说明怎么用这个表达式，然后再慢慢介绍它的详细特性。</p>
+<p>我们通过编写一个个人版本的 <code class="docutils literal"><span class="pre">drop</span></code> 函数来熟悉 <code class="docutils literal"><span class="pre">if</span></code> 表达式。先来回顾一下 <code class="docutils literal"><span class="pre">drop</span></code> 的行为：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">drop</span> <span class="mi">2</span> <span class="s">&quot;foobar&quot;</span>
+<span class="s">&quot;obar&quot;</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">drop</span> <span class="mi">4</span> <span class="s">&quot;foobar&quot;</span>
+<span class="s">&quot;ar&quot;</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">drop</span> <span class="mi">4</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+<span class="kt">[]</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">drop</span> <span class="mi">0</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">]</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">drop</span> <span class="mi">7</span> <span class="kt">[]</span>
+<span class="kt">[]</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">drop</span> <span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span> <span class="s">&quot;foo&quot;</span>
+<span class="s">&quot;foo&quot;</span>
+</pre></div>
+</div>
+<p>从测试代码的反馈可以看到。当 <code class="docutils literal"><span class="pre">drop</span></code> 函数的第一个参数小于或等于 <code class="docutils literal"><span class="pre">0</span></code> 时， <code class="docutils literal"><span class="pre">drop</span></code> 函数返回整个输入列表。否则，它就从列表左边开始移除元素，一直到移除元素的数量足够，或者输入列表被清空为止。</p>
+<p>以下是带有同样行为的 <code class="docutils literal"><span class="pre">myDrop</span></code> 函数，它使用 <code class="docutils literal"><span class="pre">if</span></code> 表达来决定该做什么。而代码中的 <code class="docutils literal"><span class="pre">null</span></code> 函数则用于检查列表是否为空：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch02/myDrop.hs</span>
+<span class="nf">myDrop</span> <span class="n">n</span> <span class="n">xs</span> <span class="ow">=</span> <span class="kr">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">null</span> <span class="n">xs</span>
+              <span class="kr">then</span> <span class="n">xs</span>
+              <span class="kr">else</span> <span class="n">myDrop</span> <span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="n">tail</span> <span class="n">xs</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>在 Haskell 里，代码的缩进非常重要：它会延续（continue）一个已存在的定义，而不是新创建一个。所以，不要省略缩进！</p>
+<p>变量 <code class="docutils literal"><span class="pre">xs</span></code> 展示了一个命名列表的常见模式： <code class="docutils literal"><span class="pre">s</span></code> 可以视为后缀，而 <code class="docutils literal"><span class="pre">xs</span></code> 则表示“复数个 <code class="docutils literal"><span class="pre">x</span></code> ”。</p>
+<p>先保存文件，试试 <code class="docutils literal"><span class="pre">myDrop</span></code> 函数是否如我们所预期的那样工作：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">myDrop</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myDrop</span> <span class="mi">2</span> <span class="s">&quot;foobar&quot;</span>
+<span class="s">&quot;obar&quot;</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myDrop</span> <span class="mi">4</span> <span class="s">&quot;foobar&quot;</span>
+<span class="s">&quot;ar&quot;</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myDrop</span> <span class="mi">4</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+<span class="kt">[]</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myDrop</span> <span class="mi">0</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">]</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myDrop</span> <span class="mi">7</span> <span class="kt">[]</span>
+<span class="kt">[]</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myDrop</span> <span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span> <span class="s">&quot;foo&quot;</span>
+<span class="s">&quot;foo&quot;</span>
+</pre></div>
+</div>
+<p>好的，代码正如我们所想的那样运行，现在是时候回过头来，说明一下 <code class="docutils literal"><span class="pre">myDrop</span></code> 的函数体里都干了些什么：</p>
+<p><code class="docutils literal"><span class="pre">if</span></code> 关键字引入了一个带有三个部分的表达式：</p>
+<ul class="simple">
+<li>跟在 <code class="docutils literal"><span class="pre">if</span></code> 之后的是一个 <code class="docutils literal"><span class="pre">Bool</span></code> 类型的表达式，它是 <code class="docutils literal"><span class="pre">if</span></code> 的条件部分。</li>
+<li>跟在 <code class="docutils literal"><span class="pre">then</span></code> 关键字之后的是另一个表达式，这个表达式在条件部分的值为 <code class="docutils literal"><span class="pre">True</span></code> 时被执行。</li>
+<li>跟在 <code class="docutils literal"><span class="pre">else</span></code> 关键字之后的又是另一个表达式，这个表达式在条件部分的值为 <code class="docutils literal"><span class="pre">False</span></code> 时被执行。</li>
+</ul>
+<p>我们将跟在 <code class="docutils literal"><span class="pre">then</span></code> 和 <code class="docutils literal"><span class="pre">else</span></code> 之后的表达式称为“分支”。不同分支之间的类型必须相同。[译注：这里原文还有一句“the <code class="docutils literal"><span class="pre">if</span></code> expression will also have this type”，这是错误的，因为条件部分的表达式只要是 <code class="docutils literal"><span class="pre">Bool</span></code> 类型就可以了，没有必要和分支的类型相同。]像是 <code class="docutils literal"><span class="pre">if</span> <span class="pre">True</span> <span class="pre">then</span> <span class="pre">1</span> <span class="pre">else</span> <span class="pre">&quot;foo&quot;</span></code> 这样的表达式会产生错误，因为两个分支的类型并不相同：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kr">if</span> <span class="kt">True</span> <span class="kr">then</span> <span class="mi">1</span> <span class="kr">else</span> <span class="s">&quot;foo&quot;</span>
+
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">2</span><span class="kt">:</span><span class="mi">14</span><span class="kt">:</span>
+    <span class="kt">No</span> <span class="kr">instance</span> <span class="n">for</span> <span class="p">(</span><span class="kt">Num</span> <span class="p">[</span><span class="kt">Char</span><span class="p">])</span>
+        <span class="n">arising</span> <span class="n">from</span> <span class="n">the</span> <span class="n">literal</span> <span class="p">`</span><span class="mi">1</span><span class="sc">&#39;</span>
+    <span class="kt">Possible</span> <span class="n">fix</span><span class="kt">:</span> <span class="n">add</span> <span class="n">an</span> <span class="kr">instance</span> <span class="n">declaration</span> <span class="n">for</span> <span class="p">(</span><span class="kt">Num</span> <span class="p">[</span><span class="kt">Char</span><span class="p">])</span>
+    <span class="kt">In</span> <span class="n">the</span> <span class="n">expression</span><span class="kt">:</span> <span class="mi">1</span>
+    <span class="kt">In</span> <span class="n">the</span> <span class="n">expression</span><span class="kt">:</span> <span class="kr">if</span> <span class="kt">True</span> <span class="kr">then</span> <span class="mi">1</span> <span class="kr">else</span> <span class="s">&quot;foo&quot;</span>
+    <span class="kt">In</span> <span class="n">an</span> <span class="n">equation</span> <span class="n">for</span> <span class="p">`</span><span class="n">it&#39;</span><span class="kt">:</span> <span class="n">it</span> <span class="ow">=</span> <span class="kr">if</span> <span class="kt">True</span> <span class="kr">then</span> <span class="mi">1</span> <span class="kr">else</span> <span class="s">&quot;foo&quot;</span>
+</pre></div>
+</div>
+<p>记住，Haskell 是一门以表达式为主导（expression-oriented）的语言。在命令式语言中，代码由陈述（statement）而不是表达式组成，因此在省略 <code class="docutils literal"><span class="pre">if</span></code> 语句的 <code class="docutils literal"><span class="pre">else</span></code> 分支的情况下，程序仍是有意义的。但是，当代码由表达式组成时，一个缺少 <code class="docutils literal"><span class="pre">else</span></code> 分支的 <code class="docutils literal"><span class="pre">if</span></code> 语句，在条件部分为 <code class="docutils literal"><span class="pre">False</span></code> 时，是没有办法给出一个结果的，当然这个 <code class="docutils literal"><span class="pre">else</span></code> 分支也不会有任何类型，因此，省略 <code class="docutils literal"><span class="pre">else</span></code> 分支对于 Haskell 是无意义的，编译器也不会允许这么做。</p>
+<p>程序里还有几个新东西需要解释。其中， <code class="docutils literal"><span class="pre">null</span></code> 函数检查一个列表是否为空：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">null</span>
+<span class="nf">null</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">null</span> <span class="kt">[]</span>
+<span class="kt">True</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">null</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+<span class="kt">False</span>
+</pre></div>
+</div>
+<p>而 <code class="docutils literal"><span class="pre">(||)</span></code> 操作符对它的 <code class="docutils literal"><span class="pre">Bool</span></code> 类型参数执行一个逻辑或（logical or）操作：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="o">||</span><span class="p">)</span>
+<span class="p">(</span><span class="o">||</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Bool</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">True</span> <span class="o">||</span> <span class="kt">False</span>
+<span class="kt">True</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">True</span> <span class="o">||</span> <span class="kt">True</span>
+<span class="kt">True</span>
+</pre></div>
+</div>
+<p>另外需要注意的是， <code class="docutils literal"><span class="pre">myDrop</span></code> 函数是一个递归函数：它通过调用自身来解决问题。关于递归，书本稍后会做更详细的介绍。</p>
+<p>最后，整个 <code class="docutils literal"><span class="pre">if</span></code> 表达式被分成了多行，而实际上，它也可以写成一行：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch02/myDropX.hs</span>
+<span class="nf">myDropX</span> <span class="n">n</span> <span class="n">xs</span> <span class="ow">=</span> <span class="kr">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">null</span> <span class="n">xs</span> <span class="kr">then</span> <span class="n">xs</span> <span class="kr">else</span> <span class="n">myDropX</span> <span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="n">tail</span> <span class="n">xs</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>[译注：原文这里的文件名称为 <code class="docutils literal"><span class="pre">myDrop.hs</span></code> ，为了和之前的 <code class="docutils literal"><span class="pre">myDrop.hs</span></code> 区别开来，这里修改文件名，让它和函数名 <code class="docutils literal"><span class="pre">myDropX</span></code> 保持一致。]</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="n">myDropX</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">myDropX</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myDropX</span> <span class="mi">2</span> <span class="s">&quot;foobar&quot;</span>
+<span class="s">&quot;obar&quot;</span>
+</pre></div>
+</div>
+<p>这个一行版本的 <code class="docutils literal"><span class="pre">myDrop</span></code> 比起之前的定义要难读得多，为了可读性考虑，一般来说，总是应该通过分行来隔开条件部分和两个分支。</p>
+<p>作为对比，以下是一个 Python 版本的 <code class="docutils literal"><span class="pre">myDrop</span></code> ，它的结构和 Haskell 版本差不多：</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">def</span> <span class="nf">myDrop</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">elts</span><span class="p">):</span>
+    <span class="k">while</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">elts</span><span class="p">:</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">n</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="n">elts</span> <span class="o">=</span> <span class="n">elts</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="k">return</span> <span class="n">elts</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="understanding-evaluation-by-example">
+<span id="id17"></span><h2>通过示例了解求值<a class="headerlink" href="#understanding-evaluation-by-example" title="Permalink to this headline">¶</a></h2>
+<p>前面对 <code class="docutils literal"><span class="pre">myDrop</span></code> 的描述关注的都是表面上的特性。我们需要更进一步，开发一个关于函数是如何被应用的心智模型：为此，我们先从一些简单的示例出发，逐步深入，直到搞清楚 <code class="docutils literal"><span class="pre">myDrop</span> <span class="pre">2</span> <span class="pre">&quot;abcd&quot;</span></code> 到底是怎样求值为止。</p>
+<p>在前面的章节里多次谈到，可以使用一个表达式去代换一个变量。在这部分的内容里，我们也会看到这种替换能力：计算过程需要多次对表达式进行重写，并将变量替换为表达式，直到产生最终结果为止。为了帮助理解，最好准备一些纸和笔，跟着书本的说明，自己计算一次。</p>
+<div class="section" id="lazy-evaluation">
+<span id="id18"></span><h3>惰性求值<a class="headerlink" href="#lazy-evaluation" title="Permalink to this headline">¶</a></h3>
+<p>先从一个简单的、非递归例子开始，其中 <code class="docutils literal"><span class="pre">mod</span></code> 函数是典型的取模函数：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch02/isOdd.hs</span>
+<span class="nf">isOdd</span> <span class="n">n</span> <span class="ow">=</span> <span class="n">mod</span> <span class="n">n</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">1</span>
+</pre></div>
+</div>
+<p>[译注：原文的文件名为 <code class="docutils literal"><span class="pre">RoundToEven.hs</span></code> ，这里修改成 <code class="docutils literal"><span class="pre">isOdd.hs</span></code> ，和函数名 <code class="docutils literal"><span class="pre">isOdd</span></code> 保持一致。]</p>
+<p>我们的第一个任务是，弄清楚 <code class="docutils literal"><span class="pre">isOdd</span> <span class="pre">(1</span> <span class="pre">+</span> <span class="pre">2)</span></code> 的结果是如何求值出的。</p>
+<p>在使用<em>严格</em>求值的语言里，函数的参数总是在应用函数之前被求值。以 <code class="docutils literal"><span class="pre">isOdd</span></code> 为例子：子表达式 <code class="docutils literal"><span class="pre">(1</span> <span class="pre">+</span> <span class="pre">2)</span></code> 会首先被求值，得出结果 <code class="docutils literal"><span class="pre">3</span></code> 。接着，将 <code class="docutils literal"><span class="pre">3</span></code> 绑定到变量 <code class="docutils literal"><span class="pre">n</span></code> ，应用到函数 <code class="docutils literal"><span class="pre">isOdd</span></code> 。最后， <code class="docutils literal"><span class="pre">mod</span> <span class="pre">3</span> <span class="pre">2</span></code> 返回 <code class="docutils literal"><span class="pre">1</span></code> ，而 <code class="docutils literal"><span class="pre">1</span> <span class="pre">==</span> <span class="pre">1</span></code> 返回 <code class="docutils literal"><span class="pre">True</span></code> 。</p>
+<p>Haskell 使用了另外一种求值方式 —— <em>非严格</em>求值。在这种情况下，求值 <code class="docutils literal"><span class="pre">isOdd</span> <span class="pre">(1</span> <span class="pre">+</span> <span class="pre">2)</span></code> <em>并不会</em>即刻使得子表达式 <code class="docutils literal"><span class="pre">1</span> <span class="pre">+</span> <span class="pre">2</span></code> 被求值为 <code class="docutils literal"><span class="pre">3</span></code> ，相反，编译器做出了一个“承诺”，说，“当真正有需要的时候，我有办法计算出 <code class="docutils literal"><span class="pre">isOdd</span> <span class="pre">(1</span> <span class="pre">+</span> <span class="pre">2)</span></code> 的值”。</p>
+<p>用于追踪未求值表达式的记录被称为块（thunk）。这就是事情发生的经过：编译器通过创建块来延迟表达式的求值，直到这个表达式的值真正被需要为止。如果某个表达式的值不被需要，那么从始至终，这个表达式都不会被求值。</p>
+<p>非严格求值通常也被称为<em>惰性求值</em>。[注：实际上，“非严格”和“惰性”在技术上有些细微的差别，但这里不讨论这些细节。]</p>
+</div>
+<div class="section" id="a-more-involved-example">
+<span id="id19"></span><h3>一个更复杂的例子<a class="headerlink" href="#a-more-involved-example" title="Permalink to this headline">¶</a></h3>
+<p>现在，将注意力放回 <code class="docutils literal"><span class="pre">myDrop</span> <span class="pre">2</span> <span class="pre">&quot;abcd&quot;</span></code> 上面，考察它的结果是如何计算出来的：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="s">&quot;myDrop.hs&quot;</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="n">myDrop</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Main</span><span class="o">.</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myDrop</span> <span class="mi">2</span> <span class="s">&quot;abcd&quot;</span>
+<span class="s">&quot;cd&quot;</span>
+</pre></div>
+</div>
+<p>当执行表达式 <code class="docutils literal"><span class="pre">myDrop</span> <span class="pre">2</span> <span class="pre">&quot;abcd&quot;</span></code> 时，函数 <code class="docutils literal"><span class="pre">myDrop</span></code> 应用于值 <code class="docutils literal"><span class="pre">2</span></code> 和 <code class="docutils literal"><span class="pre">&quot;abcd&quot;</span></code> ，变量 <code class="docutils literal"><span class="pre">n</span></code> 被绑定为 <code class="docutils literal"><span class="pre">2</span></code> ，而变量 <code class="docutils literal"><span class="pre">xs</span></code> 被绑定为 <code class="docutils literal"><span class="pre">&quot;abcd&quot;</span></code> 。将这两个变量代换到 <code class="docutils literal"><span class="pre">myDrop</span></code> 的条件判断部分，就得出了以下表达式：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="mi">2</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">null</span> <span class="s">&quot;abcd&quot;</span>
+<span class="mi">2</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">null</span> <span class="s">&quot;abcd&quot;</span> <span class="ow">::</span> <span class="kt">Bool</span>
+</pre></div>
+</div>
+<p>编译器需要对表达式 <code class="docutils literal"><span class="pre">2</span> <span class="pre">&lt;=</span> <span class="pre">0</span> <span class="pre">||</span> <span class="pre">null</span> <span class="pre">&quot;abcd&quot;</span></code> 进行求值，从而决定 <code class="docutils literal"><span class="pre">if</span></code> 该执行哪一个分支。这需要对 <code class="docutils literal"><span class="pre">(||)</span></code> 表达式进行求值，而要求值这个表达式，又需要对它的左操作符进行求值：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="mi">2</span> <span class="o">&lt;=</span> <span class="mi">0</span>
+<span class="kt">False</span>
+</pre></div>
+</div>
+<p>将值 <code class="docutils literal"><span class="pre">False</span></code> 代换到 <code class="docutils literal"><span class="pre">(||)</span></code> 表达式当中，得出以下表达式：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="kt">False</span> <span class="o">||</span> <span class="n">null</span> <span class="s">&quot;abcd&quot;</span>
+<span class="kt">False</span> <span class="o">||</span> <span class="n">null</span> <span class="s">&quot;abcd&quot;</span> <span class="ow">::</span> <span class="kt">Bool</span>
+</pre></div>
+</div>
+<p>如果 <code class="docutils literal"><span class="pre">(||)</span></code> 左操作符的值为 <code class="docutils literal"><span class="pre">True</span></code> ，那么 <code class="docutils literal"><span class="pre">(||)</span></code> 就不需要对右操作符进行求值，因为整个 <code class="docutils literal"><span class="pre">(||)</span></code> 表达式的值已经由左操作符决定了。[译注：在逻辑或计算中，只要有一个变量的值为真，那么结果就为真。]另一方面，因为这里左操作符的值为 <code class="docutils literal"><span class="pre">False</span></code> ，那么 <code class="docutils literal"><span class="pre">(||)</span></code> 表达式的值由右操作符的值来决定：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">null</span> <span class="s">&quot;abcd&quot;</span>
+<span class="kt">False</span>
+</pre></div>
+</div>
+<p>最后，将左右两个操作对象的值分别替换回 <code class="docutils literal"><span class="pre">(||)</span></code> 表达式，得出以下表达式：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">False</span> <span class="o">||</span> <span class="kt">False</span>
+<span class="kt">False</span>
+</pre></div>
+</div>
+<p>这个结果表明，下一步要求值的应该是 <code class="docutils literal"><span class="pre">if</span></code> 表达式的 <code class="docutils literal"><span class="pre">else</span></code> 分支，而这个分支包含一个对 <code class="docutils literal"><span class="pre">myDrop</span></code> 函数自身的递归调用： <code class="docutils literal"><span class="pre">myDrop</span> <span class="pre">(2</span> <span class="pre">-</span> <span class="pre">1)</span> <span class="pre">(tail</span> <span class="pre">&quot;abcd&quot;)</span></code> 。</p>
+</div>
+<div class="section" id="recursion">
+<span id="id20"></span><h3>递归<a class="headerlink" href="#recursion" title="Permalink to this headline">¶</a></h3>
+<p>当递归地调用 <code class="docutils literal"><span class="pre">myDrop</span></code> 的时候， <code class="docutils literal"><span class="pre">n</span></code> 被绑定为块 <code class="docutils literal"><span class="pre">2</span> <span class="pre">-</span> <span class="pre">1</span></code> ，而 <code class="docutils literal"><span class="pre">xs</span></code> 被绑定为 <code class="docutils literal"><span class="pre">tail</span> <span class="pre">&quot;abcd&quot;</span></code> 。</p>
+<p>于是再次对 <code class="docutils literal"><span class="pre">myDrop</span></code> 函数进行求值，这次将新的值替换到 <code class="docutils literal"><span class="pre">if</span></code> 的条件判断部分：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">null</span> <span class="p">(</span><span class="n">tail</span> <span class="s">&quot;abcd&quot;</span><span class="p">)</span>
+<span class="p">(</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">null</span> <span class="p">(</span><span class="n">tail</span> <span class="s">&quot;abcd&quot;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Bool</span>
+</pre></div>
+</div>
+<p>对 <code class="docutils literal"><span class="pre">(||)</span></code> 的左操作符的求值过程如下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+<span class="p">(</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Num</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span>
+<span class="mi">1</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="mi">1</span> <span class="o">&lt;=</span> <span class="mi">0</span>
+<span class="kt">False</span>
+</pre></div>
+</div>
+<p>正如前面“惰性求值”一节所说的那样， <code class="docutils literal"><span class="pre">(2</span> <span class="pre">-</span> <span class="pre">1)</span></code> 只有在真正需要的时候才会被求值。同样，对右操作符 <code class="docutils literal"><span class="pre">(tail</span> <span class="pre">&quot;abcd&quot;)</span></code> 的求值也会被延迟，直到真正有需要时才被执行：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">null</span> <span class="p">(</span><span class="n">tail</span> <span class="s">&quot;abcd&quot;</span><span class="p">)</span>
+<span class="nf">null</span> <span class="p">(</span><span class="n">tail</span> <span class="s">&quot;abcd&quot;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Bool</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">tail</span> <span class="s">&quot;abcd&quot;</span>
+<span class="s">&quot;bcd&quot;</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">null</span> <span class="s">&quot;bcd&quot;</span>
+<span class="kt">False</span>
+</pre></div>
+</div>
+<p>因为条件判断表达式的最终结果为 <code class="docutils literal"><span class="pre">False</span></code> ，所以这次执行的也是 <code class="docutils literal"><span class="pre">else</span></code> 分支，而被执行的表达式为 <code class="docutils literal"><span class="pre">myDrop</span> <span class="pre">(1</span> <span class="pre">-</span> <span class="pre">1)</span> <span class="pre">(tail</span> <span class="pre">&quot;bcd&quot;)</span></code> 。</p>
+</div>
+<div class="section" id="ending-the-recursion">
+<span id="id21"></span><h3>终止递归<a class="headerlink" href="#ending-the-recursion" title="Permalink to this headline">¶</a></h3>
+<p>这次递归调用将 <code class="docutils literal"><span class="pre">1</span> <span class="pre">-</span> <span class="pre">1</span></code> 绑定到 <code class="docutils literal"><span class="pre">n</span></code> ，而 <code class="docutils literal"><span class="pre">xs</span></code> 被绑定为 <code class="docutils literal"><span class="pre">tail</span> <span class="pre">&quot;bcd&quot;</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">null</span> <span class="p">(</span><span class="n">tail</span> <span class="s">&quot;bcd&quot;</span><span class="p">)</span>
+<span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">null</span> <span class="p">(</span><span class="n">tail</span> <span class="s">&quot;bcd&quot;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Bool</span>
+</pre></div>
+</div>
+<p>再次对 <code class="docutils literal"><span class="pre">(||)</span></code> 操作符的左操作对象求值：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span>
+<span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">::</span> <span class="kt">Bool</span>
+</pre></div>
+</div>
+<p>最终，我们得出了一个 <code class="docutils literal"><span class="pre">True</span></code> 值！</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">True</span> <span class="o">||</span> <span class="n">null</span> <span class="p">(</span><span class="n">tail</span> <span class="s">&quot;bcd&quot;</span><span class="p">)</span>
+<span class="kt">True</span>
+</pre></div>
+</div>
+<p>因为 <code class="docutils literal"><span class="pre">(||)</span></code> 的右操作符 <code class="docutils literal"><span class="pre">null</span> <span class="pre">(tail</span> <span class="pre">&quot;bcd&quot;)</span></code> 并不影响表达式的计算结果，因此它没有被求值，而整个条件判断部分的最终值为 <code class="docutils literal"><span class="pre">True</span></code> 。于是 <code class="docutils literal"><span class="pre">then</span></code> 分支被求值：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">tail</span> <span class="s">&quot;bcd&quot;</span>
+<span class="nf">tail</span> <span class="s">&quot;bcd&quot;</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Char</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="returning-from-the-recursion">
+<span id="id22"></span><h3>从递归中返回<a class="headerlink" href="#returning-from-the-recursion" title="Permalink to this headline">¶</a></h3>
+<p>请注意，在求值的最后一步，结果表达式 <code class="docutils literal"><span class="pre">tail</span> <span class="pre">&quot;bcd&quot;</span></code> 处于第二次对 <code class="docutils literal"><span class="pre">myDrop</span></code> 的递归调用当中。</p>
+<p>因此，表达式 <code class="docutils literal"><span class="pre">tail</span> <span class="pre">&quot;bcd&quot;</span></code> 作为结果值，被返回给对 <code class="docutils literal"><span class="pre">myDrop</span></code> 的第二次递归调用：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myDrop</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="n">tail</span> <span class="s">&quot;bcd&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="n">tail</span> <span class="s">&quot;bcd&quot;</span>
+<span class="kt">True</span>
+</pre></div>
+</div>
+<p>接着，第二次递归调用所得的值（还是 <code class="docutils literal"><span class="pre">tail</span> <span class="pre">&quot;bcd&quot;</span></code> ），它被返回给第一次递归调用：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myDrop</span> <span class="p">(</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="n">tail</span> <span class="s">&quot;abcd&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="n">tail</span> <span class="s">&quot;bcd&quot;</span>
+<span class="kt">True</span>
+</pre></div>
+</div>
+<p>然后，第一次递归调用也将 <code class="docutils literal"><span class="pre">tail</span> <span class="pre">&quot;bcd&quot;</span></code> 作为结果值，返回给最开始的 <code class="docutils literal"><span class="pre">myDrop</span></code> 调用：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myDrop</span> <span class="mi">2</span> <span class="s">&quot;abcd&quot;</span> <span class="o">==</span> <span class="n">tail</span> <span class="s">&quot;bcd&quot;</span>
+<span class="kt">True</span>
+</pre></div>
+</div>
+<p>最终计算出结果 <code class="docutils literal"><span class="pre">&quot;cd&quot;</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">myDrop</span> <span class="mi">2</span> <span class="s">&quot;abcd&quot;</span>
+<span class="s">&quot;cd&quot;</span>
+
+<span class="o">*</span><span class="kt">Main</span><span class="o">&gt;</span> <span class="n">tail</span> <span class="s">&quot;bcd&quot;</span>
+<span class="s">&quot;cd&quot;</span>
+</pre></div>
+</div>
+<p>注意，在从递归调用中退出并传递结果值的过程中， <code class="docutils literal"><span class="pre">tail</span> <span class="pre">&quot;bcd&quot;</span></code> 并不会被求值，只有当它返回到最开始的 <code class="docutils literal"><span class="pre">myDrop</span></code> 之后， ghci 需要打印这个值时， <code class="docutils literal"><span class="pre">tail</span> <span class="pre">&quot;bcd&quot;</span></code> 才会被求值。</p>
+</div>
+<div class="section" id="id23">
+<h3>学到了什么？<a class="headerlink" href="#id23" title="Permalink to this headline">¶</a></h3>
+<p>这一节介绍了三个重要的知识点：</p>
+<ul class="simple">
+<li>可以通过代换（substitution）和重写（rewriting）去了解 Haskell 求值表达式的方式。</li>
+<li>惰性求值可以延迟计算直到真正需要一个值为止，并且在求值时，也只执行可以确立出（establish）值的那部分表达式。[译注：比如之前提到的， <code class="docutils literal"><span class="pre">(||)</span></code> 的左操作对象的值为 <code class="docutils literal"><span class="pre">True</span></code> 时，就无需对右操作对象估值的情况。]</li>
+<li>函数的返回值可能是一个块（一个被延迟计算的表达式）。</li>
+</ul>
+</div>
+</div>
+<div class="section" id="polymorphism-in-haskell">
+<span id="id24"></span><h2>Haskell 里的多态<a class="headerlink" href="#polymorphism-in-haskell" title="Permalink to this headline">¶</a></h2>
+<p>之前介绍列表的时候提到过，列表是类型多态的，这一节会说明更多这方面的细节。</p>
+<p>如果想要取出一个列表的最后一个元素，那么可以使用 <code class="docutils literal"><span class="pre">last</span></code> 函数。 <code class="docutils literal"><span class="pre">last</span></code> 函数的返回值和列表中的元素的类型是相同的，但是， <code class="docutils literal"><span class="pre">last</span></code> 函数并不介意输入的列表是什么类型，它对于任何类型的列表都可以产生同样的效果：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">last</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">]</span>
+<span class="mi">5</span>
+
+<span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">last</span> <span class="s">&quot;baz&quot;</span>
+<span class="sc">&#39;z&#39;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">last</span></code> 的秘密就隐藏在类型签名里面：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">last</span>
+<span class="nf">last</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>这个类型签名可以读作“ <code class="docutils literal"><span class="pre">last</span></code> 接受一个列表，这个列表里的所有元素的类型都为 <code class="docutils literal"><span class="pre">a</span></code> ，并返回一个类型为 <code class="docutils literal"><span class="pre">a</span></code> 的元素作为返回值”，其中 <code class="docutils literal"><span class="pre">a</span></code> 是类型变量。</p>
+<p>如果函数的类型签名里包含类型变量，那么就表示这个函数的某些参数可以是任意类型，我们称这些函数是多态的。</p>
+<p>如果将一个类型为 <code class="docutils literal"><span class="pre">[Char]</span></code> 的列表传给 <code class="docutils literal"><span class="pre">last</span></code> ，那么编译器就会用 <code class="docutils literal"><span class="pre">Char</span></code> 代换 <code class="docutils literal"><span class="pre">last</span></code> 函数类型签名中的所有 <code class="docutils literal"><span class="pre">a</span></code> ，从而得出一个类型为 <code class="docutils literal"><span class="pre">[Char]</span> <span class="pre">-&gt;</span> <span class="pre">Char</span></code> 的 <code class="docutils literal"><span class="pre">last</span></code> 函数。而对于 <code class="docutils literal"><span class="pre">[Int]</span></code> 类型的列表，编译器则产生一个类型为 <code class="docutils literal"><span class="pre">[Int]</span> <span class="pre">-&gt;</span> <span class="pre">Int</span></code> 类型的 <code class="docutils literal"><span class="pre">last</span></code> 函数，诸如此类。</p>
+<p>这种类型的多态被称为<em>参数</em>多态。可以用一个类比来帮助理解这个名字：就像函数的参数可以被绑定到一个实际的值一样，Haskell 的类型也可以带有参数，并且在稍后可以将这些参数绑定到其它实际的类型上。</p>
+<p>当看见一个参数化类型（parameterized type）时，这表示代码并不在乎实际的类型是什么。另外，我们还可以给出一个更强的陈述：没有办法知道参数化类型的实际类型是什么，也不能操作这种类型的值；不能创建这种类型的值，也不能对这种类型的值进行探查（inspect）。</p>
+<p>参数化类型唯一能做的事，就是作为一个完全抽象的“黑箱”而存在。稍后的内容会解释为什么这个性质对参数化类型来说至关重要。</p>
+<p>参数多态是 Haskell 支持的多态中最明显的一个。Haskell 的参数多态直接影响了 Java 和 C# 等语言的泛型（generic）功能的设计。Java 泛型中的类型变量和 Haskell 的参数化类型非常相似。而 C++ 的模板也和参数多态相去不远。</p>
+<p>为了弄清楚 Haskell 的多态和其他语言的多态之间的区别，以下是一些被流行语言所使用的多态形式，这些形式的多态都没有在 Haskell 里出现：</p>
+<p>在主流的面向对象语言中，<em>子类</em>多态是应用得最广泛的一种。C++ 和 Java 的继承机制实现了子类多态，使得子类可以修改或扩展父类所定义的行为。Haskell 不是面向对象语言，因此它没有提供子类多态。</p>
+<p>另一个常见的多态形式是<em>强制</em>多态（coercion polymorphism），它允许值在类型之间进行隐式的转换。很多语言都提供了对强制多态的某种形式的支持，其中一个例子就是：自动将整数类型值转换成浮点数类型值。既然 Haskell 坚决反对自动类型转换，那么这种多态自然也不会出现在 Haskell 里面。</p>
+<p>关于多态还有很多东西要说，本书第六章会再次回到这个主题。</p>
+<div class="section" id="reasoning-about-polymorphic-functions">
+<span id="id25"></span><h3>对多态函数进行推理<a class="headerlink" href="#reasoning-about-polymorphic-functions" title="Permalink to this headline">¶</a></h3>
+<p>前面的《函数类型》小节介绍过，可以通过查看函数的类型签名来了解函数的行为。这种方法同样适用于对多态类型进行推理。</p>
+<p>以 <code class="docutils literal"><span class="pre">fst</span></code> 函数为例子：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">fst</span>
+<span class="nf">fst</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>首先，函数签名包含两个类型变量 <code class="docutils literal"><span class="pre">a</span></code> 和 <code class="docutils literal"><span class="pre">b</span></code> ，表明元组可以包含不同类型的值。</p>
+<p>其次， <code class="docutils literal"><span class="pre">fst</span></code> 函数的结果值的类型为 <code class="docutils literal"><span class="pre">a</span></code> 。前面提到过，参数多态没有办法知道输入参数的实际类型，并且它也没有足够的信息构造一个 <code class="docutils literal"><span class="pre">a</span></code> 类型的值，当然，它也不可以将 <code class="docutils literal"><span class="pre">a</span></code> 转换为 <code class="docutils literal"><span class="pre">b</span></code> 。因此，这个函数唯一合法的行为，就是返回元组的第一个元素。</p>
+</div>
+<div class="section" id="further-reading">
+<span id="id26"></span><h3>延伸阅读<a class="headerlink" href="#further-reading" title="Permalink to this headline">¶</a></h3>
+<p>前一节所说的 <code class="docutils literal"><span class="pre">fst</span></code> 函数的类型推导行为背后隐藏着非常高深的数学知识，并且可以延伸出一系列复杂的多态函数。有兴趣的话，可以参考 Philip Wadler 的 Theorems for free 论文。</p>
+</div>
+</div>
+<div class="section" id="the-type-of-a-function-of-more-than-one-argument">
+<span id="id27"></span><h2>多参数函数的类型<a class="headerlink" href="#the-type-of-a-function-of-more-than-one-argument" title="Permalink to this headline">¶</a></h2>
+<p>截至目前为止，我们已经见到过一些函数，比如 <code class="docutils literal"><span class="pre">take</span></code> ，它们接受一个以上的参数：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">take</span>
+<span class="nf">take</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>通过类型签名可以看到， <code class="docutils literal"><span class="pre">take</span></code> 函数和一个 <code class="docutils literal"><span class="pre">Int</span></code> 值以及两个列表有关。类型签名中的 <code class="docutils literal"><span class="pre">-&gt;</span></code> 符号是右关联的： Haskell 从右到左地串联起这些箭头，使用括号可以清晰地标示这个类型签名是怎样被解释的：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch02/Take.hs</span>
+<span class="nf">take</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">([</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>从这个新的类型签名可以看出， <code class="docutils literal"><span class="pre">take</span></code> 函数实际上只接受一个 <code class="docutils literal"><span class="pre">Int</span></code> 类型的参数，并返回另一个函数，这个新函数接受一个列表作为参数，并返回一个同类型的列表作为这个函数的结果。</p>
+<p>以上的说明都是正确的，但要说清楚隐藏在这种变换背后的重要性并不容易，在《部分函数应用和柯里化》一节，我们会再次回到这个主题上。目前来说，可以简单地将类型签名中最后一个 <code class="docutils literal"><span class="pre">-&gt;</span></code> 右边的类型看作是函数结果的类型，而将前面的其他类型看作是函数参数的类型。</p>
+<p>了解了这些之后，现在可以为前面定义的 <code class="docutils literal"><span class="pre">myDrop</span></code> 函数编写类型签名了：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">myDrop</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id28">
+<h2>练习<a class="headerlink" href="#id28" title="Permalink to this headline">¶</a></h2>
+<p>1.Haskell 提供了一个标准函数, last :: [a] -&gt; a, 其返回一个列表的最后一个元素．单就从他的类型看, 这个函数拥有的合理行为是怎样的(忽略崩溃和无限循环)？ 有哪些少数的事情这个函数显然不能做到?</p>
+<p>2.写一个函数 lastButOne, 返回列表倒数第二个元素.</p>
+<p>3.加载 lastButOne 函数到 ghci, 并且尝试在不同长度的列表上测试. 当你传入的函数过短时候，发生了什么?</p>
+</div>
+<div class="section" id="why-the-fuss-over-purity">
+<span id="id29"></span><h2>为什么要对纯度斤斤计较？<a class="headerlink" href="#why-the-fuss-over-purity" title="Permalink to this headline">¶</a></h2>
+<p>很少有语言像 Haskell 那样，默认使用纯函数。这个选择不仅意义深远，而且至关重要。</p>
+<p>因为纯函数的值只取决于输入的参数，所以通常只要看看函数的名字，还有它的类型签名，就能大概知道函数是干什么用的。</p>
+<p>以 <code class="docutils literal"><span class="pre">not</span></code> 函数为例子：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">not</span>
+<span class="nf">not</span> <span class="ow">::</span> <span class="kt">Bool</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+</pre></div>
+</div>
+<p>即使抛开函数名不说，单单函数签名就极大地限制了这个函数可能有的合法行为：</p>
+<ul class="simple">
+<li>函数要么返回 True ，要么返回 False</li>
+<li>函数直接将输入参数当作返回值返回</li>
+<li>函数对它的输入值求反</li>
+</ul>
+<p>除此之外，我们还能肯定，这个函数不会干以下这些事情：读取文件，访问网络，或者返回当前时间。</p>
+<p>纯度减轻了理解一个函数所需的工作量。一个纯函数的行为并不取决于全局变量、数据库的内容或者网络连接状态。纯代码（pure code）从一开始就是模块化的：每个函数都是自包容的，并且都带有定义良好的接口。</p>
+<p>将纯函数作为默认的另一个不太明显的好处是，它使得与<em>不纯</em>代码之间的交互变得简单。一种常见的 Haskell 风格就是，将带有副作用的代码和不带副作用的代码分开处理。在这种情况下，不纯函数需要尽可能地简单，而复杂的任务则交给纯函数去做。</p>
+<p>软件的大部分风险，都来自于与外部世界进行交互：它需要程序去应付错误的、不完整的数据，并且处理恶意的攻击，诸如此类。Haskell 的类型系统明确地告诉我们，哪一部分的代码带有副作用，让我们可以对这部分代码添加适当的保护措施。</p>
+<p>通过这种将不纯函数隔离、并尽可能简单化的编程风格，程序的漏洞将变得非常少。</p>
+</div>
+<div class="section" id="conculsion">
+<span id="id30"></span><h2>回顾<a class="headerlink" href="#conculsion" title="Permalink to this headline">¶</a></h2>
+<p>这一章对 Haskell 的类型系统以及类型语法进行了快速的概览，了解了基本类型，并学习了如何去编写简单的函数。这章还介绍了多态、条件表达式、纯度和惰性求值。</p>
+<p>这些知识必须被充分理解。在第三章，我们就会在这些基本知识的基础上，进一步加深对 Haskell 的理解。</p>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="1.html">第 1 章：入门</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="3.html">第 3 章：定义类型并简化函数</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.3.
+    </div>
+  </body>
+</html>
