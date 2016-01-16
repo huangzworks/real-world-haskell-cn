@@ -957,7 +957,7 @@ Ok, modules loaded: Main.
 </div>
 <p>这个 <code class="docutils literal"><span class="pre">niceSumFoldr</span></code> 函数在输入为 <code class="docutils literal"><span class="pre">[1,</span> <span class="pre">2,</span> <span class="pre">3]</span></code> 时，产生以下计算序列：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">niceSumFoldr</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
-    <span class="o">==</span> <span class="n">foldr</span> <span class="p">(</span><span class="o">+</span><span class="p">)</span> <span class="mi">0</span> <span class="p">(</span><span class="mi">1</span><span class="kt">:</span><span class="mi">2</span><span class="kt">:</span><span class="mi">3</span><span class="kt">[]</span><span class="p">)</span>
+    <span class="o">==</span> <span class="n">foldr</span> <span class="p">(</span><span class="o">+</span><span class="p">)</span> <span class="mi">0</span> <span class="p">(</span><span class="mi">1</span><span class="kt">:</span><span class="mi">2</span><span class="kt">:</span><span class="mi">3</span><span class="kt">:[]</span><span class="p">)</span>
     <span class="o">==</span> <span class="mi">1</span> <span class="o">+</span>           <span class="n">foldr</span> <span class="p">(</span><span class="o">+</span><span class="p">)</span> <span class="mi">0</span> <span class="p">(</span><span class="mi">2</span><span class="kt">:</span><span class="mi">3</span><span class="kt">:[]</span><span class="p">)</span>
     <span class="o">==</span> <span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="mi">2</span> <span class="o">+</span>      <span class="n">foldr</span> <span class="p">(</span><span class="o">+</span><span class="p">)</span> <span class="mi">0</span> <span class="p">(</span><span class="mi">3</span><span class="kt">:[]</span><span class="p">))</span>
     <span class="o">==</span> <span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="mi">2</span> <span class="o">+</span> <span class="p">(</span><span class="mi">3</span> <span class="o">+</span> <span class="n">foldr</span> <span class="p">(</span><span class="o">+</span><span class="p">)</span> <span class="mi">0</span> <span class="kt">[]</span><span class="p">))</span>
@@ -1117,8 +1117,9 @@ Prelude&gt; foldl (+) 0 [1..100000000]
 </pre></div>
 </div>
 <p>]</p>
-<p>练习
-1.运用 <code class="docutils literal"><span class="pre">fold</span></code> （运用合适的fold将会是你的代码更简单）重写并扩展位于＂显式递归＂章节的 <code class="docutils literal"><span class="pre">asInt</span></code> 函数．</p>
+<div class="section" id="id24">
+<h4>练习<a class="headerlink" href="#id24" title="Permalink to this headline">¶</a></h4>
+<p>1.运用 <code class="docutils literal"><span class="pre">fold</span></code> （运用合适的fold将会是你的代码更简单）重写并扩展位于＂显式递归＂章节的 <code class="docutils literal"><span class="pre">asInt</span></code> 函数．</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/ch04.exercises.hs</span>
 <span class="nf">asInt_fold</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Int</span>
 </pre></div>
@@ -1145,7 +1146,9 @@ Prelude&gt; foldl (+) 0 [1..100000000]
 <span class="mi">564616105916946374</span>
 </pre></div>
 </div>
-<p>2. <code class="docutils literal"><span class="pre">asInt_fold</span></code> 函数使用 <code class="docutils literal"><span class="pre">error</span></code>, 因而调用者不能处理这些错误．重写他来修复这个问题．</p>
+<ol class="arabic simple" start="2">
+<li><code class="docutils literal"><span class="pre">asInt_fold</span></code> 函数使用 <code class="docutils literal"><span class="pre">error</span></code>, 因而调用者不能处理这些错误．重写他来修复这个问题．</li>
+</ol>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/ch04.exercises.hs</span>
 <span class="kr">type</span> <span class="kt">ErrorMessage</span> <span class="ow">=</span> <span class="kt">String</span>
 <span class="nf">asInt_either</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">ErrorMessage</span> <span class="kt">Int</span>
@@ -1162,13 +1165,17 @@ Prelude&gt; foldl (+) 0 [1..100000000]
 </div>
 <p>用foldr写出你自己山寨的concat．</p>
 <p>4.写出你自己山寨的 <code class="docutils literal"><span class="pre">takeWhile</span></code> 函数，首先用显式递归的手法，然后改成 <code class="docutils literal"><span class="pre">foldr</span></code> 形式．</p>
-<p>5. <code class="docutils literal"><span class="pre">Data.List</span></code> 模块定义了一个函数, <code class="docutils literal"><span class="pre">groupBy</span></code>.其拥有如下签名．</p>
+<ol class="arabic simple" start="5">
+<li><code class="docutils literal"><span class="pre">Data.List</span></code> 模块定义了一个函数, <code class="docutils literal"><span class="pre">groupBy</span></code>.其拥有如下签名．</li>
+</ol>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/ch04.exercises.hs</span>
 <span class="nf">groupBy</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[[</span><span class="n">a</span><span class="p">]]</span>
 </pre></div>
 </div>
 <p>运用 <code class="docutils literal"><span class="pre">ghci</span></code> 加载 <code class="docutils literal"><span class="pre">Data.List</span></code> 模块以理解 <code class="docutils literal"><span class="pre">groupBy</span></code> 的行为，然后写出你自己山寨的 <code class="docutils literal"><span class="pre">fold</span></code> 实现．</p>
-<p>6. 下面Prelude函数能用 <code class="docutils literal"><span class="pre">fold</span></code> 系列函数重写的函数有多少？</p>
+<ol class="arabic simple" start="6">
+<li>下面Prelude函数能用 <code class="docutils literal"><span class="pre">fold</span></code> 系列函数重写的函数有多少？</li>
+</ol>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">any</span>
 
 <span class="nf">cycle</span>
@@ -1180,8 +1187,9 @@ Prelude&gt; foldl (+) 0 [1..100000000]
 </div>
 <p>这些函数你能用 <code class="docutils literal"><span class="pre">foldl</span></code> 或者 <code class="docutils literal"><span class="pre">foldr</span></code> 重写，请问那种情况更合适？</p>
 </div>
-<div class="section" id="id24">
-<h3>延伸阅读<a class="headerlink" href="#id24" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="id25">
+<h3>延伸阅读<a class="headerlink" href="#id25" title="Permalink to this headline">¶</a></h3>
 <p><a class="reference external" href="http://www.cs.nott.ac.uk/~gmh/fold.pdf">A tutorial on the universality and expressiveness of fold</a> 是一篇关于 fold 的优秀且深入的文章。它使用了很多例子来展示如何通过简单的系统化计算技术，将一些显式递归的函数转换成 fold 。</p>
 </div>
 </div>
@@ -1241,8 +1249,8 @@ Prelude&gt; foldl (+) 0 [1..100000000]
 <p>当然，这并不是说 lambda 函数完全没用，只是在使用它们的时候，必须小心谨慎。</p>
 <p>很多时候，部分应用函数可以很好地代替 lambda 函数，避免不必要的函数定义，粘合起不同的函数，并产生更清晰和更可读的代码。下一节就会介绍部分应用函数。</p>
 </div>
-<div class="section" id="id25">
-<h2>部分函数应用和柯里化<a class="headerlink" href="#id25" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id26">
+<h2>部分函数应用和柯里化<a class="headerlink" href="#id26" title="Permalink to this headline">¶</a></h2>
 <p>类型签名里的 <code class="docutils literal"><span class="pre">-&gt;</span></code> 可能会让人感到奇怪：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">dropWhile</span>
 <span class="nf">dropWhile</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
@@ -1334,7 +1342,7 @@ dropWhile isSpace :: [Char] -&gt; [Char]
 </pre></div>
 </div>
 <div class="section" id="sections">
-<span id="id26"></span><h3>节<a class="headerlink" href="#sections" title="Permalink to this headline">¶</a></h3>
+<span id="id27"></span><h3>节<a class="headerlink" href="#sections" title="Permalink to this headline">¶</a></h3>
 <p>Haskell 提供了一种方便的符号快捷方式，用于对中序函数进行部分应用：使用括号包围一个操作符，通过在括号里面提供左操作对象或者右操作对象，可以产生一个部分应用函数。这种类型的部分函数应用称之为节（section）。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="p">(</span><span class="mi">1</span><span class="o">+</span><span class="p">)</span> <span class="mi">2</span>
 <span class="mi">3</span>
@@ -1441,8 +1449,8 @@ dropWhile isSpace :: [Char] -&gt; [Char]
 <p>可以看到，使用 as-模式的定义同时完成了模式匹配和变量绑定两项工作。而不使用 as-模式的定义，则需要在对列表进行结构之后，在函数体里又重新对列表进行组合。</p>
 <p>除了增强可读性之外， as-模式还有其他作用：它可以对输入数据进行共享，而不是复制它。在 <code class="docutils literal"><span class="pre">noAsPattern</span></code> 函数的定义中，当 <code class="docutils literal"><span class="pre">(x:xs)</span></code> 匹配时，在函数体里需要复制一个 <code class="docutils literal"><span class="pre">(x:xs)</span></code> 的副本。这个动作会引起内存分配。虽然这个分配动作可能很廉价，但它并不是免费的。相反，当使用 <code class="docutils literal"><span class="pre">suffixes</span></code> 函数时，我们通过变量 <code class="docutils literal"><span class="pre">xs</span></code> 重用匹配了 as-模式的输入值，因此就避免了内存分配。</p>
 </div>
-<div class="section" id="id27">
-<h2>通过组合函数来进行代码复用<a class="headerlink" href="#id27" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id28">
+<h2>通过组合函数来进行代码复用<a class="headerlink" href="#id28" title="Permalink to this headline">¶</a></h2>
 <p>前面的 <code class="docutils literal"><span class="pre">suffixes</span></code> 函数实际上有一种更简单的实现方式。</p>
 <p>回忆前面在《使用列表》一节里介绍的 <code class="docutils literal"><span class="pre">init</span></code> 函数，它可以返回一个列表中除了最后一个元素之外的其他元素。而组合使用 <code class="docutils literal"><span class="pre">init</span></code> 和 <code class="docutils literal"><span class="pre">tails</span></code> ，可以给出一个 <code class="docutils literal"><span class="pre">suffixes</span></code> 函数的更简单实现：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/suffixes.hs</span>
@@ -1557,16 +1565,16 @@ Prelude Data.Char&gt; capCount &quot;Hello there, Mon!&quot;
 </div>
 <p>]</p>
 </div>
-<div class="section" id="id28">
-<h2>编写可读代码的提示<a class="headerlink" href="#id28" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id29">
+<h2>编写可读代码的提示<a class="headerlink" href="#id29" title="Permalink to this headline">¶</a></h2>
 <p>目前为止，我们知道 Haskell 有两个非常诱人的特性：尾递归和匿名函数。但是，这两个特性通常并不被使用。</p>
 <p>对列表的处理操作一般可以通过组合库函数比如 <code class="docutils literal"><span class="pre">map</span></code> 、 <code class="docutils literal"><span class="pre">take</span></code> 和 <code class="docutils literal"><span class="pre">filter</span></code> 来进行。当然，熟悉这些库函数需要一定的时间，不过掌握这些函数之后，就可以使用它们写出更快更好更少 bug 的代码。</p>
 <p>库函数比尾递归更好的原因很简单：尾递归和命令式语言里的 loop 有同样的问题 —— 它们太通用（general）了。在一个尾递归里，你可以同时执行过滤（filtering）、映射（mapping）和其他别的动作。这强迫代码的阅读者（可能是你自己）必须弄懂整个递归函数的定义，才能理解这个函数到底做了些什么。与此相反，<code class="docutils literal"><span class="pre">map</span></code> 和其他很多列表函数，都只专注于做<em>一件</em>事。通过这些函数，我们可以很快理解某段代码到底做了什么，以及整个程序想表达什么意思，而不是将时间浪费在关注细节方面。</p>
 <p>折叠（fold）操作处于（完全通用化的）尾递归和（只做一件事的）列表处理函数之间的中间地带。折叠也很值得我们花时间去好好理解，它的作用跟组合起 <code class="docutils literal"><span class="pre">map</span></code> 和 <code class="docutils literal"><span class="pre">filter</span></code> 函数差不多，但比起显式递归来说，折叠的行为要来得更有规律，而且更可控。一般来说，可以通过组合函数来解决的问题，就不要使用折叠。另一方面，如果问题用组合函数没办法解决，那么使用折叠要比使用显式递归要好。</p>
 <p>另一方面，匿名函数通常会对代码的可读性造成影响。一般来说，匿名函数都可以用 <code class="docutils literal"><span class="pre">let</span></code> 或者 <code class="docutils literal"><span class="pre">where</span></code> 定义的局部函数来代替。而且带名字的局部函数可以达到一箭双雕的效果：它使得代码更具可读性，且函数名本身也达到了文档化的作用。</p>
 </div>
-<div class="section" id="id29">
-<h2>内存泄漏和严格求值<a class="headerlink" href="#id29" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id30">
+<h2>内存泄漏和严格求值<a class="headerlink" href="#id30" title="Permalink to this headline">¶</a></h2>
 <p>前面介绍的 <code class="docutils literal"><span class="pre">foldl</span></code> 函数并不是 Haskell 代码里唯一会造成内存泄漏的地方。</p>
 <p>在这一节，我们使用 <code class="docutils literal"><span class="pre">foldl</span></code> 来展示非严格求值在什么情况下会造成问题，以及如何去解决这些问题。</p>
 <div class="section" id="seq">
@@ -1608,8 +1616,8 @@ Prelude Data.Char&gt; capCount &quot;Hello there, Mon!&quot;
 <p>最终得到结果 <code class="docutils literal"><span class="pre">3</span></code> 。</p>
 <p>因为 <code class="docutils literal"><span class="pre">seq</span></code> 的存在，这个创建过程没有用到任何块。</p>
 </div>
-<div class="section" id="id30">
-<h3>seq 的用法<a class="headerlink" href="#id30" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id31">
+<h3>seq 的用法<a class="headerlink" href="#id31" title="Permalink to this headline">¶</a></h3>
 <p>本节介绍一些更有效地使用 <code class="docutils literal"><span class="pre">seq</span></code> 的指导规则。</p>
 <p>要正确地产生 <code class="docutils literal"><span class="pre">seq</span></code> 的作用，表达式中被求值的第一个必须是 <code class="docutils literal"><span class="pre">seq</span></code> ：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- 错误：因为表达式中第一个被求值的是 someFunc 而不是 seq</span>

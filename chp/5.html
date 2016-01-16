@@ -690,8 +690,8 @@ Failed, modules loaded: none.
 在 <code class="docutils literal"><span class="pre">case</span></code> 表达式里，前几个分支在 <code class="docutils literal"><span class="pre">ds</span></code> 上递归，每次处理一个栈顶的元素。
 最后两个分支在 <code class="docutils literal"><span class="pre">ds</span></code> 前面加了东西：<code class="docutils literal"><span class="pre">Concat</span></code> 分支把两个元素都加到栈里，<code class="docutils literal"><span class="pre">Union</span></code> 分支忽略左侧元素（我们对它调用了 <code class="docutils literal"><span class="pre">flatten</span></code> ），只把右侧元素加进栈里。</p>
 <p>现在我们终于可以在 <strong>ghci</strong> 里试试 <code class="docutils literal"><span class="pre">compact</span></code> 函数了。[译注：这里要对 <code class="docutils literal"><span class="pre">PrettyJSON.hs</span></code> 里 <code class="docutils literal"><span class="pre">import</span> <span class="pre">Prettify</span></code> 部分作一下修改才能使 <code class="docutils literal"><span class="pre">PrettyJSON.hs</span></code> 编译。
-包括去掉还未实现的 <code class="docutils literal"><span class="pre">pretty</span></code> 函数，增加缺少的 <code class="docutils literal"><span class="pre">string</span></code>, <code class="docutils literal"><span class="pre">series</span></code> 函数等。一个可以编译的版本如下。]
-[我(sancao2)还是不能编译成功,报错:</p>
+包括去掉还未实现的 <code class="docutils literal"><span class="pre">pretty</span></code> 函数，增加缺少的 <code class="docutils literal"><span class="pre">string</span></code>, <code class="docutils literal"><span class="pre">series</span></code> 函数等。一个可以编译的版本如下。]</p>
+<p>[我(sancao2)还是不能编译成功,报错:</p>
 <div class="highlight-haskell"><div class="highlight"><pre>Prelude&gt; :l PrettyJSON.hs
 
 Prettify.hs:1:1:
@@ -837,8 +837,8 @@ Failed, modules loaded: none.
 </pre></div>
 </div>
 </div>
-<div class="section" id="exercises">
-<span id="id15"></span><h3>练习<a class="headerlink" href="#exercises" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id15">
+<h3>练习<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h3>
 <p>我们现有的美观打印器已经可以满足一定的空间限制要求，我们还可以对它做更多改进。</p>
 <ol class="arabic">
 <li><p class="first">用下面的类型签名写一个函数 <code class="docutils literal"><span class="pre">fill</span></code>。</p>
