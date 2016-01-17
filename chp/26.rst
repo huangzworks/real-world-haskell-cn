@@ -101,6 +101,34 @@ Haskell提供了一个特殊的Monad，叫做 ``ST``  *（State Transformer）* 
 
 ``IO`` Monad同样提供了这些功能。两者的主要区别是 ``ST`` Monad是有意设计用来退回到纯Haskell代码的。我们通过执行函数 ``runST`` 进入 ``ST`` Monad，就像大部分其他Haskell Monad（当然除了 ``IO`` ）一样，然后通过从 ``runST`` 中return来退出。
 
+当我们应用一个Monad的执行函数的时候，我们希望它可以反复运行：如果给予相同的函数体（body）和参数，我们每次都能得到相同的结果。这同样可以应用与 ``runST`` 。为了达到这种可重复性（repeatablility），``ST`` monad比 ``IO`` monad更加严格。我们不能读写文件，创建全局变量，或者创建线程。甚至，即使我们可以创建并且使用可变的引用和数组，类型系统也不允许它们逃逸到 ``runST`` 的调用方。在我们能够返回数据之前，一个可变的数组必须被冻结（frozen）为一个不可变的数组，并且一个可变的引用完全不可以逃逸。
+
+设计一个合格的输入API
+------------------------
+
+我们需要讨论一下用来处理布隆过滤器的公开接口。
+
+::
+
+  -- file: BloomFilter/Mutable.hs
+  module BloomFilter.Mutable
+      (
+        MutBloom
+      , elem
+      , notElem
+      , insert
+      , length
+      , new
+      ) where
+
+  import Control.Monad (liftM)
+  import Control.Monad.ST (ST)
+  import Data.Array.MArray (getBounds, newArray, readArray, writeArray)
+  import Data.Word (Word32)
+  import Prelude hiding (elem, length, notElem)
+
+  import BloomFilter.Internal (MutBloom(..))
+
 .. TO BE CONTINUE
 
 .. [Broder02] Andrei Broder. Michael Mitzenmacher. “Network applications of Bloom filters: a survey”. Internet Mathematics. 1. 4. 2005. 485-509. A K Peters Ltd..
