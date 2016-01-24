@@ -1063,7 +1063,7 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 ::
 
     niceSumFoldr [1, 2, 3]
-        == foldr (+) 0 (1:2:3[])
+        == foldr (+) 0 (1:2:3:[])
         == 1 +           foldr (+) 0 (2:3:[])
         == 1 + (2 +      foldr (+) 0 (3:[]))
         == 1 + (2 + (3 + foldr (+) 0 []))
@@ -1072,7 +1072,9 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 可以通过观察括号的包围方式，以及累积器初始化值摆放的位置，来区分 ``foldl`` 和 ``foldr`` ：\ ``foldl`` 将处初始化值放在左边，括号也是从左边开始包围。另一方面，\ ``foldr`` 将初始化值放在右边，而括号也是从右边开始包围。
 
 这里有一种可爱的凭直觉性的关于foldr如何工作的解释: 他用zero初始值替代了空列表，并且调用step函数替代列表的每个值构造器．
+
 ::
+
     1 : (2 : (3 : []))
     1 + (2 + (3 + 0 ))
 
@@ -1221,7 +1223,9 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 
 就是这样。]
 [我(github:sancao2)的电脑上面行为还是"Exception: stack overflow".
+
 ::
+
    ➜  ch04  uname -a
    Linux centos 3.10.0-229.20.1.el7.x86_64 #1 SMP Tue Nov 3 19:10:07 UTC 2015 x86_64 x86_64 x86_64 GNU/Linux
    ➜  ch04  ghci
@@ -1231,16 +1235,23 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
    Loading package base ... linking ... done.
    Prelude> foldl (+) 0 [1..100000000]
    *** Exception: stack overflow
+
 ]
 
 练习
+""""""
+
 1.运用 ``fold`` （运用合适的fold将会是你的代码更简单）重写并扩展位于＂显式递归＂章节的 ``asInt`` 函数．
+
 ::
+
    -- file: ch04/ch04.exercises.hs
    asInt_fold :: String -> Int
    
 你函数的效果应该是这样的．
+
 ::
+
    ghci> asInt_fold "101"
    101
    ghci> asInt_fold "-31337"
@@ -1249,7 +1260,9 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
    1798
    
 扩展你的函数以处理下面当调用错误时候出现的异常的情况．
+
 ::
+
    ghci> asInt_fold ""
    0
    ghci> asInt_fold "-"
@@ -1262,7 +1275,9 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
    564616105916946374
    
 2. ``asInt_fold`` 函数使用 ``error``, 因而调用者不能处理这些错误．重写他来修复这个问题．
+
 ::
+
    -- file: ch04/ch04.exercises.hs
    type ErrorMessage = String
    asInt_either :: String -> Either ErrorMessage Int
@@ -1272,7 +1287,9 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
    Left "non-digit 'o'"
    
 3.Prelude下面的函数 ``concat`` 将一个列表的列表连接成一个单独的列表．他的函数签名如下．
+
 ::
+
    --file: ch04/ch04.exercises.hs
    concat :: [[a]] -> [a]
    
@@ -1281,14 +1298,18 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 4.写出你自己山寨的 ``takeWhile`` 函数，首先用显式递归的手法，然后改成 ``foldr`` 形式．
 
 5. ``Data.List`` 模块定义了一个函数, ``groupBy``.其拥有如下签名．
+
 ::
+
    -- file: ch04/ch04.exercises.hs
    groupBy :: (a -> a -> Bool) -> [a] -> [[a]]
 
 运用 ``ghci`` 加载 ``Data.List`` 模块以理解 ``groupBy`` 的行为，然后写出你自己山寨的 ``fold`` 实现．
 
 6. 下面Prelude函数能用 ``fold`` 系列函数重写的函数有多少？
+
 ::
+
    any
 
    cycle
@@ -1304,6 +1325,7 @@ C 代码在遍历字符串的过程中，渐增地计算结果。Haskell 代码�
 ^^^^^^^^^^^
 
 `A tutorial on the universality and expressiveness of fold <http://www.cs.nott.ac.uk/~gmh/fold.pdf>`_ 是一篇关于 fold 的优秀且深入的文章。它使用了很多例子来展示如何通过简单的系统化计算技术，将一些显式递归的函数转换成 fold 。
+
 
 .. _anonymous-lambda-functions:
 

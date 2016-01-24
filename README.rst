@@ -146,6 +146,8 @@
 
 - `zhangkaizhao <https://github.com/zhangkaizhao>`_
 
+- `scarletsky <https://github.com/scarletsky>`_
+
 - 还有更多待添加 ...
 
 
