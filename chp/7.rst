@@ -708,10 +708,21 @@ hGetContents
 
 .. warning::
 
-   当使用 ``hGetContents`` 的时候，记住，就算你可能在剩下的程序里面不再显式引用句柄 ，你绝不能关闭句柄 ，直到在你结束对结果的使用后， 这点很重要。
-提早关闭会造成丢失文件数据的部分或全部。
-因为Haskell是惰性的，一般地可以假定，你只有在包含输入的计算被算出结果输出之后，你才能使用这个输入。
+   即使在余下的程序中不再显示引用文件句柄，你也必须在使用 ``hGetContents`` 的结果之后再关闭句柄，否则将会导致程序丢失部分或所有文件数据。
+   因为 Haskell 是一门惰性语言，我们通常会认为，它只有在需要输出计算结果的时候才会使用输入。
 
+[scarletsky译注：
+
+::
+
+   inpStr <- hGetContents inh
+   let outStr = map toUpper inpStr
+   hClose inh
+
+这里的 ``outStr`` 并没有使用 ``hGetContents`` 的结果，因为它并没有输出计算结果。
+这种情况就属于上面提到的：在使用 ``hGetContents`` 结果前关闭文件句柄，因此这段代码是错误的。
+
+]
 
 readFile和writeFile
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
