@@ -317,8 +317,7 @@ Haskell程序性能分析
 给程序加Cost Centre会使它的优化发生变化，甚至改变它的运行时行为，
 因为每一个表达式都被附加了额外代码来检测它们的执行情况。对于我们
 这样情况，修正起来很简单 —— 只需要用GHC运行时标记 ``-K`` 来增加
-栈空间上限即可（#todo）：
-
+栈空间上限即可（并附带指示大小的后缀）：
 
 ::
 
@@ -427,6 +426,9 @@ Haskell程序性能分析
     Space profiling
     +++++++++++++++
 
+空间性能调试
+++++++++++++
+
 ..
     Beyond basic time and allocation statistics, GHC is able to generate
     graphs of memory usage of the heap, over the program's lifetime.
@@ -434,6 +436,9 @@ Haskell程序性能分析
     unnecessarily, leading to the kind of heavy garbage collector activity
     we see in our example.
 
+GHC除了可以进行基本的时间和空间分析外，还能为程序整个执行期间的堆内存使用
+情况生成图表。这能完美检测内存泄露问题。内存泄露是指不再需要的内存没有被释放。
+这会对GC造成压力，就像在我们的例子程序中见到的那样。
 
 ..
     Constructing a heap profile follows the same steps as constructing
@@ -446,11 +451,19 @@ Haskell程序性能分析
     hp2ps, which generates a PostScript-based, graphical visualization
     of the heap over time.
 
+构建内存占用情况的性能调试和构建一般时间占用调试的步骤是一样，
+都需要用到 ``-prof -auto-all -caf-all`` 选项。 但当执行程序时，
+我们会让运行时系统收集关于堆使用的最多细节。堆使用信息能够以几种方式分解：
+cost-centre，模块(module)，构建器，数据类型。不同分解可以展现不同信息。
+对 ``A.hs`` 进行内存调试所得的原始信息会被记录到一个名为 ``A.hp`` 的文件里面，
+之后只要使用 ``hp2ps`` 处理这个文件，
+就可以得到一个基于 PostScript 的内存占用历史可视图像。
 
 ..
     To extract a standard heap profile from our program, we run it with
     the -hc runtime flag:
 
+程序的一般内存占用情况可以通过使用 -hc 选项来获取：
 
 ::
 
@@ -462,6 +475,8 @@ Haskell程序性能分析
 ..
     A heap profiling log, A.hp, was created, with the content
     in the following form:
+
+一个内存使用的性能调试的log文件 ``A.hp`` 被会创建，其内容为以下形式：
 
 ::
 
@@ -487,6 +502,10 @@ Haskell程序性能分析
     our program will run. We can now render the heap profile as a graph,
     using the hp2ps tool:
 
+这些样本是以程序的正常执行步长取得的。我们可以用 ``-iN`` 选项来增加取样频率，
+这里的 ``N`` 是内存取样之间相隔的秒数（如 0.01 秒）。
+很明显，取样越多，得到的结果越精确，但程序会执行得更慢。
+我们可以用 ``hp2ps`` 将调试结果生成一张图表：
 
 ::
 
@@ -495,9 +514,12 @@ Haskell程序性能分析
 ..
     This produces the graph, in the file A.ps:
 
+这就是生成的图表 ``A.ps`` ：
+
 ..
     [img here]
 
+[IMG#TODO]
 
 ..
     What does this graph tell us? For one, the program runs in two phases:
@@ -507,6 +529,10 @@ Haskell程序性能分析
     allocating a lot of data. We get a slightly different presentation if
     we break down the allocation by type, using -hy profiling:
 
+我们能从图片中看出什么？第一点，程序执行分两个阶段：
+在计算总和的同时， 前一阶段不断分配大量的内存，后一半清理释放这些内存。
+内存初始化分配的同时， ``sum`` 也开始干活，并消耗大量的内存。
+如果用 ``-hy`` 调试选项来按类型分解的话，我们会得到一个稍有不同的图像：
 
 ::
 
@@ -518,9 +544,13 @@ Haskell程序性能分析
 ..
     Which yields the following graph:
 
+以下是生成的图像：
+
 ..
     [img here]
 
+
+[IMG#TODO]
 
 ..
     The most interesting things to notice here are large parts of the heap
@@ -529,6 +559,9 @@ Haskell程序性能分析
     (represented as data of type "*"). Finally, let's break it down by
     what constructors are being allocated, using the -hd flag:
 
+这里最有趣的是有很大部分的内存被list类型(``[]``)和Double类型所占用；
+我们看到未知类型(图中用 ``*`` 标记)也占用了一些内存。
+最后，让我们用 ``-hd`` 选项来按构建器分解一下结果：
 
 ::
 
@@ -537,12 +570,15 @@ Haskell程序性能分析
     500000.5
     ./A 1e6 +RTS -i0.001 -hd -p -K100M  27.85s user 0.31s system 99% cpu 28.222 total
 
-
 ..
     Our final graphic reveals the full story of what is going on:
 
+下面就是我们最后一张展示了程序执行的所有情况的图像：
+
 ..
     [img here]
+
+[IMG#TODO]
 
 ..
     A lot of work is going into allocating list nodes containing
@@ -554,13 +590,17 @@ Haskell程序性能分析
     and starts calculating the length. If we look at the original
     fragment for mean, we can see exactly why that memory is being retained:
 
+程序在分配双精度浮点数列表上面花了不少功夫。列表在 Haskell 语言中的惰性的，
+所以含有上百万个元素的列表都是在程序执行过程中一点点地构建出来的。
+但这些元素在被遍历的同时并没有被逐步释放，所以导致内存占用变得越来越大。
+最终，在程序执行稍稍超过一半时，终于将列表总和计算出来，并开始计算其长度。
+如果看下关于 ``mean`` 的程序片断的话，我们就会知道内存没被释放的确切原因：
 
 ::
 
     -- file: ch25/Fragment.hs
     mean :: [Double] -> Double
     mean xs = sum xs / fromIntegral (length xs)
-
 
 ..
     At first we sum our list, which triggers the allocation of list nodes,
@@ -572,6 +612,13 @@ Haskell程序性能分析
     different phases of allocation and deallocation, and point at exactly
     what we need to do: traverse the list only once, summing and averaging
     it as we go.
+
+首先我们计算列表的总和，这会使得所有列表元素被分配到内存。
+但我们现在还不能释放列表元素，因为 ``length`` 还需要整个列表。
+一旦 ``sum`` 结束， ``length`` 会马上开始访问列表，同时 ``GC`` 会跟进，
+逐步释放列表元素，直到 ``length`` 结束。
+这两个计算阶段展示了两种明显不同的分配与释放，并指出我们需要改进的确切思路：
+只对列表遍历一次，遍历过程中同时计算总和与平均值。
 
 ..
     Controlling evaluation

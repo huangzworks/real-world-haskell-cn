@@ -166,6 +166,16 @@ monad栈      monad transformer stack / monad stack
 多态    polymorphism
 
 
+第二十五章
+----------
+
+性能调试  profiling
+
+资源消耗集中点   cost centre
+
+热点    hot spot
+
+
 第二十八章
 ------------------
 
