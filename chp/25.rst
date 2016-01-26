@@ -451,19 +451,19 @@ GHC除了可以进行基本的时间和空间分析外，还能为程序整个�
     hp2ps, which generates a PostScript-based, graphical visualization
     of the heap over time.
 
-构建内存使用情况的性能调试和构建一般时间占用调试的步骤是一样的。
-也用 ``-prof -auto-all -caf-all`` 选项，但当执行程序时，
+构建内存占用情况的性能调试和构建一般时间占用调试的步骤是一样，
+都需要用到 ``-prof -auto-all -caf-all`` 选项。 但当执行程序时，
 我们会让运行时系统收集关于堆使用的最多细节。堆使用信息能够以几种方式分解：
 cost-centre，模块(module)，构建器，数据类型。不同分解可以展现不同信息。
-对 ``A.hs`` 内存调试的原始信息会记录到一个叫 ``A.hp`` 的文件，
-这个文件再被工具 ``hp2ps`` 处理生成一个基于脚本的(PostScript-based)
-展示内存使用历史的可视图像。
+对 ``A.hs`` 进行内存调试所得的原始信息会被记录到一个名为 ``A.hp`` 的文件里面，
+之后只要使用 ``hp2ps`` 处理这个文件，
+就可以得到一个基于 PostScript 的内存占用历史可视图像。
 
 ..
     To extract a standard heap profile from our program, we run it with
     the -hc runtime flag:
 
-我们用 ``-hc`` 选项来获取关于我们程序的一般内存使用情况：
+程序的一般内存占用情况可以通过使用 -hc 选项来获取：
 
 ::
 
@@ -503,7 +503,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     using the hp2ps tool:
 
 这些样本是以程序的正常执行步长取得的。我们可以用 ``-iN`` 选项来增加取样频率，
-这里的 ``N`` 是内存样本间的秒数（如0.01秒）。
+这里的 ``N`` 是内存取样之间相隔的秒数（如 0.01 秒）。
 很明显，取样越多，得到的结果越精确，但程序会执行得更慢。
 我们可以用 ``hp2ps`` 将调试结果生成一张图表：
 
@@ -590,9 +590,9 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     and starts calculating the length. If we look at the original
     fragment for mean, we can see exactly why that memory is being retained:
 
-分配包含双精度浮点数的列表花费了大量工作。列表在 Haskell 语言中的惰性的，
-所以含有百万元素的列表是程序执行过程中一点点构建出来的。
-但问题是当这些元素被遍历时并没有被逐步释放，故而导致越来越大的内存占用。
+程序在分配双精度浮点数列表上面花了不少功夫。列表在 Haskell 语言中的惰性的，
+所以含有上百万个元素的列表都是在程序执行过程中一点点地构建出来的。
+但这些元素在被遍历的同时并没有被逐步释放，所以导致内存占用变得越来越大。
 最终，在程序执行稍稍超过一半时，终于将列表总和计算出来，并开始计算其长度。
 如果看下关于 ``mean`` 的程序片断的话，我们就会知道内存没被释放的确切原因：
 

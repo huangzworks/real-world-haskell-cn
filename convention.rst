@@ -171,7 +171,7 @@ monad栈      monad transformer stack / monad stack
 
 性能调试  profiling
 
-cost centre   cost centre  (待定)
+资源消耗集中点   cost centre
 
 热点    hot spot
 
