@@ -202,6 +202,14 @@ Haskell 中的正则表达式
 
    ghci> :module +Text.Regex.Posix
 
+[scarletsky注：
+  如果遇到 ``Could not find module `Text.Regex.Posix`` 的错误，那么你需要安装对应的包。
+
+  cabal 用户可以用 ``$ cabal install regex-posix && cabal exec ghci``
+
+  stack 用户可以用 ``$ stack install regex-posix && stack exec ghci``
+]
+
 可能正则表达式匹配函数是我们平时需要使用的唯一的函数，其以中缀运算符 ``(=~)`` (``从 Perl 中借鉴``) 表示。要克服的第一个障碍是 Haskell 的 regexp 库重度使用了多态。其结果就是， ``(=~)`` 的类型签名非常难懂，所以我们在此对其不做解释。
 
 ``=~`` 操作符的参数和返回值都使用了类型类。第一个参数 (``=~`` 左侧) 是要被匹配的文本；第二个参数 (``=~`` 右侧) 是准备匹配的正则表达式。对每个参数我们都可以使用 ``String`` 或者 ``ByteString`` 。
