@@ -43,6 +43,7 @@ Real World Haskell 中文版
    chp/23
    chp/24
    chp/25
+   chp/26
    chp/27
    chp/28
 
