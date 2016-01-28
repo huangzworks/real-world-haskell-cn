@@ -92,6 +92,8 @@ Real World Haskell 中文版
 
 - `Hugo Wang <https://github.com/mitnk>`_
 
+- `xnnyygn <https://github.com/xnnyygn>`_
+
 除了进行翻译之外，本文档还在原书的基础上做了以下改进：
 
 * 修正原文正文和代码中的错误
