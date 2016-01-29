@@ -581,7 +581,6 @@ System.FilePath 抽象了操作系统路径名称的惯例。(</>) 函数将两�
    Loading package filepath-1.1.0.0 ... linking ... done.
    "foo/bar"
 
-The name of the dropTrailingPathSeparator function is perfectly descriptive. No comments
 ``dropTrailingPathSeparator`` 函数的名字完美地描述了其作用。
 
 .. code-block:: haskell
@@ -668,7 +667,6 @@ The name of the dropTrailingPathSeparator function is perfectly descriptive. No 
       Loading package filepath-1.1.0.0 ... linking ... done.
       ("foo/","bar")
 
-   If we didn't remember (or know enough) to remove that slash, we'd recurse endlessly in namesMatching, because of the following behaviour of splitFileName. 1 comment
    如果忘记（或不够了解）要去掉这个斜线，我们将在 ``namesMatching`` 函数中进行无止尽的递归匹配，看看后面演示的 ``splitFileName`` 的行为你就会明白。
    
    .. code-block:: haskell
