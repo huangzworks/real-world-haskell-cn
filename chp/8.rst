@@ -202,7 +202,15 @@ Haskell 中的正则表达式
 
    ghci> :module +Text.Regex.Posix
 
-可能正则表达式匹配函数是我们平时需要使用的唯一的函数，其以中缀预算符 ``(=~)`` (``从 Perl 中借鉴``) 表示。要克服的第一个障碍是 Haskell 的 regexp 库重度使用了多态。其结果就是， ``(=~)`` 的类型签名非常难懂，所以我们在此对其不做解释。
+[scarletsky注：
+  如果遇到 ``Could not find module `Text.Regex.Posix`` 的错误，那么你需要安装对应的包。
+
+  cabal 用户可以用 ``$ cabal install regex-posix && cabal exec ghci``
+
+  stack 用户可以用 ``$ stack install regex-posix && stack exec ghci``
+]
+
+可能正则表达式匹配函数是我们平时需要使用的唯一的函数，其以中缀运算符 ``(=~)`` (``从 Perl 中借鉴``) 表示。要克服的第一个障碍是 Haskell 的 regexp 库重度使用了多态。其结果就是， ``(=~)`` 的类型签名非常难懂，所以我们在此对其不做解释。
 
 ``=~`` 操作符的参数和返回值都使用了类型类。第一个参数 (``=~`` 左侧) 是要被匹配的文本；第二个参数 (``=~`` 右侧) 是准备匹配的正则表达式。对每个参数我们都可以使用 ``String`` 或者 ``ByteString`` 。
 
@@ -542,7 +550,7 @@ Hackage 上也有其他 Haskell 正则表达式包可供下载。其中一些比
    (x:xs) ++ ys = x : (xs ++ ys)
    []     ++ ys = ys
 
-在严格求值语言中，如果我们执行 "foo" ++ "bar"，将马上构建并返回整个列表。非严格求值将这项工作延后很久执行，知道其结果在某处被用到。
+在严格求值语言中，如果我们执行 "foo" ++ "bar"，将马上构建并返回整个列表。非严格求值将这项工作延后很久执行，直到其结果在某处被用到。
 
 如果我们需要 "foo" ++ "bar" 这个表达式结果中的一个元素，函数定义中的第一个模式被匹配，返回表达式 x : (xs ++ ys)。因为 (:) 构造器是非严格的，xs ++ ys 的求值被延迟到当我们需要生成更多结果中的元素时。当生成了结果中的更多元素，我们不再需要 x ，垃圾收集器可以将其回收。因为我们按需要计算结果中的元素，且不保留已经计算出的结果，编译器可以用常数空间对我们的代码求值。
 
@@ -573,7 +581,6 @@ System.FilePath 抽象了操作系统路径名称的惯例。(</>) 函数将两�
    Loading package filepath-1.1.0.0 ... linking ... done.
    "foo/bar"
 
-The name of the dropTrailingPathSeparator function is perfectly descriptive. No comments
 ``dropTrailingPathSeparator`` 函数的名字完美地描述了其作用。
 
 .. code-block:: haskell
@@ -660,7 +667,6 @@ The name of the dropTrailingPathSeparator function is perfectly descriptive. No 
       Loading package filepath-1.1.0.0 ... linking ... done.
       ("foo/","bar")
 
-   If we didn't remember (or know enough) to remove that slash, we'd recurse endlessly in namesMatching, because of the following behaviour of splitFileName. 1 comment
    如果忘记（或不够了解）要去掉这个斜线，我们将在 ``namesMatching`` 函数中进行无止尽的递归匹配，看看后面演示的 ``splitFileName`` 的行为你就会明白。
    
    .. code-block:: haskell
