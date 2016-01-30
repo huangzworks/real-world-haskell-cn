@@ -200,7 +200,15 @@
 <div class="highlight-haskell"><div class="highlight"><pre>ghci&gt; :module +Text.Regex.Posix
 </pre></div>
 </div>
-<p>可能正则表达式匹配函数是我们平时需要使用的唯一的函数，其以中缀预算符 <code class="docutils literal"><span class="pre">(=~)</span></code> (<code class="docutils literal"><span class="pre">从</span> <span class="pre">Perl</span> <span class="pre">中借鉴</span></code>) 表示。要克服的第一个障碍是 Haskell 的 regexp 库重度使用了多态。其结果就是， <code class="docutils literal"><span class="pre">(=~)</span></code> 的类型签名非常难懂，所以我们在此对其不做解释。</p>
+<dl class="docutils">
+<dt>[scarletsky注：</dt>
+<dd><p class="first">如果遇到 <code class="docutils literal"><span class="pre">Could</span> <span class="pre">not</span> <span class="pre">find</span> <span class="pre">module</span> <span class="pre">`Text.Regex.Posix</span></code> 的错误，那么你需要安装对应的包。</p>
+<p>cabal 用户可以用 <code class="docutils literal"><span class="pre">$</span> <span class="pre">cabal</span> <span class="pre">install</span> <span class="pre">regex-posix</span> <span class="pre">&amp;&amp;</span> <span class="pre">cabal</span> <span class="pre">exec</span> <span class="pre">ghci</span></code></p>
+<p class="last">stack 用户可以用 <code class="docutils literal"><span class="pre">$</span> <span class="pre">stack</span> <span class="pre">install</span> <span class="pre">regex-posix</span> <span class="pre">&amp;&amp;</span> <span class="pre">stack</span> <span class="pre">exec</span> <span class="pre">ghci</span></code></p>
+</dd>
+</dl>
+<p>]</p>
+<p>可能正则表达式匹配函数是我们平时需要使用的唯一的函数，其以中缀运算符 <code class="docutils literal"><span class="pre">(=~)</span></code> (<code class="docutils literal"><span class="pre">从</span> <span class="pre">Perl</span> <span class="pre">中借鉴</span></code>) 表示。要克服的第一个障碍是 Haskell 的 regexp 库重度使用了多态。其结果就是， <code class="docutils literal"><span class="pre">(=~)</span></code> 的类型签名非常难懂，所以我们在此对其不做解释。</p>
 <p><code class="docutils literal"><span class="pre">=~</span></code> 操作符的参数和返回值都使用了类型类。第一个参数 (<code class="docutils literal"><span class="pre">=~</span></code> 左侧) 是要被匹配的文本；第二个参数 (<code class="docutils literal"><span class="pre">=~</span></code> 右侧) 是准备匹配的正则表达式。对每个参数我们都可以使用 <code class="docutils literal"><span class="pre">String</span></code> 或者 <code class="docutils literal"><span class="pre">ByteString</span></code> 。</p>
 <div class="section" id="id5">
 <h3>结果的多种类型<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
@@ -464,7 +472,7 @@ Loading package regex-posix-0.93.1 ... linking ... done.
 <span class="kt">[]</span>     <span class="o">++</span> <span class="n">ys</span> <span class="ow">=</span> <span class="n">ys</span>
 </pre></div>
 </div>
-<p>在严格求值语言中，如果我们执行 &#8220;foo&#8221; ++ &#8220;bar&#8221;，将马上构建并返回整个列表。非严格求值将这项工作延后很久执行，知道其结果在某处被用到。</p>
+<p>在严格求值语言中，如果我们执行 &#8220;foo&#8221; ++ &#8220;bar&#8221;，将马上构建并返回整个列表。非严格求值将这项工作延后很久执行，直到其结果在某处被用到。</p>
 <p>如果我们需要 &#8220;foo&#8221; ++ &#8220;bar&#8221; 这个表达式结果中的一个元素，函数定义中的第一个模式被匹配，返回表达式 x : (xs ++ ys)。因为 (:) 构造器是非严格的，xs ++ ys 的求值被延迟到当我们需要生成更多结果中的元素时。当生成了结果中的更多元素，我们不再需要 x ，垃圾收集器可以将其回收。因为我们按需要计算结果中的元素，且不保留已经计算出的结果，编译器可以用常数空间对我们的代码求值。</p>
 </div>
 <div class="section" id="id11">
@@ -487,8 +495,7 @@ Loading package regex-posix-0.93.1 ... linking ... done.
 <span class="s">&quot;foo/bar&quot;</span>
 </pre></div>
 </div>
-<p>The name of the dropTrailingPathSeparator function is perfectly descriptive. No comments
-<code class="docutils literal"><span class="pre">dropTrailingPathSeparator</span></code> 函数的名字完美地描述了其作用。</p>
+<p><code class="docutils literal"><span class="pre">dropTrailingPathSeparator</span></code> 函数的名字完美地描述了其作用。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">dropTrailingPathSeparator</span> <span class="s">&quot;foo/&quot;</span>
 <span class="s">&quot;foo&quot;</span>
 </pre></div>
@@ -556,8 +563,7 @@ Loading package filepath-1.1.0.0 ... linking ... done.
 (&quot;foo/&quot;,&quot;bar&quot;)
 </pre></div>
 </div>
-<p>If we didn&#8217;t remember (or know enough) to remove that slash, we&#8217;d recurse endlessly in namesMatching, because of the following behaviour of splitFileName. 1 comment
-如果忘记（或不够了解）要去掉这个斜线，我们将在 <code class="docutils literal"><span class="pre">namesMatching</span></code> 函数中进行无止尽的递归匹配，看看后面演示的 <code class="docutils literal"><span class="pre">splitFileName</span></code> 的行为你就会明白。</p>
+<p>如果忘记（或不够了解）要去掉这个斜线，我们将在 <code class="docutils literal"><span class="pre">namesMatching</span></code> 函数中进行无止尽的递归匹配，看看后面演示的 <code class="docutils literal"><span class="pre">splitFileName</span></code> 的行为你就会明白。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">splitFileName</span> <span class="s">&quot;foo/&quot;</span>
 <span class="p">(</span><span class="s">&quot;foo/&quot;</span><span class="p">,</span><span class="s">&quot;&quot;</span><span class="p">)</span>
 </pre></div>
