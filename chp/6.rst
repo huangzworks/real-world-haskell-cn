@@ -24,7 +24,7 @@
 
    -- file: ch06/naiveeq.hs
    data Color = Red | Green | Blue
-   
+
    colorEq :: Color -> Color -> Bool
    colorEq Red   Red   = True
    colorEq Green Green = True
@@ -70,20 +70,20 @@
    Prelude> :l naiveeq.hs
    [1 of 1] Compiling Main             ( naiveeq.hs, interpreted )
    Ok, modules loaded: Main.
-   
+
    *Main> stringEq "" ""
    True
-   
+
    *Main> stringEq "" []
    True
-   
+
    *Main> stringEq "" [""]
    <interactive>:5:14:
    Couldn't match expected type `Char' with actual type `[Char]'
    In the expression: ""
    In the second argument of `stringEq', namely `[""]'
    In the expression: stringEq "" [""]
-   
+
 现在你应该能看出一个问题了吧：我们不得不为各个不同类型（type）实现一坨带有不同名字的函数（function），以便我们有能力用其进行比较。
 这种做法非常低效，而且烦人。
 如果我们能用 ``==`` 对比任何类型的值，就再方便不过了。
@@ -159,12 +159,12 @@
 
     *Main> isEqual True True
     True
-    
+
     *Main> isEqual False True
     False
-   
+
     *Main> isEqual "hello" "moto"
-   
+
     <interactive>:5:1:
         No instance for (BasicEq [Char])
               arising from a use of `isEqual'
@@ -408,7 +408,7 @@ Show
         show Red   = "Red"
         show Green = "Green"
         show Blue  = "Blue"
-        
+
 当然， ``show`` 函数的打印值并不是非要和类型构造器一样不可，比如 ``Red`` 值并不是非要表示为 ``"Red"`` 不可，以下是另一种实例化 ``Show`` 类型类的方式：
 
 ::
@@ -418,7 +418,7 @@ Show
         show Red   = "Color 1: Red"
         show Green = "Color 2: Green"
         show Blue  = "Color 3: Blue"
-        
+
 Read
 ^^^^^^^
 
@@ -445,7 +445,7 @@ Read
 
 ::
 
-   Prelude> :l read.hs 
+   Prelude> :l read.hs
    [1 of 1] Compiling Main             ( read.hs, interpreted )
    Ok, modules loaded: Main.
    *Main> main
@@ -512,7 +512,7 @@ Read
    5.0
    ghci> (read "5.0")::Integer
    *** Exception: Prelude.read: no parse
-   
+
 注意到错误(将发生)当你试图解析 ``5.0`` 作为一个整数 ``Integer`` 。
 解释器选择了一个不同的 ``Read`` 实例：
 当返回值的期望是 ``Integer`` ，而他做的却是期望得到一个 ``Double`` 。
@@ -528,7 +528,7 @@ Read
    -- file: ch06/naiveeq.hs
    instance Read Color where
        -- readsPrec is the main function for parsing input
-       readsPrec _ value = 
+       readsPrec _ value =
            -- We pass tryParse a list of pairs.  Each pair has a string
            -- and the desired return value.  tryParse will try to match
            -- the input to one of these strings.
@@ -566,7 +566,7 @@ Read
    [Color 1: Red,Color 2: Green,Color 3: Blue]
    *Main> (read "[Red, Green, Blue]")::[Color]
    *** Exception: Prelude.read: no parse
-   
+
 注意到最后的尝试产生了错误。
 那是因为我们的编译器没有聪明到可以处理置位(leading，包括前置和后置)的空格。
 你可以改进他，通过些改你的 ``Read`` 实例以忽略任何置位的空格。
@@ -784,7 +784,7 @@ Word64                     X    X                               X        X    X
 几乎所有 Haskell 内置类型都是 ``Eq`` 类型类的实例，而 ``Ord`` 类的实例类型也几乎一样多。
 
 .. tip::
-   
+
     ``Ord`` 产生的排列顺序在某些时候是非常随意的，
     比如 ``Maybe`` 、 ``Nothing`` 就排在 ``Just x`` 之前，
     这些都是随意决定的，
@@ -825,7 +825,7 @@ Word64                     X    X                               X        X    X
 
     *Main> Red < Blue
     True
-    
+
 .. note:: 什么类型(types)能被自动派生?
 
    Haskell标准要求编译器能自动派生这些指定类型类的实例。
@@ -1225,7 +1225,7 @@ GHC 支持另外一个有用的语言扩展， ``OverlappingInstances`` （覆�
 
 .. _how-does-show-work-for-strings:
 
-show是如何处理String的? 
+show是如何处理String的?
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``OverlappingInstances`` (覆盖实例)和 ``TypeSynonymInstances`` ("同义类型的实例")语言扩展是特定于GHC的，而在定义上过去没有出现(present)于“Haskell 98”。
@@ -1339,7 +1339,7 @@ data 和 newtype 声明之间的区别
 
     -- 不可以：多于一个字段
     newtype TooManyFields = Fields Int Int
-    
+
     -- 不可以：多于一个构造器
     newtype TooManyCtors = Bad Int
                          | Worse Int
@@ -1425,7 +1425,7 @@ data 和 newtype 声明之间的区别
 JSON类型类,不带有重叠实例
 --------------------------------
 
-使能GHC的重叠实例支持是一个有效而快速的方式，来使我们的JSON代码开心（原句：make .. code happy）。
+启用GHC的重叠实例支持是一个让我们的JSON库工作的既有效又快速的方法。
 在更复杂的场景中，我们有时被迫面对这样一种情况：某个类型类有多个相关程度相同（equally good）实例。
 在这种情况下，重叠实例们将不会帮助我，而我们将需要代之以几处 ``newtype`` 声明。
 为了弄明白这涉及到了什么，让我们重构（rework）我们的JSON类型类实例们以使用 ``newtype`` 代替重叠实例。
@@ -1493,7 +1493,7 @@ JSON类型类,不带有重叠实例
    newtype JObj a = JObj {
          fromJObj :: [(String, a)]
        } deriving (Eq, Ord, Show)
-       
+
 带着这些定义好的类型，我们制造一些小改动到我们的 ``JValue`` 类型的定义。
 
 ::
@@ -1537,7 +1537,7 @@ JSON类型类,不带有重叠实例
    -- file: ch06/JSONClass.hs
    jvaluesToJAry :: [JValue] -> JAry JValue
    jvaluesToJAry = JAry
-    
+
 (记住，这种做法没有任何性能代价。我们只是告诉编译器隐藏这个事实：我们正在使用一个列表。)
 为了转化这个值成为一个 ``JValue`` ，我们应用另一个类型构造器。
 
