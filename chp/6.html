@@ -1564,7 +1564,7 @@ GHC 不会抱怨重叠实例的单单存在(mere existence)。
 </div>
 <div class="section" id="json-typeclasses-without-overlapping-instances">
 <span id="id13"></span><h2>JSON类型类,不带有重叠实例<a class="headerlink" href="#json-typeclasses-without-overlapping-instances" title="Permalink to this headline">¶</a></h2>
-<p>使能GHC的重叠实例支持是一个有效而快速的方式，来使我们的JSON代码开心（原句：make .. code happy）。
+<p>启用GHC的重叠实例支持是一个让我们的JSON库工作的既有效又快速的方法。
 在更复杂的场景中，我们有时被迫面对这样一种情况：某个类型类有多个相关程度相同（equally good）实例。
 在这种情况下，重叠实例们将不会帮助我，而我们将需要代之以几处 <code class="docutils literal"><span class="pre">newtype</span></code> 声明。
 为了弄明白这涉及到了什么，让我们重构（rework）我们的JSON类型类实例们以使用 <code class="docutils literal"><span class="pre">newtype</span></code> 代替重叠实例。</p>
