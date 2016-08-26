@@ -13,8 +13,8 @@
     getting bogged down in low level implementation decisions.
     We get to program in pure thought.
 
-Haskell 是一门高级编程语言，一门真正的高级编程语言。 我们可以一直使用抽象概念、
-幺半群、函子、以及多态进行编程，而不必与任何特定的硬件模型打交道。
+Haskell 是一门高级编程语言，一门真正的高级编程语言。 我们可以完全使用抽象概念、
+幺半群、函子、以及多态进行每日的编程，而不必与任何特定的硬件模型打交道。
 Haskell 在语言规范方面下了很大的功夫，力求语言可以不受制于某个特定的求值模型。
 这几层抽象使得我们可以把 Haskell 作为计算本身的记号，
 让编程人员关心他们问题的关键点，而不用操心低层次的实现细节，
@@ -29,9 +29,9 @@ Haskell 在语言规范方面下了很大的功夫，力求语言可以不受制
     and techniques for analyzing and controlling space and time behavior.
 
 但是，本书介绍的是真实世界中的编程行为，而真实世界中的代码都运行在资源有限的硬件之上，
-并且程序也会有时间和空间上的限制。因此，我们需要掌握好表达程序数据的方法，
-准确地理解使用惰性求值和严格求值策略带来的后果，并学会如何分析和控制程序
-在执行时的时间和空间。
+并且程序也会有时间和空间上的限制。
+因此，我们需要掌握程序数据的表示方式，准确地理解使用惰性求值和严格求值策略带来的后果，
+并学会如何分析和控制程序在时间和空间上的行为。
 
 ..
     In this chapter we'll look at typical space and time problems a Haskell programmer
@@ -43,11 +43,11 @@ Haskell 在语言规范方面下了很大的功夫，力求语言可以不受制
     in a purely functional language. So let's begin with a challenge:
     squashing unexpected memory usage in some inoccuous looking code.
 
-在这一章，我们将看到 Haskell 编程中可能遇到的典型空间和时间问题，并且如何有
-条理地分析、理解并解决它们。为此我们将研究使用一系列的技术：时间和空间使用
-分析，运行时统计，以及对严格求值和惰性求值。我们也会看下编译器优化对
-性能的影响，以及高级优化技术在纯函数式编程语言中的应用。那么，
-让我们用一个挑战开始吧：调查一个简单程序中不必要内存的使用问题。
+在这一章，我们将看到 Haskell 编程中可能遇到的典型空间和时间问题，
+并且如何有条理地分析、理解并解决它们。
+为此我们将研究使用一系列的技术：时间和空间使用分析，运行时统计，以及对严格求值和惰性求值进行推断。
+我们也会看下编译器优化对性能的影响，以及在纯函数式编程语言中可行的高级优化技术的应用。
+那么，让我们用一个挑战开始吧：调查一个看似无害的程序中出乎意料的内存使用的问题。
 
 
 Haskell程序性能分析
@@ -98,7 +98,7 @@ Haskell程序性能分析
 和 Haskell 版的 ``printf`` 函数来格式化输出。接着这个程序从命令行
 读入一个数字来构建一个由浮点数组成的列表。我们用这个列表的和除以列表的
 长度得到平均值，然后以字符串的形式打印出来。我们来将此代码编译成机器代码（打开优化开关）
-然后用 ``time`` 执行它看看情况吧：
+然后用 ``time`` 命令执行它看看情况吧：
 
 ::
 
@@ -121,7 +121,7 @@ Haskell程序性能分析
     From this alone we know something's not quite right,
     but it's unclear what resources are being used. Let's investigate.
 
-程序在处理少量输入时运行得非常好，但是当输入的列表元素数量达到一千万个时，
+程序在处理少量元素时运行得非常好，但是当输入的列表元素数量达到一千万个时，
 程序的运行速度就会变得相当缓慢。从这点我们就能感觉到应该有什么地方做得不对，
 但我们并不清楚它的资源使用情况。 我们需要研究下。
 
@@ -129,8 +129,8 @@ Haskell程序性能分析
     Collecting runtime statistics
     +++++++++++++++++++++++++++++
 
-记录运行时统计数据
-++++++++++++++++++
+收集运行时的统计数据
+++++++++++++++++++++
 
 ..
     To get access to that kind of information,
@@ -139,8 +139,8 @@ Haskell程序性能分析
     The application itself won't see those flags, as they're immediately
     consumed by the Haskell runtime system.
 
-为了能收集这些情报，GHC支持传入 ``+RTS`` 和 ``-RTS`` 这些特殊选项。
-这些选项是传给 Haskell 运行时本身的，Haskell程序为会感知到它们的存在。
+为了能收集这些情报，GHC 支持传入 ``+RTS`` 和 ``-RTS`` 这些划定给运行时系统的特殊选项。
+应用程序并不会接收到这些选项，因为它们会立即被 Haskell 运行时系统消耗到。
 
 ..
     In particular, we can ask the runtime system to gather memory and
@@ -150,15 +150,16 @@ Haskell程序性能分析
     The complete set of flags the Haskell runtime accepts is documented in the
     GHC User's Guide:
 
-特别地，我们可以用 ``-s`` 选项来让运行时系统收集内存和垃圾收集性能参数（并可以用 ``-N`` 
-来控制系统线程的数量，或调整栈和堆的大小）。我们将用运行时选项来打开性能分析的
-几种不同变量。Haskell 运行时所能接受的所有选项列表可以参见GHC用户手册。
+特别地，我们可以用 ``-s`` 选项来让运行时系统收集内存和垃圾收集器(GC)的性能参数
+（并可以用 ``-N`` 来控制系统线程的数量，或调整栈和堆的大小）。
+我们将用各种运行时选项来启动不同的性能分析。
+Haskell 运行时能够接受的所有选项列表可以参见 GHC 用户手册。
 
 ..
     So let's run the program with statistic reporting enabled,
     via +RTS -sstderr, yielding this result.
 
-那么让我们用 ``+RTS -sstderr`` 来运行程序收集我们所需要的结果吧。
+那么让我们用 ``+RTS -sstderr`` 来运行程序取得我们所需要的结果吧。
 
 ::
 
@@ -197,16 +198,16 @@ Haskell程序性能分析
     only 3.1% of the program's running time was spent doing productive work.
 
 当使用 ``-sstderr`` 时，程序的性能数字会输出到标准错误流里，告诉我们很多关于程序
-在具体做什么的信息。具体地说，它告诉我们GC用了多少时间以及最大活动内存使用情况。
-原来程序计算一千万个元素的平均值在堆上使用了多达742M的你内存，并且 96.9% 的时间是
-花费到垃圾收集上的！总共只有 3.1% 的时间是程序用来干正事的。
+在具体做什么的信息。尤其是，它告诉了我们 GC 占用了多少时间，以及最大活动内存的使用情况。
+原来，为了计算一千万个元素的平均值，程序在堆上使用了多达 742M 的内存，并且 96.9% 的时间是
+花费到垃圾收集器上的！总的来说，只有 3.1% 的时间是程序用来干正事的。
 
 ..
     So why is our program behaving so badly, and what can we do to improve it?
     After all, Haskell is a lazy language: shouldn't it be able to process the list
     in constant space?
 
-那么为什么我们的程序运行情况这么差？我们如何来提高它呢？毕竟，Haskell是一个惰性语言：
+那么为什么我们的程序运行情况这么差？我们如何来提高它呢？毕竟，Haskell 是一个惰性语言：
 它不应该只用恒定的内存空间来处理列表吗？
 
 ..
@@ -223,10 +224,10 @@ Haskell程序性能分析
     Profiling proceeds in three steps: compiling the program for profiling;
     running it with particular profiling modes enabled; and inspecting the resulting statistics.
 
-庆幸的是，GHC提供了几个工具可以分析程序的时间和空间使用情况。尤其是，
-我们可以在编写程序时打开性能调试选项，这样程序在执行时会得到每个函数
+庆幸的是，GHC 提供了多种工具来分析程序的时间和空间使用情况。
+其中一个是，我们可以在编译程序时打开性能调试选项，这样程序在执行时会得到每个函数
 所使用的资源使用的信息。性能调试过程分为三步：
-以性能调试方式编译程序；用性能调试模式执行程序；最后是分析收集到的结果数据。
+以性能调试方式编译程序；执行程序时打开特定的性能分析模式；最后是分析收集到的统计数据。
 
 ..
     To compile our program for basic time and allocation profiling, we use the -prof flag.
@@ -236,9 +237,10 @@ Haskell程序性能分析
     and GHC will generate code to compute the cost of evaluating the expression at each location.
     Cost centres can be added manually to instrument any expression, using the SCC pragma:
 
-编译程序时，我们可以打开 ``-prof`` 选项来记录基本时间和空间性能信息。我们也需要给感兴趣的
-函数标记为 "cost centres" 以便让性能分析程序知晓。一个 cost centre 即是一个信息收集点。GHC
-会生成代码来计算这些地方的资源消耗。我们可以用 ``SCC`` 语法使得任何语句成为 cost centre。
+编译程序时，我们可以使用 ``-prof`` 选项来记录基本时间和空间性能信息。
+我们也需要给感兴趣的函数标记为“消耗集中点(cost centres)”以便让性能调试程序知晓。
+一个消耗集中点即是一个信息收集点，GHC 会生成代码来计算在这些地方所执行的表达式的资源消耗。
+我们可以用 ``SCC`` 语法使得任何表达式成为消耗集中点。
 
 ::
 
@@ -253,9 +255,9 @@ Haskell程序性能分析
     as once a hot spot has been identified, we can precisely pin down the
     expensive sub-expressions of a function.
 
-另外我们也可以用 ``-auto-all`` 选项来让编译器将所有顶级函数设为 cost centre。
-手动添加 cost centre 的能力作为自动 cost centre 性能调试的辅助，
-使得我们可以在发现某个热点（hot spot）有问题时，针对性地分析一个函数的资源消耗。
+另外，我们也可以用 ``-auto-all`` 选项来让编译器将所有顶级函数设为消耗集中点。
+然后把手动添加消耗集中点作为一个十分有用的补充，
+使得我们在识别出某个热点(hot spot)的函数后，可以更为精确地去侦测该函数的子表达式。
 
 ..
     One complication to be aware of: in a lazy, pure language like Haskell,
@@ -274,6 +276,8 @@ Haskell程序性能分析
 因此它们不会每次都被计算。当然我们仍然需要评估它们的唯一一次计算的资源占用情况。
 这些只会计算一次的值被成为 CAF （Constant Applicative Forms），
 它们的确切数量可以通过 -caf-all 选项来得到。
+
+Constant Applicative Forms 常量应用形式
 
 ..
     Compiling our example program for profiling then (using the -fforce-recomp flag
@@ -374,7 +378,7 @@ Haskell程序性能分析
     of bytes allocated during the entire program run
     (not the maximum live memory, which was around 700MB).
 
-这些信息呈现给一些我们关于程序的运行时行为的情况。里面包含了程序的名字以及
+这些信息呈现给我们一些关于程序的运行时行为的情况。里面包含了程序的名字以及
 执行程序时用到的选项和参数。『total time』是运行时系统视角所见的程序运行
 的确切总时长。『Total allocation』是程序在运行过程中分配的内存总字节数（不是
 程序运行时内存使用的峰值；那个峰值大概是700MB）
@@ -389,10 +393,10 @@ Haskell程序性能分析
     (such as the floating point values in the large list, and the list itself)
     assigned to top level CAFs.
 
-报告中的第二小节是各个函数所消耗的时间和空间部分。第三小节是Cost Centre报告：
+报告中的第二段是各个函数所消耗的时间和空间部分。第三段是Cost Centre报告：
 其结构为调用关系树（比如我们可以看到 ``mean`` 是被 ``main`` 调用的）。
-"individual"和"inherited"列提供了每个Cost Centre其本身、其整体、以及其子节点
-所消耗的资源。最下面那些 ``CAF`` 是执行一些常量的一次性消耗（例如大列表中
+"individual"和"inherited"列提供了每个Cost Centre其本身、以及它和它的子程序
+所消耗的资源。此外，最下面那些 ``CAF`` 是常量执行的一次性消耗（例如大列表中
 浮点数以及列表本身）。
 
 ..
@@ -404,9 +408,9 @@ Haskell程序性能分析
     the list node allocations, containing floating point values,
     are causing a problem.
 
-我们能从这些信息得出什么结论呢？我们可以看出两个 ``CAF`` 占用了大多数时间。
-分别是计算总和相关和浮点数相关。这基本解释了所有程序运行的消耗。加上之前
-我们观察到的关于GC的压力，我们就可以推测出列表节点和浮点数值可能是问题之源。
+我们能从这些信息得出什么结论呢？我们可以看出两个 ``CAF`` 占用了大多数时间：
+一个与计算总和相关，另一个与浮点数相关。这基本解释了程序运行的所有消耗。结合我们之前
+观察到GC的压力问题，看起来像是在列表节点的内存分配和浮点数值上发生了问题。
 
 ..
     For simple performance hot spot identification, particularly in large
@@ -418,8 +422,8 @@ Haskell程序性能分析
     tools to extract more information.
 
 简单的性能热点检测，特别是对于我们难以知道时间花费点的大型程序，这个
-时间分析会突出一些特定的问题模块或高层函数。这往往足够显示出问题所在了。
-就像我们的程序，一旦我们窄化了问题所在，我们就可以用更加成熟的分析工具
+时间分析会突出某些问题模块或高层函数。这往往已足够显示出问题所在了。
+就像我们的程序，一旦我们缩小了问题代码的范围，我们就可以用更加成熟的分析工具
 来拿到更多的信息。
 
 ..
@@ -436,7 +440,7 @@ Haskell程序性能分析
     unnecessarily, leading to the kind of heavy garbage collector activity
     we see in our example.
 
-GHC除了可以进行基本的时间和空间分析外，还能为程序整个执行期间的堆内存使用
+GHC除了可以进行基本的时间和空间统计外，还能为程序整个执行期间的堆内存使用
 情况生成图表。这能完美检测内存泄露问题。内存泄露是指不再需要的内存没有被释放。
 这会对GC造成压力，就像在我们的例子程序中见到的那样。
 
@@ -463,7 +467,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     To extract a standard heap profile from our program, we run it with
     the -hc runtime flag:
 
-程序的一般内存占用情况可以通过使用 -hc 选项来获取：
+程序的一般内存占用情况可以通过使用 ``-hc`` 选项来获取：
 
 ::
 
@@ -476,7 +480,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     A heap profiling log, A.hp, was created, with the content
     in the following form:
 
-一个内存使用的性能调试的log文件 ``A.hp`` 被会创建，其内容为以下形式：
+一个内存使用的性能调试的log文件 ``A.hp`` 会被创建，其内容为以下形式：
 
 ::
 
@@ -507,6 +511,9 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 很明显，取样越多，得到的结果越精确，但程序会执行得更慢。
 我们可以用 ``hp2ps`` 将调试结果生成一张图表：
 
+在程序运行期间会定期采样。
+样本是在程序运行期间以固定的间隔采取的。
+
 ::
 
     $ hp2ps -e8in -c A.hp
@@ -520,6 +527,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     [img here]
 
 [IMG#TODO]
+ch25-heap-hc.png
 
 ..
     What does this graph tell us? For one, the program runs in two phases:
@@ -529,8 +537,8 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     allocating a lot of data. We get a slightly different presentation if
     we break down the allocation by type, using -hy profiling:
 
-我们能从图片中看出什么？第一点，程序执行分两个阶段：
-在计算总和的同时， 前一阶段不断分配大量的内存，后一半清理释放这些内存。
+我们能从图片中看出什么？举个例子，程序的执行分为两个阶段：
+前一阶段在计算数值的总和的同时不断分配大量的内存，后一阶段清理释放这些内存。
 内存初始化分配的同时， ``sum`` 也开始干活，并消耗大量的内存。
 如果用 ``-hy`` 调试选项来按类型分解的话，我们会得到一个稍有不同的图像：
 
@@ -551,6 +559,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 
 
 [IMG#TODO]
+ch25-heap-hy.png
 
 ..
     The most interesting things to notice here are large parts of the heap
@@ -579,6 +588,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     [img here]
 
 [IMG#TODO]
+ch25-heap-hd.png
 
 ..
     A lot of work is going into allocating list nodes containing
@@ -624,12 +634,18 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     Controlling evaluation
     ----------------------
 
+控制求值
+--------
+
 ..
     We have a number of options if we want to write our loop to traverse
     the list only once. For example, we can write the loop as a fold over
     the list, or via explicit recursion on the list structure. Sticking
     to the high level approaches, we'll try a fold first:
 
+如果我们想要实现只遍历一次的循环，我们会有很多选择。
+例如，我们可以写一个对列表折叠(fold)的循环，或者明确的在列表结构上迭代。
+本着使用高级的方案去解决问题，我们决定先尝试fold的方法：
 
 ::
 
@@ -648,6 +664,8 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     end of the list and work backwards, which is exactly what we're
     trying to avoid).
 
+这次，我们不再求和后保留着列表再求它的长度，而是左折叠(left-fold)整个列表，
+累积当前的总和及长度到对组(pair)上（我们必须采用左折叠，因为右折叠(right-fold)会先带我们到列表的结尾，然后倒回来计算，这恰恰是我们所想要避免的）。
 
 ..
     The body of our loop is the k function, which takes the intermediate
@@ -655,6 +673,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     the length increased by one, and the sum increased by the current
     element. When we run this, however, we get a stack overflow:
 
+循环的主体是 k 函数，总是取当即的循环状态和当前的列表元素为参数，然后返回新的状态——就是长度增一，总和加当前元素。当我们运行它，然而，我们得到栈溢出：
 
 ::
 
@@ -671,6 +690,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     with the -K runtime flag, the program runs to completion, and has
     similar allocation figures:
 
+我们把堆消耗换成栈消耗了！事实上，如果我们用 -K 参数增加栈的大小到前面堆的大小，程序就能够运行完成，并生成相似的消耗图表：
 
 ::
 
@@ -685,18 +705,27 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     Generating the heap profile, we see all the allocation is now in mean:
 
+从生成的堆性能分析，我们可以看到现在 mean 的全部消耗：
+
 ..
     [img here]
+ch25-stack.png
+
 
 ..
     The question is: why are we building up more and more allocated state,
     when all we are doing is folding over the list? This, it turns out,
     is a classic space leak due to excessive laziness.
 
+问题是：我们做的只是折叠(fold over)列表，为什么却会产生越来越多的分配状态。
+这个，其实就是典型的极度惰性(excessive laziness)带来的空间泄露问题。
 
 ..
     Strictness and tail recursion
     +++++++++++++++++++++++++++++
+
+严格求值和尾递归
+++++++++++++++++
 
 ..
     The problem is that our left-fold, foldl, is too lazy. What we want
@@ -708,6 +737,10 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     so the compiler is unable to infer any strictness, and must reduce
     the value purely lazily.
 
+产生问题的原因是，我们的左折叠函数 foldl 是惰性的。
+我们想要的是一个尾递归循环，被实现的像跳转(goto)一样高效，没有状态保留在栈上。
+而现在的情况并不是在每一步都会消掉状态元组，而是产生一个 thunk 的长链，只会在程序结束时才会求值。
+我们没有在任何时候指定要减少循环状态，所以编译器无法推断出什么时候必须严格执行，以减少纯惰性值。
 
 ..
     What we need to do is to tune the evaluation strategy slightly:
@@ -715,6 +748,8 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     The standard approach here is to replace foldl with foldl', from the
     Data.List module:
 
+我们需要的是稍微地调整求值的策略：惰性地折叠列表，但是严格地累计折叠状态。
+标准方案是使用 Data.List 模块的 foldl' 替换 foldl：
 
 ::
 
@@ -730,6 +765,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     However, if we run this implementation, we see we still haven't
     quite got it right:
 
+然而，当我们执行这个实现后会发现，我们仍然没有使它正确执行：
 
 ::
 
@@ -746,6 +782,8 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     unevaluated state on the stack. The problem here is that foldl'
     is only outermost strict:
 
+还是不是足够的严格！我们的循环还是继续在栈上累积没有求值的状态。
+这里的问题是 foldl' 只在外部严格执行：
 
 ::
 
@@ -759,13 +797,24 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     This loop uses `seq` to reduce the accumulated state at each step, but only to the outermost constructor on the loop state. That is, seq reduces an expression to "weak head normal form". Evaluation stops on the loop state once the first constructor is reached. In this case, the outermost constructor is the tuple wrapper, (,), which isn't deep enough. The problem is still the unevaluated numeric state inside the tuple.
 
+这个循环使用 `seq` 消减每步的累积状态，但是只对最外部的构造器上的循环状态。
+That is, seq reduces an expression to "weak head normal form".
+求值结束在第一个构造器被匹配的时候。
+在这种情况下，最外部的构造器是没有足够深度的元组包装器 (,)。
+问题仍然是在元组中未求值的数值状态。
 
 ..
     Adding strictness
     +++++++++++++++++
 
+增加严格
+++++++++
+
 ..
     There are a number of ways to make this function fully strict. We can, for example, add our own strictness hints to the internal state of the tuple, yielding a truly tail recursive loop:
+
+有很多方式可以使函数严格执行。
+例如，我们可以对元组的内部状态补充一些严格求值的提示，产生一个真正的尾递归循环：
 
 ::
 
@@ -779,6 +828,8 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     In this variant, we step inside the tuple state, and explicitly tell the compiler that each state component should be reduced, on each step. This gives us a version that does, at last, run in constant space:
 
+在这次变体中，我们深入到状态元组中，明确地告诉编译器在每一步都应该消掉状态的各个部分。
+最终，这样使我们得到一个常量空间消耗的版本：
 
 ::
 
@@ -788,6 +839,8 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 
 ..
     If we run this, with allocation statistics enabled, we get the satisfying result:
+
+我们打开消耗统计运行它，我们得到了满意的结果：
 
 ::
 
@@ -821,12 +874,24 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     Unlike our first version, this program is 97.4% efficient, spending only 2.6% of its time doing garbage collection, and it runs in a constant 1 megabyte of space. It illustrates a nice balance between mixed strict and lazy evaluation, with the large list unfolded lazily, while we walk over it, strictly. The result is a program that runs in constant space, and does so quickly.
 
+不像我们的第一个版本，这个程序具有 97.4% 的效率，仅花费 2.6% 的时间在 GC，并且运行在1兆的常量空间。
+它给我们展示了混合严格和惰性求值之间极好的平衡，对大型列表惰性折叠，而在折叠中严格求值。
+结果就是一个程序使用常量的空间，并且运行速度很快。
+
 ..
     Normal form reduction
     +++++++++++++++++++++
 
+正常形式减少
+++++++++++++
+
 ..
     There are a number of other ways we could have addressed the strictness issue here. For deep strictness, we can use the rnf function, part of the parallel strategies library (along with using), which unlike seq reduces to the fully evaluated "normal form" (hence its name). Such a "deep seq" fold we can write as:
+
+我们有许多其他方法来解决这里的严格执行的问题。
+如深度严格求值，我们可以使用并行策略库(parallel strategies library)里的 rnf 函数（以及相搭配的 using）。
+它不像 seq 一样
+这样的“深度 seq”折叠我们可以这样写：
 
 ::
 
@@ -856,13 +921,28 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     We change the implementation of foldl' to reduce the state to normal form, using the rnf strategy. This also raises an issue we avoided earlier: the type inferred for the loop accumulator state. Previously, we relied on type defaulting to infer a numeric, integral type for the length of the list in the accumulator, but switching to rnf introduces the NFData class constraint, and we can no longer rely on defaulting to set the length type.
 
+最新的 Parallel 库已经不使用 rnf，而是 rdeepseq。 
+参考：http://stackoverflow.com/questions/15148230/real-world-haskell-code-not-compiling
+
+
+我们修改了 fold' 的实现，使用 rnf 策略来减少状态到正常形式。
+这样也产生了一个我们早期避免的问题：循环累计状态的类型推测。
+先前，我们依赖对累加器中的列表的长度的默认的类型推导是数值整型，但是切换到 rnf 后，引入了 NFData 类常量，
+我们不能依赖默认的长度的类型推导了。
 
 ..
     Bang patterns
     +++++++++++++
 
+Bang 模式
++++++++++++++
+
+创可贴模式
+
 ..
     Perhaps the cheapest way, syntactically, to add required strictness to code that's excessively lazy is via "bang patterns" (whose name comes from pronunciation of the "!" character as "bang"), a language extension introduced with the following pragma:
+
+大概最“廉价”的方式，句法地，通过“bang 模式”（它的名字来自符号“!”的发音“bang”）对极度惰性的代码添加需要的严格，用下面的 progma 引入的一个语言扩展：
 
 ::
 
@@ -871,6 +951,11 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 
 ..
     With bang patterns, we can hint at strictness on any binding form, making the function strict in that variable. Much as explicit type annotations can guide type inference, bang patterns can help guide strictness inference. Bang patterns are a language extension, and are enabled with the BangPatterns language pragma. We can now rewrite the loop state to be simply:
+
+使用 bang 模式，我们可以在任何 binding form 上暗示严格执行，使函数再那个变量上严格执行。
+和显示的类型标注一样可以指导类型推断，bang 模式可以帮助指导严格模式推断。
+bang 模式是一个语言扩展，通过语言 progma 的 BangPatterns 启动。
+我们现在可以重写循环状态成简单的形式：
 
 ::
 
@@ -884,6 +969,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     The intermediate values in the loop state are now made strict, and the loop runs in constant space:
 
+循环状态的中间值显示被严格执行，使得循环运行在常量空间中：
 
 ::
 
@@ -918,13 +1004,22 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     In large projects, when we are investigating memory allocation hot spots, bang patterns are the cheapest way to speculatively modify the strictness properties of some code, as they're syntactically less invasive than other methods.
 
+在大型项目中，当我们正在调查内存分配的热点时，bang模式是最低价的方式来探索性的修改一些代码的严格执行属性，
+因为与其他方法相比它在句法上的侵略性更少。
 
 ..
     Strict data types
     +++++++++++++++++
 
+严格数据类型
+++++++++++++
+
 ..
     Strict data types are another effective way to provide strictness information to the compiler. By default, Haskell data types are lazy, but it is easy enough to add strictness information to the fields of a data type that then propagate through the program. We can declare a new strict pair type, for example:
+
+严格数据类型是其他有效的方式提供严格信息给编译器。
+默认 Haskell 的数据类型是惰性的，但是很容易添加严格信息对数据类型的字段上，然后蔓延到整个程序中。
+我们可以声明一个新的严格 pair 类型，例如：
 
 ::
 
@@ -934,6 +1029,8 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     This creates a pair type whose fields will always be kept in weak head normal form. We can now rewrite our loop as:
 
+这样定义一个 pair 类型，它的字段将会总是被保存成弱头正常形式。
+我们现在可以重写循环成：
 
 ::
 
@@ -947,17 +1044,31 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     This implementation again has the same efficient, constant space behavior. At this point, to squeeze the last drops of performance out of this code, though, we have to dive a bit deeper.
 
+这个实现再次产生同样的效果，常量空间的表现。
+此时，
 
 ..
     Understanding Core
     ------------------
 
+理解 Core
+--------
+
 ..
     Besides looking at runtime profiling data, one sure way of determining exactly what your program is doing is to look at the final program source after the compiler is done optimizing it, particularly in the case of Haskell compilers, which can perform very aggressive transformations on the code. GHC uses what is humorously referred to as "a simple functional language", known as Core, as the compiler intermediate representation. It is essentially a subset of Haskell, augmented with unboxed data types (raw machine types, directly corresponding to primitive data types in languages like C), suitable for code generation. GHC optimizes Haskell by transformation, repeatedly rewriting the source into more and more efficient forms. The Core representation is the final functional version of your program, before translation to low level imperative code. In other words, Core has the final say, and if all-out performance is your goal, it is worth understanding.
 
+除了看运行时性能分析数据，一个确定可以准确确定你的程序是怎么做的方法，是查看编译器优化后的最终程序源码。
+特别在 Haskell 编译器会对源码执行激进的转换的情况下。
+GHC 使用一种被幽默地称为“一个简单的函数式语言”，也被称为 Core，做为编译器的中间形式。
+它是 Haskell 的精炼的子集，并增加了 unboxed 数据类型（原生机器类型，像 C 一样直接对应着原数据类型），
+适合代码生成。
+GHC 使用转换优化 Haskell，重复重写源码到更有效率的形式。
+Core 形式的代码就是你的函数式代码的最终版本，在翻译成低层命令式代码前。
+换句话说，Core 有最终决定权，如果到达终极效率是你的目标，那么你很值得去理解它。
 
 ..
     To view the Core version of our Haskell program we compile with the -ddump-simpl flag, or use the ghc-core tool, a third-party utility that lets us view Core in a pager. So let's look at the representation of our final fold using strict data types, in Core form:
+
 
 
 ::
@@ -967,6 +1078,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     A screenful of text is generated. If we look carefully at, we'll see a loop (here, cleaned up slightly for clarity):
 
+生成了整个屏幕的文字。我们仔细看一下，我们会发现一个循环（在这里，为了能看清晰稍微清理了一下）
 
 ::
 
@@ -983,19 +1095,38 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     This is the final version of our foldl', and tells us a lot about the next steps for optimization. The fold itself has been entirely inlined, yielding an explicit recursive loop over the list. The loop state, our strict pair, has disappeared entirely, and the function now takes its length and sum accumulators as direct arguments along with the list.
 
+这就是我们的 foldl' 的最终版本，它告诉我们很多优化的下一步。
+折叠本身已经完全被内联，生成一个显式地列表递归循环。
+循环状态，我们的严格 pair，已经完全消失。
+函数现在取它的长度以及求和累加器作为和列表一起的参数。
+
 ..
     The sum of the list elements is represented with an unboxed Double# value, a raw machine double kept in a floating point register. This is ideal, as there will be no memory traffic involved keeping the sum on the heap. However, the length of the list, since we gave no explicit type annotation, has been inferred to be a heap-allocated Integer, with requires a non-primitive plusInteger to perform addition. If it is algorithmically sound to use a Int instead, we can replace Integer with it, via a type annotation, and GHC will then be able to use a raw machine Int# for the length. We can hope for an improvement in time and space by ensuring both loop components are unboxed, and kept in registers.
 
+列表元素的和被表示成 unboxed Double# 的值，原生机器双精度类型保存在一个浮点寄存器上。
+这样很理想，因为在这样就没有保存求和在堆上的一系列内存操作。
+然而，列表的长度，因为我们没有给它显式的类型标注，被推断为分配在堆上的 Integer，连带需要一个非本源的 plusInteger 实施相加。
+如果在此使用在算法上合理的 Int 取代，我们可以用它替换 Integer，通过一个类型标注，GHC 将会能够用一个原生机器的 Int# 作为长度。
+我们可以期待在时间和空间上的进步，通过两个循环部分是 unboxed，保存在寄存器上。
 
 ..
     The base case of the loop, its end, yields an unboxed pair (a pair allocated only in registers), storing the final length of the list, and the accumulated sum. Notice that the return type is a heap-allocated Double value, indicated by the D# constructor, which lifts a raw double value onto the heap. Again this has implications for performance, as GHC will need to check that there is sufficient heap space available before it can allocate and return from the loop.
 
+循环的 base case，它的结尾，生成一个 unboxed pair（一个 pair 只分配在寄存器上），存储列表的最终长度，以及累积的和。
+注意返回类型是一个堆分配的 Double 值，由 D# 构造器指明，它在堆上提一个原生的双精度值。
+再次这里对性能有影响，因为 GHC 需要检查有足够的堆空间存在再它被分配和从循环返回之前。
+
 ..
     We can avoid this final heap check by having GHC return an unboxed Double# value, which can be achieved by using a custom pair type in the loop. In addition, GHC provides an optimiztion that unboxes the strict fields of a data type, ensuring the fields of the new pair type will be stored in registers. This optimization is turned on with -funbox-strict-fields.
+
+我们可以避免最终的堆检查 使 GHC 返回一个 unboxed Double# 类型，它可以在循环上使用一个自定义 pair 类型实现。
+此外，GHC 提供一个优化 unbox 一个数据类型的严格字段，保证新 pair 类型的字段讲保存在寄存器上。
+这个优化使用 -funbox-strict-fields 开启。
 
 ..
     We can make both representation changes by replacing the polymorphic strict pair type with one whose fields are fixed as Int and Double:
 
+我们可以  替换多态严格 pair 类型成字段固定为 Int 和 Double 的类型。
 
 ::
 
@@ -1011,6 +1142,8 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     Compiling this with optimizations on, and -funbox-strict-fields -ddump-simpl, we get a tighter inner loop in Core:
 
+带着优化和 -funbox-strict-fields -ddump-simpl 编译，我们得到 Core 的一个更紧密的内部循环：
+
 ::
 
     lgo :: Int# -> Double# -> [Double] -> (# Int#, Double# #)
@@ -1024,6 +1157,9 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     Now the pair we use to represent the loop state is represented and returned as unboxed primitive types, and will be kept in registers. The final version now only allocates heap memory for the list nodes, as the list is lazily demanded. If we compile and run this tuned version, we can compare the allocation and time performance against our original program:
 
+现在我们使用的代表循环状态的 pair 被表现和返回成 unboxed 原生类型，讲被保存在寄存器中。
+最终版本现在只有列表的节点分配在堆内存上，因为列表是惰性的需要。
+如果我们编译和运行这个调优过的版本，我们可以和我们原来的程序比较内存分配和时间的性能。
 
 ::
 
@@ -1058,9 +1194,14 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     While our original program, when operating on a list of 10 million elements, took more than a minute to run, and allocated more than 700 megabytes of memory, the final version, using a simple higher order fold, and a strict data type, runs in around half a second, and allocates a total of 1 megabyte. Quite an improvement!
 
+然而我们原来的程序，当操作的列表有 10 百万的元素时，花费了超过 1 分钟多运行，分配了超过 700M 内存。
+最终版本，使用一个简单的高阶折叠，一个严格数据类型，运行了大概半秒，分配了总共 1M 内存。
+真是相当大的进步！
 
 ..
     The general rules we can learn from the profiling and optimization process are:
+
+我们可以从分析和优化过程学到的通用规则有：
 
 ..
     - Compile to native code, with optimizations on
@@ -1070,27 +1211,52 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     - Prefer strict fields for atomic data types (Int, Double and similar types)
     - Use data types with simpler machine representations (prefer Int over Integer)
 
+- 编译成本地代码，要打开优化
+- 当有疑虑，使用运行时统计，已经时间分析
+- 如果怀疑有内存分配问题，使用堆分析
+- 小心翼翼地结合严格和惰性求值策略会产生好的最好的结果
+- 对原子数据类型（如 Int、Double 等相似类型）的字段最好使用严格
+- 对数据类型使用更简单的机器形式（喜欢 Int 多过 Integer）
+
 ..
     These simple strategies are enough to identify and squash untoward memory use issues, and when used wisely, can avoid them occurring in the first place.
 
+这些简单的策略对定位和镇压不幸的内存使用问题是足够的，当明智地运行，可以第一时间避免它们发生。
 
 ..
     Advanced techniques: fusion
     ---------------------------
 
+高级技术：融合
+----------------
+
 ..
     The final bottleneck in our program is the lazy list itself. While we can avoid allocating it all at once, there is still memory traffic each time around the loop, as we demand the next cons cell in the list, allocate it to the heap, operate on it, and continue. The list type is also polymorphic, so the elements of the list will be represented as heap allocated Double values.
+
+我们程序的最后的性能瓶颈是惰性的列表本身。
+虽然我们可以避免立刻把它全部分配，
+列表类型也是多态的，所以它的元素讲被表示成分配在堆上的 Double 值。
 
 ..
     What we'd like to do is eliminate the list entirely, keeping just the next element we need in a register. Perhaps surprisingly, GHC is able to transform the list program into a listless version, using an optimization known as deforestation, which refers to a general class of optimizations that involve eliminating intermediate data structures. Due to the absence of side effects, a Haskell compiler can be extremely aggressive when rearranging code, reordering and transforming wholesale at times. The specific deforestation optimization we will use here is stream fusion.
 
+可能令人意外，GHC 能够转换列表程序成无列表的形式，使用一个称为 deforestation 的优化。
+这个优化是指一通类减少中间数据结构的优化。
+得益于没有副作用(side effect)，Haskell 编译器有时会非常激进地重排代码、大规模地调整顺序和转换。
+我们讲在这里使用的 deforestation 优化就是流融合(stream fusion)。
 
 ..
     This optimization transforms recursive list generation and transformation functions into non-recursive unfolds. When an unfold appears next to a fold, the structure between them is then eliminated entirely, yielding a single, tight loop, with no heap allocation. The optimization isn't enabled by default, and it can radically change the complexity of a piece of code, but is enabled by a number of data structure libraries, which provide "rewrite rules", custom optimizations the compiler applies to functions the library exports.
 
+这个优化转换迭代列表生成，和转换函数成非迭代非折叠。
+当一个非折叠临近一个折叠，然后它们之间的结构会减掉，生成一个单一的紧密的循环，没有堆分配。
+这个优化默认没有开启，因为它会急剧地增加一片代码的复杂度，但是它在一些数据机构库上开启了，通过提供“重写规则”，编译器应用给这些库导出的函数了自定义优化。
 
 ..
     We'll use the uvector library, which provides a suite of list-like operations that use stream fusion to remove intermediate data structures. Rewriting our program to use streams is straightforward:
+
+我们将使用 uvector 库，它提供了一套像列表的操作，使用流融合减掉中间数据结构。
+重写我们的程序使用流是很直接的：
 
 ::
 
@@ -1116,6 +1282,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     build our program, with -O2 -funbox-strict-fields, and inspect
     the Core that results:
 
+从 Hackage 安装过 uvector 库后，我们编译我们的程序，使用 -O2 -funbox-strict-fields，检查 Core 的结果：
 
 ::
 
@@ -1133,6 +1300,9 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     are kept in registers. Running this, we see another improvement
     bump in performance, with runtime falling by another order of magnitude:
 
+这次是真的最优化的结果了！
+我们的列表现在完全融化了，生成一个紧凑的循环，列表的生成是和累积交错的，所有的输入和输出变量保存在寄存器里。运行这个，我们看到在性能上的又一个猛进，运行时降到另一个数量级：
+
 ::
 
     $ time ./I 1e7
@@ -1142,6 +1312,9 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     Tuning the generated assembly
     +++++++++++++++++++++++++++++
+
+调整生成的汇编
+++++++++++++++++
 
 ..
     Given that our Core is now optimal, the only step left to
@@ -1155,11 +1328,23 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     Particularly with floating point code, it is sometimes useful to
     compile via C, and enable specific high performance C compiler optimizations.
 
+考虑到我们的 Core 现在是最优化，剩下来继续深入查看这个程序的方法只有直接查看汇编了。
+当然，到了这点只剩下很少的收获取得。
+为了查看生成的汇编，我们可以使用像 ghc-core 的工具，或者对 GHC 使用 -ddump-asm 标签在标准输出生成汇编。
+对生成的汇编我们有很少的“控制杆”可以使用，但是我们可以在 C 和 GHC 的原生代码后端之间做选择。 
+以及，如果我们选 C 后端，它会使用优化选项传给 GCC。
+特别在有浮点代码的情况下，它有时会很有用通过 C 编译，开启特定的高性能的 C 编译器优化。
+
 ..
     For example, we can squeeze out the last drops of performance from our
     final fused loop code by using -funbox-strict-fields -fvia-C -optc-O2,
     which cuts the running time in half again (as the C compiler is able to
     optimize away some redundant move instructions in the program's inner loop):
+
+榨干最后一点性能
+
+例如，我们可以榨出性能的最后点滴从最终融化进循环代码 通过 -funbox-strict-fields -fvia-C -optc-O2，
+它可以再次减少一半运行时间（因为 C 编译器能够优化掉一些在程序中的内部循环的冗余的移动指令）
 
 ::
 
@@ -1173,6 +1358,8 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     Inspecting the final x86_64 assembly (via -keep-tmp-files),
     we see the generated loop contains only six instructions:
+
+检查最终 x86_64 汇编（通过 -keep-tmp-files）,我们看到生成的循环只包含 6 个指令：
 
 ::
 
@@ -1194,10 +1381,19 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     day-to-day code, choosing better algorithms is always a more effective
     strategy, but it's useful to know we can optimize down to the metal if necessary.
 
+蹂躏。。
+我们已经有效地按摩程序通过多种源码级别的优化，所有方式导致最终的汇编。
+从这里没有其他路走。
+很少有必要优化代码到这个级别，当然，典型地只在写低级别的库时有意义，或者优化特别重要的代码，
+所有算法选择已经被决定。
+对日常的代码，选择更好的算法总是更高效的策略，但是知道如果有必要我们可以优化到本质是很有用的。
 
 ..
     Conclusions
     -----------
+
+结论
+----
 
 ..
     In this chapter we've looked at a suite of tools and techniques
@@ -1208,9 +1404,17 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     at all levels from source, through the compiler, to the metal,
     and be able to focus in on particular levels when requirements demand.
 
+在这一章，我们看一系列的工具和技术我们可以使用去跟踪和定位你的代码的有问题的区域。
+伴随着各种惯例     保持你的代码简洁高效。
+你有充分的知识知道你的代码在做什么，在源码的各种层面，通过编译器，到本质，
+然后能够注意到特定级别 当需要要求。
+
 ..
     By sticking to simple rules, choosing the right data structures,
     and avoiding the traps of the unwary, it is perfectly possible to
     reliably achieve high performance from your Haskell code, while being
     able to develop at a very high level. The result is a sweet balance
     of productivity and ruthless efficiency. 
+
+坚持简单的规则，选择正确的数据结构，避免不谨慎的陷阱，通过在很高的层面的开发，用你的 Haskell 代码可靠地实现高性能是完全有可能的。
+最终结果是一个在生产率和无情的运行效率之间美妙的平衡。
