@@ -657,7 +657,7 @@ GHC 除了可以进行基本的时间和空间统计外，还能为程序整个�
     trying to avoid).
 
 这次，我们不再求和后保留着列表再求它的长度，而是左折叠(left-fold)整个列表，
-累积当前的总和及长度到对组(pair)上（我们必须采用左折叠，因为右折叠(right-fold)会先带我们到列表的结尾，然后倒回来计算，这恰恰是我们所想要避免的）。
+累加当前的总和及长度到对组(pair)上（我们必须采用左折叠，因为右折叠(right-fold)会先带我们到列表的结尾，然后倒回来计算，这恰恰是我们想要避免的）。
 
 ..
     The body of our loop is the k function, which takes the intermediate
@@ -665,7 +665,7 @@ GHC 除了可以进行基本的时间和空间统计外，还能为程序整个�
     the length increased by one, and the sum increased by the current
     element. When we run this, however, we get a stack overflow:
 
-循环的主体是 k 函数，总是取当即的循环状态和当前的列表元素为参数，然后返回新的状态——就是长度增一，总和加当前元素。当我们运行它，然而，我们得到栈溢出：
+循环的主体是 ``k`` 函数，把即时的循环状态和当前的列表元素作为参数，然后返回新状态——长度增一、总和加当前元素。然而，当我们运行它时发生了栈溢出：
 
 ::
 
@@ -682,7 +682,9 @@ GHC 除了可以进行基本的时间和空间统计外，还能为程序整个�
     with the -K runtime flag, the program runs to completion, and has
     similar allocation figures:
 
-我们把堆消耗换成栈消耗了！事实上，如果我们用 -K 参数增加栈的大小到前面堆的大小，程序就能够运行完成，并生成相似的消耗图表：
+我们把堆消耗换成栈消耗了！
+事实上，如果我们用 ``-K`` 选项增加栈的大小到前面堆的大小，程序就能够运行完成，
+并生成相似的内存分配图：
 
 ::
 
@@ -697,27 +699,26 @@ GHC 除了可以进行基本的时间和空间统计外，还能为程序整个�
 ..
     Generating the heap profile, we see all the allocation is now in mean:
 
-从生成的堆性能分析，我们可以看到现在 mean 的全部消耗：
+从生成的堆分析中，我们可以看到现在 ``mean`` 的整个内存分配状况：
 
 ..
     [img here]
-ch25-stack.png
-
+.. image:: ../image/ch25/ch25-stack.png
 
 ..
     The question is: why are we building up more and more allocated state,
     when all we are doing is folding over the list? This, it turns out,
     is a classic space leak due to excessive laziness.
 
-问题是：我们做的只是折叠(fold over)列表，为什么却会产生越来越多的分配状态。
+问题是：明明我们是在折叠列表，为什么却会产生越来越多的内存分配。
 这个，其实就是典型的极度惰性(excessive laziness)带来的空间泄露问题。
 
 ..
     Strictness and tail recursion
     +++++++++++++++++++++++++++++
 
-严格求值和尾递归
-++++++++++++++++
+严格执行和尾递归
++++++++++++
 
 ..
     The problem is that our left-fold, foldl, is too lazy. What we want
@@ -729,10 +730,10 @@ ch25-stack.png
     so the compiler is unable to infer any strictness, and must reduce
     the value purely lazily.
 
-产生问题的原因是，我们的左折叠函数 foldl 是惰性的。
-我们想要的是一个尾递归循环，被实现的像跳转(goto)一样高效，没有状态保留在栈上。
+产生问题的原因是，我们的左折叠函数 ``foldl`` 是惰性的。
+我们想要的是一个尾递归循环，被实现的像跳转(goto)一样高效而没有保留在栈上的状态。
 而现在的情况并不是在每一步都会消掉状态元组，而是产生一个 thunk 的长链，只会在程序结束时才会求值。
-我们没有在任何时候指定要减少循环状态，所以编译器无法推断出什么时候必须严格执行，以减少纯惰性值。
+在任何时候我们都没有要求减少循环状态，所以编译器无法推断出什么时候必须严格执行，以减少纯惰性的值。
 
 ..
     What we need to do is to tune the evaluation strategy slightly:
@@ -740,8 +741,8 @@ ch25-stack.png
     The standard approach here is to replace foldl with foldl', from the
     Data.List module:
 
-我们需要的是稍微地调整求值的策略：惰性地折叠列表，但是严格地累计折叠状态。
-标准方案是使用 Data.List 模块的 foldl' 替换 foldl：
+所以，我们要稍微地调整求值的策略：惰性地折叠开列表，但是严格地累加折叠状态。
+标准方法是使用 ``Data.List`` 模块的 ``foldl'`` 替换 ``foldl``：
 
 ::
 
@@ -757,7 +758,7 @@ ch25-stack.png
     However, if we run this implementation, we see we still haven't
     quite got it right:
 
-然而，当我们执行这个实现后会发现，我们仍然没有使它正确执行：
+然而，当我们执行这个实现后会发现，我们仍然没有使它按理想的方式执行：
 
 ::
 
@@ -774,8 +775,8 @@ ch25-stack.png
     unevaluated state on the stack. The problem here is that foldl'
     is only outermost strict:
 
-还是不是足够的严格！我们的循环还是继续在栈上累积没有求值的状态。
-这里的问题是 foldl' 只在外部严格执行：
+还是没有足够的严格！我们的循环还是继续在栈上累积没有求值的折叠状态。
+这里的问题是 ``foldl'`` 只在外部严格执行：
 
 ::
 
@@ -789,24 +790,23 @@ ch25-stack.png
 ..
     This loop uses `seq` to reduce the accumulated state at each step, but only to the outermost constructor on the loop state. That is, seq reduces an expression to "weak head normal form". Evaluation stops on the loop state once the first constructor is reached. In this case, the outermost constructor is the tuple wrapper, (,), which isn't deep enough. The problem is still the unevaluated numeric state inside the tuple.
 
-这个循环使用 `seq` 消减每步的累积状态，但是只对最外部的构造器上的循环状态。
-That is, seq reduces an expression to "weak head normal form".
-求值结束在第一个构造器被匹配的时候。
-在这种情况下，最外部的构造器是没有足够深度的元组包装器 (,)。
-问题仍然是在元组中未求值的数值状态。
+这个循环虽然使用 ``seq`` 消减每步的累加状态，但是只对循环状态上最外部的对组构造器进行了严格执行。
+也就是说，``seq`` 把一个表达式消减到“weak head normal form”，仅仅对第一个匹配的构造器严格求值。
+在这种情况下，对于最外部的构造器是对组构造器 ``(,)`` 来说是深度不够。
+现在的问题是对组中的元素仍然在未求值状态。
 
 ..
     Adding strictness
     +++++++++++++++++
 
-增加严格
+加强严格执行
 ++++++++
 
 ..
     There are a number of ways to make this function fully strict. We can, for example, add our own strictness hints to the internal state of the tuple, yielding a truly tail recursive loop:
 
-有很多方式可以使函数严格执行。
-例如，我们可以对元组的内部状态补充一些严格求值的提示，产生一个真正的尾递归循环：
+有很多方式可以使函数完全地严格执行。
+例如，我们可以自己在对组的内部补充上严格求值的代码，就可以得到一个真正的尾递归循环：
 
 ::
 
@@ -820,8 +820,8 @@ That is, seq reduces an expression to "weak head normal form".
 ..
     In this variant, we step inside the tuple state, and explicitly tell the compiler that each state component should be reduced, on each step. This gives us a version that does, at last, run in constant space:
 
-在这次变体中，我们深入到状态元组中，明确地告诉编译器在每一步都应该消掉状态的各个部分。
-最终，这样使我们得到一个常量空间消耗的版本：
+在这次变化中，我们深入到状态元组中，明确地告诉编译器状态的各个部分在每一步都应该消耗掉。
+最终，我们得到一个常量内存空间的版本：
 
 ::
 
@@ -832,7 +832,7 @@ That is, seq reduces an expression to "weak head normal form".
 ..
     If we run this, with allocation statistics enabled, we get the satisfying result:
 
-我们打开消耗统计运行它，我们得到了满意的结果：
+打开内存分配统计运行它，我们得到了满意的结果：
 
 ::
 
@@ -866,24 +866,27 @@ That is, seq reduces an expression to "weak head normal form".
 ..
     Unlike our first version, this program is 97.4% efficient, spending only 2.6% of its time doing garbage collection, and it runs in a constant 1 megabyte of space. It illustrates a nice balance between mixed strict and lazy evaluation, with the large list unfolded lazily, while we walk over it, strictly. The result is a program that runs in constant space, and does so quickly.
 
-不像我们的第一个版本，这个程序具有 97.4% 的效率，仅花费 2.6% 的时间在 GC，并且运行在1兆的常量空间。
-它给我们展示了混合严格和惰性求值之间极好的平衡，对大型列表惰性折叠，而在折叠中严格求值。
-结果就是一个程序使用常量的空间，并且运行速度很快。
+不像我们的第一个版本那样，这个程序的计算效率是 97.4%，在 GC 上仅花费 2.6% 的时间，并且运行的内存是常量 1 兆。
+它给我们展示了一个混合严格和惰性执行之间极好的平衡：对大型列表惰性展开，而在展开中严格求值。
+这样就能得到一个使用常量的空间，并且运行速度很快的程序。
 
 ..
     Normal form reduction
     +++++++++++++++++++++
 
-正常形式减少
-++++++++++++
+Normal form reduction
++++++++++++++++
 
 ..
     There are a number of other ways we could have addressed the strictness issue here. For deep strictness, we can use the rnf function, part of the parallel strategies library (along with using), which unlike seq reduces to the fully evaluated "normal form" (hence its name). Such a "deep seq" fold we can write as:
 
-我们有许多其他方法来解决这里的严格执行的问题。
-如深度严格求值，我们可以使用并行策略库(parallel strategies library)里的 rnf 函数（以及相搭配的 using）。
-它不像 seq 一样
-这样的“深度 seq”折叠我们可以这样写：
+我们也有许多其他方法可以解决这里的严格执行问题。
+比如对于深度严格求值，我们也可以使用并行策略库(parallel strategies library)里的 ``rnf`` 函数（以及与之相搭配的 ``using``）。
+它不像 ``seq`` 一样能够完全执行到“normal form”。
+使用“深度 ``seq``”我们可以这样重写折叠代码：
+
+（译者注：最新的 ``Parallel`` 库已经不使用 ``rnf``，而是 ``rdeepseq``。
+参考：http://stackoverflow.com/questions/15148230/real-world-haskell-code-not-compiling）
 
 ::
 
@@ -913,28 +916,23 @@ That is, seq reduces an expression to "weak head normal form".
 ..
     We change the implementation of foldl' to reduce the state to normal form, using the rnf strategy. This also raises an issue we avoided earlier: the type inferred for the loop accumulator state. Previously, we relied on type defaulting to infer a numeric, integral type for the length of the list in the accumulator, but switching to rnf introduces the NFData class constraint, and we can no longer rely on defaulting to set the length type.
 
-最新的 Parallel 库已经不使用 rnf，而是 rdeepseq。
-参考：http://stackoverflow.com/questions/15148230/real-world-haskell-code-not-compiling
-
-
-我们修改了 fold' 的实现，使用 rnf 策略来减少状态到正常形式。
-这样也产生了一个我们早期避免的问题：循环累计状态的类型推测。
-先前，我们依赖对累加器中的列表的长度的默认的类型推导是数值整型，但是切换到 rnf 后，引入了 NFData 类常量，
-我们不能依赖默认的长度的类型推导了。
+我们修改了 ``foldl'`` 的实现，使用 ``rnf`` 策略把状态消减到 normal form。
+这样也引入了一个我们先前可以避免的问题：循环状态的类型推测。
+之前我们可以依赖，循环状态中的列表的长度默认的类型推导是数值整型。
+但是在切换到 ``rnf`` 后，由于引入了 ``NFData`` 类型类的约束，我们就无法再依赖默认类型推导了。
 
 ..
     Bang patterns
     +++++++++++++
 
-Bang 模式
-+++++++++++++
-
-创可贴模式
+Bang patterns
++++++++++
 
 ..
     Perhaps the cheapest way, syntactically, to add required strictness to code that's excessively lazy is via "bang patterns" (whose name comes from pronunciation of the "!" character as "bang"), a language extension introduced with the following pragma:
 
-大概最“廉价”的方式，句法地，通过“bang 模式”（它的名字来自符号“!”的发音“bang”）对极度惰性的代码添加需要的严格，用下面的 progma 引入的一个语言扩展：
+为一个极其惰性的代码添加严格执行，从语法修改的成本上来讲，大概最廉价的方式就是“bang patterns”了（它的名字来自符号“!”，发音是“bang”）。
+我们可以用下面的编译指示引入的这个语言扩展：
 
 ::
 
@@ -944,10 +942,9 @@ Bang 模式
 ..
     With bang patterns, we can hint at strictness on any binding form, making the function strict in that variable. Much as explicit type annotations can guide type inference, bang patterns can help guide strictness inference. Bang patterns are a language extension, and are enabled with the BangPatterns language pragma. We can now rewrite the loop state to be simply:
 
-使用 bang 模式，我们可以在任何 binding form 上暗示严格执行，使函数再那个变量上严格执行。
-和显示的类型标注一样可以指导类型推断，bang 模式可以帮助指导严格模式推断。
-bang 模式是一个语言扩展，通过语言 progma 的 BangPatterns 启动。
-我们现在可以重写循环状态成简单的形式：
+通过 bang patterns 我们可以在把严格执行指示到任何 binding form 上，从而使函数在那个变量上严格执行。
+和显示的类型标注可以指导类型推断一样，bang patterns 可以帮助指导推断严格执行。
+现在我们可以把循环状态重写成更为简单的形式：
 
 ::
 
@@ -961,7 +958,7 @@ bang 模式是一个语言扩展，通过语言 progma 的 BangPatterns 启动�
 ..
     The intermediate values in the loop state are now made strict, and the loop runs in constant space:
 
-循环状态的中间值显示被严格执行，使得循环运行在常量空间中：
+循环状态的分值都是严格执行，于是循环运行在常量空间中：
 
 ::
 
@@ -996,22 +993,23 @@ bang 模式是一个语言扩展，通过语言 progma 的 BangPatterns 启动�
 ..
     In large projects, when we are investigating memory allocation hot spots, bang patterns are the cheapest way to speculatively modify the strictness properties of some code, as they're syntactically less invasive than other methods.
 
-在大型项目中，当我们正在调查内存分配的热点时，bang模式是最低价的方式来探索性的修改一些代码的严格执行属性，
-因为与其他方法相比它在句法上的侵略性更少。
+在大型项目里，当我们正在调查内存分配的热点时，
+bang patterns 是最快速的方式来探索性地修改一些代码的严格执行属性，
+因为与其他方法相比它在语法上的侵略性更小。
 
 ..
     Strict data types
     +++++++++++++++++
 
-严格数据类型
-++++++++++++
+严格的数据类型
++++++++++
 
 ..
     Strict data types are another effective way to provide strictness information to the compiler. By default, Haskell data types are lazy, but it is easy enough to add strictness information to the fields of a data type that then propagate through the program. We can declare a new strict pair type, for example:
 
-严格数据类型是其他有效的方式提供严格信息给编译器。
-默认 Haskell 的数据类型是惰性的，但是很容易添加严格信息对数据类型的字段上，然后蔓延到整个程序中。
-我们可以声明一个新的严格 pair 类型，例如：
+严格的数据类型(strict data type)是另一个有效的方式提供给编译器严格执行的信息。
+默认 Haskell 的数据类型都是惰性的，但是很容易为数据类型的字段添加严格执行的标识，然后扩散到整个程序中。
+例如，我们可以声明一个新的严格的对组类型：
 
 ::
 
@@ -1021,8 +1019,8 @@ bang 模式是一个语言扩展，通过语言 progma 的 BangPatterns 启动�
 ..
     This creates a pair type whose fields will always be kept in weak head normal form. We can now rewrite our loop as:
 
-这样定义一个 pair 类型，它的字段将会总是被保存成弱头正常形式。
-我们现在可以重写循环成：
+这样定义的对组类型，它的字段将会总是被保存在 weak head normal form 中。
+我们现在重写循环：
 
 ::
 
@@ -1036,8 +1034,8 @@ bang 模式是一个语言扩展，通过语言 progma 的 BangPatterns 启动�
 ..
     This implementation again has the same efficient, constant space behavior. At this point, to squeeze the last drops of performance out of this code, though, we have to dive a bit deeper.
 
-这个实现再次产生同样的效果，常量空间的表现。
-此时，
+这个实现再次产生同样的效果：常量的空间表现。
+到此为止，为了能够从这个代码里榨干最后几滴性能，我们还要必须潜入的更深一点。
 
 ..
     Understanding Core
