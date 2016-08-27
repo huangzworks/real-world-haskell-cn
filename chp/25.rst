@@ -63,7 +63,7 @@ Haskell程序性能分析
     and heavy use of standard library functions.
     It also illustrates several common performance trouble spots that can catch out the unwary.
 
-请看下面这个列表处理程序，它用于计算某个大型列表的平均值。
+请看下面这个列表处理程序，它用于计算某个超长列表的平均值。
 这里展示的只是程序的其中一部分代码（并且具体的实现算法我们并不关心），
 这是我们经常会在真实的 Haskell 程序中看到的典型的简单列表操作代码，
 这些代码大量地使用标准库函数，并且包含了一些因为疏忽大意而导致的性能问题。
@@ -129,8 +129,8 @@ Haskell程序性能分析
     Collecting runtime statistics
     +++++++++++++++++++++++++++++
 
-收集运行时的统计数据
-++++++++++++++++++++
+收集运行时统计
+++++++++++++++
 
 ..
     To get access to that kind of information,
@@ -214,8 +214,8 @@ Haskell 运行时能够接受的所有选项列表可以参见 GHC 用户手册�
     Time profiling
     ++++++++++++++
 
-时间消耗分析
-++++++++++++
+时间分析
+++++++++
 
 ..
     GHC, thankfully, comes with several tools to analyze a program's time and space usage.
@@ -224,10 +224,9 @@ Haskell 运行时能够接受的所有选项列表可以参见 GHC 用户手册�
     Profiling proceeds in three steps: compiling the program for profiling;
     running it with particular profiling modes enabled; and inspecting the resulting statistics.
 
-庆幸的是，GHC 提供了多种工具来分析程序的时间和空间使用情况。
-其中一个是，我们可以在编译程序时打开性能调试选项，这样程序在执行时会得到每个函数
-所使用的资源使用的信息。性能调试过程分为三步：
-以性能调试方式编译程序；执行程序时打开特定的性能分析模式；最后是分析收集到的统计数据。
+庆幸的是，GHC 为我们提供了多种工具来分析程序的时间和空间使用情况。
+我们可以在编译程序时打开性能调试选项，这样程序在执行时会生成每个函数的资源使用信息。
+使用性能调试分为三步：以性能调试方式编译程序；执行程序时打开特定的性能分析模式；最后是分析收集到的统计数据。
 
 ..
     To compile our program for basic time and allocation profiling, we use the -prof flag.
@@ -237,10 +236,10 @@ Haskell 运行时能够接受的所有选项列表可以参见 GHC 用户手册�
     and GHC will generate code to compute the cost of evaluating the expression at each location.
     Cost centres can be added manually to instrument any expression, using the SCC pragma:
 
-编译程序时，我们可以使用 ``-prof`` 选项来记录基本时间和空间性能信息。
+编译程序时，我们可以使用 ``-prof`` 性能调试选项来得到基本的时间和空间消耗信息。
 我们也需要给感兴趣的函数标记为“消耗集中点(cost centres)”以便让性能调试程序知晓。
-一个消耗集中点即是一个信息收集点，GHC 会生成代码来计算在这些地方所执行的表达式的资源消耗。
-我们可以用 ``SCC`` 语法使得任何表达式成为消耗集中点。
+一个消耗集中点即是一个信息收集点，GHC 会生成代码来计算在这些地方执行的表达式的消耗情况。
+我们可以用 ``SCC`` 编译指示(pragma)把任何表达式设为消耗集中点。
 
 ::
 
@@ -255,9 +254,9 @@ Haskell 运行时能够接受的所有选项列表可以参见 GHC 用户手册�
     as once a hot spot has been identified, we can precisely pin down the
     expensive sub-expressions of a function.
 
-另外，我们也可以用 ``-auto-all`` 选项来让编译器将所有顶级函数设为消耗集中点。
-然后把手动添加消耗集中点作为一个十分有用的补充，
-使得我们在识别出某个热点(hot spot)的函数后，可以更为精确地去侦测该函数的子表达式。
+或者，我们也可以用 ``-auto-all`` 选项来让编译器将所有顶级函数设为消耗集中点。
+然后在我们识别出某个性能热点(hot spot)的函数之后，把手动添加消耗集中点作为一个十分有用的补充，
+就可以更为精确地去侦测该函数的子表达式了。
 
 ..
     One complication to be aware of: in a lazy, pure language like Haskell,
@@ -270,20 +269,18 @@ Haskell 运行时能够接受的所有选项列表可以参见 GHC 用户手册�
     To get accurate numbers for these values, known as "constant applicative forms",
     or CAFs, we use the -caf-all flag.
 
-另外需要注意的一个难点是：在 Haskell 这类惰性、纯函数式编程语言里，
-没有参数的值只会被计算一次（比如之前的程序展示过的巨大的列表），
-而计算的结果会被之后的所有其他计算所共享。这些值不是程序调用的其中一部分，
-因此它们不会每次都被计算。当然我们仍然需要评估它们的唯一一次计算的资源占用情况。
-这些只会计算一次的值被成为 CAF （Constant Applicative Forms），
-它们的确切数量可以通过 -caf-all 选项来得到。
-
-Constant Applicative Forms 常量应用形式
+需要注意的一个复杂的地方：在 Haskell 这类惰性、纯函数式编程语言里，
+没有参数的值只会被计算一次（比如之前计算超长列表的程序），然后计算的结果会在之后共享。
+于是这种函数在调用关系图(call graph)中记录的统计值并不准确，因为它们并不是每次调用都执行。
+然而，我们仍然想要知道它们一次执行的消耗情况是怎么样。
+为了得到这种被称为“常量函数体(Constant Applicative Forms)”或 CAF 的确切值，
+我们可以使用 ``-caf-all`` 选项。
 
 ..
     Compiling our example program for profiling then (using the -fforce-recomp flag
     to to force full recompilation):
 
-那么以分析性能的方式来编译我们的程序吧（用 ``-fforce-recomp`` 选项来强制重新编译所有部分）：
+那么以性能调试的方式来编译我们的程序吧（用 ``-fforce-recomp`` 选项来强制重新编译所有部分）：
 
 ::
 
@@ -317,11 +314,12 @@ Constant Applicative Forms 常量应用形式
     -- we use the GHC runtime flag, -K, to set a larger stack limit for
     our program (with the usual suffixes to indicate magnitude):
 
-程序竟然把栈空间耗完了！这就是使用 profiling 时需要注意的主要影响：
-给程序加Cost Centre会使它的优化发生变化，甚至改变它的运行时行为，
-因为每一个表达式都被附加了额外代码来检测它们的执行情况。对于我们
-这样情况，修正起来很简单 —— 只需要用GHC运行时标记 ``-K`` 来增加
-栈空间上限即可（并附带指示大小的后缀）：
+程序竟然把栈空间耗完了！这就是使用性能调试时需要注意的主要影响：
+给程序加消耗集中点会改变它的优化方式，进而可能影响它的运行时表现，
+因为每一个被标记的表达式都会被附加一段额外的代码，来跟踪它们的执行轨迹。
+从某种意义上说，观察程序执行会影响它的执行。
+对于我们这样情况，修正起来很简单——只需要通过 GHC 运行时选项 ``-K`` 来增加
+栈空间上限即可（要附带指示存储单位的后缀）：
 
 ::
 
@@ -335,7 +333,7 @@ Constant Applicative Forms 常量应用形式
     A.prof (named after the binary that was executed)
     which contains the following information:
 
-运行时会将性能信息生成到一个名字为 ``A.prof`` （以程序本身名字命名） 的文件中。
+运行时会将性能信息生成到一个名字为 ``A.prof``（以可执行程序的名字命名）的文件中。
 其中含有以下信息：
 
 ::
@@ -379,9 +377,9 @@ Constant Applicative Forms 常量应用形式
     (not the maximum live memory, which was around 700MB).
 
 这些信息呈现给我们一些关于程序的运行时行为的情况。里面包含了程序的名字以及
-执行程序时用到的选项和参数。『total time』是运行时系统视角所见的程序运行
-的确切总时长。『Total allocation』是程序在运行过程中分配的内存总字节数（不是
-程序运行时内存使用的峰值；那个峰值大概是700MB）
+执行程序时用到的选项和参数。“total time”是运行时系统视角所见的程序运行
+的确切总时长。“total alloc”是程序在运行过程中分配的内存总字节数（不是
+程序运行时内存使用的峰值；那个峰值大概是 700MB）
 
 ..
     The second section of the profiling report is the proportion of time and
@@ -393,10 +391,10 @@ Constant Applicative Forms 常量应用形式
     (such as the floating point values in the large list, and the list itself)
     assigned to top level CAFs.
 
-报告中的第二段是各个函数所消耗的时间和空间部分。第三段是Cost Centre报告：
-其结构为调用关系树（比如我们可以看到 ``mean`` 是被 ``main`` 调用的）。
-"individual"和"inherited"列提供了每个Cost Centre其本身、以及它和它的子程序
-所消耗的资源。此外，最下面那些 ``CAF`` 是常量执行的一次性消耗（例如大列表中
+报告中的第二段是各个函数所消耗的时间和空间部分。
+第三段是消耗集中点的报告：调用关系图的格式（比如，我们可以看到 ``mean`` 是被 ``main`` 调用的）。
+“individual”和“inherited”列提供了每个消耗集中点其本身、以及它和它的子部分
+所消耗的资源。此外，最下面那些 ``CAF`` 是常量执行的一次性消耗（例如超长列表中
 浮点数以及列表本身）。
 
 ..
@@ -409,8 +407,9 @@ Constant Applicative Forms 常量应用形式
     are causing a problem.
 
 我们能从这些信息得出什么结论呢？我们可以看出两个 ``CAF`` 占用了大多数时间：
-一个与计算总和相关，另一个与浮点数相关。这基本解释了程序运行的所有消耗。结合我们之前
-观察到GC的压力问题，看起来像是在列表节点的内存分配和浮点数值上发生了问题。
+一个与计算总和相关，另一个与浮点数相关。
+单独它们就几乎占据了程序运行期间的所有消耗。
+结合我们之前观察到 GC 的压力问题，看起来像是在列表结点的内存分配和浮点数值上发生了问题。
 
 ..
     For simple performance hot spot identification, particularly in large
@@ -421,17 +420,16 @@ Constant Applicative Forms 常量应用形式
     such as our example here, we can use more sophisticated profiling
     tools to extract more information.
 
-简单的性能热点检测，特别是对于我们难以知道时间花费点的大型程序，这个
-时间分析会突出某些问题模块或高层函数。这往往已足够显示出问题所在了。
-就像我们的程序，一旦我们缩小了问题代码的范围，我们就可以用更加成熟的分析工具
-来拿到更多的信息。
+简单的性能热点检测，特别是对于我们难以知道时间花费点的大型程序，
+这个时间分析会突出某些问题模块或顶级函数。这往往已足够显示出问题所在了。
+就像我们的程序，一旦我们缩小了问题代码的范围，我们就可以用更加尖端的分析工具来拿到更多的信息。
 
 ..
     Space profiling
     +++++++++++++++
 
-空间性能调试
-++++++++++++
+空间分析
+++++++++
 
 ..
     Beyond basic time and allocation statistics, GHC is able to generate
@@ -440,9 +438,9 @@ Constant Applicative Forms 常量应用形式
     unnecessarily, leading to the kind of heavy garbage collector activity
     we see in our example.
 
-GHC除了可以进行基本的时间和空间统计外，还能为程序整个执行期间的堆内存使用
+GHC 除了可以进行基本的时间和空间统计外，还能为程序整个执行期间的堆内存使用
 情况生成图表。这能完美检测内存泄露问题。内存泄露是指不再需要的内存没有被释放。
-这会对GC造成压力，就像在我们的例子程序中见到的那样。
+这会对 GC 造成压力，就像在我们的例子程序中见到的那样。
 
 ..
     Constructing a heap profile follows the same steps as constructing
@@ -455,19 +453,19 @@ GHC除了可以进行基本的时间和空间统计外，还能为程序整个�
     hp2ps, which generates a PostScript-based, graphical visualization
     of the heap over time.
 
-构建内存占用情况的性能调试和构建一般时间占用调试的步骤是一样，
-都需要用到 ``-prof -auto-all -caf-all`` 选项。 但当执行程序时，
+构建堆内存分析和构建一般时间分析的步骤是一样，
+都需要用到 ``-prof -auto-all -caf-all`` 编译选项。 但当执行程序时，
 我们会让运行时系统收集关于堆使用的最多细节。堆使用信息能够以几种方式分解：
-cost-centre，模块(module)，构建器，数据类型。不同分解可以展现不同信息。
-对 ``A.hs`` 进行内存调试所得的原始信息会被记录到一个名为 ``A.hp`` 的文件里面，
+消耗集中点、模块、构造器和数据类型。每个都有各自的洞见。
+对 ``A.hs`` 进行堆内存分析所得的原始数据会被记录到一个名为 ``A.hp`` 的文件里面，
 之后只要使用 ``hp2ps`` 处理这个文件，
-就可以得到一个基于 PostScript 的内存占用历史可视图像。
+就可以得到一个堆内存占用历史图像的 PostScript 文件。
 
 ..
     To extract a standard heap profile from our program, we run it with
     the -hc runtime flag:
 
-程序的一般内存占用情况可以通过使用 ``-hc`` 选项来获取：
+想要使用标准的堆内存分析的话，可以在运行程序时使用 ``-hc`` 作为运行时的性能分析选项：
 
 ::
 
@@ -480,7 +478,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     A heap profiling log, A.hp, was created, with the content
     in the following form:
 
-一个内存使用的性能调试的log文件 ``A.hp`` 会被创建，其内容为以下形式：
+一个堆内存分析的日志文件 ``A.hp`` 会创建出来，其内容为以下形式：
 
 ::
 
@@ -506,13 +504,11 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
     our program will run. We can now render the heap profile as a graph,
     using the hp2ps tool:
 
-这些样本是以程序的正常执行步长取得的。我们可以用 ``-iN`` 选项来增加取样频率，
-这里的 ``N`` 是内存取样之间相隔的秒数（如 0.01 秒）。
-很明显，取样越多，得到的结果越精确，但程序会执行得更慢。
-我们可以用 ``hp2ps`` 将调试结果生成一张图表：
-
-在程序运行期间会定期采样。
-样本是在程序运行期间以固定的间隔采取的。
+这些样本是在程序运行期间以固定的间隔采样出来的。
+我们可以用 ``-iN`` 选项来增加采样频率，
+这里的 ``N`` 是内存采样之间相隔的秒数（如 0.01 秒）。
+很明显，采样越频繁，得到的结果越精确，但程序也会执行得越慢。
+我们可以用 ``hp2ps`` 将分析结果生成一张图表：
 
 ::
 
@@ -526,8 +522,7 @@ cost-centre，模块(module)，构建器，数据类型。不同分解可以展�
 ..
     [img here]
 
-[IMG#TODO]
-ch25-heap-hc.png
+.. image:: ../image/ch25/ch25-heap-hc.png
 
 ..
     What does this graph tell us? For one, the program runs in two phases:
@@ -539,8 +534,8 @@ ch25-heap-hc.png
 
 我们能从图片中看出什么？举个例子，程序的执行分为两个阶段：
 前一阶段在计算数值的总和的同时不断分配大量的内存，后一阶段清理释放这些内存。
-内存初始化分配的同时， ``sum`` 也开始干活，并消耗大量的内存。
-如果用 ``-hy`` 调试选项来按类型分解的话，我们会得到一个稍有不同的图像：
+内存初始化分配的同时， ``sum`` 也开始工作，并消耗大量的内存。
+如果用性能分析选项 ``-hy`` 来按类型分解的话，我们会得到一个稍有不同的图像：
 
 ::
 
@@ -557,9 +552,7 @@ ch25-heap-hc.png
 ..
     [img here]
 
-
-[IMG#TODO]
-ch25-heap-hy.png
+.. image:: ../image/ch25/ch25-heap-hy.png
 
 ..
     The most interesting things to notice here are large parts of the heap
@@ -568,9 +561,9 @@ ch25-heap-hy.png
     (represented as data of type "*"). Finally, let's break it down by
     what constructors are being allocated, using the -hd flag:
 
-这里最有趣的是有很大部分的内存被list类型(``[]``)和Double类型所占用；
-我们看到未知类型(图中用 ``*`` 标记)也占用了一些内存。
-最后，让我们用 ``-hd`` 选项来按构建器分解一下结果：
+这里最有趣的是很大部分的内存都被 list 类型（即“[]”）和 Double 类型所占用；
+我们看到未知类型（图中用“*”标记）也占用了一些内存。
+最后，再让我们用 ``-hd`` 选项来按构造器的方式分解一下结果：
 
 ::
 
@@ -582,13 +575,12 @@ ch25-heap-hy.png
 ..
     Our final graphic reveals the full story of what is going on:
 
-下面就是我们最后一张展示了程序执行的所有情况的图像：
+下面就是能够展示程序执行的所有情况的最终图像：
 
 ..
     [img here]
 
-[IMG#TODO]
-ch25-heap-hd.png
+.. image:: ../image/ch25/ch25-heap-hd.png
 
 ..
     A lot of work is going into allocating list nodes containing
@@ -600,7 +592,7 @@ ch25-heap-hd.png
     and starts calculating the length. If we look at the original
     fragment for mean, we can see exactly why that memory is being retained:
 
-程序在分配双精度浮点数列表上面花了不少功夫。列表在 Haskell 语言中的惰性的，
+程序在分配双精度浮点数列表上面花了不少功夫。列表在 Haskell 语言中是惰性的，
 所以含有上百万个元素的列表都是在程序执行过程中一点点地构建出来的。
 但这些元素在被遍历的同时并没有被逐步释放，所以导致内存占用变得越来越大。
 最终，在程序执行稍稍超过一半时，终于将列表总和计算出来，并开始计算其长度。
@@ -625,7 +617,7 @@ ch25-heap-hd.png
 
 首先我们计算列表的总和，这会使得所有列表元素被分配到内存。
 但我们现在还不能释放列表元素，因为 ``length`` 还需要整个列表。
-一旦 ``sum`` 结束， ``length`` 会马上开始访问列表，同时 ``GC`` 会跟进，
+一旦 ``sum`` 结束， ``length`` 会马上开始访问列表，同时 GC 会跟进，
 逐步释放列表元素，直到 ``length`` 结束。
 这两个计算阶段展示了两种明显不同的分配与释放，并指出我们需要改进的确切思路：
 只对列表遍历一次，遍历过程中同时计算总和与平均值。
@@ -634,8 +626,8 @@ ch25-heap-hd.png
     Controlling evaluation
     ----------------------
 
-控制求值
---------
+控制计算
+---------
 
 ..
     We have a number of options if we want to write our loop to traverse
@@ -643,9 +635,9 @@ ch25-heap-hd.png
     the list, or via explicit recursion on the list structure. Sticking
     to the high level approaches, we'll try a fold first:
 
-如果我们想要实现只遍历一次的循环，我们会有很多选择。
-例如，我们可以写一个对列表折叠(fold)的循环，或者明确的在列表结构上迭代。
-本着使用高级的方案去解决问题，我们决定先尝试fold的方法：
+如果我们有很多方式来实现一个只遍历一次的循环。
+例如，我们可以写一个对列表折叠(fold)的循环，也可以写一个对列表结构明显的递归。
+本着使用更高级的方法去解决问题的原则，我们决定先尝试折叠的方式：
 
 ::
 
@@ -845,7 +837,7 @@ That is, seq reduces an expression to "weak head normal form".
 ::
 
     $ time ./D 1e6 +RTS -sstderr
-    ./D 1e6 +RTS -sstderr 
+    ./D 1e6 +RTS -sstderr
     500000.5
     256,060,848 bytes allocated in the heap
          43,928 bytes copied during GC (scavenged)
@@ -921,7 +913,7 @@ That is, seq reduces an expression to "weak head normal form".
 ..
     We change the implementation of foldl' to reduce the state to normal form, using the rnf strategy. This also raises an issue we avoided earlier: the type inferred for the loop accumulator state. Previously, we relied on type defaulting to infer a numeric, integral type for the length of the list in the accumulator, but switching to rnf introduces the NFData class constraint, and we can no longer rely on defaulting to set the length type.
 
-最新的 Parallel 库已经不使用 rnf，而是 rdeepseq。 
+最新的 Parallel 库已经不使用 rnf，而是 rdeepseq。
 参考：http://stackoverflow.com/questions/15148230/real-world-haskell-code-not-compiling
 
 
@@ -975,7 +967,7 @@ bang 模式是一个语言扩展，通过语言 progma 的 BangPatterns 启动�
 
     $ ghc -O2 F.hs --make
     $ time ./F 1e6 +RTS -sstderr
-    ./F 1e6 +RTS -sstderr 
+    ./F 1e6 +RTS -sstderr
     500000.5
     256,060,848 bytes allocated in the heap
          43,928 bytes copied during GC (scavenged)
@@ -1164,7 +1156,7 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
 ::
 
     $ time ./H 1e7 +RTS -sstderr
-    ./H 1e7 +RTS -sstderr 
+    ./H 1e7 +RTS -sstderr
     5000000.5
     1,689,133,824 bytes allocated in the heap
         284,432 bytes copied during GC (scavenged)
@@ -1331,7 +1323,7 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
 考虑到我们的 Core 现在是最优化，剩下来继续深入查看这个程序的方法只有直接查看汇编了。
 当然，到了这点只剩下很少的收获取得。
 为了查看生成的汇编，我们可以使用像 ghc-core 的工具，或者对 GHC 使用 -ddump-asm 标签在标准输出生成汇编。
-对生成的汇编我们有很少的“控制杆”可以使用，但是我们可以在 C 和 GHC 的原生代码后端之间做选择。 
+对生成的汇编我们有很少的“控制杆”可以使用，但是我们可以在 C 和 GHC 的原生代码后端之间做选择。
 以及，如果我们选 C 后端，它会使用优化选项传给 GCC。
 特别在有浮点代码的情况下，它有时会很有用通过 C 编译，开启特定的高性能的 C 编译器优化。
 
@@ -1414,7 +1406,7 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
     and avoiding the traps of the unwary, it is perfectly possible to
     reliably achieve high performance from your Haskell code, while being
     able to develop at a very high level. The result is a sweet balance
-    of productivity and ruthless efficiency. 
+    of productivity and ruthless efficiency.
 
 坚持简单的规则，选择正确的数据结构，避免不谨慎的陷阱，通过在很高的层面的开发，用你的 Haskell 代码可靠地实现高性能是完全有可能的。
 最终结果是一个在生产率和无情的运行效率之间美妙的平衡。
