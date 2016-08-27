@@ -1047,19 +1047,20 @@ bang patterns 是最快速的方式来探索性地修改一些代码的严格执
 ..
     Besides looking at runtime profiling data, one sure way of determining exactly what your program is doing is to look at the final program source after the compiler is done optimizing it, particularly in the case of Haskell compilers, which can perform very aggressive transformations on the code. GHC uses what is humorously referred to as "a simple functional language", known as Core, as the compiler intermediate representation. It is essentially a subset of Haskell, augmented with unboxed data types (raw machine types, directly corresponding to primitive data types in languages like C), suitable for code generation. GHC optimizes Haskell by transformation, repeatedly rewriting the source into more and more efficient forms. The Core representation is the final functional version of your program, before translation to low level imperative code. In other words, Core has the final say, and if all-out performance is your goal, it is worth understanding.
 
-除了看运行时性能分析数据，一个确定可以准确确定你的程序是怎么做的方法，是查看编译器优化后的最终程序源码。
-特别在 Haskell 编译器会对源码执行激进的转换的情况下。
-GHC 使用一种被幽默地称为“一个简单的函数式语言”，也被称为 Core，做为编译器的中间形式。
-它是 Haskell 的精炼的子集，并增加了 unboxed 数据类型（原生机器类型，像 C 一样直接对应着原数据类型），
-适合代码生成。
-GHC 使用转换优化 Haskell，重复重写源码到更有效率的形式。
-Core 形式的代码就是你的函数式代码的最终版本，在翻译成低层命令式代码前。
-换句话说，Core 有最终决定权，如果到达终极效率是你的目标，那么你很值得去理解它。
+除了查看运行时分析数据外，一个可靠地确定你的程序是怎么运行方法是，查看编译器优化后的最终的程序源码。
+特别是在 Haskell 编译器会对源码执行各种非常激进的转换(transform)的情况下。
+GHC 使用一种被幽默地称为“一个简单的函数式语言”，也被称为 Core 的语言，来做为编译器的中间形式。
+它实质上是适合代码生成的 Haskell 语言的子集，并扩增了一种 unboxed 数据类型(unboxed data type)，也就是原生机器类型，像 C 语言一样直接对应着系统的基本数据类型(primitive data type)。
+GHC 通过转换来优化 Haskell，反复重写源码以得到更有效率的形式。
+在被翻译成底层命令式代码之前，Core 代码就是你的代码在函数式上的最终版。
+换句话说，Core 代码具有最终发言权。
+如果把程序到达终极性能是你的目标的话，那么你很值得去学习它。
 
 ..
     To view the Core version of our Haskell program we compile with the -ddump-simpl flag, or use the ghc-core tool, a third-party utility that lets us view Core in a pager. So let's look at the representation of our final fold using strict data types, in Core form:
 
-
+为了查看我们的 Haskell 程序的 Core 版，需要编译时使用 ``-ddump-simpl`` 选项。
+也可以使用一个叫做 ghc-core 的第三方工具，使我们能够分页地查看 Core。
 
 ::
 
@@ -1068,7 +1069,8 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
 ..
     A screenful of text is generated. If we look carefully at, we'll see a loop (here, cleaned up slightly for clarity):
 
-生成了整个屏幕的文字。我们仔细看一下，我们会发现一个循环（在这里，为了能看清晰稍微清理了一下）
+生成了满屏幕的文本。
+仔细看一下，我们会发现一个循环（在此为了能够看得清晰，就稍微清理了一下）
 
 ::
 
@@ -1085,38 +1087,41 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
 ..
     This is the final version of our foldl', and tells us a lot about the next steps for optimization. The fold itself has been entirely inlined, yielding an explicit recursive loop over the list. The loop state, our strict pair, has disappeared entirely, and the function now takes its length and sum accumulators as direct arguments along with the list.
 
-这就是我们的 foldl' 的最终版本，它告诉我们很多优化的下一步。
-折叠本身已经完全被内联，生成一个显式地列表递归循环。
-循环状态，我们的严格 pair，已经完全消失。
-函数现在取它的长度以及求和累加器作为和列表一起的参数。
+这就是 ``foldl'`` 的最终版本，它告诉了我们很多下一步的优化信息。
+折叠已经完全内联，生成一个显式的列表递归循环。
+循环状态，也就是我们的严格执行的对组，已经完全消失。
+现在函数已经把累加的长度以及总和作为和列表一起的参数使用。
 
 ..
     The sum of the list elements is represented with an unboxed Double# value, a raw machine double kept in a floating point register. This is ideal, as there will be no memory traffic involved keeping the sum on the heap. However, the length of the list, since we gave no explicit type annotation, has been inferred to be a heap-allocated Integer, with requires a non-primitive plusInteger to perform addition. If it is algorithmically sound to use a Int instead, we can replace Integer with it, via a type annotation, and GHC will then be able to use a raw machine Int# for the length. We can hope for an improvement in time and space by ensuring both loop components are unboxed, and kept in registers.
 
-列表元素的和被表示成 unboxed Double# 的值，原生机器双精度类型保存在一个浮点寄存器上。
-这样很理想，因为在这样就没有保存求和在堆上的一系列内存操作。
-然而，列表的长度，因为我们没有给它显式的类型标注，被推断为分配在堆上的 Integer，连带需要一个非本源的 plusInteger 实施相加。
-如果在此使用在算法上合理的 Int 取代，我们可以用它替换 Integer，通过一个类型标注，GHC 将会能够用一个原生机器的 Int# 作为长度。
-我们可以期待在时间和空间上的进步，通过两个循环部分是 unboxed，保存在寄存器上。
+列表元素的总和被表示成 unboxed Double# 类型，在原生机器里，会被保存在一个浮点寄存器上。
+这样做很理想，因为这样就没有使用堆上的变量而必要的一系列内存操作。
+然而对于列表的长度，因为我们没有给它显式的类型标注，所以它被推断为分配在堆上的 Integer，并附带了一个非基本数据类型需要的 ``plusInteger`` 实施相加操作。
+如果在算法的合理性上我们可以用 Int 替代 Integer，那么通过使用类型标注，GHC 就会用一个原生机器的 Int# 类型作为长度。
+通过确保循环状态的分量都是保存在寄存器上的 unboxed 类型， 我们希望在时间和空间上性能会更进一步。
 
 ..
     The base case of the loop, its end, yields an unboxed pair (a pair allocated only in registers), storing the final length of the list, and the accumulated sum. Notice that the return type is a heap-allocated Double value, indicated by the D# constructor, which lifts a raw double value onto the heap. Again this has implications for performance, as GHC will need to check that there is sufficient heap space available before it can allocate and return from the loop.
 
-循环的 base case，它的结尾，生成一个 unboxed pair（一个 pair 只分配在寄存器上），存储列表的最终长度，以及累积的和。
-注意返回类型是一个堆分配的 Double 值，由 D# 构造器指明，它在堆上提一个原生的双精度值。
-再次这里对性能有影响，因为 GHC 需要检查有足够的堆空间存在再它被分配和从循环返回之前。
+循环的基础 case 分支，也就是循环的结束，生成一个 unboxed 对组（只分配在寄存器上的对组），保存着列表的最终长度以及累加的总和。
+注意返回类型是堆分配的 Double 类型，这点可以从 D# 构造器看的出来。
+所以它在堆内存上占据一个原生的双精度值大小的空间。
+再次，这里也会对性能产生影响，因为在为它分配内存和返回循环之前， GHC 需要检查是否有足够的堆空间。
 
 ..
     We can avoid this final heap check by having GHC return an unboxed Double# value, which can be achieved by using a custom pair type in the loop. In addition, GHC provides an optimiztion that unboxes the strict fields of a data type, ensuring the fields of the new pair type will be stored in registers. This optimization is turned on with -funbox-strict-fields.
 
-我们可以避免最终的堆检查 使 GHC 返回一个 unboxed Double# 类型，它可以在循环上使用一个自定义 pair 类型实现。
-此外，GHC 提供一个优化 unbox 一个数据类型的严格字段，保证新 pair 类型的字段讲保存在寄存器上。
-这个优化使用 -funbox-strict-fields 开启。
+我们可以避免这个最终的堆检查， 通过使 GHC 返回一个 unboxed Double# 类型。
+这点可以用一个自定义的对组类型实现。
+此外，GHC 提供了可以 unbox 一个数据类型的严格执行字段的优化，
+这样就保证了新的对组类型的字段会被保存在寄存器上。
+这个优化使用 ``-funbox-strict-fields`` 开启。
 
 ..
     We can make both representation changes by replacing the polymorphic strict pair type with one whose fields are fixed as Int and Double:
 
-我们可以  替换多态严格 pair 类型成字段固定为 Int 和 Double 的类型。
+对于上面的两个改进，我们可以把多态严格对组类型替换成固定为 Int 和 Double 类型的字段的对组来一并实现。
 
 ::
 
@@ -1132,7 +1137,8 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
 ..
     Compiling this with optimizations on, and -funbox-strict-fields -ddump-simpl, we get a tighter inner loop in Core:
 
-带着优化和 -funbox-strict-fields -ddump-simpl 编译，我们得到 Core 的一个更紧密的内部循环：
+带着优化选项和 ``-funbox-strict-fields -ddump-simpl`` 编译程序，
+我们得到一个拥有更紧密的内循环的 Core：
 
 ::
 
@@ -1147,9 +1153,9 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
 ..
     Now the pair we use to represent the loop state is represented and returned as unboxed primitive types, and will be kept in registers. The final version now only allocates heap memory for the list nodes, as the list is lazily demanded. If we compile and run this tuned version, we can compare the allocation and time performance against our original program:
 
-现在我们使用的代表循环状态的 pair 被表现和返回成 unboxed 原生类型，讲被保存在寄存器中。
-最终版本现在只有列表的节点分配在堆内存上，因为列表是惰性的需要。
-如果我们编译和运行这个调优过的版本，我们可以和我们原来的程序比较内存分配和时间的性能。
+现在，循环状态的对组已经作为 unboxed 基本类型来表示和返回了，它将会被保存在寄存器中。
+最终版本的程序现在只把列表的结点分配在堆内存上，这是因为作为惰性列表而要求的。
+编译和运行这个调优过的版本，我们可以和原来的程序对比一下内存分配和时间的性能。
 
 ::
 
@@ -1184,14 +1190,14 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
 ..
     While our original program, when operating on a list of 10 million elements, took more than a minute to run, and allocated more than 700 megabytes of memory, the final version, using a simple higher order fold, and a strict data type, runs in around half a second, and allocates a total of 1 megabyte. Quite an improvement!
 
-然而我们原来的程序，当操作的列表有 10 百万的元素时，花费了超过 1 分钟多运行，分配了超过 700M 内存。
-最终版本，使用一个简单的高阶折叠，一个严格数据类型，运行了大概半秒，分配了总共 1M 内存。
-真是相当大的进步！
+当操作的列表有 1 千万个元素时，我们原来的程序需要花费了超过 1 分钟的时间运行，并且需要分配了超过 700M 的内存。
+然而使用一个简单的高阶折叠，以及一个严格的数据类型的最终版本的程序，却运行了大概半秒钟，并分配了总共 1M 内存。
+这可真是相当大的进步啊！
 
 ..
     The general rules we can learn from the profiling and optimization process are:
 
-我们可以从分析和优化过程学到的通用规则有：
+我们可以从分析和优化过程中学到的通用规则有：
 
 ..
     - Compile to native code, with optimizations on
@@ -1201,52 +1207,57 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
     - Prefer strict fields for atomic data types (Int, Double and similar types)
     - Use data types with simpler machine representations (prefer Int over Integer)
 
-- 编译成本地代码，要打开优化
-- 当有疑虑，使用运行时统计，已经时间分析
-- 如果怀疑有内存分配问题，使用堆分析
-- 小心翼翼地结合严格和惰性求值策略会产生好的最好的结果
-- 对原子数据类型（如 Int、Double 等相似类型）的字段最好使用严格
-- 对数据类型使用更简单的机器形式（喜欢 Int 多过 Integer）
+- 编译成本地程序时，要打开优化选项
+- 当有疑虑，就使用运行时统计和时间分析
+- 如果怀疑有内存分配的问题，就使用堆分析
+- 小心翼翼地结合严格和惰性执行会产生最好的结果
+- 最好对原子数据类型（如 Int、Double 等相似类型）的字段标记成严格执行
+- 要使用能够表示成原生机器的基本数据类型的数据类型（最好用 Int 而不是 Integer）
 
 ..
     These simple strategies are enough to identify and squash untoward memory use issues, and when used wisely, can avoid them occurring in the first place.
 
-这些简单的策略对定位和镇压不幸的内存使用问题是足够的，当明智地运行，可以第一时间避免它们发生。
+使用这些简单的规则来定位和消除麻烦的内存使用问题是足够的。
+一开始就明智地使用，就可以第一时间避免它们发生。
 
 ..
     Advanced techniques: fusion
     ---------------------------
 
-高级技术：融合
-----------------
+高级技术：fusion(融合)
+----------------------------
 
 ..
     The final bottleneck in our program is the lazy list itself. While we can avoid allocating it all at once, there is still memory traffic each time around the loop, as we demand the next cons cell in the list, allocate it to the heap, operate on it, and continue. The list type is also polymorphic, so the elements of the list will be represented as heap allocated Double values.
 
-我们程序的最后的性能瓶颈是惰性的列表本身。
-虽然我们可以避免立刻把它全部分配，
-列表类型也是多态的，所以它的元素讲被表示成分配在堆上的 Double 值。
+这个程序最后的性能瓶颈是惰性列表本身。
+虽然我们避免了立刻把它全部内存分配出来，但是仍然有循环中内存操作的消耗。
+因为在循环中我们要取下一个列表的头元素，在堆上分配内存给它，操作，然后继续。
+这个列表类型也是多态的，所以它的元素将表示成分配在堆上的 Double 值。
 
 ..
     What we'd like to do is eliminate the list entirely, keeping just the next element we need in a register. Perhaps surprisingly, GHC is able to transform the list program into a listless version, using an optimization known as deforestation, which refers to a general class of optimizations that involve eliminating intermediate data structures. Due to the absence of side effects, a Haskell compiler can be extremely aggressive when rearranging code, reordering and transforming wholesale at times. The specific deforestation optimization we will use here is stream fusion.
 
-可能令人意外，GHC 能够转换列表程序成无列表的形式，使用一个称为 deforestation 的优化。
-这个优化是指一通类减少中间数据结构的优化。
-得益于没有副作用(side effect)，Haskell 编译器有时会非常激进地重排代码、大规模地调整顺序和转换。
-我们讲在这里使用的 deforestation 优化就是流融合(stream fusion)。
+我们想做的是完全去掉列表，仅在寄存器上保存我们需要的下一个元素。
+可能会使人感到意外，GHC 能够把一个包含列表的程序转换成无列表的形式，用一个被称为 deforestation 的优化。
+这个优化是指一类去掉中间数据结构的优化。
+得益于 Haskell 没有副作用，Haskell 编译器有时会非常激进的大规模地重排、调整顺序和转换代码。
+在次我们使用的 deforestation 优化就是 stream fusion(流融合)。
 
 ..
     This optimization transforms recursive list generation and transformation functions into non-recursive unfolds. When an unfold appears next to a fold, the structure between them is then eliminated entirely, yielding a single, tight loop, with no heap allocation. The optimization isn't enabled by default, and it can radically change the complexity of a piece of code, but is enabled by a number of data structure libraries, which provide "rewrite rules", custom optimizations the compiler applies to functions the library exports.
 
-这个优化转换迭代列表生成，和转换函数成非迭代非折叠。
-当一个非折叠临近一个折叠，然后它们之间的结构会减掉，生成一个单一的紧密的循环，没有堆分配。
-这个优化默认没有开启，因为它会急剧地增加一片代码的复杂度，但是它在一些数据机构库上开启了，通过提供“重写规则”，编译器应用给这些库导出的函数了自定义优化。
+这个优化可以把迭代列表生成(recursive list generation)和转换函数(transformation functions)转换成非迭代的展开(non-recursive unfolds)。
+当一个展开靠近一个折叠时，它们之间的结构会被去掉，然后生成一个没有堆内存分配的单一紧凑的循环。
+这个优化默认是没有开启的，因为它会急剧地增加一段代码的复杂度。
+但是它在许多数据结构库上都开启了。
+通过编译器提供的“重写规则”，自定义优化会应用到这些库的导出函数上。
 
 ..
     We'll use the uvector library, which provides a suite of list-like operations that use stream fusion to remove intermediate data structures. Rewriting our program to use streams is straightforward:
 
-我们将使用 uvector 库，它提供了一套像列表的操作，使用流融合减掉中间数据结构。
-重写我们的程序使用流是很直接的：
+这里我们将使用 ``uvector`` 库，它提供了一套相仿列表的操作的数据类型，但是使用 stream fusion 去掉了中间数据结构。
+重写我们的程序就可以直接使用 streams 了：
 
 ::
 
@@ -1272,7 +1283,7 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
     build our program, with -O2 -funbox-strict-fields, and inspect
     the Core that results:
 
-从 Hackage 安装过 uvector 库后，我们编译我们的程序，使用 -O2 -funbox-strict-fields，检查 Core 的结果：
+从 Hackage 上安装过 ``uvector`` 库后，编译程序，使用 ``-O2 -funbox-strict-fields``，再检查 Core 的结果：
 
 ::
 
@@ -1290,8 +1301,10 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
     are kept in registers. Running this, we see another improvement
     bump in performance, with runtime falling by another order of magnitude:
 
-这次是真的最优化的结果了！
-我们的列表现在完全融化了，生成一个紧凑的循环，列表的生成是和累积交错的，所有的输入和输出变量保存在寄存器里。运行这个，我们看到在性能上的又一个猛进，运行时降到另一个数量级：
+这次真的是最优化的结果了！
+我们的列表结构现在已经完全融化成一个紧凑的循环了。
+它的列表的生成是和累加相互交叠，所有的输入和输出变量保存在寄存器里。
+运行这个程序，我们会看到在性能上的又一个猛进，运行时消耗降到另一个数量级：
 
 ::
 
@@ -1303,7 +1316,7 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
     Tuning the generated assembly
     +++++++++++++++++++++++++++++
 
-调整生成的汇编
+调整生成的汇编代码
 ++++++++++++++++
 
 ..
@@ -1318,12 +1331,13 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
     Particularly with floating point code, it is sometimes useful to
     compile via C, and enable specific high performance C compiler optimizations.
 
-考虑到我们的 Core 现在是最优化，剩下来继续深入查看这个程序的方法只有直接查看汇编了。
-当然，到了这点只剩下很少的收获取得。
-为了查看生成的汇编，我们可以使用像 ghc-core 的工具，或者对 GHC 使用 -ddump-asm 标签在标准输出生成汇编。
-对生成的汇编我们有很少的“控制杆”可以使用，但是我们可以在 C 和 GHC 的原生代码后端之间做选择。
-以及，如果我们选 C 后端，它会使用优化选项传给 GCC。
-特别在有浮点代码的情况下，它有时会很有用通过 C 编译，开启特定的高性能的 C 编译器优化。
+考虑到现在我们的 Core 已是最优化了，继续深入下去就只剩下汇编代码了。
+当然，到了这点只剩下很少的收获可以取得。
+为了查看生成的汇编，我们可以使用比如像 ``ghc-core`` 这样的工具，
+或者对 GHC 使用 ``-ddump-asm`` 选项把汇编代码生成到标准输出上。
+我们几乎没有“控制杆”调整生成的汇编，但是我们可以在后端是 C 语言还是原生代码之间做选择。
+以及，如果我们选 C 语言后端，我们还可以选择把哪些优化选项传给 GCC。
+特别是在有浮点数代码的情况下，通过 C 语言编译，并开启特定的高性能的 C 编译器优化，会很有用。
 
 ..
     For example, we can squeeze out the last drops of performance from our
@@ -1331,10 +1345,8 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
     which cuts the running time in half again (as the C compiler is able to
     optimize away some redundant move instructions in the program's inner loop):
 
-榨干最后一点性能
-
-例如，我们可以榨出性能的最后点滴从最终融化进循环代码 通过 -funbox-strict-fields -fvia-C -optc-O2，
-它可以再次减少一半运行时间（因为 C 编译器能够优化掉一些在程序中的内部循环的冗余的移动指令）
+例如，从最终融化进循环代码中，通过 ``-funbox-strict-fields -fvia-C -optc-O2`` 这些选项，我们还可以榨出最后几滴性能。
+它可以再次减少一半运行时间（因为 C 编译器能够优化掉一些内循环中冗余的移动指令）：
 
 ::
 
@@ -1349,7 +1361,7 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
     Inspecting the final x86_64 assembly (via -keep-tmp-files),
     we see the generated loop contains only six instructions:
 
-检查最终 x86_64 汇编（通过 -keep-tmp-files）,我们看到生成的循环只包含 6 个指令：
+检查最终 x86_64 汇编（通过 ``-keep-tmp-files``），我们看到生成的循环只包含 6 个指令：
 
 ::
 
@@ -1371,19 +1383,19 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
     day-to-day code, choosing better algorithms is always a more effective
     strategy, but it's useful to know we can optimize down to the metal if necessary.
 
-蹂躏。。
-我们已经有效地按摩程序通过多种源码级别的优化，所有方式导致最终的汇编。
-从这里没有其他路走。
-很少有必要优化代码到这个级别，当然，典型地只在写低级别的库时有意义，或者优化特别重要的代码，
-所有算法选择已经被决定。
-对日常的代码，选择更好的算法总是更高效的策略，但是知道如果有必要我们可以优化到本质是很有用的。
+通过多种源码层的优化我们已经有力地蹂躏了程序，所有这些也促成了最终的汇编代码。
+至此就没有其他路可以走了。
+很少有必要优化代码到这个级别。
+当然，典型情况下只有在写底层的库时才有意义，或者是在优化特别重要的代码时，已经决定好最终选择的算法。
+对日常的代码，选择更好的算法总是更有效的策略。
+但是清楚如果有必要我们可以优化到底线的程度也是很有用的。
 
 ..
     Conclusions
     -----------
 
 结论
-----
+-----
 
 ..
     In this chapter we've looked at a suite of tools and techniques
@@ -1394,10 +1406,10 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
     at all levels from source, through the compiler, to the metal,
     and be able to focus in on particular levels when requirements demand.
 
-在这一章，我们看一系列的工具和技术我们可以使用去跟踪和定位你的代码的有问题的区域。
-伴随着各种惯例     保持你的代码简洁高效。
-你有充分的知识知道你的代码在做什么，在源码的各种层面，通过编译器，到本质，
-然后能够注意到特定级别 当需要要求。
+在这一章，我们看到我们可以使用的一套工具和技术去跟踪和定位到你的代码的有问题区域，
+连带着一些可以致使保持你的代码简洁高效的各种惯例。
+真正的目标是，你有充足的知识知道你的代码在做什么，从各种源码层上，通过编译器，直到底层，
+然后在需要要求时，能够集中注意到特定层面上。
 
 ..
     By sticking to simple rules, choosing the right data structures,
@@ -1406,5 +1418,6 @@ Core 形式的代码就是你的函数式代码的最终版本，在翻译成低
     able to develop at a very high level. The result is a sweet balance
     of productivity and ruthless efficiency.
 
-坚持简单的规则，选择正确的数据结构，避免不谨慎的陷阱，通过在很高的层面的开发，用你的 Haskell 代码可靠地实现高性能是完全有可能的。
-最终结果是一个在生产率和无情的运行效率之间美妙的平衡。
+坚持简单的规则，选择正确的数据结构，避免不谨慎的陷阱。
+当在很高层面的做开发时，用 Haskell 代码可靠地实现高性能也是完全有可能的。
+最终的结果将会是一个在生产率和无情的性能之间美妙的平衡。
