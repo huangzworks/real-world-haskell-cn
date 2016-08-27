@@ -1,7 +1,7 @@
+-- file: ch25/E.hs
 import System.Environment
 import Text.Printf
 import Control.Parallel.Strategies
-
 
 main = do
   [d] <- map read `fmap` getArgs
@@ -20,8 +20,3 @@ mean xs = s / fromIntegral n
   where
     (n, s) = fold'rnf k (0, 0) xs
     k (n, s) x = (n+1, s+x) :: (Int, Double)
-
-
-
-
-

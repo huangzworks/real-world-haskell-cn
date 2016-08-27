@@ -1,16 +1,13 @@
--- file: ch25/H.hs
+-- file: ch25/B.hs
 import System.Environment
 import Text.Printf
-import Data.List (foldl')
 
 main = do
   [d] <- map read `fmap` getArgs
   printf "%f\n" (mean [1..d])
 
-data Pair = Pair !Int !Double
-
 mean :: [Double] -> Double
 mean xs = s / fromIntegral n
   where
-    Pair n s = foldl' k (Pair 0 0) xs
-    k (Pair n s) x = Pair (n+1) (s+x)
+    (n, s)     = foldl k (0, 0) xs
+    k (n, s) x = (n+1, s+x)
