@@ -174,12 +174,35 @@ monad栈      monad transformer stack / monad stack
 第二十五章
 ----------
 
-性能调试  profiling
+性能剖析 profiling
 
-资源消耗集中点   cost centre
+消耗集中点 cost centre
 
-热点    hot spot
+热点 hot spot
 
+内存分配 allocations
+
+编译指示 pragma 
+
+顶层函数 top level function 
+
+标志 flag
+
+节点 node 
+
+核心语言 Core
+
+未封装数据类型 unboxed data types
+
+基本数据类型 primitive data types
+
+bang patterns
+
+normal form
+
+weak head normal form
+
+fusion
 
 第二十八章
 ------------------
