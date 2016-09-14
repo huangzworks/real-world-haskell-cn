@@ -114,7 +114,7 @@
 <div class="section" id="id6">
 <h2>线程间的简单通信<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h2>
 <p>在两个线程之间共享信息最简单的方法是，让它们使用同一个变量。上面文件压缩的例子中， <code class="docutils literal"><span class="pre">main</span></code> 线程与子线程共享了文件名和文件内容。 <code class="docutils literal"><span class="pre">Haskell</span></code> 的数据默认是不可变的，所以这样共享不会有问题，两个线程都无法修改另一个线程中的文件名和文件内容。</p>
-<p>线程经常需要和其他线程进行活跃的通信。例如， <code class="docutils literal"><span class="pre">GHC</span></code>  没有提供查看其他线程是否还在执行、执行完毕、或者崩溃的方法 <a class="footnote-reference" href="#id23" id="id7">[54]</a> 。可是，其提供了同步变量类型， <code class="docutils literal"><span class="pre">MVar</span></code> ，我们可以通过它自己实现上述功能。</p>
+<p>线程经常需要和其他线程进行活跃的通信。例如， <code class="docutils literal"><span class="pre">GHC</span></code>  没有提供查看其他线程是否还在执行、执行完毕、或者崩溃的方法 <a class="footnote-reference" href="#id22" id="id7">[54]</a> 。可是，其提供了同步变量类型， <code class="docutils literal"><span class="pre">MVar</span></code> ，我们可以通过它自己实现上述功能。</p>
 <p><code class="docutils literal"><span class="pre">MVar</span></code> 的行为类似一个单元素的箱子：其可以为满或空。将一些东西扔进箱子，使其填满，或者从中拿出一些东西，使其变空。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">putMVar</span>
 <span class="nf">putMVar</span> <span class="ow">::</span> <span class="kt">MVar</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
@@ -472,7 +472,7 @@
 <div class="section" id="id19">
 <h3>运行时选项<a class="headerlink" href="#id19" title="Permalink to this headline">¶</a></h3>
 <p>运行程序时可以向 GHC 的运行时系统传递命令行参数。在将控制权交给我们的代码前，运行时扫描程序的参数，看是否有命令行选项 <code class="docutils literal"><span class="pre">+RTS</span></code> 。其后跟随的所有选项都被运行时解释，直到特殊的选项 <code class="docutils literal"><span class="pre">-RTS</span></code> ，这些选项都是提供给运行时系统的，不为我们的程序。运行时会对我们的代码隐藏所有这些选项。当我们使用 <code class="docutils literal"><span class="pre">System.Environment</span></code> 模块的 <code class="docutils literal"><span class="pre">getArgsfunction</span></code> 来获得我们的命令行参数是，我们不会在其中获得运行时选项。</p>
-<p><code class="docutils literal"><span class="pre">threaded</span></code> 运行时接受参数 <code class="docutils literal"><span class="pre">-N</span></code> <a class="footnote-reference" href="#id24" id="id20">[55]</a> 。 其接受一个参数，指定了 <code class="docutils literal"><span class="pre">GHC</span></code> 的运行时系统将使用的核数。这个选项对输入很挑剔： <code class="docutils literal"><span class="pre">-N</span></code> 和参数之间必须没有空格。 <code class="docutils literal"><span class="pre">-N4</span></code> 可被接受， <code class="docutils literal"><span class="pre">-N</span> <span class="pre">4</span></code> 则不被接受。</p>
+<p><code class="docutils literal"><span class="pre">threaded</span></code> 运行时接受参数 <code class="docutils literal"><span class="pre">-N</span></code> <a class="footnote-reference" href="#id23" id="id20">[55]</a> 。 其接受一个参数，指定了 <code class="docutils literal"><span class="pre">GHC</span></code> 的运行时系统将使用的核数。这个选项对输入很挑剔： <code class="docutils literal"><span class="pre">-N</span></code> 和参数之间必须没有空格。 <code class="docutils literal"><span class="pre">-N4</span></code> 可被接受， <code class="docutils literal"><span class="pre">-N</span> <span class="pre">4</span></code> 则不被接受。</p>
 </div>
 <div class="section" id="haskell">
 <h3>找出 Haskell 可以使用多少核<a class="headerlink" href="#haskell" title="Permalink to this headline">¶</a></h3>
@@ -503,27 +503,32 @@
 <p>我们的目的并不是阻止你使用 <code class="docutils literal"><span class="pre">threaded</span></code> 运行时。相对于 <code class="docutils literal"><span class="pre">non-threaded</span></code> 运行时它并没有特别大的开销：相对于其他编程语言，线程依旧惊人的轻量。我们仅是希望说明 <code class="docutils literal"><span class="pre">threaded</span></code> 运行时并不是在所有场景都是最佳选择。</p>
 </div>
 </div>
-<div class="section" id="id22">
-<h2>Haskell 并行编程<a class="headerlink" href="#id22" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="parallel-programming-in-haskell">
+<h2>Parallel programming in Haskell<a class="headerlink" href="#parallel-programming-in-haskell" title="Permalink to this headline">¶</a></h2>
 <p>现在让我们来关注一下并行编程。对很多计算密集型问题，可以通过分解问题，并在多个核上求值来更快的计算出结果。多核计算机已经普及，甚至在最新的笔记本上都有，但是很少有程序可以利用这一优势。</p>
 <p>大部分原因是因为传统观念认为并行编程非常困难。在一门典型的编程语言中，我们将用处理并发程序相同的库和设施处理并发程序。这是我们的注意力集中在处理一些熟悉的问题比如死锁、竞争条件、饥饿和陡峭的复杂性。</p>
 <p>但是我们可以确定，使用 <code class="docutils literal"><span class="pre">Haskell</span></code> 的并发特性开发并行代码时，有许多更简单的方法。在一个普通的 Haskell 函数上稍加变化，就可以并行求值。</p>
-</div>
 <div class="section" id="normal-form-and-head-normal-form">
-<h2>Normal form and head normal form<a class="headerlink" href="#normal-form-and-head-normal-form" title="Permalink to this headline">¶</a></h2>
-<table class="docutils footnote" frame="void" id="id23" rules="none">
+<h3>Normal form and head normal form<a class="headerlink" href="#normal-form-and-head-normal-form" title="Permalink to this headline">¶</a></h3>
+<p>TBD</p>
+</div>
+</div>
+<div class="section" id="parallel-strategies-and-mapreduce">
+<h2>Parallel strategies and MapReduce<a class="headerlink" href="#parallel-strategies-and-mapreduce" title="Permalink to this headline">¶</a></h2>
+<p>TBD</p>
+<table class="docutils footnote" frame="void" id="id22" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id7">[54]</a></td><td>在稍后将展示，GHC 的线程异常轻量。如果运行时提供检查每个线程状态的方法，每个线程的开销将增加，哪怕永远不会用到这些信息。</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id24" rules="none">
+<table class="docutils footnote" frame="void" id="id23" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id20">[55]</a></td><td><code class="docutils literal"><span class="pre">non-threaded</span></code> 运行时不接受这个选项，会用一条错误信息拒绝它。</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id25" rules="none">
+<table class="docutils footnote" frame="void" id="id24" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label">[56]</td><td>此书撰写时，垃圾收集器已经开始重新编写以利用多核，但是我们不确定它在未来的效果。</td></tr>
