@@ -84,9 +84,13 @@
 
 主递归  primitive recursive
 
-部分应用    paritial application
+部分应用    partial application
 
-部分函数应用    paritial function application
+部分函数	partial function
+
+全函数	total function
+
+部分函数应用    partial function application
 
 柯里化  currying
 
