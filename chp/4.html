@@ -364,7 +364,13 @@ True
 </div>
 </div>
 <div class="section" id="id9">
-<h3>更多简单列表操作<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h3>
+<h3>部分函数和全函数<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h3>
+<p>如果一个函数只为合法输入的一个子集定义了返回值（函数返回的调用过程中产生的错误不属于返回值），这样的函数称作 <em>部分函数</em>（partial function）。类似的，对于整个输入域都能返回一个合法结果的函数，我们称之为 <em>全函数</em>（total function）。[译注：全函数是部分函数的特殊形式]</p>
+<p>你应当了解你正在调用的函数是否为部分函数。对于部分函数而言，传入一个其无法处理的参数将导致错误，这也是Haskell程序能够简单明了避免错误的最主要的原因。[译注：为部分函数提供一个全函数的版本可能会导致问题处理层次的上浮，例如head函数在参数为空列表时抛出错误，如果我们定义safeHead函数对于空列表同样返回空列表，那么对于head函数所处的上一级函数，必须判断head函数返回的结果究竟是一个列表还是列表中的元素。]</p>
+<p>有些使用Haskell的程序员会为部分函数加上unsafe的前缀，防止某些时候避免搬起石头砸自己的脚。标准的 <code class="docutils literal"><span class="pre">prelude</span></code> 定义了许多“不安全”的部分函数（例如head），却没有提供等价的“安全”的全函数，这可以说是标准 <code class="docutils literal"><span class="pre">prelude</span></code> 的不足。[译注：此处存在争议，有人认为“不安全”的前缀指的是该函数可能会突破类型系统的限制，比如 unsafePerformIO，unsafeCoerce 等，它们可能会导致程序完全不可预知的行为，这与在空列表上调用head有很大的区别]</p>
+</div>
+<div class="section" id="id10">
+<h3>更多简单列表操作<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
 <p>Haskell用(++)表示“追加”函数。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="o">++</span><span class="p">)</span>
 <span class="p">(</span><span class="o">++</span><span class="p">)</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
@@ -430,8 +436,8 @@ True
 </pre></div>
 </div>
 </div>
-<div class="section" id="id10">
-<h3>产生子列表<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id11">
+<h3>产生子列表<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
 <p>take函数，在“函数应用”一节遇到过，返回一个由头k个元素组成的子列表。与它相反，drop，丢掉列表开头的k个元素。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">take</span>
 <span class="nf">take</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
@@ -478,8 +484,8 @@ True
 </pre></div>
 </div>
 </div>
-<div class="section" id="id11">
-<h3>搜索列表<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id12">
+<h3>搜索列表<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
 <p>正如我们已经看到的，elem函数标示一个值是否出现在一个列表中。它有一个伴生的函数，notElem。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">elem</span>
 <span class="nf">elem</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
@@ -522,8 +528,8 @@ True
 </pre></div>
 </div>
 </div>
-<div class="section" id="id12">
-<h3>一次性处理多个列表<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id13">
+<h3>一次性处理多个列表<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h3>
 <p>zip函数把两个列表压缩成一个单一的由二元组组成的列表。结果列表和被处理的两个列表中较短的那个等长。（译注：言下之意是较长的那个列表中的多出来的元素会被丢弃）</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">zip</span>
 <span class="nf">zip</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">b</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)]</span>
@@ -540,8 +546,8 @@ True
 </div>
 <p>Haskell的类型系统使编写带有可变数量的参数的函数成为一个有趣的挑战。（译注：不知道此句和后面的内容有什么联系）。所以如果想把三个列表压缩在一起，要调用zip3或者zipWith3，可以类推到zip7和zipWith7。</p>
 </div>
-<div class="section" id="id13">
-<h3>特殊的字符串处理函数<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id14">
+<h3>特殊的字符串处理函数<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h3>
 <p>我们已经在“热身：方便地分离多行文本”一节中遇到过lines函数，它有个对应的函数，unlines。注意unlines总是在它处理的结果（译注：列表中的每个元素）的尾部放一个换行符。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">lines</span> <span class="s">&quot;foo</span><span class="se">\n</span><span class="s">bar&quot;</span>
 <span class="p">[</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;bar&quot;</span><span class="p">]</span>
@@ -557,8 +563,8 @@ True
 </pre></div>
 </div>
 </div>
-<div class="section" id="id14">
-<h3>练习题<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id15">
+<h3>练习题<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h3>
 <ol class="arabic simple">
 <li>自己写一些安全的列表函数，确保它们不会出错。下面给一些类型定义的提示。</li>
 </ol>
@@ -582,11 +588,11 @@ True
 </ol>
 </div>
 </div>
-<div class="section" id="id15">
-<h2>循环的表示<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h2>
-<p>和传统编程语言不同， Haskell 既没有 <code class="docutils literal"><span class="pre">for</span></code> 循环，也没有 <code class="docutils literal"><span class="pre">while</span></code> 循环。那么，如果有一大堆数据要处理，该用什么代替这些循环呢？这一节就会给出这个问题的几种可能的解决办法。</p>
 <div class="section" id="id16">
-<h3>显式递归<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h3>
+<h2>循环的表示<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h2>
+<p>和传统编程语言不同， Haskell 既没有 <code class="docutils literal"><span class="pre">for</span></code> 循环，也没有 <code class="docutils literal"><span class="pre">while</span></code> 循环。那么，如果有一大堆数据要处理，该用什么代替这些循环呢？这一节就会给出这个问题的几种可能的解决办法。</p>
+<div class="section" id="id17">
+<h3>显式递归<a class="headerlink" href="#id17" title="Permalink to this headline">¶</a></h3>
 <p>通过例子进行比对，可以很直观地认识有 loop 语言和没 loop 语言之间的区别。以下是一个 C 函数，它将字符串表示的数字转换成整数：</p>
 <div class="highlight-c"><div class="highlight"><pre><span class="kt">int</span> <span class="nf">as_int</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">str</span><span class="p">)</span>
 <span class="p">{</span>
@@ -666,8 +672,8 @@ True
 <p>非递归情形（列表为空）被称为“基本情形”（有时也叫终止情形）。当对函数进行递归调用时，计算最终会回到基本情形上。在数学上，这也称为“归纳情形”。</p>
 <p>作为一项有用的技术，结构递归并不仅仅局限于列表，它也适用于其他代数数据类型，稍后就会介绍更多这方面的例子。</p>
 </div>
-<div class="section" id="id17">
-<h3>对列表元素进行转换<a class="headerlink" href="#id17" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id18">
+<h3>对列表元素进行转换<a class="headerlink" href="#id18" title="Permalink to this headline">¶</a></h3>
 <p>考虑以下 C 函数， <code class="docutils literal"><span class="pre">square</span></code> ，它对数组中的所有元素执行平方计算：</p>
 <div class="highlight-c"><div class="highlight"><pre><span class="kt">void</span> <span class="nf">square</span><span class="p">(</span><span class="kt">double</span> <span class="o">*</span><span class="n">out</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">in</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">length</span><span class="p">)</span>
 <span class="p">{</span>
@@ -753,8 +759,8 @@ Prelude Data.Char&gt; toUpper &#39;*&#39;
 </div>
 <p>以上两个函数遵循了同一种处理列表的公共模式：基本情形处理（base case）空列表输入。而<em>递归情形</em>（recursive case）则处理列表非空时的情况，它对列表的头元素进行某种操作，然后递归地处理列表余下的其他元素。</p>
 </div>
-<div class="section" id="id18">
-<h3>列表映射<a class="headerlink" href="#id18" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id19">
+<h3>列表映射<a class="headerlink" href="#id19" title="Permalink to this headline">¶</a></h3>
 <p>前面定义的 <code class="docutils literal"><span class="pre">square</span></code> 和 <code class="docutils literal"><span class="pre">upperCase</span></code> 函数，都生成一个和输入列表同等长度的新列表，并且每次只对列表的一个元素进行处理。因为这种用法非常常见，所以 Haskell 的 <code class="docutils literal"><span class="pre">Prelude</span></code> 库定义了 <code class="docutils literal"><span class="pre">map</span></code> 函数来更方便地执行这种操作。 <code class="docutils literal"><span class="pre">map</span></code> 函数接受一个函数和一个列表作为参数，将输入函数应用到输入列表的每个元素上，并构建出一个新的列表。</p>
 <p>以下是使用 <code class="docutils literal"><span class="pre">map</span></code> 重写的 <code class="docutils literal"><span class="pre">square</span></code> 和 <code class="docutils literal"><span class="pre">upperCase</span></code> 函数：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/rewrite_by_map.hs</span>
@@ -798,8 +804,8 @@ Ok, modules loaded: Main.
 </div>
 <p>通过观察代码，并从中提炼出重复的抽象，是复用代码的一种良好方法。尽管对代码进行抽象并不是 Haskell 的“专利”，但高阶函数使得这种抽象变得非常容易。</p>
 </div>
-<div class="section" id="id19">
-<h3>筛选列表元素<a class="headerlink" href="#id19" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id20">
+<h3>筛选列表元素<a class="headerlink" href="#id20" title="Permalink to this headline">¶</a></h3>
 <p>另一种对列表的常见操作是，对列表元素进行筛选，只保留那些符合条件的元素。</p>
 <p>以下函数接受一个列表作为参数，并返回这个列表里的所有奇数元素。代码的递归情形比之前的 <code class="docutils literal"><span class="pre">map</span></code> 函数要复杂一些，它使用守卫对元素进行条件判断，只有符合条件的元素，才会被加入进结果列表里：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/oddList.hs</span>
@@ -841,8 +847,8 @@ Ok, modules loaded: Main.
 <p>[译注：谓词函数是指那种返回 <code class="docutils literal"><span class="pre">Bool</span></code> 类型值的函数。]</p>
 <p>稍后的章节会介绍如何定义 <code class="docutils literal"><span class="pre">filter</span></code> 。</p>
 </div>
-<div class="section" id="id20">
-<h3>处理集合并得出结果<a class="headerlink" href="#id20" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id21">
+<h3>处理集合并得出结果<a class="headerlink" href="#id21" title="Permalink to this headline">¶</a></h3>
 <p>将一个集合（collection）缩减（reduce）为一个值也是集合的常见操作之一。</p>
 <p>对列表的所有元素求和，就是其中的一个例子：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/mySum.hs</span>
@@ -893,8 +899,8 @@ Ok, modules loaded: Main.
 <p>和前面抽取出 <code class="docutils literal"><span class="pre">map</span></code> 和 <code class="docutils literal"><span class="pre">filter</span></code> 函数类似，从 <code class="docutils literal"><span class="pre">Adler32</span></code> 函数里面，我们也可以抽取出一种通用的抽象，称之为折叠（fold）：它对一个列表中的所有元素做某种处理，并且一边处理元素，一边更新累积器，最后在处理完整个列表之后，返回累积器的值。</p>
 <p>有两种不同类型的折叠，其中 <code class="docutils literal"><span class="pre">foldl</span></code> 从左边开始进行折叠，而 <code class="docutils literal"><span class="pre">foldr</span></code> 从右边开始进行折叠。</p>
 </div>
-<div class="section" id="id21">
-<h3>左折叠<a class="headerlink" href="#id21" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id22">
+<h3>左折叠<a class="headerlink" href="#id22" title="Permalink to this headline">¶</a></h3>
 <p>以下是 <code class="docutils literal"><span class="pre">foldl</span></code> 函数的定义：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/foldl.hs</span>
 
@@ -936,8 +942,8 @@ Ok, modules loaded: Main.
 <p>这意味着，即使是一个 Haskell 新手，他/她理解起 <code class="docutils literal"><span class="pre">fold</span></code> 通常都要比理解显式递归要容易。一个 <code class="docutils literal"><span class="pre">fold</span></code> 并不产生任何意外动作，但一个显式递归函数的所做作为，通常并不是那么显而易见的。</p>
 <p>以上观点同样适用于其他高阶函数库，包括前面介绍过的 <code class="docutils literal"><span class="pre">map</span></code> 和 <code class="docutils literal"><span class="pre">filter</span></code> 。因为这些函数都带有定义良好的行为，我们只需要学习怎样使用这些函数一次，以后每次碰到使用这些函数的代码，这些知识都可以加快我们对代码的理解。这种优势同样体现在代码的编写上：一旦我们能熟练使用高阶函数，那么写出更简洁的代码自然就不在话下。</p>
 </div>
-<div class="section" id="id22">
-<h3>从右边开始折叠<a class="headerlink" href="#id22" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id23">
+<h3>从右边开始折叠<a class="headerlink" href="#id23" title="Permalink to this headline">¶</a></h3>
 <p>和 <code class="docutils literal"><span class="pre">foldl</span></code> 相对应的是 <code class="docutils literal"><span class="pre">foldr</span></code> ，它从一个列表的右边开始进行折叠。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/foldr.hs</span>
 
@@ -1049,8 +1055,8 @@ Ok, modules loaded: Main.
 <p><code class="docutils literal"><span class="pre">append</span></code> 函数依然对每个列表元素使用列表构造器，但是，当第一个输入列表为空时，它将第二个输入列表（而不是空列表元素）拼接到第一个输入列表的表尾。</p>
 <p>通过前面这些例子对 <code class="docutils literal"><span class="pre">foldr</span></code> 的介绍，我们应该可以了解到， <code class="docutils literal"><span class="pre">foldr</span></code> 函数和《列表处理》一节所介绍的基本列表操作函数一样重要。由于 <code class="docutils literal"><span class="pre">foldr</span></code> 可以增量地处理和产生列表，所以它对于惰性数据处理也非常有用。</p>
 </div>
-<div class="section" id="id23">
-<h3>左折叠、惰性和内存泄漏<a class="headerlink" href="#id23" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id24">
+<h3>左折叠、惰性和内存泄漏<a class="headerlink" href="#id24" title="Permalink to this headline">¶</a></h3>
 <p>为了简化讨论，本节的例子通常都使用 <code class="docutils literal"><span class="pre">foldl</span></code> 来进行，这对于普通的测试是没有问题的，但是，千万不要把 <code class="docutils literal"><span class="pre">foldl</span></code> 用在实际使用中。</p>
 <p>这样做是因为， Haskell 使用的是非严格求值。如果我们仔细观察 <code class="docutils literal"><span class="pre">foldl</span> <span class="pre">(+)</span> <span class="pre">[1,</span> <span class="pre">2,</span> <span class="pre">3]</span></code> 的执行过程，就可以会从中看出一些问题：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">foldl</span> <span class="p">(</span><span class="o">+</span><span class="p">)</span> <span class="mi">0</span> <span class="p">(</span><span class="mi">1</span><span class="kt">:</span><span class="mi">2</span><span class="kt">:</span><span class="mi">3</span><span class="kt">:[]</span><span class="p">)</span>
@@ -1117,8 +1123,8 @@ Prelude&gt; foldl (+) 0 [1..100000000]
 </pre></div>
 </div>
 <p>]</p>
-<div class="section" id="id24">
-<h4>练习<a class="headerlink" href="#id24" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="id25">
+<h4>练习<a class="headerlink" href="#id25" title="Permalink to this headline">¶</a></h4>
 <p>1.运用 <code class="docutils literal"><span class="pre">fold</span></code> （运用合适的fold将会是你的代码更简单）重写并扩展位于＂显式递归＂章节的 <code class="docutils literal"><span class="pre">asInt</span></code> 函数．</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/ch04.exercises.hs</span>
 <span class="nf">asInt_fold</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Int</span>
@@ -1188,8 +1194,8 @@ Prelude&gt; foldl (+) 0 [1..100000000]
 <p>这些函数你能用 <code class="docutils literal"><span class="pre">foldl</span></code> 或者 <code class="docutils literal"><span class="pre">foldr</span></code> 重写，请问那种情况更合适？</p>
 </div>
 </div>
-<div class="section" id="id25">
-<h3>延伸阅读<a class="headerlink" href="#id25" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id26">
+<h3>延伸阅读<a class="headerlink" href="#id26" title="Permalink to this headline">¶</a></h3>
 <p><a class="reference external" href="http://www.cs.nott.ac.uk/~gmh/fold.pdf">A tutorial on the universality and expressiveness of fold</a> 是一篇关于 fold 的优秀且深入的文章。它使用了很多例子来展示如何通过简单的系统化计算技术，将一些显式递归的函数转换成 fold 。</p>
 </div>
 </div>
@@ -1249,8 +1255,8 @@ Prelude&gt; foldl (+) 0 [1..100000000]
 <p>当然，这并不是说 lambda 函数完全没用，只是在使用它们的时候，必须小心谨慎。</p>
 <p>很多时候，部分应用函数可以很好地代替 lambda 函数，避免不必要的函数定义，粘合起不同的函数，并产生更清晰和更可读的代码。下一节就会介绍部分应用函数。</p>
 </div>
-<div class="section" id="id26">
-<h2>部分函数应用和柯里化<a class="headerlink" href="#id26" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id27">
+<h2>部分函数应用和柯里化<a class="headerlink" href="#id27" title="Permalink to this headline">¶</a></h2>
 <p>类型签名里的 <code class="docutils literal"><span class="pre">-&gt;</span></code> 可能会让人感到奇怪：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">dropWhile</span>
 <span class="nf">dropWhile</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
@@ -1342,7 +1348,7 @@ dropWhile isSpace :: [Char] -&gt; [Char]
 </pre></div>
 </div>
 <div class="section" id="sections">
-<span id="id27"></span><h3>节<a class="headerlink" href="#sections" title="Permalink to this headline">¶</a></h3>
+<span id="id28"></span><h3>节<a class="headerlink" href="#sections" title="Permalink to this headline">¶</a></h3>
 <p>Haskell 提供了一种方便的符号快捷方式，用于对中序函数进行部分应用：使用括号包围一个操作符，通过在括号里面提供左操作对象或者右操作对象，可以产生一个部分应用函数。这种类型的部分函数应用称之为节（section）。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="p">(</span><span class="mi">1</span><span class="o">+</span><span class="p">)</span> <span class="mi">2</span>
 <span class="mi">3</span>
@@ -1449,8 +1455,8 @@ dropWhile isSpace :: [Char] -&gt; [Char]
 <p>可以看到，使用 as-模式的定义同时完成了模式匹配和变量绑定两项工作。而不使用 as-模式的定义，则需要在对列表进行结构之后，在函数体里又重新对列表进行组合。</p>
 <p>除了增强可读性之外， as-模式还有其他作用：它可以对输入数据进行共享，而不是复制它。在 <code class="docutils literal"><span class="pre">noAsPattern</span></code> 函数的定义中，当 <code class="docutils literal"><span class="pre">(x:xs)</span></code> 匹配时，在函数体里需要复制一个 <code class="docutils literal"><span class="pre">(x:xs)</span></code> 的副本。这个动作会引起内存分配。虽然这个分配动作可能很廉价，但它并不是免费的。相反，当使用 <code class="docutils literal"><span class="pre">suffixes</span></code> 函数时，我们通过变量 <code class="docutils literal"><span class="pre">xs</span></code> 重用匹配了 as-模式的输入值，因此就避免了内存分配。</p>
 </div>
-<div class="section" id="id28">
-<h2>通过组合函数来进行代码复用<a class="headerlink" href="#id28" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id29">
+<h2>通过组合函数来进行代码复用<a class="headerlink" href="#id29" title="Permalink to this headline">¶</a></h2>
 <p>前面的 <code class="docutils literal"><span class="pre">suffixes</span></code> 函数实际上有一种更简单的实现方式。</p>
 <p>回忆前面在《使用列表》一节里介绍的 <code class="docutils literal"><span class="pre">init</span></code> 函数，它可以返回一个列表中除了最后一个元素之外的其他元素。而组合使用 <code class="docutils literal"><span class="pre">init</span></code> 和 <code class="docutils literal"><span class="pre">tails</span></code> ，可以给出一个 <code class="docutils literal"><span class="pre">suffixes</span></code> 函数的更简单实现：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/suffixes.hs</span>
@@ -1565,16 +1571,16 @@ Prelude Data.Char&gt; capCount &quot;Hello there, Mon!&quot;
 </div>
 <p>]</p>
 </div>
-<div class="section" id="id29">
-<h2>编写可读代码的提示<a class="headerlink" href="#id29" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id30">
+<h2>编写可读代码的提示<a class="headerlink" href="#id30" title="Permalink to this headline">¶</a></h2>
 <p>目前为止，我们知道 Haskell 有两个非常诱人的特性：尾递归和匿名函数。但是，这两个特性通常并不被使用。</p>
 <p>对列表的处理操作一般可以通过组合库函数比如 <code class="docutils literal"><span class="pre">map</span></code> 、 <code class="docutils literal"><span class="pre">take</span></code> 和 <code class="docutils literal"><span class="pre">filter</span></code> 来进行。当然，熟悉这些库函数需要一定的时间，不过掌握这些函数之后，就可以使用它们写出更快更好更少 bug 的代码。</p>
 <p>库函数比尾递归更好的原因很简单：尾递归和命令式语言里的 loop 有同样的问题 —— 它们太通用（general）了。在一个尾递归里，你可以同时执行过滤（filtering）、映射（mapping）和其他别的动作。这强迫代码的阅读者（可能是你自己）必须弄懂整个递归函数的定义，才能理解这个函数到底做了些什么。与此相反，<code class="docutils literal"><span class="pre">map</span></code> 和其他很多列表函数，都只专注于做<em>一件</em>事。通过这些函数，我们可以很快理解某段代码到底做了什么，以及整个程序想表达什么意思，而不是将时间浪费在关注细节方面。</p>
 <p>折叠（fold）操作处于（完全通用化的）尾递归和（只做一件事的）列表处理函数之间的中间地带。折叠也很值得我们花时间去好好理解，它的作用跟组合起 <code class="docutils literal"><span class="pre">map</span></code> 和 <code class="docutils literal"><span class="pre">filter</span></code> 函数差不多，但比起显式递归来说，折叠的行为要来得更有规律，而且更可控。一般来说，可以通过组合函数来解决的问题，就不要使用折叠。另一方面，如果问题用组合函数没办法解决，那么使用折叠要比使用显式递归要好。</p>
 <p>另一方面，匿名函数通常会对代码的可读性造成影响。一般来说，匿名函数都可以用 <code class="docutils literal"><span class="pre">let</span></code> 或者 <code class="docutils literal"><span class="pre">where</span></code> 定义的局部函数来代替。而且带名字的局部函数可以达到一箭双雕的效果：它使得代码更具可读性，且函数名本身也达到了文档化的作用。</p>
 </div>
-<div class="section" id="id30">
-<h2>内存泄漏和严格求值<a class="headerlink" href="#id30" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id31">
+<h2>内存泄漏和严格求值<a class="headerlink" href="#id31" title="Permalink to this headline">¶</a></h2>
 <p>前面介绍的 <code class="docutils literal"><span class="pre">foldl</span></code> 函数并不是 Haskell 代码里唯一会造成内存泄漏的地方。</p>
 <p>在这一节，我们使用 <code class="docutils literal"><span class="pre">foldl</span></code> 来展示非严格求值在什么情况下会造成问题，以及如何去解决这些问题。</p>
 <div class="section" id="seq">
@@ -1616,8 +1622,8 @@ Prelude Data.Char&gt; capCount &quot;Hello there, Mon!&quot;
 <p>最终得到结果 <code class="docutils literal"><span class="pre">3</span></code> 。</p>
 <p>因为 <code class="docutils literal"><span class="pre">seq</span></code> 的存在，这个创建过程没有用到任何块。</p>
 </div>
-<div class="section" id="id31">
-<h3>seq 的用法<a class="headerlink" href="#id31" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id32">
+<h3>seq 的用法<a class="headerlink" href="#id32" title="Permalink to this headline">¶</a></h3>
 <p>本节介绍一些更有效地使用 <code class="docutils literal"><span class="pre">seq</span></code> 的指导规则。</p>
 <p>要正确地产生 <code class="docutils literal"><span class="pre">seq</span></code> 的作用，表达式中被求值的第一个必须是 <code class="docutils literal"><span class="pre">seq</span></code> ：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- 错误：因为表达式中第一个被求值的是 someFunc 而不是 seq</span>
