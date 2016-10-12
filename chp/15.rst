@@ -1,0 +1,140 @@
+第 15 章：使用 Monad 编程
+=========================
+
+.. _golfing-practice-association-lists:
+
+高尔夫训练：关联列表
+--------------------
+
+Web客户端和服务器通常通过简单的文本键值对列表来传输消息，例如：
+
+::
+	name=Attila+%42The+Hun%42&occupation=Khan
+	
+这种编码方式被称作 ``application/x-www-form-urlencoded``，这种方式非常容易理解：每个键值对通过 ``&`` 划分。在一个键值对中，键由一系列 URL 编码字符构成，键后紧跟着 ``=`` 和值（如果存在的话）。
+
+很明显我们可以用一个 ``String`` 来表示键，但 HTTP 没有明确指出一个键是否必须有对应的值。我们可以将值用 ``Maybe String`` 表示以捕获歧义，当我们使用 ``Nothing`` 时，值不存在，当我们用 ``Just`` 包装一个 ``String`` 时，值存在。使用 ``Maybe`` 允许我们区分“值不存在”和“空值”。[译注：``application/x-www-form-urlencoded``实际是在 HTML 的 Forms 部分定义的，而非原著中的 HTML]
+
+Haskell程序员使用 :ref:`association-lists` 表示类型 ``[(a, b)]``，你可以把列表中的每个元素理解为一个键和值的关联。关联列表的名称起源于 Lisp 社区，通常缩写为列表，因此我们可以将上述字符串表示为以下的 Haskell 值。
+
+::
+	-- file: ch15/MovieReview.hs
+    [("name",       Just "Attila \"The Hun\""),
+     ("occupation", Just "Khan")]
+
+在 :ref:`parsing-an-url-encoded-query-string` 中，我们将解析一个 ``application/x-www-form-urlencoded`` 编码的字符串，并使用形如 ``[(String, Maybe String)]`` 的关联列表表示结果。假设我们想使用这些列表中的一个来填充一个数据结构。
+
+::
+	-- file: ch15/MovieReview.hs
+	data MovieReview = MovieReview {
+		  revTitle :: String
+	    , revUser :: String
+        , revReview :: String
+		}
+		
+我们首先用一个简单的函数说明：
+
+::
+	-- file: ch15/MovieReview.hs
+	simpleReview :: [(String, Maybe String)] -> Maybe MovieReview
+	simpleReview alist =
+	  case lookup "title" alist of
+		Just (Just title@(_:_)) ->
+		  case lookup "user" alist of
+			Just (Just user@(_:_)) ->
+			  case lookup "review" alist of
+				Just (Just review@(_:_)) ->
+					Just (MovieReview title user review)
+				_ -> Nothing -- no review
+			_ -> Nothing -- no user
+		_ -> Nothing -- no title
+
+
+函数 ``simpleReview`` 将返回一个 ``MovieReview`` 当且仅当作为参数的关联列表包含了所有必须的键值对，并且这些键值对中的值不为空。然而，它的优点仅仅是能够验证输入是否合法，实际上它采用了应当尽量避免的“锯齿型（staircasing）”代码结构，并且它了解了关联列表表示的具体细节。
+
+我们已经对 ``Maybe`` monad 非常熟悉了，上面的代码可以整理一下，让它避免“锯齿化”结构。
+
+::
+	-- file: ch15/MovieReview.hs
+	maybeReview alist = do
+		title <- lookup1 "title" alist
+		user <- lookup1 "user" alist
+		review <- lookup1 "review" alist
+		return (MovieReview title user review)
+
+	lookup1 key alist = case lookup key alist of
+						  Just (Just s@(_:_)) -> Just s
+						  _ -> Nothing
+
+
+代码看起来整洁了许多，但其中仍存在重复的工作。我们可以利用 ``MovieReview`` 构造器是普通纯函数的性质，将其提升为 monad，就像我们在:ref:`mixing-pure-and-monadic-code`讨论过的那样。
+
+::
+	-- file: ch15/MovieReview.hs
+	liftedReview alist =
+		liftM3 MovieReview (lookup1 "title" alist)
+						   (lookup1 "user" alist)
+						   (lookup1 "review" alist)
+
+在上面这段代码中依旧存在很多重复的工作，但它们已经显著减少了，并且我们很难去除剩下的部分。
+
+.. _generalised-lifting:
+
+广义的提升
+----------
+
+虽然使用 ``liftM3`` 让我们的代码更加整洁，但我们不能用一堆 ``liftM`` 去解决更广泛的问题，因为标准库只定义到了 ``liftM5``。事实上我们可以根据我们的需要写出任意数字的``liftM``，但那将是非常繁重的工作。
+
+假设我们有一个构造器或者纯函数，并且接受 10 个参数，这时候再坚持用标准库，你恐怕就觉得我们没有那么好运了。
+
+当然，我们的工具箱还没有被完全利用，在 ``Control.Monad`` 中，有一个函数 ``ap``，它的类型签名（type signature）非常有趣。
+
+::
+	ghci> :m +Control.Monad
+	ghci> :type ap
+	ap :: (Monad m) => m (a -> b) -> m a -> m b
+
+你可能会觉得奇怪，谁会把一个接受单一参数的纯函数放到 monad 中，这么做的原因又是什么？回想一下，其实所有的 Haskell 函数本质上都是接受单一参数，``MovieReview``的构造器也是这样。
+
+::
+	ghci> :type MovieReview
+	MovieReview :: String -> String -> String -> MovieReview
+	
+我们可以将类型签名写成 ``String -> (String -> String -> MovieReview)``。假如我们使用 ``liftM`` 将 ``MovieReview`` 提升为 ``Maybe`` monad，我们将得到一个类型为 ``Maybe (String -> (String -> (String -> MovieReview)))``的值。这个类型恰好是 ``ap`` 接受的参数的类型，并且 ``ap`` 的返回类型将是``Maybe (String -> (String -> MovieReview))``。我们可以将``ap``返回的值继续传入``ap``，直到我们结束这个定义。
+
+::
+	-- file: ch15/MovieReview.hs
+	apReview alist =
+		MovieReview `liftM` lookup1 "title" alist
+					   `ap` lookup1 "user" alist
+					   `ap` lookup1 "review" alist
+
+.. warning::
+
+	[译注：原著这里存在错误，上面的译文直接翻译了原著，在此做出修正。使用``liftM`` 将 ``MovieReview`` 提升为 ``Maybe`` monad后，得到的类型不是``Maybe (String -> (String -> (String -> MovieReview)))``，而是``Maybe String -> Maybe (String -> (String -> MovieReview))``。下面给出在不断应用``ap``时，类型系统的显示变化过程。]
+
+	::
+		-- note by translator
+		MovieReview :: String -> ( String -> String -> MovieRevie )
+		MovieReview `liftM` :: Maybe String -> Maybe ( String -> String -> MovieRevie )
+		MovieReview `liftM` lookup1 "title" alist :: Maybe ( String -> String -> MovieRevie )
+		MovieReview `liftM` lookup1 "title" alist `ap` :: Myabe String -> Maybe ( String -> MovieRevie )
+		MovieReview `liftM` lookup1 "title" alist `ap` lookup1 "user" alist :: Maybe ( String -> MovieRevie )
+
+
+我们可以通过不断应用 ``ap`` 来替代 ``liftM`` 的一系列函数。
+
+这样理解 ``ap`` 可能会对你有所帮助：``ap`` 的 monadic 等价于我们熟悉的 ``($)`` 运算符，你可以想象一下把 ``ap`` 读成 ``apply``。通过观察这二者的类型签名，我们可以清晰地看到这一点。
+
+::
+	ghci> :type ($)
+	($) :: (a -> b) -> a -> b
+	ghci> :type ap
+	ap :: (Monad m) => m (a -> b) -> m a -> m b
+
+事实上，``ap`` 通常被定义为 ``liftM2 id`` 或者 ``liftM2 ($)``。[译注：如果你使用``:t`` 来观察这两种书写形式得到的类型签名，你会发现它们在类型细节上有所差异，这是由 ``id`` 和 ``($)`` 本身类型签名的不同导致的，``id``的签名是``a -> a``，而 ``($)`` 是 ``(a -> b) -> (a -> b)``，当然这对于广义的类型是等同的。]
+
+.. _looking-for-alternatives:
+
+寻找替代方案
+------------

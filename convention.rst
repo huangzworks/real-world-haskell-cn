@@ -132,6 +132,22 @@
 
 单一同态    monomorphism
 
+第八章
+------------------
+
+字符类  character class
+
+多态    polymorphism
+
+第十五章
+---------
+
+提升	lift
+
+类型签名	type signature
+
+锯齿化		staircasing
+
 第十八章
 ----------
 
@@ -147,33 +163,12 @@ monad栈      monad transformer stack / monad stack
 
 抬举         lift
 
-第八章
-------------------
-
-字符类  character class
-
-多态    polymorphism
-
 第十九章
 -------------
 
 错误处理 error handling
 
 惰性求值 lazy evaluation
-
-第二十六张
-------------------
-
-布隆过滤器 Bloom Filter
-
-
-第八章
-------------------
-
-字符类  character class
-
-多态    polymorphism
-
 
 第二十五章
 ----------
@@ -207,6 +202,12 @@ normal form
 weak head normal form
 
 fusion
+
+
+第二十六章
+------------------
+
+布隆过滤器 Bloom Filter
 
 第二十八章
 ------------------
