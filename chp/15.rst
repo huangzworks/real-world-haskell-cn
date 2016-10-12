@@ -9,6 +9,7 @@
 Web客户端和服务器通常通过简单的文本键值对列表来传输消息，例如：
 
 ::
+
 	name=Attila+%42The+Hun%42&occupation=Khan
 	
 这种编码方式被称作 ``application/x-www-form-urlencoded``，这种方式非常容易理解：每个键值对通过 ``&`` 划分。在一个键值对中，键由一系列 URL 编码字符构成，键后紧跟着 ``=`` 和值（如果存在的话）。
@@ -18,6 +19,7 @@ Web客户端和服务器通常通过简单的文本键值对列表来传输消息，例如：
 Haskell程序员使用 :ref:`association-lists` 表示类型 ``[(a, b)]``，你可以把列表中的每个元素理解为一个键和值的关联。关联列表的名称起源于 Lisp 社区，通常缩写为列表，因此我们可以将上述字符串表示为以下的 Haskell 值。
 
 ::
+
 	-- file: ch15/MovieReview.hs
     [("name",       Just "Attila \"The Hun\""),
      ("occupation", Just "Khan")]
@@ -25,6 +27,7 @@ Haskell程序员使用 :ref:`association-lists` 表示类型 ``[(a, b)]``，你可以把列表中
 在 :ref:`parsing-an-url-encoded-query-string` 中，我们将解析一个 ``application/x-www-form-urlencoded`` 编码的字符串，并使用形如 ``[(String, Maybe String)]`` 的关联列表表示结果。假设我们想使用这些列表中的一个来填充一个数据结构。
 
 ::
+
 	-- file: ch15/MovieReview.hs
 	data MovieReview = MovieReview {
 		  revTitle :: String
@@ -35,6 +38,7 @@ Haskell程序员使用 :ref:`association-lists` 表示类型 ``[(a, b)]``，你可以把列表中
 我们首先用一个简单的函数说明：
 
 ::
+
 	-- file: ch15/MovieReview.hs
 	simpleReview :: [(String, Maybe String)] -> Maybe MovieReview
 	simpleReview alist =
@@ -55,6 +59,7 @@ Haskell程序员使用 :ref:`association-lists` 表示类型 ``[(a, b)]``，你可以把列表中
 我们已经对 ``Maybe`` monad 非常熟悉了，上面的代码可以整理一下，让它避免“锯齿化”结构。
 
 ::
+
 	-- file: ch15/MovieReview.hs
 	maybeReview alist = do
 		title <- lookup1 "title" alist
@@ -70,6 +75,7 @@ Haskell程序员使用 :ref:`association-lists` 表示类型 ``[(a, b)]``，你可以把列表中
 代码看起来整洁了许多，但其中仍存在重复的工作。我们可以利用 ``MovieReview`` 构造器是普通纯函数的性质，将其提升为 monad，就像我们在:ref:`mixing-pure-and-monadic-code`讨论过的那样。
 
 ::
+
 	-- file: ch15/MovieReview.hs
 	liftedReview alist =
 		liftM3 MovieReview (lookup1 "title" alist)
@@ -90,6 +96,7 @@ Haskell程序员使用 :ref:`association-lists` 表示类型 ``[(a, b)]``，你可以把列表中
 当然，我们的工具箱还没有被完全利用，在 ``Control.Monad`` 中，有一个函数 ``ap``，它的类型签名（type signature）非常有趣。
 
 ::
+
 	ghci> :m +Control.Monad
 	ghci> :type ap
 	ap :: (Monad m) => m (a -> b) -> m a -> m b
@@ -97,12 +104,14 @@ Haskell程序员使用 :ref:`association-lists` 表示类型 ``[(a, b)]``，你可以把列表中
 你可能会觉得奇怪，谁会把一个接受单一参数的纯函数放到 monad 中，这么做的原因又是什么？回想一下，其实所有的 Haskell 函数本质上都是接受单一参数，``MovieReview``的构造器也是这样。
 
 ::
+
 	ghci> :type MovieReview
 	MovieReview :: String -> String -> String -> MovieReview
 	
 我们可以将类型签名写成 ``String -> (String -> String -> MovieReview)``。假如我们使用 ``liftM`` 将 ``MovieReview`` 提升为 ``Maybe`` monad，我们将得到一个类型为 ``Maybe (String -> (String -> (String -> MovieReview)))``的值。这个类型恰好是 ``ap`` 接受的参数的类型，并且 ``ap`` 的返回类型将是``Maybe (String -> (String -> MovieReview))``。我们可以将``ap``返回的值继续传入``ap``，直到我们结束这个定义。
 
 ::
+
 	-- file: ch15/MovieReview.hs
 	apReview alist =
 		MovieReview `liftM` lookup1 "title" alist
@@ -114,6 +123,7 @@ Haskell程序员使用 :ref:`association-lists` 表示类型 ``[(a, b)]``，你可以把列表中
 	[译注：原著这里存在错误，上面的译文直接翻译了原著，在此做出修正。使用``liftM`` 将 ``MovieReview`` 提升为 ``Maybe`` monad后，得到的类型不是``Maybe (String -> (String -> (String -> MovieReview)))``，而是``Maybe String -> Maybe (String -> (String -> MovieReview))``。下面给出在不断应用``ap``时，类型系统的显示变化过程。]
 
 	::
+	
 		-- note by translator
 		MovieReview :: String -> ( String -> String -> MovieRevie )
 		MovieReview `liftM` :: Maybe String -> Maybe ( String -> String -> MovieRevie )
@@ -127,6 +137,7 @@ Haskell程序员使用 :ref:`association-lists` 表示类型 ``[(a, b)]``，你可以把列表中
 这样理解 ``ap`` 可能会对你有所帮助：``ap`` 的 monadic 等价于我们熟悉的 ``($)`` 运算符，你可以想象一下把 ``ap`` 读成 ``apply``。通过观察这二者的类型签名，我们可以清晰地看到这一点。
 
 ::
+
 	ghci> :type ($)
 	($) :: (a -> b) -> a -> b
 	ghci> :type ap
