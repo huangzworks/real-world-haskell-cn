@@ -610,6 +610,8 @@ alternatives" <http://book.realworldhaskell.org/read/programming-with-monads.htm
         mzero = fail "mzero"
         mplus = (<|>)
 
+
+.. _parsing-an-url-encoded-query-string:
 解析 URL 编码查询字符串
 -----------------------
 
