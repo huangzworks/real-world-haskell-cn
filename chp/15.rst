@@ -212,7 +212,7 @@ Haskell 的 ``Control.Monad`` 模块定义了一种类型类 ``MonadPlus`` ，这使我们可以将
 	   mzero :: m a	
 	   mplus :: m a -> m a -> m a
 	   
-值 ``mzero`` 表示了一个空结果， ``mplus`` 将两个结果合并为一个。下面是 ``mzero`` 和 ``mplus`` 针对 ``Maybe`` 和列表的标准定义。[译注：在约翰·休斯 1998 年发表的《Generalising Monads to Arrows》种，他提出 ``mzero`` 可理解为对失败情况的一种概括，而 ``mplus`` 则是对选择情况的概括，例如如果第一种情况失败，则尝试第二种。]
+值 ``mzero`` 表示了一个空结果， ``mplus`` 将两个结果合并为一个。下面是 ``mzero`` 和 ``mplus`` 针对 ``Maybe`` 和列表的标准定义。[译注：在约翰·休斯 1998 年发表的《Generalising Monads to Arrows》中，他提出 ``mzero`` 可理解为对失败情况的一种概括，而 ``mplus`` 则是对选择情况的概括，例如如果第一种情况失败，则尝试第二种。]
 
 ::
 	
