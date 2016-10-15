@@ -231,7 +231,7 @@
 <p>Monad类型类另外一个非核心函数是 <code class="docutils literal"><span class="pre">fail</span></code> ,这个函数接受一个错误消息然后让函数调用链失败。</p>
 <div class="admonition warning">
 <p class="first admonition-title">Warning</p>
-<p class="last">许多Monad的实现并没有重写 <code class="docutils literal"><span class="pre">fail``函数的默认实现，因此在这些Monad的里面，</span> <span class="pre">``fail</span></code> 将由 <code class="docutils literal"><span class="pre">error</span></code> 函数实现。由于error函数直接抛出某个异常使得调用者无法捕获或者无法预期，所以调用 <code class="docutils literal"><span class="pre">errror</span></code> 通常是非常不受欢迎的。
+<p class="last">许多Monad实现并没有重写 <code class="docutils literal"><span class="pre">fail``函数的默认实现，因此在这些Monad里面，</span> <span class="pre">``fail</span></code> 将由 <code class="docutils literal"><span class="pre">error</span></code> 函数实现。但是由于 <code class="docutils literal"><span class="pre">error</span></code> 函数抛出的异常对于调用者来说要么就是无法捕获的，要么就是无法预期的，所以调用 <code class="docutils literal"><span class="pre">error</span></code> 并不是一件好事。
 就算你很清楚在Monad使用 <code class="docutils literal"><span class="pre">fail</span></code> 在当前场景下是个明智之选，但是依然非常不推荐使用它。当你以后重构代码的时候，很有可能这个 <code class="docutils literal"><span class="pre">fail</span></code> 函数在新的语境下无法工作从而导致非常复杂的问题，这种情况太容易发生了。</p>
 </div>
 <p>回顾一下我们在 <a class="reference internal" href="10.html"><em>第 10 章：代码案例学习：解析二进制数据格式</em></a> 写的parse, 里面有一个 <code class="docutils literal"><span class="pre">Monad</span></code> 的实例：</p>

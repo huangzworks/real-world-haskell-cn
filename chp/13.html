@@ -50,8 +50,8 @@
         
   <div class="section" id="id1">
 <h1>第 13 章：数据结构<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="id2">
-<h2>关联列表<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="association-lists">
+<span id="id2"></span><h2>关联列表<a class="headerlink" href="#association-lists" title="Permalink to this headline">¶</a></h2>
 <p>我们常常会跟一些以键为索引的无序数据打交道。</p>
 <p>举个例子，UNIX 管理猿可能需要这么一个列表，它包含系统中所有用户的 UID ，以及和这个 UID 相对应的用户名。这个列表根据 UID 而不是数据的位置来查找相应的用户名。换句话来说， UID 就是这个数据集的键。</p>
 <p>Haskell 里有几种不同的方法来处理这种结构的数据，最常用的两个是关联列表（association list）和 <code class="docutils literal"><span class="pre">Data.Map</span></code> 模块提供的 <code class="docutils literal"><span class="pre">Map</span></code> 类型。</p>

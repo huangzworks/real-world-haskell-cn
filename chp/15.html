@@ -1,0 +1,334 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>?? 15 ?£?ʹ?? Monad ??? &mdash; Real World Haskell 中文版</title>
+    
+    <link rel="stylesheet" href="../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/theme_extras.js"></script>
+    <link rel="top" title="Real World Haskell 中文版" href="../index.html" /> 
+  </head>
+  <body role="document">
+      <div class="header"><h1 class="heading"><a href="../index.html">
+          <span>Real World Haskell 中文版</span></a></h1>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        <a class="uplink" href="../index.html">Contents</a>
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="monad">
+<h1>?? 15 ?£?ʹ?? Monad ???<a class="headerlink" href="#monad" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="golfing-practice-association-lists">
+<span id="id1"></span><h2>?߶???ѵ?????????б?<a class="headerlink" href="#golfing-practice-association-lists" title="Permalink to this headline">¶</a></h2>
+<p>Web?ͻ??˺ͷ?????ͨ??ͨ???򵥵??ı???ֵ???б?????????Ϣ?????磺</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">name</span><span class="ow">=</span><span class="kt">Attila</span><span class="o">+%</span><span class="mi">42</span><span class="kt">The</span><span class="o">+</span><span class="kt">Hun</span><span class="o">%</span><span class="mi">42</span><span class="o">&amp;</span><span class="n">occupation</span><span class="ow">=</span><span class="kt">Khan</span>
+</pre></div>
+</div>
+<p>???ֱ??뷽ʽ?????? <code class="docutils literal"><span class="pre">application/x-www-form-urlencoded</span></code>?????ַ?ʽ?ǳ????????⣺ÿ????ֵ??ͨ?? <code class="docutils literal"><span class="pre">&amp;</span></code> ???֡???һ????ֵ???У?????һϵ?? URL ?????ַ????ɣ?????????? <code class="docutils literal"><span class="pre">=</span></code> ??ֵ????????ڵĻ?????</p>
+<p>?????????ǿ?????һ?? <code class="docutils literal"><span class="pre">String</span></code> ????ʾ?????? HTTP û????ȷָ??һ?????Ƿ?????ж?Ӧ??ֵ?????ǿ??Խ?ֵ?? <code class="docutils literal"><span class="pre">Maybe</span> <span class="pre">String</span></code> ??ʾ?Բ??????壬??????ʹ?? <code class="docutils literal"><span class="pre">Nothing</span></code> ʱ??ֵ?????ڣ????????? <code class="docutils literal"><span class="pre">Just</span></code> ??װһ?? <code class="docutils literal"><span class="pre">String</span></code> ʱ??ֵ???ڡ?ʹ?? <code class="docutils literal"><span class="pre">Maybe</span></code> ???????????֡?ֵ?????ڡ??͡???ֵ????[??ע?? <code class="docutils literal"><span class="pre">application/x-www-form-urlencoded</span></code> ʵ?????? HTML ?? Forms ???ֶ???ģ?????ԭ???е? HTML]</p>
+<p>Haskell????Աʹ?? <a class="reference internal" href="13.html#association-lists"><span>关联列表</span></a> ??ʾ???? <code class="docutils literal"><span class="pre">[(a,</span> <span class="pre">b)]</span></code>??????԰??б??е?ÿ??Ԫ??????Ϊһ??????ֵ?Ĺ??????????б?????????Դ?? Lisp ??????ͨ????дΪ?б?????????ǿ??Խ??????ַ?????ʾΪ???µ? Haskell ֵ??</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/MovieReview.hs</span>
+<span class="p">[(</span><span class="s">&quot;name&quot;</span><span class="p">,</span>       <span class="kt">Just</span> <span class="s">&quot;Attila </span><span class="se">\&quot;</span><span class="s">The Hun</span><span class="se">\&quot;</span><span class="s">&quot;</span><span class="p">),</span>
+ <span class="p">(</span><span class="s">&quot;occupation&quot;</span><span class="p">,</span> <span class="kt">Just</span> <span class="s">&quot;Khan&quot;</span><span class="p">)]</span>
+</pre></div>
+</div>
+<p>?? <span class="xref std std-ref">parsing-an-url-encoded-query-string</span> ?У????ǽ?????һ?? <code class="docutils literal"><span class="pre">application/x-www-form-urlencoded</span></code> ??????ַ???????ʹ?????? <code class="docutils literal"><span class="pre">[(String,</span> <span class="pre">Maybe</span> <span class="pre">String)]</span></code> ?Ĺ????б???ʾ???????????????ʹ????Щ?б??е?һ???????һ?????ݽṹ??</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/MovieReview.hs</span>
+<span class="kr">data</span> <span class="kt">MovieReview</span> <span class="ow">=</span> <span class="kt">MovieReview</span> <span class="p">{</span>
+          <span class="n">revTitle</span> <span class="ow">::</span> <span class="kt">String</span>
+    <span class="p">,</span> <span class="n">revUser</span> <span class="ow">::</span> <span class="kt">String</span>
+<span class="p">,</span> <span class="n">revReview</span> <span class="ow">::</span> <span class="kt">String</span>
+        <span class="p">}</span>
+</pre></div>
+</div>
+<p>??????????һ???򵥵ĺ???˵????</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/MovieReview.hs</span>
+<span class="nf">simpleReview</span> <span class="ow">::</span> <span class="p">[(</span><span class="kt">String</span><span class="p">,</span> <span class="kt">Maybe</span> <span class="kt">String</span><span class="p">)]</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">MovieReview</span>
+<span class="nf">simpleReview</span> <span class="n">alist</span> <span class="ow">=</span>
+  <span class="kr">case</span> <span class="n">lookup</span> <span class="s">&quot;title&quot;</span> <span class="n">alist</span> <span class="kr">of</span>
+        <span class="kt">Just</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">title</span><span class="o">@</span><span class="p">(</span><span class="kr">_</span><span class="kt">:</span><span class="kr">_</span><span class="p">))</span> <span class="ow">-&gt;</span>
+          <span class="kr">case</span> <span class="n">lookup</span> <span class="s">&quot;user&quot;</span> <span class="n">alist</span> <span class="kr">of</span>
+                <span class="kt">Just</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">user</span><span class="o">@</span><span class="p">(</span><span class="kr">_</span><span class="kt">:</span><span class="kr">_</span><span class="p">))</span> <span class="ow">-&gt;</span>
+                  <span class="kr">case</span> <span class="n">lookup</span> <span class="s">&quot;review&quot;</span> <span class="n">alist</span> <span class="kr">of</span>
+                        <span class="kt">Just</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">review</span><span class="o">@</span><span class="p">(</span><span class="kr">_</span><span class="kt">:</span><span class="kr">_</span><span class="p">))</span> <span class="ow">-&gt;</span>
+                                <span class="kt">Just</span> <span class="p">(</span><span class="kt">MovieReview</span> <span class="n">title</span> <span class="n">user</span> <span class="n">review</span><span class="p">)</span>
+                        <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span> <span class="c1">-- no review</span>
+                <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span> <span class="c1">-- no user</span>
+        <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span> <span class="c1">-- no title</span>
+</pre></div>
+</div>
+<p>???ҽ?????Ϊ?????Ĺ????б??????????б???ļ?ֵ?ԣ???????Щ??ֵ???е?ֵ??Ϊ??ʱ?????? <code class="docutils literal"><span class="pre">simpleReview</span></code> ??????һ?? <code class="docutils literal"><span class="pre">MovieReview</span></code> ??Ȼ?????????ŵ???????ܹ???֤?????Ƿ?Ϸ???ʵ????????????Ӧ??????????ġ?????ͣ?staircasing????????ṹ?????????????˽?????б??ı?ʾϸ?ڡ?</p>
+<p>?????Ѿ??? <code class="docutils literal"><span class="pre">Maybe</span></code> monad ?ǳ???Ϥ?ˣ?????Ĵ??????????һ?£????????⡰??ݻ????ṹ??</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/MovieReview.hs</span>
+<span class="nf">maybeReview</span> <span class="n">alist</span> <span class="ow">=</span> <span class="kr">do</span>
+        <span class="n">title</span> <span class="ow">&lt;-</span> <span class="n">lookup1</span> <span class="s">&quot;title&quot;</span> <span class="n">alist</span>
+        <span class="n">user</span> <span class="ow">&lt;-</span> <span class="n">lookup1</span> <span class="s">&quot;user&quot;</span> <span class="n">alist</span>
+        <span class="n">review</span> <span class="ow">&lt;-</span> <span class="n">lookup1</span> <span class="s">&quot;review&quot;</span> <span class="n">alist</span>
+        <span class="n">return</span> <span class="p">(</span><span class="kt">MovieReview</span> <span class="n">title</span> <span class="n">user</span> <span class="n">review</span><span class="p">)</span>
+
+<span class="nf">lookup1</span> <span class="n">key</span> <span class="n">alist</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">lookup</span> <span class="n">key</span> <span class="n">alist</span> <span class="kr">of</span>
+                                          <span class="kt">Just</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">s</span><span class="o">@</span><span class="p">(</span><span class="kr">_</span><span class="kt">:</span><span class="kr">_</span><span class="p">))</span> <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="n">s</span>
+                                          <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>???뿴?????????????࣬???????Դ????ظ??Ĺ????????ǿ??????? <code class="docutils literal"><span class="pre">MovieReview</span></code> ??????????ͨ???????????ʣ?????????Ϊ monad???????????? <a class="reference internal" href="14.html#mixing-pure-and-monadic-code"><span>同时使用puer和monadic代码</span></a> ???۹?????????</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/MovieReview.hs</span>
+<span class="nf">liftedReview</span> <span class="n">alist</span> <span class="ow">=</span>
+        <span class="n">liftM3</span> <span class="kt">MovieReview</span> <span class="p">(</span><span class="n">lookup1</span> <span class="s">&quot;title&quot;</span> <span class="n">alist</span><span class="p">)</span>
+                                           <span class="p">(</span><span class="n">lookup1</span> <span class="s">&quot;user&quot;</span> <span class="n">alist</span><span class="p">)</span>
+                                           <span class="p">(</span><span class="n">lookup1</span> <span class="s">&quot;review&quot;</span> <span class="n">alist</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>????????δ????????ɴ??ںܶ??ظ??Ĺ????????????Ѿ??????????ˣ????????Ǻ???ȥ??ʣ?µĲ??֡?</p>
+<p>??Ȼʹ?? <code class="docutils literal"><span class="pre">liftM3</span></code> ?????ǵĴ?????????࣬?????ǲ?????һ?? <code class="docutils literal"><span class="pre">liftM</span></code> ȥ??????㷺?????⣬??Ϊ??׼??ֻ???嵽?? <code class="docutils literal"><span class="pre">liftM5</span></code>????ʵ?????ǿ??Ը??????ǵ???Ҫд?????????ֵ? <code class="docutils literal"><span class="pre">liftM</span></code> ?????ǽ??Ƿǳ????صĹ?????</p>
+<p>??????????һ???????????ߴ??????????ҽ??? 10 ??????????ʱ???ټ???ñ?׼?⣬????¾;???????û????ô?????ˡ?</p>
+<p>??Ȼ????׼?????滹?????????߿??ã??? <code class="docutils literal"><span class="pre">Control.Monad</span></code> ?У???һ?????? <code class="docutils literal"><span class="pre">ap</span></code>??????????ǩ????type signature???ǳ???Ȥ??</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="o">+</span><span class="kt">Control</span><span class="o">.</span><span class="kt">Monad</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">ap</span>
+<span class="nf">ap</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Monad</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">m</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>????ܻ??????֣?˭???һ?????ܵ?һ?????Ĵ??????ŵ? monad ?У???ô????ԭ??????ʲô??????һ?£???ʵ???е? Haskell ?????????϶??ǽ??ܵ?һ??????``MovieReview`` ?Ĺ?????Ҳ????????</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="kt">MovieReview</span>
+<span class="kt">MovieReview</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">MovieReview</span>
+</pre></div>
+</div>
+<p>???ǿ??Խ?????ǩ??д?? <code class="docutils literal"><span class="pre">String</span> <span class="pre">-&gt;</span> <span class="pre">(String</span> <span class="pre">-&gt;</span> <span class="pre">String</span> <span class="pre">-&gt;</span> <span class="pre">MovieReview)</span></code>??????????ʹ?? <code class="docutils literal"><span class="pre">liftM</span></code> ?? <code class="docutils literal"><span class="pre">MovieReview</span></code> ????Ϊ <code class="docutils literal"><span class="pre">Maybe</span></code> monad?????ǽ??õ?һ??????Ϊ <code class="docutils literal"><span class="pre">Maybe</span> <span class="pre">(String</span> <span class="pre">-&gt;</span> <span class="pre">(String</span> <span class="pre">-&gt;</span> <span class="pre">(String</span> <span class="pre">-&gt;</span> <span class="pre">MovieReview)))</span></code>??ֵ?????????ǡ???? <code class="docutils literal"><span class="pre">ap</span></code> ???ܵĲ????????ͣ????? <code class="docutils literal"><span class="pre">ap</span></code> ?ķ??????ͽ??? <code class="docutils literal"><span class="pre">Maybe</span> <span class="pre">(String</span> <span class="pre">-&gt;</span> <span class="pre">(String</span> <span class="pre">-&gt;</span> <span class="pre">MovieReview))</span></code>?????ǿ??Խ? <code class="docutils literal"><span class="pre">ap</span></code> ???ص?ֵ???????? <code class="docutils literal"><span class="pre">ap</span></code> ??ֱ?????ǽ?????????塣</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/MovieReview.hs</span>
+<span class="nf">apReview</span> <span class="n">alist</span> <span class="ow">=</span>
+        <span class="kt">MovieReview</span> <span class="p">`</span><span class="n">liftM</span><span class="p">`</span> <span class="n">lookup1</span> <span class="s">&quot;title&quot;</span> <span class="n">alist</span>
+                                   <span class="p">`</span><span class="n">ap</span><span class="p">`</span> <span class="n">lookup1</span> <span class="s">&quot;user&quot;</span> <span class="n">alist</span>
+                                   <span class="p">`</span><span class="n">ap</span><span class="p">`</span> <span class="n">lookup1</span> <span class="s">&quot;review&quot;</span> <span class="n">alist</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p>[??ע??ԭ????????ڴ????????????ֱ?ӷ?????ԭ?????ڴ???????????ʹ?? <code class="docutils literal"><span class="pre">liftM</span></code> ?? <code class="docutils literal"><span class="pre">MovieReview</span></code> ????Ϊ <code class="docutils literal"><span class="pre">Maybe</span></code> monad?󣬵õ??????Ͳ??? <code class="docutils literal"><span class="pre">Maybe</span> <span class="pre">(String</span> <span class="pre">-&gt;</span> <span class="pre">(String</span> <span class="pre">-&gt;</span> <span class="pre">(String</span> <span class="pre">-&gt;</span> <span class="pre">MovieReview)))</span></code>?????? <code class="docutils literal"><span class="pre">Maybe</span> <span class="pre">String</span> <span class="pre">-&gt;</span> <span class="pre">Maybe</span> <span class="pre">(String</span> <span class="pre">-&gt;</span> <span class="pre">(String</span> <span class="pre">-&gt;</span> <span class="pre">MovieReview))</span></code>??????????ڲ???Ӧ?? <code class="docutils literal"><span class="pre">ap</span></code> ʱ??????ϵͳ????ʾ?仯???̡?]</p>
+<div class="last highlight-haskell"><div class="highlight"><pre><span class="c1">-- note by translator</span>
+<span class="kt">MovieReview</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="p">(</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">MovieRevie</span> <span class="p">)</span>
+<span class="kt">MovieReview</span> <span class="p">`</span><span class="n">liftM</span><span class="p">`</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="p">(</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">MovieRevie</span> <span class="p">)</span>
+<span class="kt">MovieReview</span> <span class="p">`</span><span class="n">liftM</span><span class="p">`</span> <span class="n">lookup1</span> <span class="s">&quot;title&quot;</span> <span class="n">alist</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="p">(</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">MovieRevie</span> <span class="p">)</span>
+<span class="kt">MovieReview</span> <span class="p">`</span><span class="n">liftM</span><span class="p">`</span> <span class="n">lookup1</span> <span class="s">&quot;title&quot;</span> <span class="n">alist</span> <span class="p">`</span><span class="n">ap</span><span class="p">`</span> <span class="ow">::</span> <span class="kt">Myabe</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="p">(</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">MovieRevie</span> <span class="p">)</span>
+<span class="kt">MovieReview</span> <span class="p">`</span><span class="n">liftM</span><span class="p">`</span> <span class="n">lookup1</span> <span class="s">&quot;title&quot;</span> <span class="n">alist</span> <span class="p">`</span><span class="n">ap</span><span class="p">`</span> <span class="n">lookup1</span> <span class="s">&quot;user&quot;</span> <span class="n">alist</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="p">(</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">MovieRevie</span> <span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>???ǿ???ͨ??????Ӧ?? <code class="docutils literal"><span class="pre">ap</span></code> ????? <code class="docutils literal"><span class="pre">liftM</span></code> ??һϵ?к?????</p>
+<p>???????? <code class="docutils literal"><span class="pre">ap</span></code> ???ܻ??????????????``ap`` ?? monadic ?ȼ?????????Ϥ?? <code class="docutils literal"><span class="pre">($)</span></code> ????????????????һ?°? <code class="docutils literal"><span class="pre">ap</span></code> ???? <code class="docutils literal"><span class="pre">apply</span></code>??ͨ???۲?????ߵ?????ǩ???????ǿ????????ؿ?????һ?㡣</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="p">(</span><span class="o">$</span><span class="p">)</span>
+<span class="p">(</span><span class="o">$</span><span class="p">)</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="kr">type</span> <span class="n">ap</span>
+<span class="nf">ap</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Monad</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">m</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>??ʵ?ϣ?``ap`` ͨ????????Ϊ <code class="docutils literal"><span class="pre">liftM2</span> <span class="pre">id</span></code> ???? <code class="docutils literal"><span class="pre">liftM2</span> <span class="pre">($)</span></code>??[??ע???????ʹ?? <code class="docutils literal"><span class="pre">:t</span></code> ???۲?????????д??ʽ?õ???????ǩ??????ᷢ????????????ϸ???????????죬?????? <code class="docutils literal"><span class="pre">id</span></code> ?? <code class="docutils literal"><span class="pre">($)</span></code> ????????ǩ???Ĳ?ͬ???µģ?``id``??ǩ????``a -&gt; a``???? <code class="docutils literal"><span class="pre">($)</span></code> ?? <code class="docutils literal"><span class="pre">(a</span> <span class="pre">-&gt;</span> <span class="pre">b)</span> <span class="pre">-&gt;</span> <span class="pre">(a</span> <span class="pre">-&gt;</span> <span class="pre">b)</span></code>????Ȼ????ڹ?????????ǵ?ͬ?ġ?]</p>
+</div>
+<div class="section" id="looking-for-alternatives">
+<span id="id2"></span><h2>Ѱ?????????<a class="headerlink" href="#looking-for-alternatives" title="Permalink to this headline">¶</a></h2>
+<p>??????ͨѶ¼??һ??ļ򵥱?ʾ??</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/VCard.hs</span>
+<span class="kr">data</span> <span class="kt">Context</span> <span class="ow">=</span> <span class="kt">Home</span> <span class="o">|</span> <span class="kt">Mobile</span> <span class="o">|</span> <span class="kt">Business</span>
+                           <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Show</span><span class="p">)</span>
+
+<span class="kr">type</span> <span class="kt">Phone</span> <span class="ow">=</span> <span class="kt">String</span>
+
+<span class="nf">albulena</span> <span class="ow">=</span> <span class="p">[(</span><span class="kt">Home</span><span class="p">,</span> <span class="s">&quot;+355-652-55512&quot;</span><span class="p">)]</span>
+
+<span class="nf">nils</span> <span class="ow">=</span> <span class="p">[(</span><span class="kt">Mobile</span><span class="p">,</span> <span class="s">&quot;+47-922-55-512&quot;</span><span class="p">),</span> <span class="p">(</span><span class="kt">Business</span><span class="p">,</span> <span class="s">&quot;+47-922-12-121&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="kt">Home</span><span class="p">,</span> <span class="s">&quot;+47-925-55-121&quot;</span><span class="p">),</span> <span class="p">(</span><span class="kt">Business</span><span class="p">,</span> <span class="s">&quot;+47-922-25-551&quot;</span><span class="p">)]</span>
+
+<span class="nf">twalumba</span> <span class="ow">=</span> <span class="p">[(</span><span class="kt">Business</span><span class="p">,</span> <span class="s">&quot;+260-02-55-5121&quot;</span><span class="p">)]</span>
+</pre></div>
+</div>
+<p>???????????ĳ???˴?һ??˽?˵绰?????Ǳ?Ȼ??ѡ?????ļ?ͥ???루???????еĻ??????????????Ĺ??????롣</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/VCard.hs</span>
+<span class="nf">onePersonalPhone</span> <span class="ow">::</span> <span class="p">[(</span><span class="kt">Context</span><span class="p">,</span> <span class="kt">Phone</span><span class="p">)]</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">Phone</span>
+<span class="nf">onePersonalPhone</span> <span class="n">ps</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">lookup</span> <span class="kt">Home</span> <span class="n">ps</span> <span class="kr">of</span>
+                                                <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">lookup</span> <span class="kt">Mobile</span> <span class="n">ps</span>
+                                                <span class="kt">Just</span> <span class="n">n</span> <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="n">n</span>
+</pre></div>
+</div>
+<p>??????Ĵ????У?????ʹ?? <code class="docutils literal"><span class="pre">Maybe</span></code> ??Ϊ???ɽ???????ͣ??????޷?????ĳ?????ж??????Ҫ??ĺ???????????ˣ????ǽ?????????ת??Ϊһ???б???</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/VCard.hs</span>
+<span class="nf">allBusinessPhones</span> <span class="ow">::</span> <span class="p">[(</span><span class="kt">Context</span><span class="p">,</span> <span class="kt">Phone</span><span class="p">)]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Phone</span><span class="p">]</span>
+<span class="nf">allBusinessPhones</span> <span class="n">ps</span> <span class="ow">=</span> <span class="n">map</span> <span class="n">snd</span> <span class="n">numbers</span>
+        <span class="kr">where</span> <span class="n">numbers</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">filter</span> <span class="p">(</span><span class="n">contextIs</span> <span class="kt">Business</span><span class="p">)</span> <span class="n">ps</span> <span class="kr">of</span>
+                                          <span class="kt">[]</span> <span class="ow">-&gt;</span> <span class="n">filter</span> <span class="p">(</span><span class="n">contextIs</span> <span class="kt">Mobile</span><span class="p">)</span> <span class="n">ps</span>
+                                          <span class="n">ns</span> <span class="ow">-&gt;</span> <span class="n">ns</span>
+
+<span class="nf">contextIs</span> <span class="n">a</span> <span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">=</span> <span class="n">a</span> <span class="o">==</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>ע?⣬???????????? <code class="docutils literal"><span class="pre">case</span></code> ????ʽ?Ľṹ?ǳ????ƣ?????һ????ǩ???????ҽ??Ϊ?յ??????ʣ?µĴ???????ǿյ??????</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">onePersonalPhone</span> <span class="n">twalumba</span>
+<span class="kt">Nothing</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">onePersonalPhone</span> <span class="n">albulena</span>
+<span class="kt">Just</span> <span class="s">&quot;+355-652-55512&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">allBusinessPhones</span> <span class="n">nils</span>
+<span class="p">[</span><span class="s">&quot;+47-922-12-121&quot;</span><span class="p">,</span><span class="s">&quot;+47-922-25-551&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>[??ע??????Ĵ???ͨ????Ҫ <code class="docutils literal"><span class="pre">:l</span></code> ???? <code class="docutils literal"><span class="pre">VCard.hs</span></code> ]</p>
+<p>Haskell ?? <code class="docutils literal"><span class="pre">Control.Monad</span></code> ģ?鶨????һ???????? <code class="docutils literal"><span class="pre">MonadPlus</span></code> ????ʹ???ǿ??Խ? <code class="docutils literal"><span class="pre">case</span></code> ????ʽ?е???ͨģʽ?????????</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/VCard.hs</span>
+<span class="kr">class</span> <span class="kt">Monad</span> <span class="n">m</span> <span class="ow">=&gt;</span> <span class="kt">MonadPlus</span> <span class="n">m</span> <span class="kr">where</span>
+   <span class="n">mzero</span> <span class="ow">::</span> <span class="n">m</span> <span class="n">a</span>
+   <span class="n">mplus</span> <span class="ow">::</span> <span class="n">m</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>ֵ <code class="docutils literal"><span class="pre">mzero</span></code> ??ʾ??һ???ս???? <code class="docutils literal"><span class="pre">mplus</span></code> ??????????ϲ?Ϊһ?????????? <code class="docutils literal"><span class="pre">mzero</span></code> ?? <code class="docutils literal"><span class="pre">mplus</span></code> ??? <code class="docutils literal"><span class="pre">Maybe</span></code> ???б??ı?׼???塣[??ע????Լ??????˹ 1998 ?귢???ġ?Generalising Monads to Arrows???У?????? <code class="docutils literal"><span class="pre">mzero</span></code> ??????Ϊ??ʧ???????һ?ָ??????? <code class="docutils literal"><span class="pre">mplus</span></code> ???Ƕ?ѡ??????ĸ??????????????һ?????ʧ?ܣ????Եڶ??֡?]</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/VCard.hs</span>
+<span class="kr">instance</span> <span class="kt">MonadPlus</span> <span class="kt">[]</span> <span class="kr">where</span>
+   <span class="n">mzero</span> <span class="ow">=</span> <span class="kt">[]</span>
+   <span class="n">mplus</span> <span class="ow">=</span> <span class="p">(</span><span class="o">++</span><span class="p">)</span>
+
+<span class="kr">instance</span> <span class="kt">MonadPlus</span> <span class="kt">Maybe</span> <span class="kr">where</span>
+   <span class="n">mzero</span> <span class="ow">=</span> <span class="kt">Nothing</span>
+
+   <span class="kt">Nothing</span> <span class="p">`</span><span class="n">mplus</span><span class="p">`</span> <span class="n">ys</span>  <span class="ow">=</span> <span class="n">ys</span>
+   <span class="n">xs</span>      <span class="p">`</span><span class="n">mplus</span><span class="p">`</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">xs</span>
+</pre></div>
+</div>
+<p>???????ڿ???ʹ?? <code class="docutils literal"><span class="pre">mplus</span></code> ?滻?????? <code class="docutils literal"><span class="pre">case</span></code> ????ʽ??Ϊ???չ?????Ķ????ԣ?????????????ȡͨѶ¼??ĳ?˵?һ????????????????е?˽?˺??롣</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/VCard.hs</span>
+<span class="nf">oneBusinessPhone</span> <span class="ow">::</span> <span class="p">[(</span><span class="kt">Context</span><span class="p">,</span> <span class="kt">Phone</span><span class="p">)]</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">Phone</span>
+<span class="nf">oneBusinessPhone</span> <span class="n">ps</span> <span class="ow">=</span> <span class="n">lookup</span> <span class="kt">Business</span> <span class="n">ps</span> <span class="p">`</span><span class="n">mplus</span><span class="p">`</span> <span class="n">lookup</span> <span class="kt">Mobile</span> <span class="n">ps</span>
+
+<span class="nf">allPersonalPhones</span> <span class="ow">::</span> <span class="p">[(</span><span class="kt">Context</span><span class="p">,</span> <span class="kt">Phone</span><span class="p">)]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Phone</span><span class="p">]</span>
+<span class="nf">allPersonalPhones</span> <span class="n">ps</span> <span class="ow">=</span> <span class="n">map</span> <span class="n">snd</span> <span class="o">$</span> <span class="n">filter</span> <span class="p">(</span><span class="n">contextIs</span> <span class="kt">Home</span><span class="p">)</span> <span class="n">ps</span> <span class="p">`</span><span class="n">mplus</span><span class="p">`</span>
+                                                                 <span class="n">filter</span> <span class="p">(</span><span class="n">contextIs</span> <span class="kt">Mobile</span><span class="p">)</span> <span class="n">ps</span>
+</pre></div>
+</div>
+<p>[??ע????ǰ????????У????ǽ? <code class="docutils literal"><span class="pre">mplus</span></code> ??Ϊ <code class="docutils literal"><span class="pre">case</span></code> ģʽ??һ?ֳ???????????ܣ????Ƕ??? <code class="docutils literal"><span class="pre">list</span></code> monad???????????ǰ?????Ӳ?ͬ?Ľ????????ǰ??????? <code class="docutils literal"><span class="pre">allBusinessPhones</span></code>????????ͼ??ȡһ???˵?ȫ?????????룬???ҽ?????û?й???????ʱ??????вŰ???˽?˺??롣?? <code class="docutils literal"><span class="pre">mplus</span></code> ֻ?ǽ?ȫ???????????˽?˺?????????һ???????????Ҫ?Ľ???г??롣]</p>
+<p>?????Ѿ?֪?? <code class="docutils literal"><span class="pre">lookup</span></code> ?᷵??һ?? <code class="docutils literal"><span class="pre">Maybe</span></code> ???͵?ֵ???? <code class="docutils literal"><span class="pre">filter</span></code> ??????һ???б??????Զ?????Щ??????Ӧ??ʹ??ʲô?汾?? <code class="docutils literal"><span class="pre">mplus</span></code> ?Ƿǳ???Ȼ?ġ?</p>
+<p>????Ȥ???????????ڿ???ʹ?? <code class="docutils literal"><span class="pre">mzero</span></code> ?? <code class="docutils literal"><span class="pre">mplus</span></code> ????д?????? <code class="docutils literal"><span class="pre">MonadPlus</span></code> ʵ??????Ч?ĺ????????????ԣ???????һ????׼?? <code class="docutils literal"><span class="pre">lookup</span></code> ??????????????һ?? <code class="docutils literal"><span class="pre">Maybe</span></code> ???͵?ֵ??</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/VCard.hs</span>
+<span class="nf">lookup</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)]</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">b</span>
+<span class="nf">lookup</span> <span class="kr">_</span> <span class="kt">[]</span>                      <span class="ow">=</span> <span class="kt">Nothing</span>
+<span class="nf">lookup</span> <span class="n">k</span> <span class="p">((</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span><span class="kt">:</span><span class="n">xys</span><span class="p">)</span> <span class="o">|</span> <span class="n">x</span> <span class="o">==</span> <span class="n">k</span>    <span class="ow">=</span> <span class="kt">Just</span> <span class="n">y</span>
+                                         <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="n">lookup</span> <span class="n">k</span> <span class="n">xys</span>
+</pre></div>
+</div>
+<p>ͨ??????Ĵ??룬???ǿ??Ժ????׵Ľ?????????ƹ㵽 <code class="docutils literal"><span class="pre">MonadPlus</span></code> ??????ʵ????</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/VCard.hs</span>
+<span class="nf">lookupM</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">MonadPlus</span> <span class="n">m</span><span class="p">,</span> <span class="kt">Eq</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)]</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span>
+<span class="nf">lookupM</span> <span class="kr">_</span> <span class="kt">[]</span>    <span class="ow">=</span> <span class="n">mzero</span>
+<span class="nf">lookupM</span> <span class="n">k</span> <span class="p">((</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span><span class="kt">:</span><span class="n">xys</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">x</span> <span class="o">==</span> <span class="n">k</span>    <span class="ow">=</span> <span class="n">return</span> <span class="n">y</span> <span class="p">`</span><span class="n">mplus</span><span class="p">`</span> <span class="n">lookupM</span> <span class="n">k</span> <span class="n">xys</span>
+        <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="n">lookupM</span> <span class="n">k</span> <span class="n">xys</span>
+</pre></div>
+</div>
+<p>???????ǵõ??Ľ???? <code class="docutils literal"><span class="pre">Maybe</span></code> ???ͣ???ôͨ?????ַ?ʽ???ǽ??õ?һ???????û?н?????????????ǵõ??Ľ????һ???б?????ô???ǽ???????еĽ????????????£????ǽ????һЩ?????????? <code class="docutils literal"><span class="pre">MonadPlus</span></code> ʵ???Ľ????</p>
+<p>????һЩ????????????չʾ??С??????ʹ?? <code class="docutils literal"><span class="pre">mplus</span></code> ûʲô???Ե??ŵ㡣 <code class="docutils literal"><span class="pre">mplus</span></code> ???ŵ??????ڸ????ӵĴ??????Щ?????? monad ִ?й??̵Ĵ????С???ʹ??û?????Լ??Ĵ???????????Ҫʹ?? <code class="docutils literal"><span class="pre">MonadPlus</span></code> ?????????Ҳ?ܿ????ڱ??˵???Ŀ??????????</p>
+<div class="section" id="mplus">
+<span id="the-name-mplus-does-not-imply-addition"></span><h3>mplus ????ζ?????<a class="headerlink" href="#mplus" title="Permalink to this headline">¶</a></h3>
+<p>???? <code class="docutils literal"><span class="pre">mplus</span></code> ???????а????? ??plus???????Ⲣ????????????һ????Ҫ??????ֵ??ӡ????????Ǵ????? monad ?Ĳ?ͬ????ʱ <code class="docutils literal"><span class="pre">mplus</span></code> ??ʵ?ֿ???????????ӵĲ????????磬?б? monad ?? <code class="docutils literal"><span class="pre">mplus</span></code> ??ͬ?? <code class="docutils literal"><span class="pre">(++)</span></code> ???????</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span> <span class="p">`</span><span class="n">mplus</span><span class="p">`</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">]</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>???ǣ??????????л?????һ?? monad?? <code class="docutils literal"><span class="pre">mplus</span></code> ?ͼӷ????????????????Ե??????ԡ?</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">Just</span> <span class="mi">1</span> <span class="p">`</span><span class="n">mplus</span><span class="p">`</span> <span class="kt">Just</span> <span class="mi">2</span>
+<span class="kt">Just</span> <span class="mi">1</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="monadplus-l">
+<span id="rules-for-working-with-monadplus"></span><h3>ʹ?? MonadPlus ?Ĺ???<a class="headerlink" href="#monadplus-l" title="Permalink to this headline">¶</a></h3>
+<p>????ͨ??????? monad ?Ĺ????⣬ <code class="docutils literal"><span class="pre">MonadPlus</span></code> ???????ʵ????????ѭһЩ?????򵥵Ĺ???</p>
+<p>???һ?????????ʽ???????? <code class="docutils literal"><span class="pre">mzero</span></code> ????ô???ʵ???????·??short circuit???????仰˵??????ʽ <code class="docutils literal"><span class="pre">mzero</span> <span class="pre">&gt;&gt;=</span> <span class="pre">f</span></code> ????͵????? <code class="docutils literal"><span class="pre">mzero</span></code> Ч????ͬ??[??ע??????·?? Ҳ?????????ϸ???ֵ?????в?????????ġ???·?????ԣ????? <code class="docutils literal"><span class="pre">B</span> <span class="pre">!=</span> <span class="pre">null</span> <span class="pre">&amp;&amp;</span> <span class="pre">B.value</span> <span class="pre">!=</span> <span class="pre">&quot;&quot;</span></code> ???Ա????? <code class="docutils literal"><span class="pre">B</span> <span class="pre">==</span> <span class="pre">null</span></code> ʱ???? <code class="docutils literal"><span class="pre">B.value</span></code> ]</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/MonadPlus.hs</span>
+        <span class="n">mzero</span> <span class="o">&gt;&gt;=</span> <span class="n">f</span> <span class="o">==</span> <span class="n">mzero</span>
+</pre></div>
+</div>
+<p>??? <code class="docutils literal"><span class="pre">mzero</span></code> ????????һ?????б???ʽ???Ҳ࣬?????ʵ???????·??[??ע???˴????????飬???? <code class="docutils literal"><span class="pre">Maybe</span></code> monad??һ?????? <code class="docutils literal"><span class="pre">(undefined</span> <span class="pre">&gt;&gt;</span> <span class="pre">Nothing)</span> <span class="pre">=</span> <span class="pre">undefined</span> <span class="pre">/=</span> <span class="pre">Nothing</span></code> ????????һ??????һ?ֹ۵???Ϊ????·??????ζ?????????ʽ??ĳ?????????Ľ??Ϊĳ?£?????????һ??????????Ҳ????˵????????????һ?????????????ԣ??ڡ????????ҡ??͡????????󡱵Ķ?·֮?䣬ֻ?ܴ???һ?֡?]</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/MonadPlus.hs</span>
+        <span class="n">v</span> <span class="o">&gt;&gt;</span> <span class="n">mzero</span> <span class="o">==</span> <span class="n">mzero</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="monadplus-o">
+<span id="failing-safely-with-monadplus"></span><h3>ͨ?? MonadPlus ??ȫ??ʧ??<a class="headerlink" href="#monadplus-o" title="Permalink to this headline">¶</a></h3>
+<p>???????? <a class="reference internal" href="14.html#the-monad-typeclass"><span>Monad 类型类</span></a> ?н??? <code class="docutils literal"><span class="pre">fail</span></code> ????ʱ?????Ƕ?????ʹ??????˾??棺?????? monad ?У??????ܱ?ʵ??Ϊһ???Դ???ĵ??ã???ᵼ?????˲????ĺ????</p>
+<p><code class="docutils literal"><span class="pre">MonadPlus</span></code> ??????Ϊ?????ṩ??һ?ָ??º͵ķ?????ʹһ??????ʧ?ܣ???ʹ???ǲ???????ʹ?? <code class="docutils literal"><span class="pre">fail</span></code> ?? <code class="docutils literal"><span class="pre">error</span></code> ??????Σ?ա???????ܵĹ????????????ڴ???????Ҫ???κεط?????һ?? <code class="docutils literal"><span class="pre">mzero</span></code> ?????????㽫?ڸô???·??</p>
+<p>?? <code class="docutils literal"><span class="pre">Control.Monad</span></code> ģ???У???׼???? <code class="docutils literal"><span class="pre">guard</span></code> ??????뷨??װ????һ?ַ??????ʽ??</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/MonadPlus.hs</span>
+<span class="nf">guard</span>        <span class="ow">::</span> <span class="p">(</span><span class="kt">MonadPlus</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Bool</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="nb">()</span>
+<span class="nf">guard</span> <span class="kt">True</span>   <span class="ow">=</span>  <span class="n">return</span> <span class="nb">()</span>
+<span class="nf">guard</span> <span class="kt">False</span>  <span class="ow">=</span>  <span class="n">mzero</span>
+</pre></div>
+</div>
+<p>??Ϊһ???򵥵????ӣ???????һ??????????????һ???? <code class="docutils literal"><span class="pre">x</span></code> ??Ϊ???????????? <code class="docutils literal"><span class="pre">x</span></code> ??????һ???? <code class="docutils literal"><span class="pre">n</span></code> ??ȡģ????????????? 0 ?򷵻? <code class="docutils literal"><span class="pre">x</span></code> ?????򷵻ص?ǰ monad ??Ӧ?? <code class="docutils literal"><span class="pre">mzero</span></code> ??</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/MonadPlus.hs</span>
+<span class="nf">x</span> <span class="p">`</span><span class="n">zeroMod</span><span class="p">`</span> <span class="n">n</span> <span class="ow">=</span> <span class="n">guard</span> <span class="p">((</span><span class="n">x</span> <span class="p">`</span><span class="n">mod</span><span class="p">`</span> <span class="n">n</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&gt;&gt;</span> <span class="n">return</span> <span class="n">x</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="adventures-in-hiding-the-plumbing">
+<span id="id3"></span><h2>???عܵ?<a class="headerlink" href="#adventures-in-hiding-the-plumbing" title="Permalink to this headline">¶</a></h2>
+</div>
+</div>
+
+
+        <div class="section" id="discuss">
+    <h2>
+        讨论
+        <a class="headerlink" href="#discuss" title="永久链接至标题">¶</a>
+    </h2>
+    <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'realworldhaskll'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        <a class="uplink" href="../index.html">Contents</a>
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &copy; Copyright 2012, huangz1990.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.3.
+    </div>
+  </body>
+</html>
