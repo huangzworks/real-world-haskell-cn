@@ -1,22 +1,22 @@
-µÚ 15 ÕÂ£ºÊ¹ÓÃ Monad ±à³Ì
+ï»¿ç¬¬ 15 ç« ï¼šä½¿ç”¨ Monad ç¼–ç¨‹
 =========================
 
 .. _golfing-practice-association-lists:
 
-¸ß¶û·òÑµÁ·£º¹ØÁªÁÐ±í
+é«˜å°”å¤«è®­ç»ƒï¼šå…³è”åˆ—è¡¨
 --------------------
 
-Web¿Í»§¶ËºÍ·þÎñÆ÷Í¨³£Í¨¹ý¼òµ¥µÄÎÄ±¾¼üÖµ¶ÔÁÐ±íÀ´´«ÊäÏûÏ¢£¬ÀýÈç£º
+Webå®¢æˆ·ç«¯å’ŒæœåŠ¡å™¨é€šå¸¸é€šè¿‡ç®€å•çš„æ–‡æœ¬é”®å€¼å¯¹åˆ—è¡¨æ¥ä¼ è¾“æ¶ˆæ¯ï¼Œä¾‹å¦‚ï¼š
 
 ::
 
 	name=Attila+%42The+Hun%42&occupation=Khan
 	
-ÕâÖÖ±àÂë·½Ê½±»³Æ×÷ ``application/x-www-form-urlencoded``£¬ÕâÖÖ·½Ê½·Ç³£ÈÝÒ×Àí½â£ºÃ¿¸ö¼üÖµ¶ÔÍ¨¹ý ``&`` »®·Ö¡£ÔÚÒ»¸ö¼üÖµ¶ÔÖÐ£¬¼üÓÉÒ»ÏµÁÐ URL ±àÂë×Ö·û¹¹³É£¬¼üºó½ô¸ú×Å ``=`` ºÍÖµ£¨Èç¹û´æÔÚµÄ»°£©¡£
+è¿™ç§ç¼–ç æ–¹å¼è¢«ç§°ä½œ ``application/x-www-form-urlencoded``ï¼Œè¿™ç§æ–¹å¼éžå¸¸å®¹æ˜“ç†è§£ï¼šæ¯ä¸ªé”®å€¼å¯¹é€šè¿‡ ``&`` åˆ’åˆ†ã€‚åœ¨ä¸€ä¸ªé”®å€¼å¯¹ä¸­ï¼Œé”®ç”±ä¸€ç³»åˆ— URL ç¼–ç å­—ç¬¦æž„æˆï¼Œé”®åŽç´§è·Ÿç€ ``=`` å’Œå€¼ï¼ˆå¦‚æžœå­˜åœ¨çš„è¯ï¼‰ã€‚
 
-ºÜÃ÷ÏÔÎÒÃÇ¿ÉÒÔÓÃÒ»¸ö ``String`` À´±íÊ¾¼ü£¬µ« HTTP Ã»ÓÐÃ÷È·Ö¸³öÒ»¸ö¼üÊÇ·ñ±ØÐëÓÐ¶ÔÓ¦µÄÖµ¡£ÎÒÃÇ¿ÉÒÔ½«ÖµÓÃ ``Maybe String`` ±íÊ¾ÒÔ²¶»ñÆçÒå£¬µ±ÎÒÃÇÊ¹ÓÃ ``Nothing`` Ê±£¬Öµ²»´æÔÚ£¬µ±ÎÒÃÇÓÃ ``Just`` °ü×°Ò»¸ö ``String`` Ê±£¬Öµ´æÔÚ¡£Ê¹ÓÃ ``Maybe`` ÔÊÐíÎÒÃÇÇø·Ö¡°Öµ²»´æÔÚ¡±ºÍ¡°¿ÕÖµ¡±¡£[Òë×¢£º ``application/x-www-form-urlencoded`` Êµ¼ÊÊÇÔÚ HTML µÄ Forms ²¿·Ö¶¨ÒåµÄ£¬¶ø·ÇÔ­ÖøÖÐµÄ HTML]
+å¾ˆæ˜Žæ˜¾æˆ‘ä»¬å¯ä»¥ç”¨ä¸€ä¸ª ``String`` æ¥è¡¨ç¤ºé”®ï¼Œä½† HTTP æ²¡æœ‰æ˜Žç¡®æŒ‡å‡ºä¸€ä¸ªé”®æ˜¯å¦å¿…é¡»æœ‰å¯¹åº”çš„å€¼ã€‚æˆ‘ä»¬å¯ä»¥å°†å€¼ç”¨ ``Maybe String`` è¡¨ç¤ºä»¥æ•èŽ·æ­§ä¹‰ï¼Œå½“æˆ‘ä»¬ä½¿ç”¨ ``Nothing`` æ—¶ï¼Œå€¼ä¸å­˜åœ¨ï¼Œå½“æˆ‘ä»¬ç”¨ ``Just`` åŒ…è£…ä¸€ä¸ª ``String`` æ—¶ï¼Œå€¼å­˜åœ¨ã€‚ä½¿ç”¨ ``Maybe`` å…è®¸æˆ‘ä»¬åŒºåˆ†â€œå€¼ä¸å­˜åœ¨â€å’Œâ€œç©ºå€¼â€ã€‚[è¯‘æ³¨ï¼š ``application/x-www-form-urlencoded`` å®žé™…æ˜¯åœ¨ HTML çš„ Forms éƒ¨åˆ†å®šä¹‰çš„ï¼Œè€ŒéžåŽŸè‘—ä¸­çš„ HTML]
 
-Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐµÄÃ¿¸öÔªËØÀí½âÎªÒ»¸ö¼üºÍÖµµÄ¹ØÁª¡£¹ØÁªÁÐ±íµÄÃû³ÆÆðÔ´ÓÚ Lisp ÉçÇø£¬Í¨³£ËõÐ´ÎªÁÐ±í£¬Òò´ËÎÒÃÇ¿ÉÒÔ½«ÉÏÊö×Ö·û´®±íÊ¾ÎªÒÔÏÂµÄ Haskell Öµ¡£
+Haskellç¨‹åºå‘˜ä½¿ç”¨ :ref:`association-lists` è¡¨ç¤ºç±»åž‹ ``[(a, b)]``ï¼Œä½ å¯ä»¥æŠŠåˆ—è¡¨ä¸­çš„æ¯ä¸ªå…ƒç´ ç†è§£ä¸ºä¸€ä¸ªé”®å’Œå€¼çš„å…³è”ã€‚å…³è”åˆ—è¡¨çš„åç§°èµ·æºäºŽ Lisp ç¤¾åŒºï¼Œé€šå¸¸ç¼©å†™ä¸ºåˆ—è¡¨ï¼Œå› æ­¤æˆ‘ä»¬å¯ä»¥å°†ä¸Šè¿°å­—ç¬¦ä¸²è¡¨ç¤ºä¸ºä»¥ä¸‹çš„ Haskell å€¼ã€‚
 
 ::
 
@@ -24,7 +24,7 @@ Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐ
 	[("name",       Just "Attila \"The Hun\""),
 	 ("occupation", Just "Khan")]
 
-ÔÚ :ref:`parsing-an-url-encoded-query-string` ÖÐ£¬ÎÒÃÇ½«½âÎöÒ»¸ö ``application/x-www-form-urlencoded`` ±àÂëµÄ×Ö·û´®£¬²¢Ê¹ÓÃÐÎÈç ``[(String, Maybe String)]`` µÄ¹ØÁªÁÐ±í±íÊ¾½á¹û¡£¼ÙÉèÎÒÃÇÏëÊ¹ÓÃÕâÐ©ÁÐ±íÖÐµÄÒ»¸öÀ´Ìî³äÒ»¸öÊý¾Ý½á¹¹¡£
+åœ¨ :ref:`parsing-an-url-encoded-query-string` ä¸­ï¼Œæˆ‘ä»¬å°†è§£æžä¸€ä¸ª ``application/x-www-form-urlencoded`` ç¼–ç çš„å­—ç¬¦ä¸²ï¼Œå¹¶ä½¿ç”¨å½¢å¦‚ ``[(String, Maybe String)]`` çš„å…³è”åˆ—è¡¨è¡¨ç¤ºç»“æžœã€‚å‡è®¾æˆ‘ä»¬æƒ³ä½¿ç”¨è¿™äº›åˆ—è¡¨ä¸­çš„ä¸€ä¸ªæ¥å¡«å……ä¸€ä¸ªæ•°æ®ç»“æž„ã€‚
 
 ::
 
@@ -35,7 +35,7 @@ Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐ
         , revReview :: String
 		}
 		
-ÎÒÃÇÊ×ÏÈÓÃÒ»¸ö¼òµ¥µÄº¯ÊýËµÃ÷£º
+æˆ‘ä»¬é¦–å…ˆç”¨ä¸€ä¸ªç®€å•çš„å‡½æ•°è¯´æ˜Žï¼š
 
 ::
 
@@ -54,9 +54,9 @@ Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐ
 		_ -> Nothing -- no title
 
 
-µ±ÇÒ½öµ±×÷Îª²ÎÊýµÄ¹ØÁªÁÐ±í°üº¬ÁËËùÓÐ±ØÐëµÄ¼üÖµ¶Ô£¬²¢ÇÒÕâÐ©¼üÖµ¶ÔÖÐµÄÖµ²»Îª¿ÕÊ±£¬º¯Êý ``simpleReview`` ½«·µ»ØÒ»¸ö ``MovieReview`` ¡£È»¶ø£¬ËüµÄÓÅµã½ö½öÊÇÄÜ¹»ÑéÖ¤ÊäÈëÊÇ·ñºÏ·¨£¬Êµ¼ÊÉÏËü²ÉÓÃÁËÓ¦µ±¾¡Á¿±ÜÃâµÄ¡°¾â³ÝÐÍ£¨staircasing£©¡±´úÂë½á¹¹£¬²¢ÇÒËü¹ýÓÚÁË½â¹ØÁªÁÐ±íµÄ±íÊ¾Ï¸½Ú¡£
+å½“ä¸”ä»…å½“ä½œä¸ºå‚æ•°çš„å…³è”åˆ—è¡¨åŒ…å«äº†æ‰€æœ‰å¿…é¡»çš„é”®å€¼å¯¹ï¼Œå¹¶ä¸”è¿™äº›é”®å€¼å¯¹ä¸­çš„å€¼ä¸ä¸ºç©ºæ—¶ï¼Œå‡½æ•° ``simpleReview`` å°†è¿”å›žä¸€ä¸ª ``MovieReview`` ã€‚ç„¶è€Œï¼Œå®ƒçš„ä¼˜ç‚¹ä»…ä»…æ˜¯èƒ½å¤ŸéªŒè¯è¾“å…¥æ˜¯å¦åˆæ³•ï¼Œå®žé™…ä¸Šå®ƒé‡‡ç”¨äº†åº”å½“å°½é‡é¿å…çš„â€œé”¯é½¿åž‹ï¼ˆstaircasingï¼‰â€ä»£ç ç»“æž„ï¼Œå¹¶ä¸”å®ƒè¿‡äºŽäº†è§£å…³è”åˆ—è¡¨çš„è¡¨ç¤ºç»†èŠ‚ã€‚
 
-ÎÒÃÇÒÑ¾­¶Ô ``Maybe`` monad ·Ç³£ÊìÏ¤ÁË£¬ÉÏÃæµÄ´úÂë¿ÉÒÔÕûÀíÒ»ÏÂ£¬ÈÃËü±ÜÃâ¡°¾â³Ý»¯¡±½á¹¹¡£
+æˆ‘ä»¬å·²ç»å¯¹ ``Maybe`` monad éžå¸¸ç†Ÿæ‚‰äº†ï¼Œä¸Šé¢çš„ä»£ç å¯ä»¥æ•´ç†ä¸€ä¸‹ï¼Œè®©å®ƒé¿å…â€œé”¯é½¿åŒ–â€ç»“æž„ã€‚
 
 ::
 
@@ -72,7 +72,7 @@ Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐ
 						  _ -> Nothing
 
 
-´úÂë¿´ÆðÀ´Õû½àÁËÐí¶à£¬µ«ÆäÖÐÈÔ´æÔÚÖØ¸´µÄ¹¤×÷¡£ÎÒÃÇ¿ÉÒÔÀûÓÃ ``MovieReview`` ¹¹ÔìÆ÷ÊÇÆÕÍ¨´¿º¯ÊýµÄÐÔÖÊ£¬½«ÆäÌáÉýÎª monad£¬¾ÍÏñÎÒÃÇÔÚ :ref:`mixing-pure-and-monadic-code` ÌÖÂÛ¹ýµÄÄÇÑù¡£
+ä»£ç çœ‹èµ·æ¥æ•´æ´äº†è®¸å¤šï¼Œä½†å…¶ä¸­ä»å­˜åœ¨é‡å¤çš„å·¥ä½œã€‚æˆ‘ä»¬å¯ä»¥åˆ©ç”¨ ``MovieReview`` æž„é€ å™¨æ˜¯æ™®é€šçº¯å‡½æ•°çš„æ€§è´¨ï¼Œå°†å…¶æå‡ä¸º monadï¼Œå°±åƒæˆ‘ä»¬åœ¨ :ref:`mixing-pure-and-monadic-code` è®¨è®ºè¿‡çš„é‚£æ ·ã€‚
 
 ::
 
@@ -82,18 +82,18 @@ Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐ
 						   (lookup1 "user" alist)
 						   (lookup1 "review" alist)
 
-ÔÚÉÏÃæÕâ¶Î´úÂëÖÐÒÀ¾É´æÔÚºÜ¶àÖØ¸´µÄ¹¤×÷£¬µ«ËüÃÇÒÑ¾­ÏÔÖø¼õÉÙÁË£¬²¢ÇÒÎÒÃÇºÜÄÑÈ¥³ýÊ£ÏÂµÄ²¿·Ö¡£
+åœ¨ä¸Šé¢è¿™æ®µä»£ç ä¸­ä¾æ—§å­˜åœ¨å¾ˆå¤šé‡å¤çš„å·¥ä½œï¼Œä½†å®ƒä»¬å·²ç»æ˜¾è‘—å‡å°‘äº†ï¼Œå¹¶ä¸”æˆ‘ä»¬å¾ˆéš¾åŽ»é™¤å‰©ä¸‹çš„éƒ¨åˆ†ã€‚
 
 .. _generalised-lifting:
 
-¹ãÒåµÄÌáÉý
+å¹¿ä¹‰çš„æå‡
 ----------
 
-ËäÈ»Ê¹ÓÃ ``liftM3`` ÈÃÎÒÃÇµÄ´úÂë¸ü¼ÓÕû½à£¬µ«ÎÒÃÇ²»ÄÜÓÃÒ»¶Ñ ``liftM`` È¥½â¾ö¸ü¹ã·ºµÄÎÊÌâ£¬ÒòÎª±ê×¼¿âÖ»¶¨Òåµ½ÁË ``liftM5``¡£ÊÂÊµÉÏÎÒÃÇ¿ÉÒÔ¸ù¾ÝÎÒÃÇµÄÐèÒªÐ´³öÈÎÒâÊý×ÖµÄ ``liftM`` £¬µ«ÄÇ½«ÊÇ·Ç³£·±ÖØµÄ¹¤×÷¡£
+è™½ç„¶ä½¿ç”¨ ``liftM3`` è®©æˆ‘ä»¬çš„ä»£ç æ›´åŠ æ•´æ´ï¼Œä½†æˆ‘ä»¬ä¸èƒ½ç”¨ä¸€å † ``liftM`` åŽ»è§£å†³æ›´å¹¿æ³›çš„é—®é¢˜ï¼Œå› ä¸ºæ ‡å‡†åº“åªå®šä¹‰åˆ°äº† ``liftM5``ã€‚äº‹å®žä¸Šæˆ‘ä»¬å¯ä»¥æ ¹æ®æˆ‘ä»¬çš„éœ€è¦å†™å‡ºä»»æ„æ•°å­—çš„ ``liftM`` ï¼Œä½†é‚£å°†æ˜¯éžå¸¸ç¹é‡çš„å·¥ä½œã€‚
 
-¼ÙÉèÎÒÃÇÓÐÒ»¸ö¹¹ÔìÆ÷»òÕß´¿º¯Êý£¬²¢ÇÒ½ÓÊÜ 10 ¸ö²ÎÊý£¬ÕâÊ±ºòÔÙ¼á³ÖÓÃ±ê×¼¿â£¬Äã¿ÖÅÂ¾Í¾õµÃÎÒÃÇÃ»ÓÐÄÇÃ´ºÃÔËÁË¡£
+å‡è®¾æˆ‘ä»¬æœ‰ä¸€ä¸ªæž„é€ å™¨æˆ–è€…çº¯å‡½æ•°ï¼Œå¹¶ä¸”æŽ¥å— 10 ä¸ªå‚æ•°ï¼Œè¿™æ—¶å€™å†åšæŒç”¨æ ‡å‡†åº“ï¼Œä½ ææ€•å°±è§‰å¾—æˆ‘ä»¬æ²¡æœ‰é‚£ä¹ˆå¥½è¿äº†ã€‚
 
-µ±È»£¬±ê×¼¿âÀïÃæ»¹ÓÐÆäËû¹¤¾ß¿ÉÓÃ£¬ÔÚ ``Control.Monad`` ÖÐ£¬ÓÐÒ»¸öº¯Êý ``ap``£¬ËüµÄÀàÐÍÇ©Ãû£¨type signature£©·Ç³£ÓÐÈ¤¡£
+å½“ç„¶ï¼Œæ ‡å‡†åº“é‡Œé¢è¿˜æœ‰å…¶ä»–å·¥å…·å¯ç”¨ï¼Œåœ¨ ``Control.Monad`` ä¸­ï¼Œæœ‰ä¸€ä¸ªå‡½æ•° ``ap``ï¼Œå®ƒçš„ç±»åž‹ç­¾åï¼ˆtype signatureï¼‰éžå¸¸æœ‰è¶£ã€‚
 
 ::
 
@@ -101,14 +101,14 @@ Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐ
 	ghci> :type ap
 	ap :: (Monad m) => m (a -> b) -> m a -> m b
 
-Äã¿ÉÄÜ»á¾õµÃÆæ¹Ö£¬Ë­»á°ÑÒ»¸ö½ÓÊÜµ¥Ò»²ÎÊýµÄ´¿º¯Êý·Åµ½ monad ÖÐ£¬ÕâÃ´×öµÄÔ­ÒòÓÖÊÇÊ²Ã´£¿»ØÏëÒ»ÏÂ£¬ÆäÊµËùÓÐµÄ Haskell º¯Êý±¾ÖÊÉÏ¶¼ÊÇ½ÓÊÜµ¥Ò»²ÎÊý£¬``MovieReview`` µÄ¹¹ÔìÆ÷Ò²ÊÇÕâÑù¡£
+ä½ å¯èƒ½ä¼šè§‰å¾—å¥‡æ€ªï¼Œè°ä¼šæŠŠä¸€ä¸ªæŽ¥å—å•ä¸€å‚æ•°çš„çº¯å‡½æ•°æ”¾åˆ° monad ä¸­ï¼Œè¿™ä¹ˆåšçš„åŽŸå› åˆæ˜¯ä»€ä¹ˆï¼Ÿå›žæƒ³ä¸€ä¸‹ï¼Œå…¶å®žæ‰€æœ‰çš„ Haskell å‡½æ•°æœ¬è´¨ä¸Šéƒ½æ˜¯æŽ¥å—å•ä¸€å‚æ•°ï¼Œ``MovieReview`` çš„æž„é€ å™¨ä¹Ÿæ˜¯è¿™æ ·ã€‚
 
 ::
 
 	ghci> :type MovieReview
 	MovieReview :: String -> String -> String -> MovieReview
 	
-ÎÒÃÇ¿ÉÒÔ½«ÀàÐÍÇ©ÃûÐ´³É ``String -> (String -> String -> MovieReview)``¡£¼ÙÈçÎÒÃÇÊ¹ÓÃ ``liftM`` ½« ``MovieReview`` ÌáÉýÎª ``Maybe`` monad£¬ÎÒÃÇ½«µÃµ½Ò»¸öÀàÐÍÎª ``Maybe (String -> (String -> (String -> MovieReview)))``µÄÖµ¡£Õâ¸öÀàÐÍÇ¡ºÃÊÇ ``ap`` ½ÓÊÜµÄ²ÎÊýµÄÀàÐÍ£¬²¢ÇÒ ``ap`` µÄ·µ»ØÀàÐÍ½«ÊÇ ``Maybe (String -> (String -> MovieReview))``¡£ÎÒÃÇ¿ÉÒÔ½« ``ap`` ·µ»ØµÄÖµ¼ÌÐø´«Èë ``ap`` £¬Ö±µ½ÎÒÃÇ½áÊøÕâ¸ö¶¨Òå¡£
+æˆ‘ä»¬å¯ä»¥å°†ç±»åž‹ç­¾åå†™æˆ ``String -> (String -> String -> MovieReview)``ã€‚å‡å¦‚æˆ‘ä»¬ä½¿ç”¨ ``liftM`` å°† ``MovieReview`` æå‡ä¸º ``Maybe`` monadï¼Œæˆ‘ä»¬å°†å¾—åˆ°ä¸€ä¸ªç±»åž‹ä¸º ``Maybe (String -> (String -> (String -> MovieReview)))``çš„å€¼ã€‚è¿™ä¸ªç±»åž‹æ°å¥½æ˜¯ ``ap`` æŽ¥å—çš„å‚æ•°çš„ç±»åž‹ï¼Œå¹¶ä¸” ``ap`` çš„è¿”å›žç±»åž‹å°†æ˜¯ ``Maybe (String -> (String -> MovieReview))``ã€‚æˆ‘ä»¬å¯ä»¥å°† ``ap`` è¿”å›žçš„å€¼ç»§ç»­ä¼ å…¥ ``ap`` ï¼Œç›´åˆ°æˆ‘ä»¬ç»“æŸè¿™ä¸ªå®šä¹‰ã€‚
 
 ::
 
@@ -120,7 +120,7 @@ Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐ
 
 .. warning::
 
-	[Òë×¢£ºÔ­ÖøÕâÀï´æÔÚ´íÎó£¬ÉÏÃæµÄÒëÎÄÖ±½Ó·­ÒëÁËÔ­Öø£¬ÔÚ´Ë×ö³öÐÞÕý¡£Ê¹ÓÃ ``liftM`` ½« ``MovieReview`` ÌáÉýÎª ``Maybe`` monadºó£¬µÃµ½µÄÀàÐÍ²»ÊÇ ``Maybe (String -> (String -> (String -> MovieReview)))``£¬¶øÊÇ ``Maybe String -> Maybe (String -> (String -> MovieReview))``¡£ÏÂÃæ¸ø³öÔÚ²»¶ÏÓ¦ÓÃ ``ap`` Ê±£¬ÀàÐÍÏµÍ³µÄÏÔÊ¾±ä»¯¹ý³Ì¡£]
+	[è¯‘æ³¨ï¼šåŽŸè‘—è¿™é‡Œå­˜åœ¨é”™è¯¯ï¼Œä¸Šé¢çš„è¯‘æ–‡ç›´æŽ¥ç¿»è¯‘äº†åŽŸè‘—ï¼Œåœ¨æ­¤åšå‡ºä¿®æ­£ã€‚ä½¿ç”¨ ``liftM`` å°† ``MovieReview`` æå‡ä¸º ``Maybe`` monadåŽï¼Œå¾—åˆ°çš„ç±»åž‹ä¸æ˜¯ ``Maybe (String -> (String -> (String -> MovieReview)))``ï¼Œè€Œæ˜¯ ``Maybe String -> Maybe (String -> (String -> MovieReview))``ã€‚ä¸‹é¢ç»™å‡ºåœ¨ä¸æ–­åº”ç”¨ ``ap`` æ—¶ï¼Œç±»åž‹ç³»ç»Ÿçš„æ˜¾ç¤ºå˜åŒ–è¿‡ç¨‹ã€‚]
 
 	::
 	
@@ -132,9 +132,9 @@ Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐ
 		MovieReview `liftM` lookup1 "title" alist `ap` lookup1 "user" alist :: Maybe ( String -> MovieRevie )
 
 
-ÎÒÃÇ¿ÉÒÔÍ¨¹ý²»¶ÏÓ¦ÓÃ ``ap`` À´Ìæ´ú ``liftM`` µÄÒ»ÏµÁÐº¯Êý¡£
+æˆ‘ä»¬å¯ä»¥é€šè¿‡ä¸æ–­åº”ç”¨ ``ap`` æ¥æ›¿ä»£ ``liftM`` çš„ä¸€ç³»åˆ—å‡½æ•°ã€‚
 
-ÕâÑùÀí½â ``ap`` ¿ÉÄÜ»á¶ÔÄãÓÐËù°ïÖú£º``ap`` µÄ monadic µÈ¼ÛÓÚÎÒÃÇÊìÏ¤µÄ ``($)`` ÔËËã·û£¬Äã¿ÉÒÔÏëÏóÒ»ÏÂ°Ñ ``ap`` ¶Á³É ``apply``¡£Í¨¹ý¹Û²ìÕâ¶þÕßµÄÀàÐÍÇ©Ãû£¬ÎÒÃÇ¿ÉÒÔÇåÎúµØ¿´µ½ÕâÒ»µã¡£
+è¿™æ ·ç†è§£ ``ap`` å¯èƒ½ä¼šå¯¹ä½ æœ‰æ‰€å¸®åŠ©ï¼š``ap`` çš„ monadic ç­‰ä»·äºŽæˆ‘ä»¬ç†Ÿæ‚‰çš„ ``($)`` è¿ç®—ç¬¦ï¼Œä½ å¯ä»¥æƒ³è±¡ä¸€ä¸‹æŠŠ ``ap`` è¯»æˆ ``apply``ã€‚é€šè¿‡è§‚å¯Ÿè¿™äºŒè€…çš„ç±»åž‹ç­¾åï¼Œæˆ‘ä»¬å¯ä»¥æ¸…æ™°åœ°çœ‹åˆ°è¿™ä¸€ç‚¹ã€‚
 
 ::
 
@@ -143,14 +143,14 @@ Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐ
 	ghci> :type ap
 	ap :: (Monad m) => m (a -> b) -> m a -> m b
 
-ÊÂÊµÉÏ£¬``ap`` Í¨³£±»¶¨ÒåÎª ``liftM2 id`` »òÕß ``liftM2 ($)``¡£[Òë×¢£ºÈç¹ûÄãÊ¹ÓÃ ``:t`` À´¹Û²ìÕâÁ½ÖÖÊéÐ´ÐÎÊ½µÃµ½µÄÀàÐÍÇ©Ãû£¬Äã»á·¢ÏÖËüÃÇÔÚÀàÐÍÏ¸½ÚÉÏÓÐËù²îÒì£¬ÕâÊÇÓÉ ``id`` ºÍ ``($)`` ±¾ÉíÀàÐÍÇ©ÃûµÄ²»Í¬µ¼ÖÂµÄ£¬``id``µÄÇ©ÃûÊÇ``a -> a``£¬¶ø ``($)`` ÊÇ ``(a -> b) -> (a -> b)``£¬µ±È»Õâ¶ÔÓÚ¹ãÒåµÄÀàÐÍÊÇµÈÍ¬µÄ¡£]
+äº‹å®žä¸Šï¼Œ``ap`` é€šå¸¸è¢«å®šä¹‰ä¸º ``liftM2 id`` æˆ–è€… ``liftM2 ($)``ã€‚[è¯‘æ³¨ï¼šå¦‚æžœä½ ä½¿ç”¨ ``:t`` æ¥è§‚å¯Ÿè¿™ä¸¤ç§ä¹¦å†™å½¢å¼å¾—åˆ°çš„ç±»åž‹ç­¾åï¼Œä½ ä¼šå‘çŽ°å®ƒä»¬åœ¨ç±»åž‹ç»†èŠ‚ä¸Šæœ‰æ‰€å·®å¼‚ï¼Œè¿™æ˜¯ç”± ``id`` å’Œ ``($)`` æœ¬èº«ç±»åž‹ç­¾åçš„ä¸åŒå¯¼è‡´çš„ï¼Œ``id``çš„ç­¾åæ˜¯``a -> a``ï¼Œè€Œ ``($)`` æ˜¯ ``(a -> b) -> (a -> b)``ï¼Œå½“ç„¶è¿™å¯¹äºŽå¹¿ä¹‰çš„ç±»åž‹æ˜¯ç­‰åŒçš„ã€‚]
 
 .. _looking-for-alternatives:
 
-Ñ°ÕÒÌæ´ú·½°¸
+å¯»æ‰¾æ›¿ä»£æ–¹æ¡ˆ
 ------------
 
-ÏÂÃæÊÇÍ¨Ñ¶Â¼ÖÐÒ»ÏîµÄ¼òµ¥±íÊ¾¡£
+ä¸‹é¢æ˜¯é€šè®¯å½•ä¸­ä¸€é¡¹çš„ç®€å•è¡¨ç¤ºã€‚
 
 ::
 
@@ -167,7 +167,7 @@ Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐ
 
 	twalumba = [(Business, "+260-02-55-5121")]
 	
-¼ÙÉèÎÒÃÇÏë¸øÄ³¸öÈË´òÒ»¸öË½ÈËµç»°£¬ÎÒÃÇ±ØÈ»»áÑ¡ÔñËûµÄ¼ÒÍ¥ºÅÂë£¨¼ÙÈçËûÓÐµÄ»°£©£¬¶ø²»ÊÇËûµÄ¹¤×÷ºÅÂë¡£
+å‡è®¾æˆ‘ä»¬æƒ³ç»™æŸä¸ªäººæ‰“ä¸€ä¸ªç§äººç”µè¯ï¼Œæˆ‘ä»¬å¿…ç„¶ä¼šé€‰æ‹©ä»–çš„å®¶åº­å·ç ï¼ˆå‡å¦‚ä»–æœ‰çš„è¯ï¼‰ï¼Œè€Œä¸æ˜¯ä»–çš„å·¥ä½œå·ç ã€‚
 
 ::
 
@@ -177,7 +177,7 @@ Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐ
 							Nothing -> lookup Mobile ps
 							Just n -> Just n
 							
-ÔÚÉÏÃæµÄ´úÂëÖÐ£¬ÎÒÃÇÊ¹ÓÃ ``Maybe`` ×÷ÎªÉú³É½á¹ûµÄÀàÐÍ£¬ÕâÑùÎÞ·¨´¦ÀíÄ³¸öÈËÓÐ¶à¸ö·ûºÏÒªÇóµÄºÅÂëµÄÇé¿ö¡£Òò´Ë£¬ÎÒÃÇ½«·µ»ØÀàÐÍ×ª»»ÎªÒ»¸öÁÐ±í¡£
+åœ¨ä¸Šé¢çš„ä»£ç ä¸­ï¼Œæˆ‘ä»¬ä½¿ç”¨ ``Maybe`` ä½œä¸ºç”Ÿæˆç»“æžœçš„ç±»åž‹ï¼Œè¿™æ ·æ— æ³•å¤„ç†æŸä¸ªäººæœ‰å¤šä¸ªç¬¦åˆè¦æ±‚çš„å·ç çš„æƒ…å†µã€‚å› æ­¤ï¼Œæˆ‘ä»¬å°†è¿”å›žç±»åž‹è½¬æ¢ä¸ºä¸€ä¸ªåˆ—è¡¨ã€‚
 
 ::
 	
@@ -190,7 +190,7 @@ Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐ
 
 	contextIs a (b, _) = a == b
 	
-×¢Òâ£¬ÕâÁ½¸öº¯ÊýÖÐ ``case`` ±í´ïÊ½µÄ½á¹¹·Ç³£ÏàËÆ£ºÆäÖÐÒ»¸ö±êÇ©´¦Àí²éÕÒ½á¹ûÎª¿ÕµÄÇé¿ö£¬Ê£ÏÂµÄ´¦Àí½á¹û·Ç¿ÕµÄÇé¿ö¡£
+æ³¨æ„ï¼Œè¿™ä¸¤ä¸ªå‡½æ•°ä¸­ ``case`` è¡¨è¾¾å¼çš„ç»“æž„éžå¸¸ç›¸ä¼¼ï¼šå…¶ä¸­ä¸€ä¸ªæ ‡ç­¾å¤„ç†æŸ¥æ‰¾ç»“æžœä¸ºç©ºçš„æƒ…å†µï¼Œå‰©ä¸‹çš„å¤„ç†ç»“æžœéžç©ºçš„æƒ…å†µã€‚
 
 ::
 
@@ -201,9 +201,9 @@ Haskell³ÌÐòÔ±Ê¹ÓÃ :ref:`association-lists` ±íÊ¾ÀàÐÍ ``[(a, b)]``£¬Äã¿ÉÒÔ°ÑÁÐ±íÖÐ
 	ghci> allBusinessPhones nils
 	["+47-922-12-121","+47-922-25-551"]
 
-[Òë×¢£ºÕâÀïµÄ´úÂëÍ¨¹ýÐèÒª ``:l`` µ¼Èë ``VCard.hs`` ]
+[è¯‘æ³¨ï¼šè¿™é‡Œçš„ä»£ç é€šè¿‡éœ€è¦ ``:l`` å¯¼å…¥ ``VCard.hs`` ]
 
-Haskell µÄ ``Control.Monad`` Ä£¿é¶¨ÒåÁËÒ»ÖÖÀàÐÍÀà ``MonadPlus`` £¬ÕâÊ¹ÎÒÃÇ¿ÉÒÔ½« ``case`` ±í´ïÊ½ÖÐµÄÆÕÍ¨Ä£Ê½³éÏó³öÀ´¡£
+Haskell çš„ ``Control.Monad`` æ¨¡å—å®šä¹‰äº†ä¸€ç§ç±»åž‹ç±» ``MonadPlus`` ï¼Œè¿™ä½¿æˆ‘ä»¬å¯ä»¥å°† ``case`` è¡¨è¾¾å¼ä¸­çš„æ™®é€šæ¨¡å¼æŠ½è±¡å‡ºæ¥ã€‚
 
 ::
 
@@ -212,7 +212,7 @@ Haskell µÄ ``Control.Monad`` Ä£¿é¶¨ÒåÁËÒ»ÖÖÀàÐÍÀà ``MonadPlus`` £¬ÕâÊ¹ÎÒÃÇ¿ÉÒÔ½«
 	   mzero :: m a	
 	   mplus :: m a -> m a -> m a
 	   
-Öµ ``mzero`` ±íÊ¾ÁËÒ»¸ö¿Õ½á¹û£¬ ``mplus`` ½«Á½¸ö½á¹ûºÏ²¢ÎªÒ»¸ö¡£ÏÂÃæÊÇ ``mzero`` ºÍ ``mplus`` Õë¶Ô ``Maybe`` ºÍÁÐ±íµÄ±ê×¼¶¨Òå¡£[Òë×¢£ºÔÚÔ¼º²¡¤ÐÝË¹ 1998 Äê·¢±íµÄ¡¶Generalising Monads to Arrows¡·ÖÐ£¬ËûÌá³ö ``mzero`` ¿ÉÀí½âÎª¶ÔÊ§°ÜÇé¿öµÄÒ»ÖÖ¸ÅÀ¨£¬¶ø ``mplus`` ÔòÊÇ¶ÔÑ¡ÔñÇé¿öµÄ¸ÅÀ¨£¬ÀýÈçÈç¹ûµÚÒ»ÖÖÇé¿öÊ§°Ü£¬Ôò³¢ÊÔµÚ¶þÖÖ¡£]
+å€¼ ``mzero`` è¡¨ç¤ºäº†ä¸€ä¸ªç©ºç»“æžœï¼Œ ``mplus`` å°†ä¸¤ä¸ªç»“æžœåˆå¹¶ä¸ºä¸€ä¸ªã€‚ä¸‹é¢æ˜¯ ``mzero`` å’Œ ``mplus`` é’ˆå¯¹ ``Maybe`` å’Œåˆ—è¡¨çš„æ ‡å‡†å®šä¹‰ã€‚[è¯‘æ³¨ï¼šåœ¨çº¦ç¿°Â·ä¼‘æ–¯ 1998 å¹´å‘è¡¨çš„ã€ŠGeneralising Monads to Arrowsã€‹ä¸­ï¼Œä»–æå‡º ``mzero`` å¯ç†è§£ä¸ºå¯¹å¤±è´¥æƒ…å†µçš„ä¸€ç§æ¦‚æ‹¬ï¼Œè€Œ ``mplus`` åˆ™æ˜¯å¯¹é€‰æ‹©æƒ…å†µçš„æ¦‚æ‹¬ï¼Œä¾‹å¦‚å¦‚æžœç¬¬ä¸€ç§æƒ…å†µå¤±è´¥ï¼Œåˆ™å°è¯•ç¬¬äºŒç§ã€‚]
 
 ::
 	
@@ -227,7 +227,7 @@ Haskell µÄ ``Control.Monad`` Ä£¿é¶¨ÒåÁËÒ»ÖÖÀàÐÍÀà ``MonadPlus`` £¬ÕâÊ¹ÎÒÃÇ¿ÉÒÔ½«
 	   Nothing `mplus` ys  = ys
 	   xs      `mplus` _ = xs
 	   
-ÎÒÃÇÏÖÔÚ¿ÉÒÔÊ¹ÓÃ ``mplus`` Ìæ»»µôÕû¸ö ``case`` ±í´ïÊ½¡£ÎªÁËÕÕ¹ËÇé¿öµÄ¶àÑùÐÔ£¬ÎÒÃÇÏÂÃæÀ´»ñÈ¡Í¨Ñ¶Â¼ÖÐÄ³ÈËµÄÒ»¸ö¹¤×÷ºÅÂëºÍËûËùÓÐµÄË½ÈËºÅÂë¡£
+æˆ‘ä»¬çŽ°åœ¨å¯ä»¥ä½¿ç”¨ ``mplus`` æ›¿æ¢æŽ‰æ•´ä¸ª ``case`` è¡¨è¾¾å¼ã€‚ä¸ºäº†ç…§é¡¾æƒ…å†µçš„å¤šæ ·æ€§ï¼Œæˆ‘ä»¬ä¸‹é¢æ¥èŽ·å–é€šè®¯å½•ä¸­æŸäººçš„ä¸€ä¸ªå·¥ä½œå·ç å’Œä»–æ‰€æœ‰çš„ç§äººå·ç ã€‚
 
 ::
 
@@ -239,11 +239,11 @@ Haskell µÄ ``Control.Monad`` Ä£¿é¶¨ÒåÁËÒ»ÖÖÀàÐÍÀà ``MonadPlus`` £¬ÕâÊ¹ÎÒÃÇ¿ÉÒÔ½«
 	allPersonalPhones ps = map snd $ filter (contextIs Home) ps `mplus`
 									 filter (contextIs Mobile) ps
 									 
-[Òë×¢£ºÔÚÇ°ÃæµÄÀý×ÓÖÐ£¬ÎÒÃÇ½« ``mplus`` ×÷Îª ``case`` Ä£Ê½µÄÒ»ÖÖ³éÏó±í´ïÀ´½éÉÜ£¬µ«ÊÇ¶ÔÓÚ ``list`` monad£¬Ëü»á²úÉúºÍÇ°ÃæÀý×Ó²»Í¬µÄ½á¹û¡£¿¼ÂÇÇ°ÃæµÄÀý×Ó ``allBusinessPhones``£¬ÎÒÃÇÊÔÍ¼»ñÈ¡Ò»¸öÈËµÄÈ«²¿¹¤×÷ºÅÂë£¬µ±ÇÒ½öµ±ËûÃ»ÓÐ¹¤×÷ºÅÂëÊ±£¬½á¹ûÖÐ²Å°üº¬Ë½ÈËºÅÂë¡£¶ø ``mplus`` Ö»ÊÇ½«È«²¿¹¤×÷ºÅÂëºÍË½ÈËºÅÂëÁ¬½ÓÔÚÒ»Æð£¬ÕâºÍÎÒÃÇÏëÒªµÄ½á¹ûÓÐ³öÈë¡£]
+[è¯‘æ³¨ï¼šåœ¨å‰é¢çš„ä¾‹å­ä¸­ï¼Œæˆ‘ä»¬å°† ``mplus`` ä½œä¸º ``case`` æ¨¡å¼çš„ä¸€ç§æŠ½è±¡è¡¨è¾¾æ¥ä»‹ç»ï¼Œä½†æ˜¯å¯¹äºŽ ``list`` monadï¼Œå®ƒä¼šäº§ç”Ÿå’Œå‰é¢ä¾‹å­ä¸åŒçš„ç»“æžœã€‚è€ƒè™‘å‰é¢çš„ä¾‹å­ ``allBusinessPhones``ï¼Œæˆ‘ä»¬è¯•å›¾èŽ·å–ä¸€ä¸ªäººçš„å…¨éƒ¨å·¥ä½œå·ç ï¼Œå½“ä¸”ä»…å½“ä»–æ²¡æœ‰å·¥ä½œå·ç æ—¶ï¼Œç»“æžœä¸­æ‰åŒ…å«ç§äººå·ç ã€‚è€Œ ``mplus`` åªæ˜¯å°†å…¨éƒ¨å·¥ä½œå·ç å’Œç§äººå·ç è¿žæŽ¥åœ¨ä¸€èµ·ï¼Œè¿™å’Œæˆ‘ä»¬æƒ³è¦çš„ç»“æžœæœ‰å‡ºå…¥ã€‚]
 
-ÎÒÃÇÒÑ¾­ÖªµÀ ``lookup`` »á·µ»ØÒ»¸ö ``Maybe`` ÀàÐÍµÄÖµ£¬¶ø ``filter`` ½«·µ»ØÒ»¸öÁÐ±í£¬ËùÒÔ¶ÔÓÚÕâÐ©º¯Êý£¬Ó¦µ±Ê¹ÓÃÊ²Ã´°æ±¾µÄ ``mplus`` ÊÇ·Ç³£ÏÔÈ»µÄ¡£
+æˆ‘ä»¬å·²ç»çŸ¥é“ ``lookup`` ä¼šè¿”å›žä¸€ä¸ª ``Maybe`` ç±»åž‹çš„å€¼ï¼Œè€Œ ``filter`` å°†è¿”å›žä¸€ä¸ªåˆ—è¡¨ï¼Œæ‰€ä»¥å¯¹äºŽè¿™äº›å‡½æ•°ï¼Œåº”å½“ä½¿ç”¨ä»€ä¹ˆç‰ˆæœ¬çš„ ``mplus`` æ˜¯éžå¸¸æ˜¾ç„¶çš„ã€‚
 
-¸üÓÐÈ¤µÄÊÇÎÒÃÇÏÖÔÚ¿ÉÒÔÊ¹ÓÃ ``mzero`` ºÍ ``mplus`` À´±àÐ´¶ÔÈÎÒâ ``MonadPlus`` ÊµÀý¾ùÓÐÐ§µÄº¯Êý¡£¾ÙÀý¶øÑÔ£¬ÏÂÃæÊÇÒ»¸ö±ê×¼µÄ ``lookup`` º¯Êý£¬Ëü½«·µ»ØÒ»¸ö ``Maybe`` ÀàÐÍµÄÖµ¡£
+æ›´æœ‰è¶£çš„æ˜¯æˆ‘ä»¬çŽ°åœ¨å¯ä»¥ä½¿ç”¨ ``mzero`` å’Œ ``mplus`` æ¥ç¼–å†™å¯¹ä»»æ„ ``MonadPlus`` å®žä¾‹å‡æœ‰æ•ˆçš„å‡½æ•°ã€‚ä¸¾ä¾‹è€Œè¨€ï¼Œä¸‹é¢æ˜¯ä¸€ä¸ªæ ‡å‡†çš„ ``lookup`` å‡½æ•°ï¼Œå®ƒå°†è¿”å›žä¸€ä¸ª ``Maybe`` ç±»åž‹çš„å€¼ã€‚
 
 ::
 
@@ -253,7 +253,7 @@ Haskell µÄ ``Control.Monad`` Ä£¿é¶¨ÒåÁËÒ»ÖÖÀàÐÍÀà ``MonadPlus`` £¬ÕâÊ¹ÎÒÃÇ¿ÉÒÔ½«
 	lookup k ((x,y):xys) | x == k    = Just y
 						 | otherwise = lookup k xys
 						 
-Í¨¹ýÏÂÃæµÄ´úÂë£¬ÎÒÃÇ¿ÉÒÔºÜÈÝÒ×µÄ½«½á¹ûÀàÐÍÍÆ¹ãµ½ ``MonadPlus`` µÄÈÎÒâÊµÀý¡£
+é€šè¿‡ä¸‹é¢çš„ä»£ç ï¼Œæˆ‘ä»¬å¯ä»¥å¾ˆå®¹æ˜“çš„å°†ç»“æžœç±»åž‹æŽ¨å¹¿åˆ° ``MonadPlus`` çš„ä»»æ„å®žä¾‹ã€‚
 
 ::
 
@@ -264,23 +264,23 @@ Haskell µÄ ``Control.Monad`` Ä£¿é¶¨ÒåÁËÒ»ÖÖÀàÐÍÀà ``MonadPlus`` £¬ÕâÊ¹ÎÒÃÇ¿ÉÒÔ½«
 		| x == k    = return y `mplus` lookupM k xys
 		| otherwise = lookupM k xys
 		
-¼ÙÈçÎÒÃÇµÃµ½µÄ½á¹ûÊÇ ``Maybe`` ÀàÐÍ£¬ÄÇÃ´Í¨¹ýÕâÖÖ·½Ê½ÎÒÃÇ½«µÃµ½Ò»¸ö½á¹û»ò¡°Ã»ÓÐ½á¹û¡±£»¼ÙÈçÎÒÃÇµÃµ½µÄ½á¹ûÊÇÒ»¸öÁÐ±í£¬ÄÇÃ´ÎÒÃÇ½«»ñµÃËùÓÐµÄ½á¹û£»ÆäËüÇé¿öÏÂ£¬ÎÒÃÇ½«»ñµÃÒ»Ð©ÊÊÓÃÓÚÆäËü ``MonadPlus`` ÊµÀýµÄ½á¹û¡£
+å‡å¦‚æˆ‘ä»¬å¾—åˆ°çš„ç»“æžœæ˜¯ ``Maybe`` ç±»åž‹ï¼Œé‚£ä¹ˆé€šè¿‡è¿™ç§æ–¹å¼æˆ‘ä»¬å°†å¾—åˆ°ä¸€ä¸ªç»“æžœæˆ–â€œæ²¡æœ‰ç»“æžœâ€ï¼›å‡å¦‚æˆ‘ä»¬å¾—åˆ°çš„ç»“æžœæ˜¯ä¸€ä¸ªåˆ—è¡¨ï¼Œé‚£ä¹ˆæˆ‘ä»¬å°†èŽ·å¾—æ‰€æœ‰çš„ç»“æžœï¼›å…¶å®ƒæƒ…å†µä¸‹ï¼Œæˆ‘ä»¬å°†èŽ·å¾—ä¸€äº›é€‚ç”¨äºŽå…¶å®ƒ ``MonadPlus`` å®žä¾‹çš„ç»“æžœã€‚
 
-¶ÔÓÚÒ»Ð©ÀàËÆÎÒÃÇÉÏÃæÕ¹Ê¾µÄÐ¡º¯Êý£¬Ê¹ÓÃ ``mplus`` Ã»Ê²Ã´Ã÷ÏÔµÄÓÅµã¡£ ``mplus`` µÄÓÅµãÌåÏÖÔÚ¸ü¸´ÔÓµÄ´úÂëºÍÄÇÐ©¶ÀÁ¢ÓÚ monad Ö´ÐÐ¹ý³ÌµÄ´úÂëÖÐ¡£¼´Ê¹ÄãÃ»ÓÐÔÚ×Ô¼ºµÄ´úÂëÖÐÅöµ½ÐèÒªÊ¹ÓÃ ``MonadPlus`` µÄÇé¿ö£¬ÄãÒ²ºÜ¿ÉÄÜÔÚ±ðÈËµÄÏîÄ¿ÖÐÓöµ½Ëü¡£
+å¯¹äºŽä¸€äº›ç±»ä¼¼æˆ‘ä»¬ä¸Šé¢å±•ç¤ºçš„å°å‡½æ•°ï¼Œä½¿ç”¨ ``mplus`` æ²¡ä»€ä¹ˆæ˜Žæ˜¾çš„ä¼˜ç‚¹ã€‚ ``mplus`` çš„ä¼˜ç‚¹ä½“çŽ°åœ¨æ›´å¤æ‚çš„ä»£ç å’Œé‚£äº›ç‹¬ç«‹äºŽ monad æ‰§è¡Œè¿‡ç¨‹çš„ä»£ç ä¸­ã€‚å³ä½¿ä½ æ²¡æœ‰åœ¨è‡ªå·±çš„ä»£ç ä¸­ç¢°åˆ°éœ€è¦ä½¿ç”¨ ``MonadPlus`` çš„æƒ…å†µï¼Œä½ ä¹Ÿå¾ˆå¯èƒ½åœ¨åˆ«äººçš„é¡¹ç›®ä¸­é‡åˆ°å®ƒã€‚
 
 .. _the-name-mplus-does-not-imply-addition:
 
-mplus ²»ÒâÎ¶×ÅÏà¼Ó
+mplus ä¸æ„å‘³ç€ç›¸åŠ 
 ^^^^^^^^^^^^^^^^^^
 
-º¯Êý ``mplus`` µÄÃû×ÖÖÐ°üº¬ÁË ¡°plus¡±£¬µ«Õâ²¢²»´ú±í×ÅÎÒÃÇÒ»¶¨ÊÇÒª½«Á½¸öÖµÏà¼Ó¡£¸ù¾ÝÎÒÃÇ´¦ÀíµÄ monad µÄ²»Í¬£¬ÓÐÊ± ``mplus`` »áÊµÏÖ¿´ÆðÀ´ÀàËÆÏà¼ÓµÄ²Ù×÷¡£ÀýÈç£¬ÁÐ±í monad ÖÐ ``mplus`` µÈÍ¬ÓÚ ``(++)`` ÔËËã·û¡£
+å‡½æ•° ``mplus`` çš„åå­—ä¸­åŒ…å«äº† â€œplusâ€ï¼Œä½†è¿™å¹¶ä¸ä»£è¡¨ç€æˆ‘ä»¬ä¸€å®šæ˜¯è¦å°†ä¸¤ä¸ªå€¼ç›¸åŠ ã€‚æ ¹æ®æˆ‘ä»¬å¤„ç†çš„ monad çš„ä¸åŒï¼Œæœ‰æ—¶ ``mplus`` ä¼šå®žçŽ°çœ‹èµ·æ¥ç±»ä¼¼ç›¸åŠ çš„æ“ä½œã€‚ä¾‹å¦‚ï¼Œåˆ—è¡¨ monad ä¸­ ``mplus`` ç­‰åŒäºŽ ``(++)`` è¿ç®—ç¬¦ã€‚
 
 ::
 
 	ghci> [1,2,3] `mplus` [4,5,6]
 	[1,2,3,4,5,6]
 	
-µ«ÊÇ£¬¼ÙÈçÎÒÃÇÇÐ»»µ½ÁíÒ»¸ö monad£¬ ``mplus`` ºÍ¼Ó·¨²Ù×÷½«²»´æÔÚÃ÷ÏÔµÄÏàËÆÐÔ¡£
+ä½†æ˜¯ï¼Œå‡å¦‚æˆ‘ä»¬åˆ‡æ¢åˆ°å¦ä¸€ä¸ª monadï¼Œ ``mplus`` å’ŒåŠ æ³•æ“ä½œå°†ä¸å­˜åœ¨æ˜Žæ˜¾çš„ç›¸ä¼¼æ€§ã€‚
 
 ::
 
@@ -289,19 +289,19 @@ mplus ²»ÒâÎ¶×ÅÏà¼Ó
 
 .. _rules-for-working-with-monadplus:
 
-Ê¹ÓÃ MonadPlus µÄ¹æÔò
+ä½¿ç”¨ MonadPlus çš„è§„åˆ™
 ^^^^^^^^^^^^^^^^^^^^^
 
-³ýÁËÍ¨³£Çé¿öÏÂ monad µÄ¹æÔòÍâ£¬ ``MonadPlus`` ÀàÐÍÀàµÄÊµÀý±ØÐë×ñÑ­Ò»Ð©ÆäËû¼òµ¥µÄ¹æÔò¡£
+é™¤äº†é€šå¸¸æƒ…å†µä¸‹ monad çš„è§„åˆ™å¤–ï¼Œ ``MonadPlus`` ç±»åž‹ç±»çš„å®žä¾‹å¿…é¡»éµå¾ªä¸€äº›å…¶ä»–ç®€å•çš„è§„åˆ™ã€‚
 
-Èç¹ûÒ»¸öÀ¦°ó±í´ïÊ½×ó²à³öÏÖÁË ``mzero`` £¬ÄÇÃ´Õâ¸öÊµÀý±ØÐë¶ÌÂ·£¨short circuit£©¡£»»¾ä»°Ëµ£¬±í´ïÊ½ ``mzero >>= f`` ±ØÐëºÍµ¥¶ÀµÄ ``mzero`` Ð§¹ûÏàÍ¬¡£[Òë×¢£º¡°¶ÌÂ·¡± Ò²ÓÃÀ´ÃèÊöÑÏ¸ñÇóÖµÓïÑÔÖÐ²¼¶ûÔËËã·ûµÄ¡°¶ÌÂ·¡±ÌØÐÔ£¬ÀýÈç ``B != null && B.value != ""`` ¿ÉÒÔ±ÜÃâÔÚ ``B == null`` Ê±¿¼Á¿ ``B.value`` ]
+å¦‚æžœä¸€ä¸ªæ†ç»‘è¡¨è¾¾å¼å·¦ä¾§å‡ºçŽ°äº† ``mzero`` ï¼Œé‚£ä¹ˆè¿™ä¸ªå®žä¾‹å¿…é¡»çŸ­è·¯ï¼ˆshort circuitï¼‰ã€‚æ¢å¥è¯è¯´ï¼Œè¡¨è¾¾å¼ ``mzero >>= f`` å¿…é¡»å’Œå•ç‹¬çš„ ``mzero`` æ•ˆæžœç›¸åŒã€‚[è¯‘æ³¨ï¼šâ€œçŸ­è·¯â€ ä¹Ÿç”¨æ¥æè¿°ä¸¥æ ¼æ±‚å€¼è¯­è¨€ä¸­å¸ƒå°”è¿ç®—ç¬¦çš„â€œçŸ­è·¯â€ç‰¹æ€§ï¼Œä¾‹å¦‚ ``B != null && B.value != ""`` å¯ä»¥é¿å…åœ¨ ``B == null`` æ—¶è€ƒé‡ ``B.value`` ]
 
 ::
 
 	-- file: ch15/MonadPlus.hs
 		mzero >>= f == mzero
 
-Èç¹û ``mzero`` ³öÏÖÔÚÁËÒ»¸öÐòÁÐ±í´ïÊ½µÄÓÒ²à£¬ÔòÕâ¸öÊµÀý±ØÐë¶ÌÂ·¡£[Òë×¢£º´Ë´¦´æÔÚÕùÒé£¬ÀýÈç ``Maybe`` monadµÄÒ»¸öÀý×Ó ``(undefined >> Nothing) = undefined /= Nothing`` ²»Âú×ãÕâÒ»Ìõ¼þ¡£Ò»ÖÖ¹ÛµãÈÏÎª£¬¶ÌÂ·ÌØÐÔÒâÎ¶×ÅÈç¹û±í´ïÊ½ÖÐÄ³¸ö²Ù×÷ÊýµÄ½á¹ûÎªÄ³ÊÂ£¬Ôò²»ÆÀ¹ÀÁíÒ»¸ö²Ù×÷Êý£¬Ò²¾ÍÊÇËµ±ØÐëÊ×ÏÈÆÀ¹ÀÒ»¸ö²Ù×÷Êý¡£ËùÒÔ£¬ÔÚ¡°´Ó×óÏòÓÒ¡±ºÍ¡°´ÓÓÒÏò×ó¡±µÄ¶ÌÂ·Ö®¼ä£¬Ö»ÄÜ´æÔÚÒ»ÖÖ¡£]
+å¦‚æžœ ``mzero`` å‡ºçŽ°åœ¨äº†ä¸€ä¸ªåºåˆ—è¡¨è¾¾å¼çš„å³ä¾§ï¼Œåˆ™è¿™ä¸ªå®žä¾‹å¿…é¡»çŸ­è·¯ã€‚[è¯‘æ³¨ï¼šæ­¤å¤„å­˜åœ¨äº‰è®®ï¼Œä¾‹å¦‚ ``Maybe`` monadçš„ä¸€ä¸ªä¾‹å­ ``(undefined >> Nothing) = undefined /= Nothing`` ä¸æ»¡è¶³è¿™ä¸€æ¡ä»¶ã€‚ä¸€ç§è§‚ç‚¹è®¤ä¸ºï¼ŒçŸ­è·¯ç‰¹æ€§æ„å‘³ç€å¦‚æžœè¡¨è¾¾å¼ä¸­æŸä¸ªæ“ä½œæ•°çš„ç»“æžœä¸ºæŸäº‹ï¼Œåˆ™ä¸è¯„ä¼°å¦ä¸€ä¸ªæ“ä½œæ•°ï¼Œä¹Ÿå°±æ˜¯è¯´å¿…é¡»é¦–å…ˆè¯„ä¼°ä¸€ä¸ªæ“ä½œæ•°ã€‚æ‰€ä»¥ï¼Œåœ¨â€œä»Žå·¦å‘å³â€å’Œâ€œä»Žå³å‘å·¦â€çš„çŸ­è·¯ä¹‹é—´ï¼Œåªèƒ½å­˜åœ¨ä¸€ç§ã€‚]
 
 ::
 
@@ -311,14 +311,14 @@ mplus ²»ÒâÎ¶×ÅÏà¼Ó
 		
 .. _failing-safely-with-monadplus:
 
-Í¨¹ý MonadPlus °²È«µØÊ§°Ü
+é€šè¿‡ MonadPlus å®‰å…¨åœ°å¤±è´¥
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-µ±ÎÒÃÇÔÚ :ref:`the-monad-typeclass` ÖÐ½éÉÜ ``fail`` º¯ÊýÊ±£¬ÎÒÃÇ¶ÔËüµÄÊ¹ÓÃÌá³öÁË¾¯¸æ£ºÔÚÐí¶à monad ÖÐ£¬Ëü¿ÉÄÜ±»ÊµÏÖÎªÒ»¸ö¶Ô´íÎóµÄµ÷ÓÃ£¬Õâ»áµ¼ÖÂÁîÈË²»Óä¿ìµÄºó¹û¡£
+å½“æˆ‘ä»¬åœ¨ :ref:`the-monad-typeclass` ä¸­ä»‹ç» ``fail`` å‡½æ•°æ—¶ï¼Œæˆ‘ä»¬å¯¹å®ƒçš„ä½¿ç”¨æå‡ºäº†è­¦å‘Šï¼šåœ¨è®¸å¤š monad ä¸­ï¼Œå®ƒå¯èƒ½è¢«å®žçŽ°ä¸ºä¸€ä¸ªå¯¹é”™è¯¯çš„è°ƒç”¨ï¼Œè¿™ä¼šå¯¼è‡´ä»¤äººä¸æ„‰å¿«çš„åŽæžœã€‚
 
-``MonadPlus`` ÀàÐÍÀàÎªÎÒÃÇÌá¹©ÁËÒ»ÖÖ¸üÎÂºÍµÄ·½·¨À´Ê¹Ò»¸ö¼ÆËãÊ§°Ü£¬ÕâÊ¹ÎÒÃÇ²»±ØÃæÁÙÊ¹ÓÃ ``fail`` ºÍ ``error`` ´øÀ´µÄÎ£ÏÕ¡£ÉÏÃæ½éÉÜµÄ¹æÔòÔÊÐíÎÒÃÇÔÚ´úÂëÖÐÐèÒªµÄÈÎºÎµØ·½ÒýÈëÒ»¸ö ``mzero`` £¬ÕâÑù¼ÆËã½«ÔÚ¸Ã´¦¶ÌÂ·¡£
+``MonadPlus`` ç±»åž‹ç±»ä¸ºæˆ‘ä»¬æä¾›äº†ä¸€ç§æ›´æ¸©å’Œçš„æ–¹æ³•æ¥ä½¿ä¸€ä¸ªè®¡ç®—å¤±è´¥ï¼Œè¿™ä½¿æˆ‘ä»¬ä¸å¿…é¢ä¸´ä½¿ç”¨ ``fail`` å’Œ ``error`` å¸¦æ¥çš„å±é™©ã€‚ä¸Šé¢ä»‹ç»çš„è§„åˆ™å…è®¸æˆ‘ä»¬åœ¨ä»£ç ä¸­éœ€è¦çš„ä»»ä½•åœ°æ–¹å¼•å…¥ä¸€ä¸ª ``mzero`` ï¼Œè¿™æ ·è®¡ç®—å°†åœ¨è¯¥å¤„çŸ­è·¯ã€‚
 
-ÔÚ ``Control.Monad`` Ä£¿éÖÐ£¬±ê×¼º¯Êý ``guard`` ½«Õâ¸öÏë·¨·â×°³ÉÁËÒ»ÖÖ·½±ãµÄÐÎÊ½¡£
+åœ¨ ``Control.Monad`` æ¨¡å—ä¸­ï¼Œæ ‡å‡†å‡½æ•° ``guard`` å°†è¿™ä¸ªæƒ³æ³•å°è£…æˆäº†ä¸€ç§æ–¹ä¾¿çš„å½¢å¼ã€‚
 
 ::
 	
@@ -327,7 +327,7 @@ mplus ²»ÒâÎ¶×ÅÏà¼Ó
 	guard True   =  return ()
 	guard False  =  mzero
 	
-×÷ÎªÒ»¸ö¼òµ¥µÄÀý×Ó£¬ÕâÀïÓÐÒ»¸öº¯Êý£¬Ëü½ÓÊÜÒ»¸öÊý ``x`` ×÷Îª²ÎÊý£¬²¢¼ÆËã ``x`` ¶ÔÓÚÁíÒ»¸öÊý ``n`` µÄÈ¡Ä£½á¹û¡£¼ÙÈç½á¹ûÊÇ 0 Ôò·µ»Ø ``x`` £¬·ñÔò·µ»Øµ±Ç° monad ¶ÔÓ¦µÄ ``mzero`` ¡£
+ä½œä¸ºä¸€ä¸ªç®€å•çš„ä¾‹å­ï¼Œè¿™é‡Œæœ‰ä¸€ä¸ªå‡½æ•°ï¼Œå®ƒæŽ¥å—ä¸€ä¸ªæ•° ``x`` ä½œä¸ºå‚æ•°ï¼Œå¹¶è®¡ç®— ``x`` å¯¹äºŽå¦ä¸€ä¸ªæ•° ``n`` çš„å–æ¨¡ç»“æžœã€‚å‡å¦‚ç»“æžœæ˜¯ 0 åˆ™è¿”å›ž ``x`` ï¼Œå¦åˆ™è¿”å›žå½“å‰ monad å¯¹åº”çš„ ``mzero`` ã€‚
 
 ::
 
@@ -336,5 +336,5 @@ mplus ²»ÒâÎ¶×ÅÏà¼Ó
 	
 .. _adventures-in-hiding-the-plumbing:
 
-Òþ²Ø¹ÜµÀ
+éšè—ç®¡é“
 --------
