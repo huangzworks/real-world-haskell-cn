@@ -149,3 +149,192 @@ Haskell程序员使用 :ref:`association-lists` 表示类型 ``[(a, b)]``，你可以把列表中
 
 寻找替代方案
 ------------
+
+下面是通讯录中一项的简单表示。
+
+::
+
+	-- file: ch15/VCard.hs
+	data Context = Home | Mobile | Business
+				   deriving (Eq, Show)
+
+	type Phone = String
+
+	albulena = [(Home, "+355-652-55512")]
+
+	nils = [(Mobile, "+47-922-55-512"), (Business, "+47-922-12-121"),
+			(Home, "+47-925-55-121"), (Business, "+47-922-25-551")]
+
+	twalumba = [(Business, "+260-02-55-5121")]
+	
+假设我们想给某个人打一个私人电话，我们必然会选择他的家庭号码（假如他有的话），而不是他的工作号码。
+
+::
+
+	-- file: ch15/VCard.hs
+	onePersonalPhone :: [(Context, Phone)] -> Maybe Phone
+	onePersonalPhone ps = case lookup Home ps of
+							Nothing -> lookup Mobile ps
+							Just n -> Just n
+							
+在上面的代码中，我们使用 ``Maybe`` 作为生成结果的类型，这样无法处理某个人有多个符合要求的号码的情况。因此，我们将返回类型转换为一个列表。
+
+::
+	
+	-- file: ch15/VCard.hs
+	allBusinessPhones :: [(Context, Phone)] -> [Phone]
+	allBusinessPhones ps = map snd numbers
+		where numbers = case filter (contextIs Business) ps of
+						  [] -> filter (contextIs Mobile) ps
+						  ns -> ns
+
+	contextIs a (b, _) = a == b
+	
+注意，这两个函数中 ``case`` 表达式的结构非常相似：其中一个标签处理查找结果为空的情况，剩下的处理结果非空的情况。
+
+::
+
+	ghci> onePersonalPhone twalumba
+	Nothing
+	ghci> onePersonalPhone albulena
+	Just "+355-652-55512"
+	ghci> allBusinessPhones nils
+	["+47-922-12-121","+47-922-25-551"]
+
+[译注：这里的代码通过需要 ``:l`` 导入 ``VCard.hs`` ]
+
+Haskell 的 ``Control.Monad`` 模块定义了一种类型类 ``MonadPlus`` ，这使我们可以将 ``case`` 表达式中的普通模式抽象出来。
+
+::
+
+	-- file: ch15/VCard.hs
+	class Monad m => MonadPlus m where
+	   mzero :: m a	
+	   mplus :: m a -> m a -> m a
+	   
+值 ``mzero`` 表示了一个空结果， ``mplus`` 将两个结果合并为一个。下面是 ``mzero`` 和 ``mplus`` 针对 ``Maybe`` 和列表的标准定义。[译注：在约翰·休斯 1998 年发表的《Generalising Monads to Arrows》中，他提出 ``mzero`` 可理解为对失败情况的一种概括，而 ``mplus`` 则是对选择情况的概括，例如如果第一种情况失败，则尝试第二种。]
+
+::
+	
+	-- file: ch15/VCard.hs
+	instance MonadPlus [] where
+	   mzero = []
+	   mplus = (++)
+
+	instance MonadPlus Maybe where
+	   mzero = Nothing
+
+	   Nothing `mplus` ys  = ys
+	   xs      `mplus` _ = xs
+	   
+我们现在可以使用 ``mplus`` 替换掉整个 ``case`` 表达式。为了照顾情况的多样性，我们下面来获取通讯录中某人的一个工作号码和他所有的私人号码。
+
+::
+
+	-- file: ch15/VCard.hs
+	oneBusinessPhone :: [(Context, Phone)] -> Maybe Phone
+	oneBusinessPhone ps = lookup Business ps `mplus` lookup Mobile ps
+
+	allPersonalPhones :: [(Context, Phone)] -> [Phone]
+	allPersonalPhones ps = map snd $ filter (contextIs Home) ps `mplus`
+									 filter (contextIs Mobile) ps
+									 
+[译注：在前面的例子中，我们将 ``mplus`` 作为 ``case`` 模式的一种抽象表达来介绍，但是对于 ``list`` monad，它会产生和前面例子不同的结果。考虑前面的例子 ``allBusinessPhones``，我们试图获取一个人的全部工作号码，当且仅当他没有工作号码时，结果中才包含私人号码。而 ``mplus`` 只是将全部工作号码和私人号码连接在一起，这和我们想要的结果有出入。]
+
+我们已经知道 ``lookup`` 会返回一个 ``Maybe`` 类型的值，而 ``filter`` 将返回一个列表，所以对于这些函数，应当使用什么版本的 ``mplus`` 是非常显然的。
+
+更有趣的是我们现在可以使用 ``mzero`` 和 ``mplus`` 来编写对任意 ``MonadPlus`` 实例均有效的函数。举例而言，下面是一个标准的 ``lookup`` 函数，它将返回一个 ``Maybe`` 类型的值。
+
+::
+
+	-- file: ch15/VCard.hs
+	lookup :: (Eq a) => a -> [(a, b)] -> Maybe b
+	lookup _ []                      = Nothing
+	lookup k ((x,y):xys) | x == k    = Just y
+						 | otherwise = lookup k xys
+						 
+通过下面的代码，我们可以很容易的将结果类型推广到 ``MonadPlus`` 的任意实例。
+
+::
+
+	-- file: ch15/VCard.hs
+	lookupM :: (MonadPlus m, Eq a) => a -> [(a, b)] -> m b
+	lookupM _ []    = mzero
+	lookupM k ((x,y):xys)
+		| x == k    = return y `mplus` lookupM k xys
+		| otherwise = lookupM k xys
+		
+假如我们得到的结果是 ``Maybe`` 类型，那么通过这种方式我们将得到一个结果或“没有结果”；假如我们得到的结果是一个列表，那么我们将获得所有的结果；其它情况下，我们将获得一些适用于其它 ``MonadPlus`` 实例的结果。
+
+对于一些类似我们上面展示的小函数，使用 ``mplus`` 没什么明显的优点。 ``mplus`` 的优点体现在更复杂的代码和那些独立于 monad 执行过程的代码中。即使你没有在自己的代码中碰到需要使用 ``MonadPlus`` 的情况，你也很可能在别人的项目中遇到它。
+
+.. _the-name-mplus-does-not-imply-addition:
+
+mplus 不意味着相加
+^^^^^^^^^^^^^^^^^^
+
+函数 ``mplus`` 的名字中包含了 “plus”，但这并不代表着我们一定是要将两个值相加。根据我们处理的 monad 的不同，有时 ``mplus`` 会实现看起来类似相加的操作。例如，列表 monad 中 ``mplus`` 等同于 ``(++)`` 运算符。
+
+::
+
+	ghci> [1,2,3] `mplus` [4,5,6]
+	[1,2,3,4,5,6]
+	
+但是，假如我们切换到另一个 monad， ``mplus`` 和加法操作将不存在明显的相似性。
+
+::
+
+	ghci> Just 1 `mplus` Just 2
+	Just 1
+
+.. _rules-for-working-with-monadplus:
+
+使用 MonadPlus 的规则
+^^^^^^^^^^^^^^^^^^^^^
+
+除了通常情况下 monad 的规则外， ``MonadPlus`` 类型类的实例必须遵循一些其他简单的规则。
+
+如果一个捆绑表达式左侧出现了 ``mzero`` ，那么这个实例必须短路（short circuit）。换句话说，表达式 ``mzero >>= f`` 必须和单独的 ``mzero`` 效果相同。[译注：“短路” 也用来描述严格求值语言中布尔运算符的“短路”特性，例如 ``B != null && B.value != ""`` 可以避免在 ``B == null`` 时考量 ``B.value`` ]
+
+::
+
+	-- file: ch15/MonadPlus.hs
+		mzero >>= f == mzero
+
+如果 ``mzero`` 出现在了一个序列表达式的右侧，则这个实例必须短路。[译注：此处存在争议，例如 ``Maybe`` monad的一个例子 ``(undefined >> Nothing) = undefined /= Nothing`` 不满足这一条件。一种观点认为，短路特性意味着如果表达式中某个操作数的结果为某事，则不评估另一个操作数，也就是说必须首先评估一个操作数。所以，在“从左向右”和“从右向左”的短路之间，只能存在一种。]
+
+::
+
+	-- file: ch15/MonadPlus.hs
+		v >> mzero == mzero
+
+		
+.. _failing-safely-with-monadplus:
+
+通过 MonadPlus 安全地失败
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+当我们在 :ref:`the-monad-typeclass` 中介绍 ``fail`` 函数时，我们对它的使用提出了警告：在许多 monad 中，它可能被实现为一个对错误的调用，这会导致令人不愉快的后果。
+
+``MonadPlus`` 类型类为我们提供了一种更温和的方法来使一个计算失败，这使我们不必面临使用 ``fail`` 和 ``error`` 带来的危险。上面介绍的规则允许我们在代码中需要的任何地方引入一个 ``mzero`` ，这样计算将在该处短路。
+
+在 ``Control.Monad`` 模块中，标准函数 ``guard`` 将这个想法封装成了一种方便的形式。
+
+::
+	
+	-- file: ch15/MonadPlus.hs
+	guard        :: (MonadPlus m) => Bool -> m ()
+	guard True   =  return ()
+	guard False  =  mzero
+	
+作为一个简单的例子，这里有一个函数，它接受一个数 ``x`` 作为参数，并计算 ``x`` 对于另一个数 ``n`` 的取模结果。假如结果是 0 则返回 ``x`` ，否则返回当前 monad 对应的 ``mzero`` 。
+
+::
+
+	-- file: ch15/MonadPlus.hs
+	x `zeroMod` n = guard ((x `mod` n) == 0) >> return x
+	
+.. _adventures-in-hiding-the-plumbing:
+
+隐藏管道
+--------

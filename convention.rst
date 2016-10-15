@@ -148,6 +148,10 @@
 
 锯齿化		staircasing
 
+捆绑表达式	bind expression
+
+短路	short circuit
+
 第十八章
 ----------
 
