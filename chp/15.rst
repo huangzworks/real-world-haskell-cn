@@ -338,3 +338,160 @@ mplus 不意味着相加
 
 隐藏管道
 --------
+
+在 :ref:`using-the-state-monad-generating-random-values` 中，我们展示了使用 ``State`` monad 生成随机数的简单方法。
+
+我们编写的代码的一个缺点是它泄露了细节：使用者知道代码运行在 ``State`` monad中。这意味着他们可以像我们这些作者一样检测并修改随机数生成器的状态。
+
+人的本性决定了，一旦我们将工作内部细节暴露出来，就会有人试图对其做手脚。对于一个足够小的程序，这也许没什么问题，但在更大的软件项目中，如果库的某个使用者使用了其他使用者都没有预料到的方式修改库，这一举动可能导致的错误将非常严重。因为问题出现在库中，而我们通常不会怀疑库有问题，所以这些错误很难被发现，除非我们排除了所有其他可能。
+
+更糟糕的是，一旦程序的实现细节暴露，一些人将绕过我们提供的 API 并直接采用内部实现方式。当我们需要修复某个错误或者增强某个功能时，我们等于为自己设置了一道屏障。我们可以修改内部、破坏依赖它们的代码，或者我们坚持现有的内部结构并寻找其他方式来做出需要的改变。
+
+我们该如何修改随机数 monad 来隐藏我们使用了 ``State`` monad 的事实？我们需要使用某种方式来阻止用户调用 ``get`` 或 ``put`` 。要实现这一点并不难，而且具体实现中介绍了我们在日常 Haskell 编程中经常使用的技巧。
+
+为了扩大应用的范围，我们不用随机数做例子，而是实现了一个可以提供任意类型值的 monad，这个 monad 叫做 ``Supply`` 。我们将为执行函数 ``runSupply`` 提供一个值的列表，并确保列表中每个值是独一无二的。
+
+::
+
+	-- file: ch15/Supply.hs
+	runSupply :: Supply s a -> [s] -> (a, [s])
+
+这个 monad 并不关心这些值是什么，它们可能是随机数，或临时文件的名称，或者是 HTTP cookie的标识符。
+
+在这个 monad 中，每当用户要求获取一个值时， ``next`` 就会从列表中取出下一个值并将其交给用户。每个值都被 ``Maybe`` 构造器包装以防止这个列表的长度不满足需求。
+
+::
+
+	-- file: ch15/Supply.hs
+	next :: Supply s (Maybe s)
+	
+为了隐藏我们的管道，在模块声明中我们只导出了类型构造函数，执行函数和 ``next`` 动作。
+
+::
+
+	-- file: ch15/Supply.hs
+	module Supply
+		(
+		  Supply
+		, next
+		, runSupply
+		) where
+		
+因为导入库的模块不能看到 monad 的内部，因此模块不能修改我们的库。
+
+我们的管道非常简单：我们使用一个 ``newtype`` 声明来包装现有的 ``State`` monad。
+
+::
+
+	-- file: ch15/Supply.hs
+	import Control.Monad.State
+
+	newtype Supply s a = S (State [s] a)
+	
+参数 ``s`` 是我们提供的独特值的类型， ``a`` 是我们必须提供的常见类型参数，以使我们的类型成为 monad。[译注：这里类型 ``a`` 是自由的，即 ``a`` 可以是任何东西，以允许 monadic 函数返回任何可能需要的类型。例如 ``hGetLine :: Handle - > IO String`` 这样一个 monadic 函数，给定一个文件句柄，将从它读取一行并返回这一行的内容。这里，``String`` 是 IO Monad 要返回的类型 ``a`` ，程序员可以将 ``hGetLine`` 看作从句柄读取 String 的函数。]
+
+我们通过在 ``Supply`` 类型上应用 ``newtype`` 以及定义模块头来阻止用户使用 ``State`` monad 的 ``get`` 和 ``set`` 动作。因为我们的模块并不导出 ``s`` 的构造器，所以用户没有程序化的方式来查看或访问包装在 ``State`` monad 中的内容。
+
+现在我们有了一个类型 ``Supply`` ，我们需要定义一个 ``Monad`` 类型类的实例。我们可以遵循通常的方式如 ``(>>=)`` 和 ``return``，但这将是纯样板代码。我们现在所做的是通过 ``s`` 值构造器将 ``State`` monad 版本的 ``(>>=)`` 及 ``return`` 包装和展开。代码看起来应该是这个样子：
+
+::
+
+	-- file: ch15/AltSupply.hs
+	unwrapS :: Supply s a -> State [s] a
+	unwrapS (S s) = s
+
+	instance Monad (Supply s) where
+		s >>= m = S (unwrapS s >>= unwrapS . m)
+		return = S . return
+		
+Haskell 程序员不喜欢样板，GHC 有一个可爱的语言拓展功能消除了这一工作。我们将以下指令添加到源文件顶部（模块头之前）来使用这一功能。
+
+::
+
+	-- file: ch15/Supply.hs
+	{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+	
+通常我们只能自动导出一些标准类型类的实例如 ``Show`` 和 ``Eq`` 。顾名思义， ``GeneralizedNewtypeDeriving`` 拓展了我们派生类型类实例的能力，并且它特定于 ``newtype`` 的声明。通过下面的方式，如果我们包装的类型是任意一个类型类的实例，这个拓展可以自动让我们的新类型成为该类型类的实例。
+
+::
+
+	-- file: ch15/Supply.hs
+		deriving (Monad)
+	
+这需要底层类型实现 ``(>>=)`` 和 ``return`` ，通过 ``s`` 值构造器添加必要的包装和展开方法，并使用这些函数的新版本为我们导出一个 ``Monad`` 实例。[译注：这里的底层类型指的是 ``State`` 。]
+
+我们在这里获得到的远比这个例子来的多。我们可以使用 ``newtype`` 来包装任何底层类型；我们选择性地只暴露符合我们想法的类型类实例；而且我们几乎没有花费更多的工作来创建这些更恰当、专业的类型。
+
+现在我们已经看到了 ``GeneralizedNewtypeDeriving`` 技术，剩下的工作就是提供 ``next`` 和 ``runSupply`` 的定义。
+
+::
+
+	-- file: ch15/Supply.hs
+	next = S $ do st <- get
+				  case st of
+					[] -> return Nothing
+					(x:xs) -> do put xs
+								 return (Just x)
+
+	runSupply (S m) xs = runState m xs
+	
+我们可以将模块导入 ghci ，并用几种简单的方式尝试：
+
+::
+
+	ghci> :load Supply
+	[1 of 1] Compiling Supply           ( Supply.hs, interpreted )
+	Ok, modules loaded: Supply.
+	ghci> runSupply next [1,2,3]
+	Loading package mtl-1.1.0.0 ... linking ... done.
+	(Just 1,[2,3])
+	ghci> runSupply (liftM2 (,) next next) [1,2,3]
+	((Just 1,Just 2),[3])
+	ghci> runSupply (liftM2 (,) next next) [1]
+	((Just 1,Nothing),[])
+	
+我们也可以验证 ``State`` monad 是否以某种方式泄露。
+
+::
+
+	ghci> :browse Supply
+	data Supply s a
+	next :: Supply s (Maybe s)
+	runSupply :: Supply s a -> [s] -> (a, [s])
+	ghci> :info Supply
+	data Supply s a 	-- Defined at Supply.hs:17:8-13
+	instance Monad (Supply s) -- Defined at Supply.hs:17:8-13
+	
+.. _supplying-random-numbers:
+
+提供随机数
+^^^^^^^^^^
+
+
+
+.. _another-round-of-golf:
+
+另一轮高尔夫训练
+^^^^^^^^^^^^^^^^
+
+这种将函数应用在一对元素的其中一个元素上，并且与另一个未被修改的原始元素构成新对的模式在 Haskell 代码中已经非常普遍，它已经成为了一种标准代码。
+
+在 ``Control.Arrow`` 模块中有两个函数 ``first`` 和 ``second`` ，它们执行这个操作。
+
+::
+
+	ghci> :m +Control.Arrow
+	ghci> first (+3) (1,2)
+	(4,2)
+	ghci> second odd ('a',1)
+	('a',True)
+	
+（事实上我们已经在 :ref:`json_typeclasses_without_overlapping_instances` 中遇到过 ``second`` 了。）我们可以使用 ``first`` 来产生我们自己 ``randomsIO`` 的定义，将其转化为单线。
+
+::
+
+	-- file: ch15/RandomGolf.hs
+	import Control.Arrow (first)
+
+	randomsIO_golfed :: Random a => IO [a]
+	randomsIO_golfed = getStdRandom (first randoms . split)
