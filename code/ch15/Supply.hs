@@ -1,8 +1,6 @@
 -- file: ch15/Supply.hs
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-import Control.Monad.State
-
 module Supply
     (
       Supply
@@ -10,12 +8,15 @@ module Supply
     , runSupply
     ) where
 
-newtype Supply s a = S (State [s] a) deriving (Monad)
+import Control.Monad.State
 
 runSupply :: Supply s a -> [s] -> (a, [s])
+next :: Supply s (Maybe s)
+
+newtype Supply s a = S (State [s] a) deriving (Functor, Applicative, Monad)
+
 runSupply (S m) xs = runState m xs
 
-next :: Supply s (Maybe s)
 next = S $ do st <- get
               case st of
                 [] -> return Nothing

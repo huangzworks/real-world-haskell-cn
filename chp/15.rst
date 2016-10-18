@@ -417,6 +417,8 @@ Haskell 程序员不喜欢样板，GHC 有一个可爱的语言拓展功能消�
 
 	-- file: ch15/Supply.hs
 		deriving (Monad)
+		
+[译注：在 GHC 7.10 中， ``Monad` 是 ``Applicative`` 和 ``Functor`` 的子类，因此上面的 ``deriving`` 需要改为 ``deriving(Functor, Applicative, Monad)`` 。] 
 	
 这需要底层类型实现 ``(>>=)`` 和 ``return`` ，通过 ``s`` 值构造器添加必要的包装和展开方法，并使用这些函数的新版本为我们导出一个 ``Monad`` 实例。[译注：这里的底层类型指的是 ``State`` 。]
 
@@ -435,7 +437,7 @@ Haskell 程序员不喜欢样板，GHC 有一个可爱的语言拓展功能消�
 
 	runSupply (S m) xs = runState m xs
 	
-我们可以将模块导入 ghci ，并用几种简单的方式尝试：
+我们可以将模块导入 **ghci** ，并用几种简单的方式尝试：
 
 ::
 
@@ -467,8 +469,70 @@ Haskell 程序员不喜欢样板，GHC 有一个可爱的语言拓展功能消�
 提供随机数
 ^^^^^^^^^^
 
+如果我们想使用 ``Supply`` monad 作为随机数的源，那么有一些小困难需要克服。理想情况下，我们希望能为它提供一个无限的随机数流。我们可以在 ``IO`` monad 中获得一个 ``StdGen`` ，但完成后必须 “放回” 一个不同的 ``StdGen`` 。加入我们不这么做，下一段代码得到的 ``StdGen`` 将获得与之前相同的状态。这意味着它将产生与此前相同的随机数，这样的结果可能是灾难性的。
 
+目前为止我们所看到的部分 ``System.Random`` 模块很难满足这些要求。我们可以使用 ``getStdRandom`` ，它的类型确保了我们可以同时得到和放回一个 ``StdGen`` 。
 
+我们可以使用 ``random`` 在获取一个随机数的同时得到一个新的 ``StdGen`` 。我们可以用 ``randoms`` 获取一个无限的随机数列表。但我们如何同时得到一个无限的随机数列表和一个新的 ``StdGen``？
+
+答案在于 ``RandomGen`` 类型类的拆分函数，它接受一个随机数生成器，并将其转换为两个生成器。能够分裂这样的随机生成器是一件很不寻常的事，它在纯函数的设定中显然非常有用，但对于非纯函数语言基本不需要。[译注： ``stdSplit`` 的统计基础较差，如果随机数的质量很重要，应当尽量避免不必要的分割。]
+
+通过使用 ``split`` 函数，我们可以用一个 ``StdGen`` 来生成一个无限长的随机数列表并将其交付 ``runSupply`` ，同时将另一个 ``StdGen`` 返还给 ``IO`` monad。
+
+::
+
+	-- file: ch15/RandomSupply.hs
+	import Supply
+	import System.Random hiding (next)
+
+	randomsIO :: Random a => IO [a]
+	randomsIO =
+		getStdRandom $ \g ->
+			let (a, b) = split g
+			in (randoms a, b)
+
+如果我们正确的书写了这个函数，我们的例子应该在每次调用时打印一个不同的随机数。
+
+::
+	
+	ghci> :load RandomSupply
+	[1 of 2] Compiling Supply           ( Supply.hs, interpreted )
+	[2 of 2] Compiling RandomSupply     ( RandomSupply.hs, interpreted )
+	Ok, modules loaded: RandomSupply, Supply.
+	ghci> (fst . runSupply next) `fmap` randomsIO
+
+	<interactive>:1:17:
+		Ambiguous occurrence `next'
+		It could refer to either `Supply.next', imported from Supply at RandomSupply.hs:4:0-12
+												  (defined at Supply.hs:32:0)
+							  or `System.Random.next', imported from System.Random
+	ghci> (fst . runSupply next) `fmap` randomsIO
+
+	<interactive>:1:17:
+		Ambiguous occurrence `next'
+		It could refer to either `Supply.next', imported from Supply at RandomSupply.hs:4:0-12
+												  (defined at Supply.hs:32:0)
+							  or `System.Random.next', imported from System.Random
+	
+.. warning::
+	
+	[译注：此处保留了原著中的错误，原著执行的代码中可能丢失了 ``hiding (next)`` ，因此产生歧义。下面给出正确情况下的某次执行结果。]
+	
+	::
+	
+		ghci> :load RandomSupply
+		[1 of 2] Compiling Supply           ( Supply.hs, interpreted )
+		[2 of 2] Compiling Main             ( RandomSupply.hs, interpreted )
+		Ok, modules loaded: Supply, Main.
+		ghci> (fst . runSupply next) `fmap` randomsIO
+		Just (-54705384517081531)
+		ghci> (fst . runSupply next) `fmap` randomsIO
+		Just (-2652939136952789000)
+		ghci> (fst . runSupply next) `fmap` randomsIO
+		Just (-5089130856647223466)
+		
+回想一下，我们的 ``runSupply`` 函数同时返回执行 monadic 操作的结果和列表的剩余部分。因为我们传递了一个无限的随机数列表，所以用 ``fst`` 来组合，以保证当 **ghci** 尝试打印结果时不会被随机数淹没。
+	
 .. _another-round-of-golf:
 
 另一轮高尔夫训练
@@ -495,3 +559,4 @@ Haskell 程序员不喜欢样板，GHC 有一个可爱的语言拓展功能消�
 
 	randomsIO_golfed :: Random a => IO [a]
 	randomsIO_golfed = getStdRandom (first randoms . split)
+	

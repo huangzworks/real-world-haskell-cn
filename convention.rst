@@ -152,6 +152,8 @@
 
 短路	short circuit
 
+拆分函数	split function
+
 第十八章
 ----------
 
