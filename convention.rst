@@ -154,6 +154,8 @@
 
 拆分函数	split function
 
+单线	one-liner
+
 第十八章
 ----------
 
