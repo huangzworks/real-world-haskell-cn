@@ -302,6 +302,221 @@
 </div>
 <div class="section" id="adventures-in-hiding-the-plumbing">
 <span id="id5"></span><h2>隐藏管道<a class="headerlink" href="#adventures-in-hiding-the-plumbing" title="Permalink to this headline">¶</a></h2>
+<p>在 <a class="reference internal" href="14.html#using-the-state-monad-generating-random-values"><span>使用State monad生成随机数</span></a> 中，我们展示了使用 <code class="docutils literal"><span class="pre">State</span></code> monad 生成随机数的简单方法。</p>
+<p>我们编写的代码的一个缺点是它泄露了细节：使用者知道代码运行在 <code class="docutils literal"><span class="pre">State</span></code> monad中。这意味着他们可以像我们这些作者一样检测并修改随机数生成器的状态。</p>
+<p>人的本性决定了，一旦我们将工作内部细节暴露出来，就会有人试图对其做手脚。对于一个足够小的程序，这也许没什么问题，但在更大的软件项目中，如果库的某个使用者使用了其他使用者都没有预料到的方式修改库，这一举动可能导致的错误将非常严重。因为问题出现在库中，而我们通常不会怀疑库有问题，所以这些错误很难被发现，直到我们排除了所有其他可能。</p>
+<p>更糟糕的是，一旦程序的实现细节暴露，一些人将绕过我们提供的 API 并直接采用内部实现方式。当我们需要修复某个错误或者增强某个功能时，我们等于为自己设置了一道屏障。我们要么修改内部、破坏依赖它们的代码，要么坚持现有的内部结构并寻找其他方式来做出需要的改变。</p>
+<p>我们该如何修改随机数 monad 来隐藏我们使用了 <code class="docutils literal"><span class="pre">State</span></code> monad 的事实？我们需要使用某种方式来阻止用户调用 <code class="docutils literal"><span class="pre">get</span></code> 或 <code class="docutils literal"><span class="pre">put</span></code> 。要实现这一点并不难，并且在具体实现中我们将会介绍一些在日常 Haskell 编程中经常使用的技巧。</p>
+<p>为了扩大应用的范围，我们不用随机数做例子，而是实现了一个可以提供任意类型不重复值的 monad，这个 monad 叫做 <code class="docutils literal"><span class="pre">Supply</span></code> 。我们将为执行函数 <code class="docutils literal"><span class="pre">runSupply</span></code> 提供一个值的列表，并确保列表中每个值是独一无二的。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/Supply.hs</span>
+<span class="nf">runSupply</span> <span class="ow">::</span> <span class="kt">Supply</span> <span class="n">s</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="p">[</span><span class="n">s</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>这个 monad 并不关心这些值是什么，它们可能是随机数，或临时文件的名称，或者是 HTTP cookie的标识符。</p>
+<p>在这个 monad 中，每当用户要求获取一个值时， <code class="docutils literal"><span class="pre">next</span></code> 就会从列表中取出下一个值并将其交给用户。每个值都被 <code class="docutils literal"><span class="pre">Maybe</span></code> 构造器包装以防止这个列表的长度不满足需求。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/Supply.hs</span>
+<span class="nf">next</span> <span class="ow">::</span> <span class="kt">Supply</span> <span class="n">s</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">s</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>为了隐藏我们的管道，在模块声明中我们只导出了类型构造函数，执行函数和 <code class="docutils literal"><span class="pre">next</span></code> 动作。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/Supply.hs</span>
+<span class="kr">module</span> <span class="nn">Supply</span>
+        <span class="p">(</span>
+          <span class="kt">Supply</span>
+        <span class="p">,</span> <span class="nf">next</span>
+        <span class="p">,</span> <span class="nf">runSupply</span>
+        <span class="p">)</span> <span class="kr">where</span>
+</pre></div>
+</div>
+<p>因为导入库的模块不能看到 monad 的内部，所以它不能修改我们的库。</p>
+<p>我们的管道非常简单：使用一个 <code class="docutils literal"><span class="pre">newtype</span></code> 声明来包装现有的 <code class="docutils literal"><span class="pre">State</span></code> monad。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/Supply.hs</span>
+<span class="kr">import</span> <span class="nn">Control.Monad.State</span>
+
+<span class="kr">newtype</span> <span class="kt">Supply</span> <span class="n">s</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">S</span> <span class="p">(</span><span class="kt">State</span> <span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="n">a</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>参数 <code class="docutils literal"><span class="pre">s</span></code> 是我们提供的独特值的类型， <code class="docutils literal"><span class="pre">a</span></code> 是我们必须提供的常见类型参数，以使我们的类型成为 monad。[译注：这里类型 <code class="docutils literal"><span class="pre">a</span></code> 是自由的，即 <code class="docutils literal"><span class="pre">a</span></code> 可以是任何东西，以允许 monadic 函数返回任何可能需要的类型。例如 <code class="docutils literal"><span class="pre">hGetLine</span> <span class="pre">::</span> <span class="pre">Handle</span> <span class="pre">-</span> <span class="pre">&gt;</span> <span class="pre">IO</span> <span class="pre">String</span></code> 这样一个 monadic 函数，给定一个文件句柄，将从它读取一行并返回这一行的内容。这里，<code class="docutils literal"><span class="pre">String</span></code> 是 IO Monad 要返回的类型 <code class="docutils literal"><span class="pre">a</span></code> ，程序员可以将 <code class="docutils literal"><span class="pre">hGetLine</span></code> 看作从句柄读取 String 的函数。]</p>
+<p>我们通过在 <code class="docutils literal"><span class="pre">Supply</span></code> 类型上应用 <code class="docutils literal"><span class="pre">newtype</span></code> 以及定义模块头来阻止用户使用 <code class="docutils literal"><span class="pre">State</span></code> monad 的 <code class="docutils literal"><span class="pre">get</span></code> 和 <code class="docutils literal"><span class="pre">set</span></code> 动作。因为我们的模块并不导出 <code class="docutils literal"><span class="pre">s</span></code> 的构造器，所以用户没有程序化的方式来查看或访问包装在 <code class="docutils literal"><span class="pre">State</span></code> monad 中的内容。</p>
+<p>现在我们有了一个类型 <code class="docutils literal"><span class="pre">Supply</span></code> ，接下来需要定义一个 <code class="docutils literal"><span class="pre">Monad</span></code> 类型类的实例。我们可以遵循通常的方式如 <code class="docutils literal"><span class="pre">(&gt;&gt;=)</span></code> 和 <code class="docutils literal"><span class="pre">return</span></code>，但这将变成纯样板代码。我们现在所做的是通过 <code class="docutils literal"><span class="pre">s</span></code> 值构造器将 <code class="docutils literal"><span class="pre">State</span></code> monad 版本的 <code class="docutils literal"><span class="pre">(&gt;&gt;=)</span></code> 及 <code class="docutils literal"><span class="pre">return</span></code> 包装和展开。代码看起来应该是这个样子：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/AltSupply.hs</span>
+<span class="nf">unwrapS</span> <span class="ow">::</span> <span class="kt">Supply</span> <span class="n">s</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">State</span> <span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="n">a</span>
+<span class="nf">unwrapS</span> <span class="p">(</span><span class="kt">S</span> <span class="n">s</span><span class="p">)</span> <span class="ow">=</span> <span class="n">s</span>
+
+<span class="kr">instance</span> <span class="kt">Monad</span> <span class="p">(</span><span class="kt">Supply</span> <span class="n">s</span><span class="p">)</span> <span class="kr">where</span>
+        <span class="n">s</span> <span class="o">&gt;&gt;=</span> <span class="n">m</span> <span class="ow">=</span> <span class="kt">S</span> <span class="p">(</span><span class="n">unwrapS</span> <span class="n">s</span> <span class="o">&gt;&gt;=</span> <span class="n">unwrapS</span> <span class="o">.</span> <span class="n">m</span><span class="p">)</span>
+        <span class="n">return</span> <span class="ow">=</span> <span class="kt">S</span> <span class="o">.</span> <span class="n">return</span>
+</pre></div>
+</div>
+<p>Haskell 程序员不喜欢样板，GHC 有一个可爱的语言拓展功能消除了这一工作。我们将以下指令添加到源文件顶部（模块头之前）来使用这一功能。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/Supply.hs</span>
+<span class="cm">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span>
+</pre></div>
+</div>
+<p>通常我们只能自动导出一些标准类型类的实例如 <code class="docutils literal"><span class="pre">Show</span></code> 和 <code class="docutils literal"><span class="pre">Eq</span></code> 。顾名思义， <code class="docutils literal"><span class="pre">GeneralizedNewtypeDeriving</span></code> 拓展了我们派生类型类实例的能力，并且它特定于 <code class="docutils literal"><span class="pre">newtype</span></code> 的声明。通过下面的方式，如果我们包装的类型是任意一个类型类的实例，这个拓展可以自动让我们的新类型成为该类型类的实例。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/Supply.hs</span>
+        <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Monad</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>[译注：在 GHC 7.10 中， <code class="docutils literal"><span class="pre">Monad`</span> <span class="pre">是</span> <span class="pre">``Applicative</span></code> 和 <code class="docutils literal"><span class="pre">Functor</span></code> 的子类，因此上面的 <code class="docutils literal"><span class="pre">deriving</span></code> 需要改为 <code class="docutils literal"><span class="pre">deriving(Functor,</span> <span class="pre">Applicative,</span> <span class="pre">Monad)</span></code> 。]</p>
+<p>这需要底层类型实现 <code class="docutils literal"><span class="pre">(&gt;&gt;=)</span></code> 和 <code class="docutils literal"><span class="pre">return</span></code> ，通过 <code class="docutils literal"><span class="pre">s</span></code> 值构造器添加必要的包装和展开方法，并使用这些函数的新版本为我们导出一个 <code class="docutils literal"><span class="pre">Monad</span></code> 实例。[译注：这里的底层类型指的是 <code class="docutils literal"><span class="pre">State</span></code> 。]</p>
+<p>我们在这里获得到的远比这个例子来的多。我们可以使用 <code class="docutils literal"><span class="pre">newtype</span></code> 来包装任何底层类型；我们选择性地只暴露符合我们想法的类型类实例；而且我们几乎没有花费更多的工作来创建这些更恰当、专业的类型。</p>
+<p>现在我们已经看到了 <code class="docutils literal"><span class="pre">GeneralizedNewtypeDeriving</span></code> 技术，剩下的工作就是提供 <code class="docutils literal"><span class="pre">next</span></code> 和 <code class="docutils literal"><span class="pre">runSupply</span></code> 的定义。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/Supply.hs</span>
+<span class="nf">next</span> <span class="ow">=</span> <span class="kt">S</span> <span class="o">$</span> <span class="kr">do</span> <span class="n">st</span> <span class="ow">&lt;-</span> <span class="n">get</span>
+                          <span class="kr">case</span> <span class="n">st</span> <span class="kr">of</span>
+                                <span class="kt">[]</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="kt">Nothing</span>
+                                <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kr">do</span> <span class="n">put</span> <span class="n">xs</span>
+                                                         <span class="n">return</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">x</span><span class="p">)</span>
+
+<span class="nf">runSupply</span> <span class="p">(</span><span class="kt">S</span> <span class="n">m</span><span class="p">)</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">runState</span> <span class="n">m</span> <span class="n">xs</span>
+</pre></div>
+</div>
+<p>我们可以将模块导入 <strong>ghci</strong> ，并用几种简单的方式尝试：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">Supply</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Supply</span>           <span class="p">(</span> <span class="kt">Supply</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Supply</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">runSupply</span> <span class="n">next</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+<span class="kt">Loading</span> <span class="n">package</span> <span class="n">mtl</span><span class="o">-</span><span class="mf">1.1</span><span class="o">.</span><span class="mf">0.0</span> <span class="o">...</span> <span class="n">linking</span> <span class="o">...</span> <span class="n">done</span><span class="o">.</span>
+<span class="p">(</span><span class="kt">Just</span> <span class="mi">1</span><span class="p">,[</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">])</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">runSupply</span> <span class="p">(</span><span class="n">liftM2</span> <span class="p">(,)</span> <span class="n">next</span> <span class="n">next</span><span class="p">)</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+<span class="p">((</span><span class="kt">Just</span> <span class="mi">1</span><span class="p">,</span><span class="kt">Just</span> <span class="mi">2</span><span class="p">),[</span><span class="mi">3</span><span class="p">])</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">runSupply</span> <span class="p">(</span><span class="n">liftM2</span> <span class="p">(,)</span> <span class="n">next</span> <span class="n">next</span><span class="p">)</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="p">((</span><span class="kt">Just</span> <span class="mi">1</span><span class="p">,</span><span class="kt">Nothing</span><span class="p">),</span><span class="kt">[]</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>我们也可以验证 <code class="docutils literal"><span class="pre">State</span></code> monad 是否以某种方式泄露。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">browse</span> <span class="kt">Supply</span>
+<span class="kr">data</span> <span class="kt">Supply</span> <span class="n">s</span> <span class="n">a</span>
+<span class="nf">next</span> <span class="ow">::</span> <span class="kt">Supply</span> <span class="n">s</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">s</span><span class="p">)</span>
+<span class="nf">runSupply</span> <span class="ow">::</span> <span class="kt">Supply</span> <span class="n">s</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="p">[</span><span class="n">s</span><span class="p">])</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">info</span> <span class="kt">Supply</span>
+<span class="kr">data</span> <span class="kt">Supply</span> <span class="n">s</span> <span class="n">a</span>         <span class="c1">-- Defined at Supply.hs:17:8-13</span>
+<span class="kr">instance</span> <span class="kt">Monad</span> <span class="p">(</span><span class="kt">Supply</span> <span class="n">s</span><span class="p">)</span> <span class="c1">-- Defined at Supply.hs:17:8-13</span>
+</pre></div>
+</div>
+<div class="section" id="supplying-random-numbers">
+<span id="id6"></span><h3>提供随机数<a class="headerlink" href="#supplying-random-numbers" title="Permalink to this headline">¶</a></h3>
+<p>如果我们想使用 <code class="docutils literal"><span class="pre">Supply</span></code> monad 作为随机数的源，那么有一些小困难需要克服。理想情况下，我们希望能为它提供一个无限的随机数流。我们可以在 <code class="docutils literal"><span class="pre">IO</span></code> monad 中获得一个 <code class="docutils literal"><span class="pre">StdGen</span></code> ，但完成后必须 “放回” 一个不同的 <code class="docutils literal"><span class="pre">StdGen</span></code> 。假如我们不这么做，下一段代码得到的 <code class="docutils literal"><span class="pre">StdGen</span></code> 将获得与之前相同的状态。这意味着它将产生与此前相同的随机数，这样的结果可能是灾难性的。</p>
+<p>目前为止我们所看到的 <code class="docutils literal"><span class="pre">System.Random</span></code> 模块很难满足这些要求。我们可以使用 <code class="docutils literal"><span class="pre">getStdRandom</span></code> ，它的类型确保了我们可以同时得到和放回一个 <code class="docutils literal"><span class="pre">StdGen</span></code> 。</p>
+<p>我们可以使用 <code class="docutils literal"><span class="pre">random</span></code> 在获取一个随机数的同时得到一个新的 <code class="docutils literal"><span class="pre">StdGen</span></code> 。我们可以用 <code class="docutils literal"><span class="pre">randoms</span></code> 获取一个无限的随机数列表。但我们如何同时得到一个无限的随机数列表和一个新的 <code class="docutils literal"><span class="pre">StdGen</span></code>？</p>
+<p>答案在于 <code class="docutils literal"><span class="pre">RandomGen</span></code> 类型类的拆分函数。它接受一个随机数生成器，并将其转换为两个生成器。能够分裂这样的随机生成器是一件很不寻常的事，它在纯函数的设定中显然非常有用，但对于非纯函数语言基本不需要。[译注： <code class="docutils literal"><span class="pre">stdSplit</span></code> 的统计基础较差，如果随机数的质量很重要，应当尽量避免不必要的分割。]</p>
+<p>通过使用 <code class="docutils literal"><span class="pre">split</span></code> 函数，我们可以用一个 <code class="docutils literal"><span class="pre">StdGen</span></code> 来生成一个无限长的随机数列表并将其交付 <code class="docutils literal"><span class="pre">runSupply</span></code> ，同时将另一个 <code class="docutils literal"><span class="pre">StdGen</span></code> 返还给 <code class="docutils literal"><span class="pre">IO</span></code> monad。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/RandomSupply.hs</span>
+<span class="kr">import</span> <span class="nn">Supply</span>
+<span class="kr">import</span> <span class="nn">System.Random</span> <span class="k">hiding</span> <span class="p">(</span><span class="nf">next</span><span class="p">)</span>
+
+<span class="nf">randomsIO</span> <span class="ow">::</span> <span class="kt">Random</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">randomsIO</span> <span class="ow">=</span>
+        <span class="n">getStdRandom</span> <span class="o">$</span> <span class="nf">\</span><span class="n">g</span> <span class="ow">-&gt;</span>
+                <span class="kr">let</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=</span> <span class="n">split</span> <span class="n">g</span>
+                <span class="kr">in</span> <span class="p">(</span><span class="n">randoms</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>如果我们正确的书写了这个函数，我们的例子应该在每次调用时打印一个不同的随机数。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">RandomSupply</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Supply</span>           <span class="p">(</span> <span class="kt">Supply</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="p">[</span><span class="mi">2</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">RandomSupply</span>     <span class="p">(</span> <span class="kt">RandomSupply</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">RandomSupply</span><span class="p">,</span> <span class="kt">Supply</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">fst</span> <span class="o">.</span> <span class="n">runSupply</span> <span class="n">next</span><span class="p">)</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="n">randomsIO</span>
+
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">17</span><span class="kt">:</span>
+        <span class="kt">Ambiguous</span> <span class="n">occurrence</span> <span class="p">`</span><span class="n">next&#39;</span>
+        <span class="kt">It</span> <span class="n">could</span> <span class="n">refer</span> <span class="n">to</span> <span class="n">either</span> <span class="p">`</span><span class="kt">Supply</span><span class="o">.</span><span class="n">next&#39;</span><span class="p">,</span> <span class="n">imported</span> <span class="n">from</span> <span class="kt">Supply</span> <span class="n">at</span> <span class="kt">RandomSupply</span><span class="o">.</span><span class="n">hs</span><span class="kt">:</span><span class="mi">4</span><span class="kt">:</span><span class="mi">0</span><span class="o">-</span><span class="mi">12</span>
+                                                                                          <span class="p">(</span><span class="n">defined</span> <span class="n">at</span> <span class="kt">Supply</span><span class="o">.</span><span class="n">hs</span><span class="kt">:</span><span class="mi">32</span><span class="kt">:</span><span class="mi">0</span><span class="p">)</span>
+                                                  <span class="n">or</span> <span class="p">`</span><span class="kt">System</span><span class="o">.</span><span class="kt">Random</span><span class="o">.</span><span class="n">next&#39;</span><span class="p">,</span> <span class="n">imported</span> <span class="n">from</span> <span class="kt">System</span><span class="o">.</span><span class="kt">Random</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">fst</span> <span class="o">.</span> <span class="n">runSupply</span> <span class="n">next</span><span class="p">)</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="n">randomsIO</span>
+
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">17</span><span class="kt">:</span>
+        <span class="kt">Ambiguous</span> <span class="n">occurrence</span> <span class="p">`</span><span class="n">next&#39;</span>
+        <span class="kt">It</span> <span class="n">could</span> <span class="n">refer</span> <span class="n">to</span> <span class="n">either</span> <span class="p">`</span><span class="kt">Supply</span><span class="o">.</span><span class="n">next&#39;</span><span class="p">,</span> <span class="n">imported</span> <span class="n">from</span> <span class="kt">Supply</span> <span class="n">at</span> <span class="kt">RandomSupply</span><span class="o">.</span><span class="n">hs</span><span class="kt">:</span><span class="mi">4</span><span class="kt">:</span><span class="mi">0</span><span class="o">-</span><span class="mi">12</span>
+                                                                                          <span class="p">(</span><span class="n">defined</span> <span class="n">at</span> <span class="kt">Supply</span><span class="o">.</span><span class="n">hs</span><span class="kt">:</span><span class="mi">32</span><span class="kt">:</span><span class="mi">0</span><span class="p">)</span>
+                                                  <span class="n">or</span> <span class="p">`</span><span class="kt">System</span><span class="o">.</span><span class="kt">Random</span><span class="o">.</span><span class="n">next&#39;</span><span class="p">,</span> <span class="n">imported</span> <span class="n">from</span> <span class="kt">System</span><span class="o">.</span><span class="kt">Random</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p>[译注：此处保留了原著中的错误，原著执行的代码中可能丢失了 <code class="docutils literal"><span class="pre">hiding</span> <span class="pre">(next)</span></code> ，因此产生歧义。下面给出正确情况下的某次执行结果。]</p>
+<div class="last highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">load</span> <span class="kt">RandomSupply</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Supply</span>           <span class="p">(</span> <span class="kt">Supply</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="p">[</span><span class="mi">2</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">RandomSupply</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">Supply</span><span class="p">,</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">fst</span> <span class="o">.</span> <span class="n">runSupply</span> <span class="n">next</span><span class="p">)</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="n">randomsIO</span>
+<span class="kt">Just</span> <span class="p">(</span><span class="o">-</span><span class="mi">54705384517081531</span><span class="p">)</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">fst</span> <span class="o">.</span> <span class="n">runSupply</span> <span class="n">next</span><span class="p">)</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="n">randomsIO</span>
+<span class="kt">Just</span> <span class="p">(</span><span class="o">-</span><span class="mi">2652939136952789000</span><span class="p">)</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">fst</span> <span class="o">.</span> <span class="n">runSupply</span> <span class="n">next</span><span class="p">)</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="n">randomsIO</span>
+<span class="kt">Just</span> <span class="p">(</span><span class="o">-</span><span class="mi">5089130856647223466</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>回想一下，我们的 <code class="docutils literal"><span class="pre">runSupply</span></code> 函数同时返回执行 monadic 操作的结果和列表的剩余部分。因为我们传递了一个无限的随机数列表，所以这里用 <code class="docutils literal"><span class="pre">fst</span></code> 来组合，以保证当 <strong>ghci</strong> 尝试打印结果时不会被随机数淹没。</p>
+</div>
+<div class="section" id="another-round-of-golf">
+<span id="id7"></span><h3>另一轮高尔夫训练<a class="headerlink" href="#another-round-of-golf" title="Permalink to this headline">¶</a></h3>
+<p>这种将函数应用在一对元素的其中一个元素上，并且与另一个未被修改的原始元素构成新对的模式在 Haskell 代码中已经非常普遍，它已经成为了一种标准代码。</p>
+<p>在 <code class="docutils literal"><span class="pre">Control.Arrow</span></code> 模块中有两个函数 <code class="docutils literal"><span class="pre">first</span></code> 和 <code class="docutils literal"><span class="pre">second</span></code> ，它们执行这个操作。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="o">+</span><span class="kt">Control</span><span class="o">.</span><span class="kt">Arrow</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">first</span> <span class="p">(</span><span class="o">+</span><span class="mi">3</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span>
+<span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">second</span> <span class="n">odd</span> <span class="p">(</span><span class="sc">&#39;a&#39;</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+<span class="p">(</span><span class="sc">&#39;a&#39;</span><span class="p">,</span><span class="kt">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>（事实上我们已经在 <a class="reference internal" href="6.html#json-typeclasses-without-overlapping-instances"><span>JSON类型类,不带有重叠实例</span></a> 中遇到过 <code class="docutils literal"><span class="pre">second</span></code> 了。）我们可以使用 <code class="docutils literal"><span class="pre">first</span></code> 来产生我们自己 <code class="docutils literal"><span class="pre">randomsIO</span></code> 的定义，将其转化为单线形式。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/RandomGolf.hs</span>
+<span class="kr">import</span> <span class="nn">Control.Arrow</span> <span class="p">(</span><span class="nf">first</span><span class="p">)</span>
+
+<span class="nf">randomsIO_golfed</span> <span class="ow">::</span> <span class="kt">Random</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">randomsIO_golfed</span> <span class="ow">=</span> <span class="n">getStdRandom</span> <span class="p">(</span><span class="n">first</span> <span class="n">randoms</span> <span class="o">.</span> <span class="n">split</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="separating-interface-from-implementation">
+<span id="id8"></span><h2>将接口与实现分离<a class="headerlink" href="#separating-interface-from-implementation" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="multi-parameter-typeclasses">
+<span id="id9"></span><h3>多参数类型类<a class="headerlink" href="#multi-parameter-typeclasses" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="functional-dependencies">
+<span id="id10"></span><h3>功能依赖<a class="headerlink" href="#functional-dependencies" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="rounding-out-our-module">
+<span id="id11"></span><h3>舍入模块<a class="headerlink" href="#rounding-out-our-module" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="programming-to-a-monads-interface">
+<span id="id12"></span><h3>对 monad 接口编程<a class="headerlink" href="#programming-to-a-monads-interface" title="Permalink to this headline">¶</a></h3>
+</div>
+</div>
+<div class="section" id="reader-monad">
+<span id="the-reader-monad"></span><h2>Reader monad<a class="headerlink" href="#reader-monad" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="a-return-to-automated-deriving">
+<span id="id13"></span><h2>返回自动导出<a class="headerlink" href="#a-return-to-automated-deriving" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="io-monad">
+<span id="hiding-the-io-monad"></span><h2>隐藏 IO monad<a class="headerlink" href="#io-monad" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="newtype">
+<span id="using-a-newtype"></span><h3>使用 newtype<a class="headerlink" href="#newtype" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="designing-for-unexpected-uses">
+<span id="id14"></span><h3>针对意外使用情况设计<a class="headerlink" href="#designing-for-unexpected-uses" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="using-typeclasses">
+<span id="id15"></span><h3>使用类型类<a class="headerlink" href="#using-typeclasses" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="isolation-and-testing">
+<span id="id16"></span><h3>隔离和测试<a class="headerlink" href="#isolation-and-testing" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="writer-monad">
+<span id="the-writer-monad-and-lists"></span><h3>Writer monad 和 列表<a class="headerlink" href="#writer-monad" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="i-o">
+<span id="arbitrary-io-revisited"></span><h3>任意 I/O 访问<a class="headerlink" href="#i-o" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="id17">
+<h3>练习<a class="headerlink" href="#id17" title="Permalink to this headline">¶</a></h3>
+</div>
 </div>
 </div>
 
