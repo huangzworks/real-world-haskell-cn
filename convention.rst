@@ -156,6 +156,12 @@
 
 单线	one-liner
 
+多参数类型类	MultiParamTypeClasses
+
+超类	superclass
+
+功能依赖	functional dependency
+
 第十八章
 ----------
 
