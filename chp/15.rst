@@ -565,25 +565,122 @@ Haskell 程序员不喜欢样板，GHC 有一个可爱的语言拓展功能消�
 将接口与实现分离
 ----------------
 
+在前面的章节中，我们看到了如何向用户隐藏我们在内部使用 ``State`` monad 来保持 ``Supply`` monad状态的事实。
+
+使代码更加模块化的另一个重要方式是将接口（代码可以做什么）从实现（代码具体如何做）中分离出来。
+
+众所周知，标准的随机数生成器 ``System.Random`` 速度很慢。如果使用我们的 ``randomsIO`` 函数为它提供随机数，那么我们的 ``next`` 动作执行效果将不会很好。
+
+一个简单有效的解决办法是为 ``Supply`` 提供一个更好的随机数源，但现在让我们把这个方法先放到一边，转而考虑一种在许多设定中都有效的替代方法。我们将使用一个类型类，对 monad 的行为和实现进行分离。
+
+::
+
+	-- file: ch15/SupplyClass.hs
+	class (Monad m) => MonadSupply s m | m -> s where
+		next :: m (Maybe s)
+		
+这个类型类定义了任何 ``Supply`` monad 都必须实现的接口。因为这个类型类使用了几个我们尚不熟悉的 Haskell 语言扩展，所以我们需要对这个类型类进行详细的分析，它涉及的各个扩展将在接下来的小节中介绍。
+
 .. _multi-parameter-typeclasses:
 
 多参数类型类
 ^^^^^^^^^^^^
+
+我们应该如何读取类型类中的代码片段 ``MonadSupply s m`` ？如果我们添加括号，则等价表达式是 ``( MonadSupply s ) m`` ，它看起来更清晰一些。换句话说，给定一些 ``Monad`` 类型变量 ``m`` ，我们可以让它成为类型类 ``MonadSupply s`` 的一个实例。与常规类型类不同，这里的类型类有一个参数。 [译注： `此链接 <http://www.haskell.org/ghc/docs/7.6-latest/html/users_guide/type-class-extensions.html#functional-dependencies>`_ 可能会帮助你更好地理解功能依赖及多参数类型类。实际上，上面给出的例子中， ``s`` 和 ``m`` 仅仅是两个参数，它们的位置可以互换。原作者通过加括号的方式，将其理解为一个参数和另一个有参数的类型类，也许在数学上正确，但译者认为此处可能导致读者的困惑。]
+
+这个语言扩展被称作 ``MultiParamTypeClasses`` ，因为它允许类型类有多个参数。参数 ``s`` 的作用与 ``Supply`` 类型的参数相同：它代表了 ``next`` 动作发出的值。
+
+注意，我们不需要在 ``MonadSupply s`` 的定义中提到 ``(>>=)`` 或 ``return`` ，因为类型类的上下文（超类）要求 ``MonadSupply s`` 必须已经是一个 ``Monad`` 。
 
 .. _functional-dependencies:
 
 功能依赖
 ^^^^^^^^
 
+现在让我们回头看之前被忽略的代码段， ``| m -> s`` 是一个功能依赖，通常被称作 ``fundep`` 。我们可以将竖线 ``|`` 读作 “这样”，将箭头 ``->`` 读作“唯一确定”。我们的功能依赖建立了 ``m`` 和 ``s`` 之间的关系。
+
+功能依赖由 ``FunctionalDependencies`` 语言编译指令管理。
+
+我们声明 ``m`` 和 ``s`` 之间关系的目的是帮助类型检查器。回想一下，Haskell类型检查器本质上是一个定理证明器，并且它在操作上是保守的：它坚持这个证明过程必须终止。一个非终止的证明结果将导致编译器放弃或陷入无限循环。
+
+通过功能依赖，我们告诉类型检查器，一旦它看到一些 monad ``m`` 在 ``MonadSupply s`` 的上下文中被使用，那么类型 ``s`` 就是唯一可以接受的类型。假如我们省略功能依赖，类型检查器就会放弃并返回一个错误消息。
+
+我们很难描述 ``m`` 和 ``s`` 之间的关系究竟是什么，所以让我们来看一个该类型类具体的实例。
+
+::
+
+	-- file: ch15/SupplyClass.hs
+	import qualified Supply as S
+
+	instance MonadSupply s (S.Supply s) where
+		next = S.next
+		
+这里，类型变量 ``m`` 由类型 ``S.Supply s`` 替换。因为功能依赖的存在，类型检查器知道当它看到类型 ``S.Supply s`` 时， 这个类型可以被当作类型类 ``MonadSupply s`` 的实例来使用。
+
+假如没有功能依赖，类型检查器不会发现 ``MonadSupply s`` 和 ``Supply s`` 二者类型参数之间的关系，因此它将终止编译并产生一个错误。它们的定义本身将会编译，而类型错误直到我们尝试使用它的时候才会产生。
+
+下面我们用一个例子剥离最后一层抽象：考虑类型 ``S.Supply Int`` 。我们可以不使用功能依赖而将其声明为 ``MonadSupply s`` 的一个实例。但是假如我们试图使用这个实例编写代码，编译器将无法得知类型的 ``Int`` 参数需要和类型类 ``s`` 的参数相同，因此它将报告一个错误。
+
+功能依赖可能难以理解，并且它们被证明在实践中通常很难使用。幸运的是，功能依赖一般在和我们例子类似的简单情况下使用，此时它们不会导致什么麻烦。
+
 .. _rounding-out-our-module:
 
 舍入模块
 ^^^^^^^^
 
+假如我们将类型类和实例保存在名为 ``SupplyClass.hs`` 的源文件中，那么就需要在文件中添加一个类似这样的模块头：
+
+::
+
+	-- file: ch15/SupplyClass.hs
+	{-# LANGUAGE FlexibleInstances, FunctionalDependencies,
+				 MultiParamTypeClasses #-}
+
+	module SupplyClass
+		(
+		  MonadSupply(..)
+		, S.Supply
+		, S.runSupply
+		) where
+		
+这个 ``FlexibleInstances`` 扩展是必须的，否则编译器不会接受我们的实例声明。这个扩展放宽了在某些情况下书写实例的一般规则，但同时仍然让编译器的类型检查器保证它的推导会结束。我们这里需要 ``FlexibleInstances`` 的原因是我们使用了功能依赖，具体的细节超过了本书所讨论的范畴。
+
+..info::
+
+	如何知道是否需要一个语言扩展
+	>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	
+	假如 GHC 因为需要启用某些语言扩展而不能编译一段代码，它会提醒我们哪些扩展需要使用。比如，假如它认为我们的代码需要 flexible 的实例支持，它将提醒我们使用 ``-XFlexibleInstances`` 选项编译。 ``-x`` 选项和 ``LANGUAGE`` 伪指令具有相同的效果：它们都可以启用一个特定的扩展。
+	
+最后，请注意我们正在从此模块中重新导出 ``runSupply`` 和 ``Supply`` 的名称。从一个模块中导出名称是完全合法的，即使它在另一个模块中被定义。在我们的例子中，这意味着客户端代码只需要导入 ``SupplyClass`` 模块，而不需要导入 ``Supply`` 模块。这减少了用户需要记住的 “移动部件” 的数量。
+	
+
 .. _programming-to-a-monads-interface:
 
 对 monad 接口编程
 ^^^^^^^^^^^^^^^^^
+
+下面是一个简单的函数，它从我们的 ``Supply`` monad 中获取两个值，将它们格式化为字符串，并返回它们。
+
+::
+
+	-- file: ch15/Supply.hs
+	showTwo :: (Show s) => Supply s String
+	showTwo = do
+	  a <- next
+	  b <- next
+	  return (show "a: " ++ show a ++ ", b: " ++ show b)
+	  
+这份代码通过它的结果类型绑定到我们的 ``Supply`` monad。通过修改函数类型，我们可以在维持函数主体不变的情况下，将此方法推广至所有实现了 ``MonadSupply`` 接口的 monad。
+
+::
+
+	-- file: ch15/SupplyClass.hs
+	showTwo_class :: (Show s, Monad m, MonadSupply s m) => m String
+	showTwo_class = do
+	  a <- next
+	  b <- next
+	  return (show "a: " ++ show a ++ ", b: " ++ show b)
 
 .. _the-reader-monad:
 

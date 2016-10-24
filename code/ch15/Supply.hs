@@ -22,3 +22,10 @@ next = S $ do st <- get
                 [] -> return Nothing
                 (x:xs) -> do put xs
                              return (Just x)
+
+-- file: ch15/Supply.hs
+showTwo :: (Show s) => Supply s String
+showTwo = do
+  a <- next
+  b <- next
+  return (show "a: " ++ show a ++ ", b: " ++ show b)
