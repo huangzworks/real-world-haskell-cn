@@ -475,24 +475,93 @@
 </div>
 <div class="section" id="separating-interface-from-implementation">
 <span id="id8"></span><h2>将接口与实现分离<a class="headerlink" href="#separating-interface-from-implementation" title="Permalink to this headline">¶</a></h2>
+<p>在前面的章节中，我们看到了如何向用户隐藏我们在内部使用 <code class="docutils literal"><span class="pre">State</span></code> monad 来保持 <code class="docutils literal"><span class="pre">Supply</span></code> monad状态的事实。</p>
+<p>使代码更加模块化的另一个重要方式是将接口（代码可以做什么）从实现（代码具体如何做）中分离出来。</p>
+<p>众所周知，标准的随机数生成器 <code class="docutils literal"><span class="pre">System.Random</span></code> 速度很慢。如果使用我们的 <code class="docutils literal"><span class="pre">randomsIO</span></code> 函数为它提供随机数，那么我们的 <code class="docutils literal"><span class="pre">next</span></code> 动作执行效果将不会很好。</p>
+<p>一个简单有效的解决办法是为 <code class="docutils literal"><span class="pre">Supply</span></code> 提供一个更好的随机数源，但现在让我们把这个方法先放到一边，转而考虑一种在许多设定中都有效的替代方法。我们将使用一个类型类，对 monad 的行为和实现进行分离。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/SupplyClass.hs</span>
+<span class="kr">class</span> <span class="p">(</span><span class="kt">Monad</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">MonadSupply</span> <span class="n">s</span> <span class="n">m</span> <span class="o">|</span> <span class="n">m</span> <span class="ow">-&gt;</span> <span class="n">s</span> <span class="kr">where</span>
+        <span class="n">next</span> <span class="ow">::</span> <span class="n">m</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">s</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>这个类型类定义了任何 <code class="docutils literal"><span class="pre">Supply</span></code> monad 都必须实现的接口。因为这个类型类使用了几个我们尚不熟悉的 Haskell 语言扩展，所以我们需要对这个类型类进行详细的分析，它涉及的各个扩展将在接下来的小节中介绍。</p>
 <div class="section" id="multi-parameter-typeclasses">
 <span id="id9"></span><h3>多参数类型类<a class="headerlink" href="#multi-parameter-typeclasses" title="Permalink to this headline">¶</a></h3>
+<p>我们应该如何读取类型类中的代码片段 <code class="docutils literal"><span class="pre">MonadSupply</span> <span class="pre">s</span> <span class="pre">m</span></code> ？如果我们添加括号，则等价表达式是 <code class="docutils literal"><span class="pre">(</span> <span class="pre">MonadSupply</span> <span class="pre">s</span> <span class="pre">)</span> <span class="pre">m</span></code> ，它看起来更清晰一些。换句话说，给定一些 <code class="docutils literal"><span class="pre">Monad</span></code> 类型变量 <code class="docutils literal"><span class="pre">m</span></code> ，我们可以让它成为类型类 <code class="docutils literal"><span class="pre">MonadSupply</span> <span class="pre">s</span></code> 的一个实例。与常规类型类不同，这里的类型类有一个参数。 [译注： <a class="reference external" href="http://www.haskell.org/ghc/docs/7.6-latest/html/users_guide/type-class-extensions.html#functional-dependencies">此链接</a> 可能会帮助你更好地理解功能依赖及多参数类型类。实际上，上面给出的例子中， <code class="docutils literal"><span class="pre">s</span></code> 和 <code class="docutils literal"><span class="pre">m</span></code> 仅仅是两个参数，它们的位置可以互换。原作者通过加括号的方式，将其理解为一个参数和另一个有参数的类型类，也许在数学上正确，但译者认为此处可能导致读者的困惑。]</p>
+<p>这个语言扩展被称作 <code class="docutils literal"><span class="pre">MultiParamTypeClasses</span></code> ，因为它允许类型类有多个参数。参数 <code class="docutils literal"><span class="pre">s</span></code> 的作用与 <code class="docutils literal"><span class="pre">Supply</span></code> 类型的参数相同：它代表了 <code class="docutils literal"><span class="pre">next</span></code> 动作发出的值。</p>
+<p>注意，我们不需要在 <code class="docutils literal"><span class="pre">MonadSupply</span> <span class="pre">s</span></code> 的定义中提到 <code class="docutils literal"><span class="pre">(&gt;&gt;=)</span></code> 或 <code class="docutils literal"><span class="pre">return</span></code> ，因为类型类的上下文（超类）要求 <code class="docutils literal"><span class="pre">MonadSupply</span> <span class="pre">s</span></code> 必须已经是一个 <code class="docutils literal"><span class="pre">Monad</span></code> 。</p>
 </div>
 <div class="section" id="functional-dependencies">
-<span id="id10"></span><h3>功能依赖<a class="headerlink" href="#functional-dependencies" title="Permalink to this headline">¶</a></h3>
+<span id="id11"></span><h3>功能依赖<a class="headerlink" href="#functional-dependencies" title="Permalink to this headline">¶</a></h3>
+<p>现在让我们回头看之前被忽略的代码段， <code class="docutils literal"><span class="pre">|</span> <span class="pre">m</span> <span class="pre">-&gt;</span> <span class="pre">s</span></code> 是一个功能依赖，通常被称作 <code class="docutils literal"><span class="pre">fundep</span></code> 。我们可以将竖线 <code class="docutils literal"><span class="pre">|</span></code> 读作 “这样”，将箭头 <code class="docutils literal"><span class="pre">-&gt;</span></code> 读作“唯一确定”。我们的功能依赖建立了 <code class="docutils literal"><span class="pre">m</span></code> 和 <code class="docutils literal"><span class="pre">s</span></code> 之间的关系。</p>
+<p>功能依赖由 <code class="docutils literal"><span class="pre">FunctionalDependencies</span></code> 语言编译指令管理。</p>
+<p>我们声明 <code class="docutils literal"><span class="pre">m</span></code> 和 <code class="docutils literal"><span class="pre">s</span></code> 之间关系的目的是帮助类型检查器。回想一下，Haskell类型检查器本质上是一个定理证明器，并且它在操作上是保守的：它坚持这个证明过程必须终止。一个非终止的证明结果将导致编译器放弃或陷入无限循环。</p>
+<p>通过功能依赖，我们告诉类型检查器，一旦它看到一些 monad <code class="docutils literal"><span class="pre">m</span></code> 在 <code class="docutils literal"><span class="pre">MonadSupply</span> <span class="pre">s</span></code> 的上下文中被使用，那么类型 <code class="docutils literal"><span class="pre">s</span></code> 就是唯一可以接受的类型。假如我们省略功能依赖，类型检查器就会放弃并返回一个错误消息。</p>
+<p>我们很难描述 <code class="docutils literal"><span class="pre">m</span></code> 和 <code class="docutils literal"><span class="pre">s</span></code> 之间的关系究竟是什么，所以让我们来看一个该类型类具体的实例。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/SupplyClass.hs</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Supply</span> <span class="k">as</span> <span class="n">S</span>
+
+<span class="kr">instance</span> <span class="kt">MonadSupply</span> <span class="n">s</span> <span class="p">(</span><span class="kt">S</span><span class="o">.</span><span class="kt">Supply</span> <span class="n">s</span><span class="p">)</span> <span class="kr">where</span>
+        <span class="n">next</span> <span class="ow">=</span> <span class="kt">S</span><span class="o">.</span><span class="n">next</span>
+</pre></div>
+</div>
+<p>这里，类型变量 <code class="docutils literal"><span class="pre">m</span></code> 由类型 <code class="docutils literal"><span class="pre">S.Supply</span> <span class="pre">s</span></code> 替换。因为功能依赖的存在，类型检查器知道当它看到类型 <code class="docutils literal"><span class="pre">S.Supply</span> <span class="pre">s</span></code> 时， 这个类型可以被当作类型类 <code class="docutils literal"><span class="pre">MonadSupply</span> <span class="pre">s</span></code> 的实例来使用。</p>
+<p>假如没有功能依赖，类型检查器不会发现 <code class="docutils literal"><span class="pre">MonadSupply</span> <span class="pre">s</span></code> 和 <code class="docutils literal"><span class="pre">Supply</span> <span class="pre">s</span></code> 二者类型参数之间的关系，因此它将终止编译并产生一个错误。它们的定义本身将会编译，而类型错误直到我们尝试使用它的时候才会产生。</p>
+<p>下面我们用一个例子剥离最后一层抽象：考虑类型 <code class="docutils literal"><span class="pre">S.Supply</span> <span class="pre">Int</span></code> 。我们可以不使用功能依赖而将其声明为 <code class="docutils literal"><span class="pre">MonadSupply</span> <span class="pre">s</span></code> 的一个实例。但是假如我们试图使用这个实例编写代码，编译器将无法得知类型的 <code class="docutils literal"><span class="pre">Int</span></code> 参数需要和类型类 <code class="docutils literal"><span class="pre">s</span></code> 的参数相同，因此它将报告一个错误。</p>
+<p>功能依赖可能难以理解，并且它们被证明在实践中通常很难使用。幸运的是，功能依赖一般在和我们例子类似的简单情况下使用，此时它们不会导致什么麻烦。</p>
 </div>
 <div class="section" id="rounding-out-our-module">
-<span id="id11"></span><h3>舍入模块<a class="headerlink" href="#rounding-out-our-module" title="Permalink to this headline">¶</a></h3>
+<span id="id12"></span><h3>舍入模块<a class="headerlink" href="#rounding-out-our-module" title="Permalink to this headline">¶</a></h3>
+<p>假如我们将类型类和实例保存在名为 <code class="docutils literal"><span class="pre">SupplyClass.hs</span></code> 的源文件中，那么就需要在文件中添加一个类似这样的模块头：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/SupplyClass.hs</span>
+<span class="cm">{-# LANGUAGE FlexibleInstances, FunctionalDependencies,</span>
+<span class="cm">                         MultiParamTypeClasses #-}</span>
+
+<span class="kr">module</span> <span class="nn">SupplyClass</span>
+        <span class="p">(</span>
+          <span class="kt">MonadSupply</span><span class="p">(</span><span class="o">..</span><span class="p">)</span>
+        <span class="p">,</span> <span class="kt">S</span><span class="o">.</span><span class="kt">Supply</span>
+        <span class="p">,</span> <span class="kt">S</span><span class="o">.</span><span class="nf">runSupply</span>
+        <span class="p">)</span> <span class="kr">where</span>
+</pre></div>
+</div>
+<p>这个 <code class="docutils literal"><span class="pre">FlexibleInstances</span></code> 扩展是必须的，否则编译器不会接受我们的实例声明。这个扩展放宽了在某些情况下书写实例的一般规则，但同时仍然让编译器的类型检查器保证它的推导会结束。我们这里需要 <code class="docutils literal"><span class="pre">FlexibleInstances</span></code> 的原因是我们使用了功能依赖，具体的细节超过了本书所讨论的范畴。</p>
+<p>..info:</p>
+<div class="highlight-haskell"><div class="highlight"><pre>如何知道是否需要一个语言扩展
+&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;
+
+假如 GHC 因为需要启用某些语言扩展而不能编译一段代码，它会提醒我们哪些扩展需要使用。比如，假如它认为我们的代码需要 flexible 的实例支持，它将提醒我们使用 ``-XFlexibleInstances`` 选项编译。 ``-x`` 选项和 ``LANGUAGE`` 伪指令具有相同的效果：它们都可以启用一个特定的扩展。
+</pre></div>
+</div>
+<p>最后，请注意我们正在从此模块中重新导出 <code class="docutils literal"><span class="pre">runSupply</span></code> 和 <code class="docutils literal"><span class="pre">Supply</span></code> 的名称。从一个模块中导出名称是完全合法的，即使它在另一个模块中被定义。在我们的例子中，这意味着客户端代码只需要导入 <code class="docutils literal"><span class="pre">SupplyClass</span></code> 模块，而不需要导入 <code class="docutils literal"><span class="pre">Supply</span></code> 模块。这减少了用户需要记住的 “移动部件” 的数量。</p>
 </div>
 <div class="section" id="programming-to-a-monads-interface">
-<span id="id12"></span><h3>对 monad 接口编程<a class="headerlink" href="#programming-to-a-monads-interface" title="Permalink to this headline">¶</a></h3>
+<span id="id13"></span><h3>对 monad 接口编程<a class="headerlink" href="#programming-to-a-monads-interface" title="Permalink to this headline">¶</a></h3>
+<p>下面是一个简单的函数，它从我们的 <code class="docutils literal"><span class="pre">Supply</span></code> monad 中获取两个值，将它们格式化为字符串，并返回它们。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/Supply.hs</span>
+<span class="nf">showTwo</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Show</span> <span class="n">s</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Supply</span> <span class="n">s</span> <span class="kt">String</span>
+<span class="nf">showTwo</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">a</span> <span class="ow">&lt;-</span> <span class="n">next</span>
+  <span class="n">b</span> <span class="ow">&lt;-</span> <span class="n">next</span>
+  <span class="n">return</span> <span class="p">(</span><span class="n">show</span> <span class="s">&quot;a: &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">a</span> <span class="o">++</span> <span class="s">&quot;, b: &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">b</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>这份代码通过它的结果类型绑定到我们的 <code class="docutils literal"><span class="pre">Supply</span></code> monad。通过修改函数类型，我们可以在维持函数主体不变的情况下，将此方法推广至所有实现了 <code class="docutils literal"><span class="pre">MonadSupply</span></code> 接口的 monad。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch15/SupplyClass.hs</span>
+<span class="nf">showTwo_class</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Show</span> <span class="n">s</span><span class="p">,</span> <span class="kt">Monad</span> <span class="n">m</span><span class="p">,</span> <span class="kt">MonadSupply</span> <span class="n">s</span> <span class="n">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">m</span> <span class="kt">String</span>
+<span class="nf">showTwo_class</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">a</span> <span class="ow">&lt;-</span> <span class="n">next</span>
+  <span class="n">b</span> <span class="ow">&lt;-</span> <span class="n">next</span>
+  <span class="n">return</span> <span class="p">(</span><span class="n">show</span> <span class="s">&quot;a: &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">a</span> <span class="o">++</span> <span class="s">&quot;, b: &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">b</span><span class="p">)</span>
+</pre></div>
+</div>
 </div>
 </div>
 <div class="section" id="reader-monad">
 <span id="the-reader-monad"></span><h2>Reader monad<a class="headerlink" href="#reader-monad" title="Permalink to this headline">¶</a></h2>
 </div>
 <div class="section" id="a-return-to-automated-deriving">
-<span id="id13"></span><h2>返回自动导出<a class="headerlink" href="#a-return-to-automated-deriving" title="Permalink to this headline">¶</a></h2>
+<span id="id14"></span><h2>返回自动导出<a class="headerlink" href="#a-return-to-automated-deriving" title="Permalink to this headline">¶</a></h2>
 </div>
 <div class="section" id="io-monad">
 <span id="hiding-the-io-monad"></span><h2>隐藏 IO monad<a class="headerlink" href="#io-monad" title="Permalink to this headline">¶</a></h2>
@@ -500,13 +569,13 @@
 <span id="using-a-newtype"></span><h3>使用 newtype<a class="headerlink" href="#newtype" title="Permalink to this headline">¶</a></h3>
 </div>
 <div class="section" id="designing-for-unexpected-uses">
-<span id="id14"></span><h3>针对意外使用情况设计<a class="headerlink" href="#designing-for-unexpected-uses" title="Permalink to this headline">¶</a></h3>
+<span id="id15"></span><h3>针对意外使用情况设计<a class="headerlink" href="#designing-for-unexpected-uses" title="Permalink to this headline">¶</a></h3>
 </div>
 <div class="section" id="using-typeclasses">
-<span id="id15"></span><h3>使用类型类<a class="headerlink" href="#using-typeclasses" title="Permalink to this headline">¶</a></h3>
+<span id="id16"></span><h3>使用类型类<a class="headerlink" href="#using-typeclasses" title="Permalink to this headline">¶</a></h3>
 </div>
 <div class="section" id="isolation-and-testing">
-<span id="id16"></span><h3>隔离和测试<a class="headerlink" href="#isolation-and-testing" title="Permalink to this headline">¶</a></h3>
+<span id="id17"></span><h3>隔离和测试<a class="headerlink" href="#isolation-and-testing" title="Permalink to this headline">¶</a></h3>
 </div>
 <div class="section" id="writer-monad">
 <span id="the-writer-monad-and-lists"></span><h3>Writer monad 和 列表<a class="headerlink" href="#writer-monad" title="Permalink to this headline">¶</a></h3>
@@ -514,8 +583,8 @@
 <div class="section" id="i-o">
 <span id="arbitrary-io-revisited"></span><h3>任意 I/O 访问<a class="headerlink" href="#i-o" title="Permalink to this headline">¶</a></h3>
 </div>
-<div class="section" id="id17">
-<h3>练习<a class="headerlink" href="#id17" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id18">
+<h3>练习<a class="headerlink" href="#id18" title="Permalink to this headline">¶</a></h3>
 </div>
 </div>
 </div>
