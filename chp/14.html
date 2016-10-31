@@ -1004,7 +1004,7 @@ Data.Map.lookup :: (Ord k, Monad m) =&gt; k -&gt; Map k a -&gt; m a
                      <span class="kr">in</span> <span class="p">((</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">),</span> <span class="n">gen&#39;&#39;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>现在我们学到了 <code class="docutils literal"><span class="pre">State</span></code> monad, 它好像是个比较好的解决办法。 state monad 允许我们整洁地管理可变的状态，并且保证这部分代码与任何诸如修改文件，连接网络等副作用操作分离开来；这样让我们能够更加容易滴思考代码的行为。</p>
+<p>现在我们学到了 <code class="docutils literal"><span class="pre">State</span></code> monad, 它好像是个比较好的解决办法。 state monad 允许我们整洁地管理可变的状态，并且保证这部分代码与任何诸如修改文件，连接网络等副作用操作分离开来；这样让我们能够更加容易地思考代码的行为。</p>
 </div>
 <div class="section" id="random-values-in-the-state-monad">
 <span id="id24"></span><h3>state monad里面的随机数值<a class="headerlink" href="#random-values-in-the-state-monad" title="Permalink to this headline">¶</a></h3>
