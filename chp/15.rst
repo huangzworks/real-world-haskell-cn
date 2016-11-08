@@ -1,4 +1,4 @@
-﻿第 15 章：使用 Monad 编程
+第 15 章：使用 Monad 编程
 =========================
 
 .. _golfing-practice-association-lists:
@@ -645,7 +645,7 @@ Haskell 程序员不喜欢样板，GHC 有一个可爱的语言拓展功能消�
 		
 这个 ``FlexibleInstances`` 扩展是必须的，否则编译器不会接受我们的实例声明。这个扩展放宽了在某些情况下书写实例的一般规则，但同时仍然让编译器的类型检查器保证它的推导会结束。我们这里需要 ``FlexibleInstances`` 的原因是我们使用了功能依赖，具体的细节超过了本书所讨论的范畴。
 
-..info::
+.. info::
 
 	如何知道是否需要一个语言扩展
 	>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -922,26 +922,223 @@ Reader monad
 针对意外使用情况设计
 ^^^^^^^^^^^^^^^^^^^^
 
+``HandleIO`` monad 有一个重要的小问题：我们可能偶尔需要一个 “逃生舱门” ，而 ``HandleIO`` monad 没有考虑到这种可能性。如果定义一个这样的 monad，我们很有可能会偶尔执行 monad 设计所不允许的 I/O 动作。
+
+设计这个 monad 的目的是让我们更容易在普通情况下编写无错代码，而不是为了杜绝特殊情况发生。让我们给自己留一条出路。
+
+``Conotrol.Monad.Trans`` 模块定义了一个 “标准逃生舱门” ： ``MonadIO`` 类型类。函数 ``liftIO`` 可以将一个 ``IO`` 动作嵌入另一个 monad 中。
+
+::
+
+	ghci> :m +Control.Monad.Trans
+	ghci> :info MonadIO
+	class (Monad m) => MonadIO m where liftIO :: IO a -> m a
+		-- Defined in Control.Monad.Trans
+	instance MonadIO IO -- Defined in Control.Monad.Trans
+	
+要实现这个类型类非常简单，只需要用我们自己的数据构造器将 ``IO`` 包装起来就可以了：
+
+::
+
+	-- file: ch15/HandleIO.hs
+	import Control.Monad.Trans (MonadIO(..))
+
+	instance MonadIO HandleIO where
+		liftIO = HandleIO
+
+通过审慎地使用 ``liftIO`` ，我们可以逃脱束缚，并在必要的时候调用 IO 操作。
+
+::
+
+	-- file: ch15/HandleIO.hs
+	tidyHello :: FilePath -> HandleIO ()
+	tidyHello path = do
+	  safeHello path
+	  liftIO (removeFile path)
+	  
+.. info:
+
+	自动推导和 ``MonadIO``
+	
+	通过将类型类添加到 ``HandleIO`` 的 ``deriving`` 子式，我们可以让编译器自动导出一个 ``MonadIO`` 实例。事实上，这在生产代码中是一个常见的策略。为了将之前材料和 ``MonadIO`` 二者的表示分离，这里简单地避免了这样的方式。
+
 .. _using-typeclasses:
 
 使用类型类
 ^^^^^^^^^^
 
+将 ``IO`` 隐藏到另一个 monad 的缺陷是我们仍然绑定到了一个具体的实现。假如要将 ``HandleIO`` 和一些其它的 monad 交换，就必须改变每个使用 ``HandleIO`` 的动作的类型。
+
+一种替代方式是创建一个类型类。我们想从一个操作文件的 monad 中获取接口，这个类型类指定了这个接口。
+
+::
+
+	-- file: ch15/MonadHandle.hs
+	{-# LANGUAGE FunctionalDependencies, MultiParamTypeClasses #-}
+
+	module MonadHandle (MonadHandle(..)) where
+
+	import System.IO (IOMode(..))
+
+	class Monad m => MonadHandle h m | m -> h where
+		openFile :: FilePath -> IOMode -> m h
+		hPutStr :: h -> String -> m ()
+		hClose :: h -> m ()
+		hGetContents :: h -> m String
+
+		hPutStrLn :: h -> String -> m ()
+		hPutStrLn h s = hPutStr h s >> hPutStr h "\n"
+
+现在，我们决定抽象出 monad 的类型和文件句柄的类型。为了满足类型检查器，这里添加了一个函数依赖：对于 ``MonadHandle`` 的任何实例，只有一个句柄类型可以使用。当 ``IO`` monad 成为这个类的一个实例时，我们使用一个普通的 ``Handle`` 。
+
+::
+
+	-- file: ch15/MonadHandleIO.hs
+	{-# LANGUAGE FunctionalDependencies, MultiParamTypeClasses #-}
+
+	import MonadHandle
+	import qualified System.IO
+
+	import System.IO (IOMode(..))
+	import Control.Monad.Trans (MonadIO(..), MonadTrans(..))
+	import System.Directory (removeFile)
+
+	import SafeHello
+
+	instance MonadHandle System.IO.Handle IO where
+		openFile = System.IO.openFile
+		hPutStr = System.IO.hPutStr
+		hClose = System.IO.hClose
+		hGetContents = System.IO.hGetContents
+		hPutStrLn = System.IO.hPutStrLn
+
+因为任何 ``MonadHandle`` 也必须是一个 ``Monad`` ，所以我们可以使用普通的 ``do`` 标识符编写修改文件的代码，而不需要关心它最终在哪个 monad 中执行。
+
+::
+
+	-- file: ch15/SafeHello.hs
+	safeHello :: MonadHandle h m => FilePath -> m ()
+	safeHello path = do
+	  h <- openFile path WriteMode
+	  hPutStrLn h "hello world"
+	  hClose h
+
+我们已经让 ``IO`` 成为这个类型类的一个实例，现在可以在 **ghci** 中执行这个动作：
+
+::
+
+	ghci> safeHello "hello to my fans in domestic surveillance"
+	Loading package old-locale-1.0.0.0 ... linking ... done.
+	Loading package old-time-1.0.0.0 ... linking ... done.
+	Loading package filepath-1.1.0.0 ... linking ... done.
+	Loading package directory-1.0.0.0 ... linking ... done.
+	Loading package mtl-1.1.0.0 ... linking ... done.
+	ghci> removeFile "hello to my fans in domestic surveillance"
+	
+使用类型类的好处在于，我们可以不需要接触过多代码并互换一个底层的 monad ，因为大多数代码不知道或不关心具体底层 monad 的实现。例如，可以用一个 monad 来替换 ``IO`` ，它会在文件写入时压缩文件。
+
+通过类型类定义一个 monad 的接口有另一个好处：它允许其他人在 ``newtype`` 包装器中隐藏我们的实现，并自动派生他们想要暴露的类型类的实例。
+	  
 .. _isolation-and-testing:
 
 隔离和测试
 ^^^^^^^^^^
 
+事实上，因为 ``safeHello`` 函数没有使用 ``IO`` 类型，我们甚至可以使用不能执行 I/O 的 monad。通过这种方法，我们可以在纯粹且受控的环境中对那些在平常情况下会出现副作用的代码进行测试。
+
+为此，我们将创建一个 monad，这个 monad 不会执行任何 I/O 操作，但它会记录每个与文件相关联的事件以供后续处理。
+
+::
+
+	-- file: ch15/WriterIO.hs
+	data Event = Open FilePath IOMode
+			   | Put String String
+			   | Close String
+			   | GetContents String
+				 deriving (Show)
+
+虽然在 :ref:`using-a-new-monad-show-your-work` 中已经开发了一个 ``Logger`` 类型，但这里我们将使用标准的、更广泛的 ``Writer`` monad。和其它 ``mtl`` monad 类似， ``Writer`` 提供的 API 将在一个类型类中被定义，也就是接下来要展示的 ``MonadWriter`` 。``MonadWriter`` 最有用的方法是 ``tell`` ，这个方法记录了一个值。
+
+::
+
+	ghci> :m +Control.Monad.Writer
+	ghci> :type tell
+	tell :: (MonadWriter w m) => w -> m ()
+	
+虽然 ``tell`` 方法可以记录任意类型的 ``Monoid`` ，但是因为列表的类型是 ``Monoid`` ，所以 ``tell`` 方法将记录一个由 ``Event`` 构成的列表。
+
+尽管我们可以让 ``Writer [Event]`` 成为 ``MonadHandle`` 的一个实例，但一个更廉价也更安全的做法是编写一个特殊的 monad ，并且要做到这一点也比较容易。
+
+::
+
+	-- file: ch15/WriterIO.hs
+	newtype WriterIO a = W { runW :: Writer [Event] a }
+		deriving (Monad, MonadWriter [Event])
+
+执行函数首先会移除我们之前添加的 ``newtype`` 包装器，然后再调用普通 ``Writer`` monad 的执行函数。
+
+::
+
+	-- file: ch15/WriterIO.hs
+	runWriterIO :: WriterIO a -> (a, [Event])
+	runWriterIO = runWriter . runW
+
+当我们在 **ghci** 中执行这段代码的时候，它将反馈给我们一份日志，这份日志记录了函数对文件所做的行为。
+
+::
+
+	ghci> :load WriterIO
+	[1 of 3] Compiling MonadHandle      ( MonadHandle.hs, interpreted )
+	[2 of 3] Compiling SafeHello        ( SafeHello.hs, interpreted )
+	[3 of 3] Compiling WriterIO         ( WriterIO.hs, interpreted )
+	Ok, modules loaded: SafeHello, MonadHandle, WriterIO.
+	ghci> runWriterIO (safeHello "foo")
+	((),[Open "foo" WriteMode,Put "foo" "hello world",Put "foo" "\n",Close "foo"])
+	
 .. _the-writer-monad-and-lists:
 
 Writer monad 和 列表
 ^^^^^^^^^^^^^^^^^^^^
+
+每当我们使用 ``tell`` 方法时， ``Writer`` monad 都会调用 monoid 的 ``mappend`` 函数。因为列表的 ``mappend`` 动作是 ``(++)`` ，而不断重复附加操作是非常浪费资源的，所以在实际使用 ``Writer`` 时，列表并不是一个很好的选择。在上面的实例中，我们纯粹是为了追求简单才使用了列表。
+
+在生产代码中，如果你想使用 ``Writer`` monad ，并且需要类似列表的行为，那么你应当选择那些在执行附加操作时性能更优的类型。在 :ref:`taking-advantage-of-functions-as-data` 中介绍过的差异列表就是一个这样的类型。你不需要实现自己的差异列表：Haskell 包数据库 Hackage 提供了一个调试好的库，你可以直接下载使用。除此之外，你可以使用 ``Data.Sequence`` 模块中的 ``Seq`` 类型，我们在 :ref:`general-purpose-sequences` 中介绍过这个类型。
 
 .. _arbitrary-io-revisited:
 
 任意 I/O 访问
 ^^^^^^^^^^^^^
 
+在使用类型类方法限制 ``IO`` 的同时，我们可能还会希望继续保留执行任意 I/O 操作的能力。为此，我们可以尝试将 ``MonadIO`` 作为约束添加到类型类里面。
+
+::
+
+	-- file: ch15/MonadHandleIO.hs
+	class (MonadHandle h m, MonadIO m) => MonadHandleIO h m | m -> h
+
+	instance MonadHandleIO System.IO.Handle IO
+
+	tidierHello :: (MonadHandleIO h m) => FilePath -> m ()
+	tidierHello path = do
+	  safeHello path
+	  liftIO (removeFile path)
+
+但是这种方法会导致一个问题：添加 ``MonadIO`` 约束将使得我们无法再判断一个测试是否会带有副作用，我们也因此失去了在纯粹的环境中测试代码的能力。另一种方法是调整这个约束的作用域，使它只影响那些真正需要执行 I/O 操作的函数，而非所有函数。
+
+::
+
+	-- file: ch15/MonadHandleIO.hs
+	tidyHello :: (MonadIO m, MonadHandle h m) => FilePath -> m ()
+	tidyHello path = do
+	  safeHello path
+	  liftIO (removeFile path)
+
+我们可以对不受 ``MonadIO`` 约束的函数使用纯属性测试，对其余的函数使用传统的单元测试。
+
+遗憾的是，这种做法只不过是将一个问题换成了另一个问题：只受 ``MonadHandle`` 约束的代码将无法调用同时受 ``MonadIO`` 和 ``MonadHandle`` 约束的代码。如果我们在 ``MonadHandle`` 约束的代码内部发现了这个问题，那么我们就必须在引发这个问题的所有代码路径上都加上 ``MonadIO`` 约束。
+
+允许执行任意 I/O 操作是有风险的，而且这么做对我们开发、测试代码的流程都会有巨大的影响。相比放宽对代码行为的限制，我们通常会追求更清晰的代码逻辑和更容易的测试环境。
+	  
 练习
 ^^^^
 

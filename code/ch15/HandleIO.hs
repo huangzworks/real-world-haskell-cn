@@ -36,3 +36,15 @@ safeHello path = do
   hPutStrLn h "hello world"
   hClose h
 
+-- file: ch15/HandleIO.hs
+import Control.Monad.Trans (MonadIO(..))
+
+instance MonadIO HandleIO where
+    liftIO = HandleIO
+
+-- file: ch15/HandleIO.hs
+tidyHello :: FilePath -> HandleIO ()
+tidyHello path = do
+  safeHello path
+  liftIO (removeFile path)
+
