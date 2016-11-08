@@ -1102,7 +1102,7 @@ Writer monad 和 列表
 
 每当我们使用 ``tell`` 方法， ``Writer`` monad 就会调用 monoid 的 ``mappend`` 函数。因为列表的 ``mappend`` 动作是 ``(++)`` ，而不断重复附加操作是非常浪费资源的，所以在实际使用 ``Writer`` 时，列表不是一个很好的选择。上面的示例中，我们纯粹是为了追求简单才使用了列表。
 
-在生产代码中，如果你想使用 ``Writer`` monad ，并且需要类似列表的行为，那么你应当选择那些在执行附加操作时性能更优的类型。在 :ref: `taking-advantage-of-functions-as-data` 中介绍过的差异列表就是一个这样的类型。你不需要实现自己的差异列表：Haskell 包数据库 Hackage 提供了一个调试好的库，你可以直接下载使用。或者，你可以使用 ``Data.Sequence`` 模块中的 ``Seq`` 类型，我们在 :ref:`general-purpose-sequences` 中介绍过这个类型。
+在生产代码中，如果你想使用 ``Writer`` monad ，并且需要类似列表的行为，那么你应当选择那些在执行附加操作时性能更优的类型。在 :ref:`taking-advantage-of-functions-as-data` 中介绍过的差异列表就是一个这样的类型。你不需要实现自己的差异列表：Haskell 包数据库 Hackage 提供了一个调试好的库，你可以直接下载使用。或者，你可以使用 ``Data.Sequence`` 模块中的 ``Seq`` 类型，我们在 :ref:`general-purpose-sequences` 中介绍过这个类型。
 
 .. _arbitrary-io-revisited:
 
