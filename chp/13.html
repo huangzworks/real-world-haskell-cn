@@ -1118,8 +1118,8 @@ Haskell 的 <code class="docutils literal"><span class="pre">(++)</span></code> 
 </div>
 </div>
 </div>
-<div class="section" id="id9">
-<h2>通用序列<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="general-purpose-sequences">
+<span id="id9"></span><h2>通用序列<a class="headerlink" href="#general-purpose-sequences" title="Permalink to this headline">¶</a></h2>
 <p>不论是 Haskell 内置的列表，还是我们前面定义的 <code class="docutils literal"><span class="pre">DList</span></code> ，这些数据结构在不同的地方都有自己的性能短板。为此， <code class="docutils literal"><span class="pre">Data.Sequence</span></code> 模块定义了 <code class="docutils literal"><span class="pre">Seq</span></code> 容器类型，对于大多数操作，这种类型能都提供良好的效率保证。</p>
 <p>为了避免命名冲突， <code class="docutils literal"><span class="pre">Data.Sequence</span></code> 模块通常以 <code class="docutils literal"><span class="pre">qualified</span></code> 的方式引入：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.Sequence</span> <span class="k">as</span> <span class="n">Seq</span>
