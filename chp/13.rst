@@ -1004,6 +1004,8 @@ Haskell 中幺半群无所不在。``Data.Monoid`` 模块定义了 ``Monoid`` �
     跟 functor 规则一样，Haskell 没法替我们检查幺半群的规则。
     如果我们定义了一个 ``Monoid`` 实例，我们可以很容易地写一些 QuickCheck 性质来得到一个较高的统计推断，确保代码遵守了幺半群规则。
 
+.. _general-purpose-sequences:
+
 通用序列
 ----------
 

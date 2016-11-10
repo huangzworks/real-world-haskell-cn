@@ -1,4 +1,4 @@
-﻿第 15 章：使用 Monad 编程
+第 15 章：使用 Monad 编程
 =========================
 
 .. _golfing-practice-association-lists:
@@ -120,11 +120,11 @@ Haskell程序员使用 :ref:`association-lists` 表示类型 ``[(a, b)]``，你�
 
 .. warning::
 
-	[译注：原著这里存在错误，上面的译文直接翻译了原著，在此做出修正。使用 ``liftM`` 将 ``MovieReview`` 提升为 ``Maybe`` monad后，得到的类型不是 ``Maybe (String -> (String -> (String -> MovieReview)))``，而是 ``Maybe String -> Maybe (String -> (String -> MovieReview))``。下面给出在不断应用 ``ap`` 时，类型系统的显示变化过程。]
+    [译注：原著这里存在错误，上面的译文直接翻译了原著，在此做出修正。使用 ``liftM`` 将 ``MovieReview`` 提升为 ``Maybe`` monad后，得到的类型不是 ``Maybe (String -> (String -> (String -> MovieReview)))``，而是 ``Maybe String -> Maybe (String -> (String -> MovieReview))``。下面给出在不断应用 ``ap`` 时，类型系统的显示变化过程。]
 
-	::
+    ::
 	
-		-- note by translator
+        -- note by translator
 		MovieReview :: String -> ( String -> String -> MovieRevie )
 		MovieReview `liftM` :: Maybe String -> Maybe ( String -> String -> MovieRevie )
 		MovieReview `liftM` lookup1 "title" alist :: Maybe ( String -> String -> MovieRevie )
@@ -645,10 +645,7 @@ Haskell 程序员不喜欢样板，GHC 有一个可爱的语言拓展功能消�
 		
 这个 ``FlexibleInstances`` 扩展是必须的，否则编译器不会接受我们的实例声明。这个扩展放宽了在某些情况下书写实例的一般规则，但同时仍然让编译器的类型检查器保证它的推导会结束。我们这里需要 ``FlexibleInstances`` 的原因是我们使用了功能依赖，具体的细节超过了本书所讨论的范畴。
 
-..info::
-
-	如何知道是否需要一个语言扩展
-	>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+.. note:: 如何知道是否需要一个语言扩展
 	
 	假如 GHC 因为需要启用某些语言扩展而不能编译一段代码，它会提醒我们哪些扩展需要使用。比如，假如它认为我们的代码需要 flexible 的实例支持，它将提醒我们使用 ``-XFlexibleInstances`` 选项编译。 ``-x`` 选项和 ``LANGUAGE`` 伪指令具有相同的效果：它们都可以启用一个特定的扩展。
 	
@@ -687,45 +684,463 @@ Haskell 程序员不喜欢样板，GHC 有一个可爱的语言拓展功能消�
 Reader monad
 ------------
 
+``State`` monad 让我们通过代码传递了一些可变状态。有时，我们希望能够传递一些不可变的状态，比如程序的配置数据。在这种情况下我们仍可以使用 ``State`` monad ，但这种做法有时候可能会错误地修改了不可变的数据。
+
+让我们暂时忘记 monad 。考虑一个能满足我们要求的函数，它应当具有什么行为？它应当接收一个类型为 ``e`` （根据环境而定）的值，该值携带了我们要传入的数据；它应当返回一个其它类型 ``a`` 的值作为结果。我们希望整个函数的类型签名为 ``e -> a`` 。
+
+为了将这个类型转化为一个方便的 ``Monad`` 实例，我们用一个 ``newtype`` 包装它。
+
+::
+
+	-- file: ch15/SupplyInstance.hs
+	newtype Reader e a = R { runReader :: e -> a }
+	
+很容易将它转化为 ``Monad`` 实例。
+
+::
+
+	-- file: ch15/SupplyInstance.hs
+	instance Monad (Reader e) where
+		return a = R $ \_ -> a
+		m >>= k = R $ \r -> runReader (k (runReader m r)) r
+
+.. warning::
+	
+	[译注：在 **GHC** 7.10 中，你需要同时定义 ``Functor`` 和 ``Applicative`` 的实例，其中一种实现如下。]
+	
+	::
+		
+		instance Functor (Reader e) where
+		__fmap f m = R $ \r -> f (runReader m r)
+
+		instance Applicative (Reader e) where
+		__pure = R . const
+		__f <*> x = R $ \r -> runReader f r (runReader x r)
+		
+我们可以将类型 ``e`` 表示的值理解为计算某个表达式所处的环境。因为 ``return`` 动作应当在任何情况下都具有相同的效果，所以这段代码不必考虑 ``return`` 所处的环境。
+
+为了让环境 ———— 也即是代码中的变量 ``r`` ———— 能够在当前和接下来的计算中使用，我们使用了比较复杂的 ``(>>=)`` 定义。
+
+在 monad 中执行的一段代码可以通过 ``ask`` 来获取环境中包含的值。
+
+::
+
+	-- file: ch15/SupplyInstance.hs
+	ask :: Reader e e
+	ask = R id
+
+在给定的一连串动作中，每次调用 ``ask`` 都将返回相同的值，因为存储在环境中的值不会改变。我们可以在 **ghci** 中方便地测试代码。
+
+::
+	
+	ghci> runReader (ask >>= \x -> return (x * 3)) 2
+	Loading package old-locale-1.0.0.0 ... linking ... done.
+	Loading package old-time-1.0.0.0 ... linking ... done.
+	Loading package random-1.0.0.0 ... linking ... done.
+	6
+
+``Reader`` monad 包含在标准 ``mtl`` 库中，它通常与 GHC 捆绑在一起。你可以在 ``Control.Monad.Reader`` 模块中找到它。你可能不明白设计这个 monad 的动机是什么，实际上它通常在复杂的代码中更有用。我们时常需要访问程序深处的一段配置信息，若将这些信息作为正常参数传递，我们需要对代码做一次极为痛苦的重构。如果将这些信息隐藏在 monad 的管道中，那么不关心配置信息的中间函数就不需要看到它们。
+
+使用 ``Reader`` monad 最明显的动机将在 :ref:`monad-transformers` 中介绍，我们将讨论如何把几个 monad 合并为一个新的 monad 。那时候，我们将学会如何利用 ``Reader`` monad 去更好地控制状态，以便我们的代码可以通过 ``State`` monad 修改一些值，而其他值则保持不变。
+	
 .. _a-return-to-automated-deriving:
 
 返回自动导出
 ------------
 
+既然我们了解了 ``Reader`` monad ，下面让我们用它来创建一个 ``MonadSupply`` 类型类的实例。为了保持例子的简洁性，这里我们将违反 ``MonadSupply`` 的精神：我们的 ``next`` 动作将始终返回相同的值。
+
+将 ``Reader`` 类型变成一个 ``MonadSupply`` 类实例是一个糟糕的想法，因为任意 ``Reader`` 都可以表现为一个 ``MonadSupply`` 。所以这样的做法通常没有任何意义。
+
+事实上，我们在 ``Reader`` 的基础上创建一个 ``newtype`` 。这个 ``newtype`` 隐藏了内部使用 ``Reader`` 的事实。我们必须让类型成为我们关心的类型类的一个实例。通过激活 ``GeneralizedNewtypeDeriving`` 扩展功能，GHC 会帮助我们完成大部分困难的工作。
+
+::
+
+	-- file: ch15/SupplyInstance.hs
+	newtype MySupply e a = MySupply { runMySupply :: Reader e a }
+		deriving (Monad)
+
+	instance MonadSupply e (MySupply e) where
+		next = MySupply $ do
+				 v <- ask
+				 return (Just v)
+
+		-- more concise:
+		-- next = MySupply (Just `liftM` ask)
+
+注意，类型必须是 ``MonadSupply e`` 的实例，而不是 ``MonadSupply`` 。如果我们省略了类型变量，编译器将会报错。[译注：在类型声明中指定类型依赖的方式是在类名和实例名中使用相同的参数名。]
+
+要尝试我们的 ``MySupply`` 类型，首先创建一个能处理任何 ``MonadSupply`` 实例的简单函数。
+
+::
+
+	-- file: ch15/SupplyInstance.hs
+	xy :: (Num s, MonadSupply s m) => m s
+	xy = do
+	  Just x <- next
+	  Just y <- next
+	  return (x * y)
+	  
+正如我们期望的那样，如果我们将 ``Supply`` monad 和 ``randomsIO`` 函数与上面这个函数结合，那么每次都会得到一个不同的结果。
+
+::
+
+	ghci> (fst . runSupply xy) `fmap` randomsIO
+	-15697064270863081825448476392841917578
+	ghci> (fst . runSupply xy) `fmap` randomsIO
+	17182983444616834494257398042360119726
+	
+因为 ``MySupply`` monad 由两层 ``newtype`` 包装，为了使其更易使用，我们可以为它编写一个自定义的执行函数：
+
+::
+
+	-- file: ch15/SupplyInstance.hs
+	runMS :: MySupply i a -> i -> a
+	runMS = runReader . runMySupply
+	
+当我们通过这个执行函数来应用 ``xy`` 动作时，每次都会得到相同的结果。虽然代码没有改动，但因为我们在不同 ``MonadSupply`` 的实现下执行，所以它的行为改变了。
+
+::
+
+	ghci> runMS xy 2
+	4
+	ghci> runMS xy 2
+	4
+	
+就像我们的 ``MonadSupply`` 类型类和 ``Supply`` monad，几乎所有常见的 Haskell monad 都建立在接口与实现分离的情况下。举个例子，我们介绍过两个 “属于” ``State`` monad 的函数 ``get`` 和 ``put`` ，它们事实上是 ``MonadState`` 类型类的方法； ``State`` 类型只是这个类的一个实例。
+
+类似的，标准的 ``Reader`` monad 是类型类 ``MonadReader`` 的实例，它指定了 ``ask`` 方法。
+
+我们上面讨论的接口和实现分离不止对于架构清洁有帮助，它重要的实际应用在日后将更加清楚。当我们在 :ref:`monad-transformers` 中开始合并 monad 时，我们会通过使用 ``GeneralizedNewtypeDeriving`` 和类型类来节约大量的工作。
+	  
 .. _hiding-the-io-monad:
 
 隐藏 IO monad
 -------------
+
+``IO`` monad 的 “祝福”和 “诅咒” 都来源于它的过分强大。假如我们相信小心地使用类型能帮助我们杜绝程序错误，那么 ``IO`` monad 将成为错误的一个重要来源。因为 ``IO`` monad 对我们做的事情不加以限制，这使我们容易遭受各种意外。
+
+我们如何驯服它的力量？假如我们想保证一段代码可以读取和写入本地文件，但它不能访问网络。这时我们不能使用 ``IO`` monad，因为它不会限制我们。
 
 .. _using-a-newtype:
 
 使用 newtype
 ^^^^^^^^^^^^
 
+让我们创建一个新模块，它提供了一组读取和写入文件的功能。
+
+::
+
+	-- file: ch15/HandleIO.hs
+	{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
+	module HandleIO
+		(
+		  HandleIO
+		, Handle
+		, IOMode(..)
+		, runHandleIO
+		, openFile
+		, hClose
+		, hPutStrLn
+		) where
+		
+	import System.IO (Handle, IOMode(..))
+	import qualified System.IO
+
+我们要创建有限制 ``IO`` 的第一步是使用 ``newtype`` 对其进行包装。
+
+::
+
+	-- file: ch15/HandleIO.hs
+	newtype HandleIO a = HandleIO { runHandleIO :: IO a }
+		deriving (Monad)
+		
+我们使用已经熟悉的技巧，从模块中导出类型构造函数和 ``runHandleIO`` 执行函数，但不导出数据构造器。这可以阻止在 ``HandleIO`` monad 中执行的代码获取它所包装的 ``IO`` monad。
+
+剩下的工作就是包装我们希望 monad 允许的每个动作。这可以通过用 ``HandleIO`` 数据构造函数包装每个 ``IO`` 实现。
+
+::
+
+	-- file: ch15/HandleIO.hs
+	openFile :: FilePath -> IOMode -> HandleIO Handle
+	openFile path mode = HandleIO (System.IO.openFile path mode)
+
+	hClose :: Handle -> HandleIO ()
+	hClose = HandleIO . System.IO.hClose
+
+	hPutStrLn :: Handle -> String -> HandleIO ()
+	hPutStrLn h s = HandleIO (System.IO.hPutStrLn h s)
+	
+我们现在可以使用有限制的 ``HandleIO`` monad 来执行 I/O 操作。
+
+::
+	
+	-- file: ch15/HandleIO.hs
+	safeHello :: FilePath -> HandleIO ()
+	safeHello path = do
+	  h <- openFile path WriteMode
+	  hPutStrLn h "hello world"
+	  hClose h
+	  
+要执行这个动作，我们使用 ``runHandleIO`` 。
+
+::
+
+	ghci> :load HandleIO
+	[1 of 1] Compiling HandleIO         ( HandleIO.hs, interpreted )
+	Ok, modules loaded: HandleIO.
+	ghci> runHandleIO (safeHello "hello_world_101.txt")
+	Loading package old-locale-1.0.0.0 ... linking ... done.
+	Loading package old-time-1.0.0.0 ... linking ... done.
+	Loading package filepath-1.1.0.0 ... linking ... done.
+	Loading package directory-1.0.0.0 ... linking ... done.
+	Loading package mtl-1.1.0.0 ... linking ... done.
+	ghci> :m +System.Directory
+	ghci> removeFile "hello_world_101.txt"
+	
+假如我们试图用一种不被允许的方式排列一个在 ``HandleIO`` monad 中执行的动作，类型系统会加以阻止。
+
+::
+	
+	ghci> runHandleIO (safeHello "goodbye" >> removeFile "goodbye")
+
+	<interactive>:1:36:
+		Couldn't match expected type `HandleIO a'
+			   against inferred type `IO ()'
+		In the second argument of `(>>)', namely `removeFile "goodbye"'
+		In the first argument of `runHandleIO', namely
+			`(safeHello "goodbye" >> removeFile "goodbye")'
+		In the expression:
+			runHandleIO (safeHello "goodbye" >> removeFile "goodbye")
+	
 .. _designing-for-unexpected-uses:
 
 针对意外使用情况设计
 ^^^^^^^^^^^^^^^^^^^^
+
+``HandleIO`` monad 有一个重要的小问题：我们可能偶尔需要一个 “逃生舱门” ，而 ``HandleIO`` monad 没有考虑到这种可能性。如果定义一个这样的 monad，我们很有可能会偶尔执行 monad 设计所不允许的 I/O 动作。
+
+设计这个 monad 的目的是让我们更容易在普通情况下编写无错代码，而不是为了杜绝特殊情况发生。让我们给自己留一条出路。
+
+``Conotrol.Monad.Trans`` 模块定义了一个 “标准逃生舱门” ： ``MonadIO`` 类型类。函数 ``liftIO`` 可以将一个 ``IO`` 动作嵌入另一个 monad 中。
+
+::
+
+	ghci> :m +Control.Monad.Trans
+	ghci> :info MonadIO
+	class (Monad m) => MonadIO m where liftIO :: IO a -> m a
+		-- Defined in Control.Monad.Trans
+	instance MonadIO IO -- Defined in Control.Monad.Trans
+	
+要实现这个类型类非常简单，只需要用我们自己的数据构造器将 ``IO`` 包装起来就可以了：
+
+::
+
+	-- file: ch15/HandleIO.hs
+	import Control.Monad.Trans (MonadIO(..))
+
+	instance MonadIO HandleIO where
+		liftIO = HandleIO
+
+通过审慎地使用 ``liftIO`` ，我们可以逃脱束缚，并在必要的时候调用 IO 操作。
+
+::
+
+	-- file: ch15/HandleIO.hs
+	tidyHello :: FilePath -> HandleIO ()
+	tidyHello path = do
+	  safeHello path
+	  liftIO (removeFile path)
+	  
+.. info:
+
+	自动推导和 ``MonadIO``
+	
+	通过将类型类添加到 ``HandleIO`` 的 ``deriving`` 子式，我们可以让编译器自动导出一个 ``MonadIO`` 实例。事实上，这在生产代码中是一个常见的策略。为了将之前材料和 ``MonadIO`` 二者的表示分离，这里简单地避免了这样的方式。
 
 .. _using-typeclasses:
 
 使用类型类
 ^^^^^^^^^^
 
+将 ``IO`` 隐藏到另一个 monad 的缺陷是我们仍然绑定到了一个具体的实现。假如要将 ``HandleIO`` 和一些其它的 monad 交换，就必须改变每个使用 ``HandleIO`` 的动作的类型。
+
+一种替代方式是创建一个类型类。我们想从一个操作文件的 monad 中获取接口，这个类型类指定了这个接口。
+
+::
+
+	-- file: ch15/MonadHandle.hs
+	{-# LANGUAGE FunctionalDependencies, MultiParamTypeClasses #-}
+
+	module MonadHandle (MonadHandle(..)) where
+
+	import System.IO (IOMode(..))
+
+	class Monad m => MonadHandle h m | m -> h where
+		openFile :: FilePath -> IOMode -> m h
+		hPutStr :: h -> String -> m ()
+		hClose :: h -> m ()
+		hGetContents :: h -> m String
+
+		hPutStrLn :: h -> String -> m ()
+		hPutStrLn h s = hPutStr h s >> hPutStr h "\n"
+
+现在，我们决定抽象出 monad 的类型和文件句柄的类型。为了满足类型检查器，这里添加了一个函数依赖：对于 ``MonadHandle`` 的任何实例，只有一个句柄类型可以使用。当 ``IO`` monad 成为这个类的一个实例时，我们使用一个普通的 ``Handle`` 。
+
+::
+
+	-- file: ch15/MonadHandleIO.hs
+	{-# LANGUAGE FunctionalDependencies, MultiParamTypeClasses #-}
+
+	import MonadHandle
+	import qualified System.IO
+
+	import System.IO (IOMode(..))
+	import Control.Monad.Trans (MonadIO(..), MonadTrans(..))
+	import System.Directory (removeFile)
+
+	import SafeHello
+
+	instance MonadHandle System.IO.Handle IO where
+		openFile = System.IO.openFile
+		hPutStr = System.IO.hPutStr
+		hClose = System.IO.hClose
+		hGetContents = System.IO.hGetContents
+		hPutStrLn = System.IO.hPutStrLn
+
+因为任何 ``MonadHandle`` 也必须是一个 ``Monad`` ，所以我们可以使用普通的 ``do`` 标识符编写修改文件的代码，而不需要关心它最终在哪个 monad 中执行。
+
+::
+
+	-- file: ch15/SafeHello.hs
+	safeHello :: MonadHandle h m => FilePath -> m ()
+	safeHello path = do
+	  h <- openFile path WriteMode
+	  hPutStrLn h "hello world"
+	  hClose h
+
+我们已经让 ``IO`` 成为这个类型类的一个实例，现在可以在 **ghci** 中执行这个动作：
+
+::
+
+	ghci> safeHello "hello to my fans in domestic surveillance"
+	Loading package old-locale-1.0.0.0 ... linking ... done.
+	Loading package old-time-1.0.0.0 ... linking ... done.
+	Loading package filepath-1.1.0.0 ... linking ... done.
+	Loading package directory-1.0.0.0 ... linking ... done.
+	Loading package mtl-1.1.0.0 ... linking ... done.
+	ghci> removeFile "hello to my fans in domestic surveillance"
+	
+使用类型类的好处在于，我们可以不需要接触过多代码并互换一个底层的 monad ，因为大多数代码不知道或不关心具体底层 monad 的实现。例如，可以用一个 monad 来替换 ``IO`` ，它会在文件写入时压缩文件。
+
+通过类型类定义一个 monad 的接口有另一个好处：它允许其他人在 ``newtype`` 包装器中隐藏我们的实现，并自动派生他们想要暴露的类型类的实例。
+	  
 .. _isolation-and-testing:
 
 隔离和测试
 ^^^^^^^^^^
 
+事实上，因为 ``safeHello`` 函数没有使用 ``IO`` 类型，我们甚至可以使用不能执行 I/O 的 monad。通过这种方法，我们可以在纯粹且受控的环境中对那些在平常情况下会出现副作用的代码进行测试。
+
+为此，我们将创建一个 monad，这个 monad 不会执行任何 I/O 操作，但它会记录每个与文件相关联的事件以供后续处理。
+
+::
+
+	-- file: ch15/WriterIO.hs
+	data Event = Open FilePath IOMode
+			   | Put String String
+			   | Close String
+			   | GetContents String
+				 deriving (Show)
+
+虽然在 :ref:`using-a-new-monad-show-your-work` 中已经开发了一个 ``Logger`` 类型，但这里我们将使用标准的、更广泛的 ``Writer`` monad。和其它 ``mtl`` monad 类似， ``Writer`` 提供的 API 将在一个类型类中被定义，也就是接下来要展示的 ``MonadWriter`` 。``MonadWriter`` 最有用的方法是 ``tell`` ，这个方法记录了一个值。
+
+::
+
+	ghci> :m +Control.Monad.Writer
+	ghci> :type tell
+	tell :: (MonadWriter w m) => w -> m ()
+	
+虽然 ``tell`` 方法可以记录任意类型的 ``Monoid`` ，但是因为列表的类型是 ``Monoid`` ，所以 ``tell`` 方法将记录一个由 ``Event`` 构成的列表。
+
+尽管我们可以让 ``Writer [Event]`` 成为 ``MonadHandle`` 的一个实例，但一个更廉价也更安全的做法是编写一个特殊的 monad ，并且要做到这一点也比较容易。
+
+::
+
+	-- file: ch15/WriterIO.hs
+	newtype WriterIO a = W { runW :: Writer [Event] a }
+		deriving (Monad, MonadWriter [Event])
+
+执行函数首先会移除我们之前添加的 ``newtype`` 包装器，然后再调用普通 ``Writer`` monad 的执行函数。
+
+::
+
+	-- file: ch15/WriterIO.hs
+	runWriterIO :: WriterIO a -> (a, [Event])
+	runWriterIO = runWriter . runW
+
+当我们在 **ghci** 中执行这段代码的时候，它将反馈给我们一份日志，这份日志记录了函数对文件所做的行为。
+
+::
+
+	ghci> :load WriterIO
+	[1 of 3] Compiling MonadHandle      ( MonadHandle.hs, interpreted )
+	[2 of 3] Compiling SafeHello        ( SafeHello.hs, interpreted )
+	[3 of 3] Compiling WriterIO         ( WriterIO.hs, interpreted )
+	Ok, modules loaded: SafeHello, MonadHandle, WriterIO.
+	ghci> runWriterIO (safeHello "foo")
+	((),[Open "foo" WriteMode,Put "foo" "hello world",Put "foo" "\n",Close "foo"])
+	
 .. _the-writer-monad-and-lists:
 
 Writer monad 和 列表
 ^^^^^^^^^^^^^^^^^^^^
+
+每当我们使用 ``tell`` 方法时， ``Writer`` monad 都会调用 monoid 的 ``mappend`` 函数。因为列表的 ``mappend`` 动作是 ``(++)`` ，而不断重复附加操作是非常浪费资源的，所以在实际使用 ``Writer`` 时，列表并不是一个很好的选择。在上面的实例中，我们纯粹是为了追求简单才使用了列表。
+
+在生产代码中，如果你想使用 ``Writer`` monad ，并且需要类似列表的行为，那么你应当选择那些在执行附加操作时性能更优的类型。在 :ref:`taking-advantage-of-functions-as-data` 中介绍过的差异列表就是一个这样的类型。你不需要实现自己的差异列表：Haskell 包数据库 Hackage 提供了一个调试好的库，你可以直接下载使用。除此之外，你可以使用 ``Data.Sequence`` 模块中的 ``Seq`` 类型，我们在 :ref:`general-purpose-sequences` 中介绍过这个类型。
 
 .. _arbitrary-io-revisited:
 
 任意 I/O 访问
 ^^^^^^^^^^^^^
 
+在使用类型类方法限制 ``IO`` 的同时，我们可能还会希望继续保留执行任意 I/O 操作的能力。为此，我们可以尝试将 ``MonadIO`` 作为约束添加到类型类里面。
+
+::
+
+	-- file: ch15/MonadHandleIO.hs
+	class (MonadHandle h m, MonadIO m) => MonadHandleIO h m | m -> h
+
+	instance MonadHandleIO System.IO.Handle IO
+
+	tidierHello :: (MonadHandleIO h m) => FilePath -> m ()
+	tidierHello path = do
+	  safeHello path
+	  liftIO (removeFile path)
+
+但是这种方法会导致一个问题：添加 ``MonadIO`` 约束将使得我们无法再判断一个测试是否会带有副作用，我们也因此失去了在纯粹的环境中测试代码的能力。另一种方法是调整这个约束的作用域，使它只影响那些真正需要执行 I/O 操作的函数，而非所有函数。
+
+::
+
+	-- file: ch15/MonadHandleIO.hs
+	tidyHello :: (MonadIO m, MonadHandle h m) => FilePath -> m ()
+	tidyHello path = do
+	  safeHello path
+	  liftIO (removeFile path)
+
+我们可以对不受 ``MonadIO`` 约束的函数使用纯属性测试，对其余的函数使用传统的单元测试。
+
+遗憾的是，这种做法只不过是将一个问题换成了另一个问题：只受 ``MonadHandle`` 约束的代码将无法调用同时受 ``MonadIO`` 和 ``MonadHandle`` 约束的代码。如果我们在 ``MonadHandle`` 约束的代码内部发现了这个问题，那么我们就必须在引发这个问题的所有代码路径上都加上 ``MonadIO`` 约束。
+
+允许执行任意 I/O 操作是有风险的，而且这么做对我们开发、测试代码的流程都会有巨大的影响。相比放宽对代码行为的限制，我们通常会追求更清晰的代码逻辑和更容易的测试环境。
+	  
 练习
 ^^^^
+
+1. 使用 Quick Check，为 ``MonadHandle`` monad 中的一个动作编写一个测试，观察它是否尝试向一个未打开的文件句柄写入。在 ``safeHello`` 下尝试。
+
+2. 编写一个试图向已关闭句柄写入的动作。你的测试捕获到这个问题了吗？
+
+3. 在表单编码的字符串中，相同的键可能出现数次，每个键具有或不具有对应的值，例如 ``key&key=1&key=2`` 。你会用什么类型来表示这类字符串中和键相关联的值？编写一个正确捕获所有信息的解析器。
