@@ -127,14 +127,14 @@ Haskell 提供了一个特殊的 Monad，叫做 ``ST``  *（State Transformer）
 
   import BloomFilter.Internal (MutBloom(..))
 
-我们导出的函数中有几个和 Prelude 导出函数相冲突的名称。这么做是经过考虑的：我们希望用户使用限制名称导入我们的模块，这减轻了用户记忆的负担，因为他们对 Prelude 中的 `elem`，`notElem` 和 ``length`` 函数已经相当熟悉了。
+我们导出的函数中有几个和 Prelude 导出函数相冲突的名称。这么做是经过考虑的：我们希望用户使用限制名称导入我们的模块，这减轻了用户记忆的负担，因为他们对 Prelude 中的 ``elem`` ，``notElem`` 和 ``length`` 函数已经相当熟悉了。
 
 我们通常使用单个字母的前缀来导入这种风格的模块。例如，用户在代码中使用 ``import qualified BloomFilter.Mutable as M`` 导入模块，此时用户可以将导入模块中的 ``length`` 写为 ``M.length`` ，这保持了代码的紧凑型和可读性。
 
-我们也可以不使用限制名称导入模块，此时需要通过 ``import Prelude hiding (length)`` 来隐藏 Prelude 与模块相冲突的函数。我们不建议使用这种做法，因为它使读者容易忽视这里的 ``length`` 并非 Prelude 中的 ``length`` 。
+我们也可以不使用限制名称导入模块，此时需要通过 ``import Prelude hiding (length)`` 来隐藏 Prelude 与模块相冲突的函数。我们不建议使用这种做法，因为它使读者容易忽视代码中的 ``length`` 并非 Prelude 模块的 ``length`` 。
 
 当然，我们在上面定义的模块头中违背了这个规则：我们导入了 Prelude 并且隐藏了它的一些函数名。这是因为我们在模块中定义了自己的函数 ``length`` ，如果不先将 Prelude 包中的同名函数隐藏，编译器将无法确定它该导出我们自定义的 ``length`` 还是 Prelude 中的 ``length`` 。
 
-虽然导出完全限定名称 ``BloomFilter.Mutable.length`` 能够消除歧义，但它看起来更丑陋。这个决定对模块的用户没有影响，它仅仅针对我们自己 ———— 黑盒的作者，所以这里很少会混淆。
+虽然导出完全限定名称 ``BloomFilter.Mutable.length`` 能够消除歧义，但它看起来更丑陋。这个决定对使用模块的用户没有影响，它仅仅针对我们自己 —— 黑盒的设计者，所以这里一般不会导致混淆。
 
 .. [Broder02] Andrei Broder. Michael Mitzenmacher. “Network applications of Bloom filters: a survey”. Internet Mathematics. 1. 4. 2005. 485-509. A K Peters Ltd..

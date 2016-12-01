@@ -223,6 +223,10 @@ fusion
 
 布隆过滤器 Bloom Filter
 
+可变引用 mutable references
+
+冻结 frozen
+
 第二十八章
 ------------------
 
