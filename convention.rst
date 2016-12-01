@@ -223,6 +223,8 @@ fusion
 
 布隆过滤器 Bloom Filter
 
+网络流量整形 traffic shaper
+
 可变引用 mutable references
 
 冻结 frozen
