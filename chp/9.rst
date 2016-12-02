@@ -62,7 +62,7 @@ find命令
 
 在 `Anonymous (lambda) functions <http://book.realworldhaskell.org/read/functional-programming.html#fp.anonymous>`_ 这部分，我们列举了一系列不使用匿名函数的原因，然而在这里，我们将使用它作为函数体，这是匿名函数在 Haskell 中最常见的用途之一。
 
-我们已经在 ``froM`` 和 ``mapM`` 上看到使用函数作为参数的方式，许多循环体是程序中只出现一次的代码块。既然我们喜欢在循环中使用一个再也不会出现的循环体，那么为什么要给他们命名？
+我们已经在 ``forM`` 和 ``mapM`` 上看到使用函数作为参数的方式，许多循环体是程序中只出现一次的代码块。既然我们喜欢在循环中使用一个再也不会出现的循环体，那么为什么要给他们命名？
 
 显而易见，有时候我们需要在不同的循环中嵌入相同的代码，这时候我们不应该使用匿名函数，把他们剪贴和复制进去，而是给这些匿名函数命名来调用，这样显得有意义一点
 
@@ -118,7 +118,7 @@ find命令
     ghci> :type simpleFind (\p -> takeExtension p == ".c")
     simpleFind (\p -> takeExtension p == ".c") :: FilePath -> IO [FilePath]
 
-``simpleFind`` 在工作中有一些非常刺眼的问题，第一个就是谓词并不能准确而完全的表达，他只关注文件夹中的目录项名称，而无法做到辨认这是个文件还是个目录此类的事情，——而我们使用 ``simpleFind`` 的尝试就是想列举所文件和有和文件一样拥有 ``.c`` 扩展名的文件夹
+``simpleFind`` 在工作中有一些非常刺眼的问题，第一个就是谓词并不能准确而完全的表达，他只关注文件夹中的目录项名称，而无法做到辨认这是个文件还是个目录此类的事情，——而我们使用 ``simpleFind`` 的尝试就是想列举所有文件和与文件一样拥有 ``.c`` 扩展名的文件夹
 
 第二个问题是在 ``simpleFind`` 中我们无法控制它遍历文件系统的方式，这是显而易见的，想想在分布式版本控制系统中控制下的树状结构中查找一个源文件的问题吧，所有被控制的目录都含有一个 ``.svn`` 的私有文件夹，每一个包含了许多我们毫不感兴趣的子文件夹和文件，简单的过滤所有包含 ``.svn`` 的路径远比仅仅在读取时避免遍历这些文件夹更加有效。例如，一个分布式源码树包含了45000个文件，30000个分布在1200个不同的.svn文件夹中，避免遍历这1200个文件夹比过滤他们包含的30000个文件代价更低。
 
@@ -191,6 +191,15 @@ Haskell 的 ``System.Directory`` 模块提供了一个尽管受限但仍然有�
     getModificationTime :: FilePath -> IO System.Time.ClockTime
     ghci> getModificationTime "."
     Mon Aug 18 12:08:24 CDT 2008
+	
+[
+Forec 译注：在 GHC 7.6 之后，``getModificationTime`` 不再返回 ``ClockTime`` 类型，你可以使用 ``UTCTime`` 代替：
+
+::
+
+	import Data.Time.Clock (UTCTime(..))
+
+]
 
 如果我们像标准的Haskell代码一样对可移植性要求严格，这些函数就是我们手头所有的一切(我们同样可以通过黑客手段来获得文件大小)，这些已经足够让我们明白所感兴趣领域中的原则，而非让我们浪费宝贵的时间对着一个例子冥思苦想，如果你需要写满足更多需求的代码， ``System.Posix`` 和 ``System.Win32`` 模块提供关于当代两种计算平台的更多文件元数据的细节。 ``Hackage`` 中同样有一个 ``unix-compat`` 包，提供windows下的类unix的api 。
 
@@ -279,6 +288,18 @@ Haskell 的 ``System.Directory`` 模块提供了一个尽管受限但仍然有�
       size <- hFileSize h
       hClose h
       return (Just size)
+	  
+[
+Forec 译注：此处在 GHC 7.8.* 中会出现编译错误，如果你想按照原文中的匿名函数格式编写，则需要做如下修改：
+
+::
+
+	{-# LANGUAGE ScopedTypeVariables #-}
+	import Control.Exception (bracket, handle, SomeException)
+
+	getFileSize path = handle (\(_ :: SomeException) -> return Nothing) $
+	
+]
 
 函数体几乎完全一致，除了 ``handle`` 语句。
 
@@ -420,6 +441,8 @@ Haskell 的 ``System.Directory`` 模块提供了一个尽管受限但仍然有�
 
 注意我们并没有直接调用 ``betterFind`` ，我们只是确定我们的表达式进行了类型检查，现在我们需要更多的方法来列出大小为特定值的所有文件，之前的成功给了我们继续下去的勇气。
 
+:: _avoiding-boilerplate-with-lifting:
+
 多用提升（lifting）来减少样板代码
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -434,6 +457,20 @@ Haskell 的 ``System.Directory`` 模块提供了一个尽管受限但仍然有�
     greaterP, lesserP :: (Ord a) => InfoP a -> a -> InfoP Bool
     greaterP = liftP (>)
     lesserP = liftP (<)
+	
+[
+Forec 译注：此处 ``liftP`` 的参数可能较容易弄混，这里我们令 ``k`` 的类型和 ``a`` 相同，令 ``c`` 的类型是 ``Bool`` ，通过下面的写法可能会更好理解一些：
+
+::
+	
+	liftP :: (a -> a -> Bool) -> InfoP a -> a -> InfoP Bool
+	liftP comparator getter argument w x y z = (getter w x y z) `comparator` argument
+	
+这里的 ``comparator`` 对应原文中的 ``q`` ，为 ``(a -> b -> c)`` 类型的函数， ``getter`` 对应原文的 ``f`` ，``argument`` 对应原文的 ``k`` 。
+``getter`` 是 ``InfoP a`` 类的函数，这类函数根据 ``Predicate`` 类型中的元素计算出一个结果。因此整个 ``liftP`` 函数接收到参数的类型签名为 ``(a -> b -> c) -> InfoP a -> b -> w -> x -> y -> z`` ，
+此处 ``w -> x -> y -> z`` 是 ``InfoP c`` 展开的前四项。 ``getter`` 从这四项中提取到一个类型为 ``a`` 的值，并和 ``argument`` 比较，最终返回 ``Bool`` 。在原文的代码中则返回类型为 ``c`` 的值， ``c`` 类型由比较函数决定。
+
+]
 
 为了完成这个，让我们使用 Haskell 的抽象功能，定义 ``equalP`` 代替直接调用 ``==`` ，我们就可以把二元函数作为参数传入我们想调用的函数。
 
@@ -552,6 +589,16 @@ Haskell 的 ``System.Directory`` 模块提供了一个尽管受限但仍然有�
 
 学会这些就可以写一个不用括号的表达式，却和 ``myTest3`` 的解析结果一致的表达式了
 
+::
+
+	-- file: ch09/BetterPredicate.hs
+	infix 4 ==?
+	infixr 3 &&?
+	infix 4 >?
+
+	myTest4 = liftPath takeExtension ==? ".cpp" &&? sizeP >? 131072
+
+	
 控制遍历
 ---------------------------------
 
@@ -624,6 +671,40 @@ Haskell 的 ``System.Directory`` 模块提供了一个尽管受限但仍然有�
       return (Info path perms size modified)
 
 在此唯一值得记录的事情是一个有用的组合字， ``maybeIO`` ，将一个可能抛出异常的 IO 操作转换成用 ``Maybe`` 包装的结果
+
+[
+Forec 译注：在 GHC 7.6 以后的版本中，以上代码编译会出现问题，需添加 ``import`` 列表，并对部分代码做修改如下：
+
+::
+
+	{-# LANGUAGE ScopedTypeVariables #-}
+	import Prelude hiding (traverse)
+	import Control.Monad (filterM, liftM, forM)
+	import System.Directory (Permissions(..), 
+							 getModificationTime, 
+							 getPermissions, 
+							 getDirectoryContents)
+	import Data.Time.Clock (UTCTime(..))
+	import System.FilePath (takeExtension, (</>))
+	import Control.Exception (bracket, handle, SomeException)
+	import System.IO (IOMode(..), hClose, hFileSize, openFile)
+	
+	maybeIO act = handle (\(_::SomeException) -> return Nothing) (liftM Just act)
+
+你可以在 GHC 中导入代码并查看执行结果：
+
+::
+	
+	ghci> :l ControlledVisit.hs
+	[1 of 2] Compiling RecursiveContents ( RecursiveContents.hs, interpreted )
+	[2 of 2] Compiling Main             ( ControlledVisit.hs, interpreted )
+	Ok, modules loaded: RecursiveContents, Main.
+	ghci> :m +Data.List
+	ghci> infos<-traverse sort "."
+	ghci> map infoPath infos
+	[".",".\\BetterPredicate.hs",".\\ControlledVisit.hs",".\\RecursiveContents.hs"]
+	
+]
 
 练习
 ^^^^^^^^^^^
@@ -733,6 +814,25 @@ Haskell 的 ``System.Directory`` 模块提供了一个尽管受限但仍然有�
               | otherwise -> walk seed' names
         walk seed _ = return (Continue seed)
 
+[
+Forec 译注：要在 GHC 中使用这段代码，你需要修改 ``ControlledVisit.hs`` 的头部，并在 ``FoldDir.hs`` 的头部加入 ``import ControlledVisit`` ：
+
+::
+
+	{-# LANGUAGE ScopedTypeVariables #-}
+	module ControlledVisit 
+	(
+		Info(..),
+		getInfo,
+		getUsefulContents,
+		isDirectory
+	) where
+	
+	-- code left
+
+]
+		
+		
 这段代码有些有意思的地方。开始是通过使用作用域来避免通过额外的参数，最高层 ``foldTree`` 函数只是 ``fold`` 的包装器，用来揭开 ``fold`` 的最后结果的生成器。
 
 由于 ``fold`` 是局部函数，我们不需要把 ``foldTree`` 的 ``iter`` 变量传给它，它可以直接访问外围作用域的变量，相似的， ``walk`` 也可以在它的外围作用域中部看到 ``path`` 。
