@@ -96,7 +96,7 @@
 <div class="section" id="id2">
 <h3>再次认识匿名和命名函数<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
 <p>在 <a class="reference external" href="http://book.realworldhaskell.org/read/functional-programming.html#fp.anonymous">Anonymous (lambda) functions</a> 这部分，我们列举了一系列不使用匿名函数的原因，然而在这里，我们将使用它作为函数体，这是匿名函数在 Haskell 中最常见的用途之一。</p>
-<p>我们已经在 <code class="docutils literal"><span class="pre">froM</span></code> 和 <code class="docutils literal"><span class="pre">mapM</span></code> 上看到使用函数作为参数的方式，许多循环体是程序中只出现一次的代码块。既然我们喜欢在循环中使用一个再也不会出现的循环体，那么为什么要给他们命名？</p>
+<p>我们已经在 <code class="docutils literal"><span class="pre">forM</span></code> 和 <code class="docutils literal"><span class="pre">mapM</span></code> 上看到使用函数作为参数的方式，许多循环体是程序中只出现一次的代码块。既然我们喜欢在循环中使用一个再也不会出现的循环体，那么为什么要给他们命名？</p>
 <p>显而易见，有时候我们需要在不同的循环中嵌入相同的代码，这时候我们不应该使用匿名函数，把他们剪贴和复制进去，而是给这些匿名函数命名来调用，这样显得有意义一点</p>
 </div>
 <div class="section" id="mapm-form">
@@ -140,7 +140,7 @@
 <span class="nf">simpleFind</span> <span class="p">(</span><span class="nf">\</span><span class="n">p</span> <span class="ow">-&gt;</span> <span class="n">takeExtension</span> <span class="n">p</span> <span class="o">==</span> <span class="s">&quot;.c&quot;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">FilePath</span><span class="p">]</span>
 </pre></div>
 </div>
-<p><code class="docutils literal"><span class="pre">simpleFind</span></code> 在工作中有一些非常刺眼的问题，第一个就是谓词并不能准确而完全的表达，他只关注文件夹中的目录项名称，而无法做到辨认这是个文件还是个目录此类的事情，——而我们使用 <code class="docutils literal"><span class="pre">simpleFind</span></code> 的尝试就是想列举所文件和有和文件一样拥有 <code class="docutils literal"><span class="pre">.c</span></code> 扩展名的文件夹</p>
+<p><code class="docutils literal"><span class="pre">simpleFind</span></code> 在工作中有一些非常刺眼的问题，第一个就是谓词并不能准确而完全的表达，他只关注文件夹中的目录项名称，而无法做到辨认这是个文件还是个目录此类的事情，——而我们使用 <code class="docutils literal"><span class="pre">simpleFind</span></code> 的尝试就是想列举所有文件和与文件一样拥有 <code class="docutils literal"><span class="pre">.c</span></code> 扩展名的文件夹</p>
 <p>第二个问题是在 <code class="docutils literal"><span class="pre">simpleFind</span></code> 中我们无法控制它遍历文件系统的方式，这是显而易见的，想想在分布式版本控制系统中控制下的树状结构中查找一个源文件的问题吧，所有被控制的目录都含有一个 <code class="docutils literal"><span class="pre">.svn</span></code> 的私有文件夹，每一个包含了许多我们毫不感兴趣的子文件夹和文件，简单的过滤所有包含 <code class="docutils literal"><span class="pre">.svn</span></code> 的路径远比仅仅在读取时避免遍历这些文件夹更加有效。例如，一个分布式源码树包含了45000个文件，30000个分布在1200个不同的.svn文件夹中，避免遍历这1200个文件夹比过滤他们包含的30000个文件代价更低。</p>
 <p>最后。 <code class="docutils literal"><span class="pre">simpleFind</span></code> 是严格的，因为它包含一系列IO Monad操作执行构成的动作，如果我们有一百万个文件要遍历，我们需要等待很长一段时间才能得到一个包含一百万个名字的巨大的返回值，这对用户体验和资源消耗都是噩梦，我们更需要一个只有当他们获得结果的时才展示的结果流。</p>
 <p>在接下来的环节里，我们将解决每个遇到的问题</p>
@@ -198,6 +198,12 @@
 <span class="kt">Mon</span> <span class="kt">Aug</span> <span class="mi">18</span> <span class="mi">12</span><span class="kt">:</span><span class="mi">08</span><span class="kt">:</span><span class="mi">24</span> <span class="kt">CDT</span> <span class="mi">2008</span>
 </pre></div>
 </div>
+<p>[
+Forec 译注：在 GHC 7.6 之后，<code class="docutils literal"><span class="pre">getModificationTime</span></code> 不再返回 <code class="docutils literal"><span class="pre">ClockTime</span></code> 类型，你可以使用 <code class="docutils literal"><span class="pre">UTCTime</span></code> 代替：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kr">import</span> <span class="nn">Data.Time.Clock</span> <span class="p">(</span><span class="kt">UTCTime</span><span class="p">(</span><span class="o">..</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>]</p>
 <p>如果我们像标准的Haskell代码一样对可移植性要求严格，这些函数就是我们手头所有的一切(我们同样可以通过黑客手段来获得文件大小)，这些已经足够让我们明白所感兴趣领域中的原则，而非让我们浪费宝贵的时间对着一个例子冥思苦想，如果你需要写满足更多需求的代码， <code class="docutils literal"><span class="pre">System.Posix</span></code> 和 <code class="docutils literal"><span class="pre">System.Win32</span></code> 模块提供关于当代两种计算平台的更多文件元数据的细节。 <code class="docutils literal"><span class="pre">Hackage</span></code> 中同样有一个 <code class="docutils literal"><span class="pre">unix-compat</span></code> 包，提供windows下的类unix的api 。</p>
 <p>新的富类型谓词需要关注的数据段到底有几个？自从我们可以通过 <code class="docutils literal"><span class="pre">Permissions</span></code> 来判断目录项是文件还是目录之后，我们就不再需要获得 <code class="docutils literal"><span class="pre">doesFileExist</span></code> 和 <code class="docutils literal"><span class="pre">doesDirectoryExist</span></code> 的结果，因此一个谓词需要关注的输入有四个。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
@@ -270,6 +276,15 @@
   <span class="n">return</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">size</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>[
+Forec 译注：此处在 GHC 7.8.* 中会出现编译错误，如果你想按照原文中的匿名函数格式编写，则需要做如下修改：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="cm">{-# LANGUAGE ScopedTypeVariables #-}</span>
+<span class="kr">import</span> <span class="nn">Control.Exception</span> <span class="p">(</span><span class="nf">bracket</span><span class="p">,</span> <span class="nf">handle</span><span class="p">,</span> <span class="kt">SomeException</span><span class="p">)</span>
+
+<span class="nf">getFileSize</span> <span class="n">path</span> <span class="ow">=</span> <span class="n">handle</span> <span class="p">(</span><span class="nf">\</span><span class="p">(</span><span class="kr">_</span> <span class="ow">::</span> <span class="kt">SomeException</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="kt">Nothing</span><span class="p">)</span> <span class="o">$</span>
+</pre></div>
+</div>
+<p>]</p>
 <p>函数体几乎完全一致，除了 <code class="docutils literal"><span class="pre">handle</span></code> 语句。</p>
 <p>我们的异常捕捉在忽略通过的异常的同时返回一个空值，函数体唯一的变化就是允许通过 <code class="docutils literal"><span class="pre">Just</span></code> 包装文件大小</p>
 <p><code class="docutils literal"><span class="pre">saferFileSize</span></code> 函数现在有正确的类型签名，并且不会抛出任何异常，但他扔未能完全的正常工作，存在 <code class="docutils literal"><span class="pre">openFile</span></code> 会成功的目录项，但 <code class="docutils literal"><span class="pre">hFileSize</span></code> 会抛出异常，这将和被称作命名管道的状况一起发生，这样的异常会被捕捉，但却从未发起调用 <code class="docutils literal"><span class="pre">hClose</span></code> 。</p>
@@ -370,6 +385,7 @@
 </pre></div>
 </div>
 <p>注意我们并没有直接调用 <code class="docutils literal"><span class="pre">betterFind</span></code> ，我们只是确定我们的表达式进行了类型检查，现在我们需要更多的方法来列出大小为特定值的所有文件，之前的成功给了我们继续下去的勇气。</p>
+<p>:: _avoiding-boilerplate-with-lifting:</p>
 <div class="section" id="lifting">
 <h3>多用提升（lifting）来减少样板代码<a class="headerlink" href="#lifting" title="Permalink to this headline">¶</a></h3>
 <p>除了 <code class="docutils literal"><span class="pre">equalP</span></code> ，我们还将能够编写其他二元函数，我们更希望不去写他们每个的具体实现，因为这看起来只是重复工作：</p>
@@ -382,6 +398,16 @@
 <span class="nf">lesserP</span> <span class="ow">=</span> <span class="n">liftP</span> <span class="p">(</span><span class="o">&lt;</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>[
+Forec 译注：此处 <code class="docutils literal"><span class="pre">liftP</span></code> 的参数可能较容易弄混，这里我们令 <code class="docutils literal"><span class="pre">k</span></code> 的类型和 <code class="docutils literal"><span class="pre">a</span></code> 相同，令 <code class="docutils literal"><span class="pre">c</span></code> 的类型是 <code class="docutils literal"><span class="pre">Bool</span></code> ，通过下面的写法可能会更好理解一些：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">liftP</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">InfoP</span> <span class="kt">Bool</span>
+<span class="nf">liftP</span> <span class="n">comparator</span> <span class="n">getter</span> <span class="n">argument</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="p">(</span><span class="n">getter</span> <span class="n">w</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span><span class="p">)</span> <span class="p">`</span><span class="n">comparator</span><span class="p">`</span> <span class="n">argument</span>
+</pre></div>
+</div>
+<p>这里的 <code class="docutils literal"><span class="pre">comparator</span></code> 对应原文中的 <code class="docutils literal"><span class="pre">q</span></code> ，为 <code class="docutils literal"><span class="pre">(a</span> <span class="pre">-&gt;</span> <span class="pre">b</span> <span class="pre">-&gt;</span> <span class="pre">c)</span></code> 类型的函数， <code class="docutils literal"><span class="pre">getter</span></code> 对应原文的 <code class="docutils literal"><span class="pre">f</span></code> ，<code class="docutils literal"><span class="pre">argument</span></code> 对应原文的 <code class="docutils literal"><span class="pre">k</span></code> 。
+<code class="docutils literal"><span class="pre">getter</span></code> 是 <code class="docutils literal"><span class="pre">InfoP</span> <span class="pre">a</span></code> 类的函数，这类函数根据 <code class="docutils literal"><span class="pre">Predicate</span></code> 类型中的元素计算出一个结果。因此整个 <code class="docutils literal"><span class="pre">liftP</span></code> 函数接收到参数的类型签名为 <code class="docutils literal"><span class="pre">(a</span> <span class="pre">-&gt;</span> <span class="pre">b</span> <span class="pre">-&gt;</span> <span class="pre">c)</span> <span class="pre">-&gt;</span> <span class="pre">InfoP</span> <span class="pre">a</span> <span class="pre">-&gt;</span> <span class="pre">b</span> <span class="pre">-&gt;</span> <span class="pre">w</span> <span class="pre">-&gt;</span> <span class="pre">x</span> <span class="pre">-&gt;</span> <span class="pre">y</span> <span class="pre">-&gt;</span> <span class="pre">z</span></code> ，
+此处 <code class="docutils literal"><span class="pre">w</span> <span class="pre">-&gt;</span> <span class="pre">x</span> <span class="pre">-&gt;</span> <span class="pre">y</span> <span class="pre">-&gt;</span> <span class="pre">z</span></code> 是 <code class="docutils literal"><span class="pre">InfoP</span> <span class="pre">c</span></code> 展开的前四项。 <code class="docutils literal"><span class="pre">getter</span></code> 从这四项中提取到一个类型为 <code class="docutils literal"><span class="pre">a</span></code> 的值，并和 <code class="docutils literal"><span class="pre">argument</span></code> 比较，最终返回 <code class="docutils literal"><span class="pre">Bool</span></code> 。在原文的代码中则返回类型为 <code class="docutils literal"><span class="pre">c</span></code> 的值， <code class="docutils literal"><span class="pre">c</span></code> 类型由比较函数决定。</p>
+<p>]</p>
 <p>为了完成这个，让我们使用 Haskell 的抽象功能，定义 <code class="docutils literal"><span class="pre">equalP</span></code> 代替直接调用 <code class="docutils literal"><span class="pre">==</span></code> ，我们就可以把二元函数作为参数传入我们想调用的函数。</p>
 <p>函数动作，比如 <code class="docutils literal"><span class="pre">&gt;</span></code> ，以及将它转换成另一个函数操作另一种上下文，在这里是 <code class="docutils literal"><span class="pre">greaterP</span></code> ，通过提升（lifting）将它引入到上下文，这解释了当前函数名称中lifting出现的原因，提升让我们复用代码并降低模板的使用，在本书的后半部分的内容中，我们将大量使用这一技术</p>
 <p>当我们提升一个函数，我们通常将它转换到原始类型和一个新版本——提升和未提升两个版本</p>
@@ -478,6 +504,14 @@
 </pre></div>
 </div>
 <p>学会这些就可以写一个不用括号的表达式，却和 <code class="docutils literal"><span class="pre">myTest3</span></code> 的解析结果一致的表达式了</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch09/BetterPredicate.hs</span>
+<span class="kr">infix</span> <span class="mi">4</span> <span class="o">==?</span>
+<span class="kr">infixr</span> <span class="mi">3</span> <span class="o">&amp;&amp;?</span>
+<span class="kr">infix</span> <span class="mi">4</span> <span class="o">&gt;?</span>
+
+<span class="nf">myTest4</span> <span class="ow">=</span> <span class="n">liftPath</span> <span class="n">takeExtension</span> <span class="o">==?</span> <span class="s">&quot;.cpp&quot;</span> <span class="o">&amp;&amp;?</span> <span class="n">sizeP</span> <span class="o">&gt;?</span> <span class="mi">131072</span>
+</pre></div>
+</div>
 </div>
 <div class="section" id="id11">
 <h2>控制遍历<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h2>
@@ -536,6 +570,35 @@
 </pre></div>
 </div>
 <p>在此唯一值得记录的事情是一个有用的组合字， <code class="docutils literal"><span class="pre">maybeIO</span></code> ，将一个可能抛出异常的 IO 操作转换成用 <code class="docutils literal"><span class="pre">Maybe</span></code> 包装的结果</p>
+<p>[
+Forec 译注：在 GHC 7.6 以后的版本中，以上代码编译会出现问题，需添加 <code class="docutils literal"><span class="pre">import</span></code> 列表，并对部分代码做修改如下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="cm">{-# LANGUAGE ScopedTypeVariables #-}</span>
+<span class="kr">import</span> <span class="nn">Prelude</span> <span class="k">hiding</span> <span class="p">(</span><span class="nf">traverse</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Control.Monad</span> <span class="p">(</span><span class="nf">filterM</span><span class="p">,</span> <span class="nf">liftM</span><span class="p">,</span> <span class="nf">forM</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Directory</span> <span class="p">(</span><span class="kt">Permissions</span><span class="p">(</span><span class="o">..</span><span class="p">),</span>
+                                                 <span class="nf">getModificationTime</span><span class="p">,</span>
+                                                 <span class="nf">getPermissions</span><span class="p">,</span>
+                                                 <span class="nf">getDirectoryContents</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Data.Time.Clock</span> <span class="p">(</span><span class="kt">UTCTime</span><span class="p">(</span><span class="o">..</span><span class="p">))</span>
+<span class="kr">import</span> <span class="nn">System.FilePath</span> <span class="p">(</span><span class="nf">takeExtension</span><span class="p">,</span> <span class="p">(</span><span class="o">&lt;/&gt;</span><span class="p">))</span>
+<span class="kr">import</span> <span class="nn">Control.Exception</span> <span class="p">(</span><span class="nf">bracket</span><span class="p">,</span> <span class="nf">handle</span><span class="p">,</span> <span class="kt">SomeException</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.IO</span> <span class="p">(</span><span class="kt">IOMode</span><span class="p">(</span><span class="o">..</span><span class="p">),</span> <span class="nf">hClose</span><span class="p">,</span> <span class="nf">hFileSize</span><span class="p">,</span> <span class="nf">openFile</span><span class="p">)</span>
+
+<span class="nf">maybeIO</span> <span class="n">act</span> <span class="ow">=</span> <span class="n">handle</span> <span class="p">(</span><span class="nf">\</span><span class="p">(</span><span class="kr">_</span><span class="ow">::</span><span class="kt">SomeException</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="kt">Nothing</span><span class="p">)</span> <span class="p">(</span><span class="n">liftM</span> <span class="kt">Just</span> <span class="n">act</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>你可以在 GHC 中导入代码并查看执行结果：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="kt">ControlledVisit</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">RecursiveContents</span> <span class="p">(</span> <span class="kt">RecursiveContents</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="p">[</span><span class="mi">2</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">ControlledVisit</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">RecursiveContents</span><span class="p">,</span> <span class="kt">Main</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="o">+</span><span class="kt">Data</span><span class="o">.</span><span class="kt">List</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">infos</span><span class="ow">&lt;-</span><span class="n">traverse</span> <span class="n">sort</span> <span class="s">&quot;.&quot;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">map</span> <span class="n">infoPath</span> <span class="n">infos</span>
+<span class="p">[</span><span class="s">&quot;.&quot;</span><span class="p">,</span><span class="s">&quot;.</span><span class="se">\\</span><span class="s">BetterPredicate.hs&quot;</span><span class="p">,</span><span class="s">&quot;.</span><span class="se">\\</span><span class="s">ControlledVisit.hs&quot;</span><span class="p">,</span><span class="s">&quot;.</span><span class="se">\\</span><span class="s">RecursiveContents.hs&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>]</p>
 <div class="section" id="id12">
 <h3>练习<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
 <ol class="arabic simple">
@@ -624,6 +687,21 @@
     <span class="n">walk</span> <span class="n">seed</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">return</span> <span class="p">(</span><span class="kt">Continue</span> <span class="n">seed</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>[
+Forec 译注：要在 GHC 中使用这段代码，你需要修改 <code class="docutils literal"><span class="pre">ControlledVisit.hs</span></code> 的头部，并在 <code class="docutils literal"><span class="pre">FoldDir.hs</span></code> 的头部加入 <code class="docutils literal"><span class="pre">import</span> <span class="pre">ControlledVisit</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="cm">{-# LANGUAGE ScopedTypeVariables #-}</span>
+<span class="kr">module</span> <span class="nn">ControlledVisit</span>
+<span class="p">(</span>
+        <span class="kt">Info</span><span class="p">(</span><span class="o">..</span><span class="p">),</span>
+        <span class="nf">getInfo</span><span class="p">,</span>
+        <span class="nf">getUsefulContents</span><span class="p">,</span>
+        <span class="nf">isDirectory</span>
+<span class="p">)</span> <span class="kr">where</span>
+
+<span class="c1">-- code left</span>
+</pre></div>
+</div>
+<p>]</p>
 <p>这段代码有些有意思的地方。开始是通过使用作用域来避免通过额外的参数，最高层 <code class="docutils literal"><span class="pre">foldTree</span></code> 函数只是 <code class="docutils literal"><span class="pre">fold</span></code> 的包装器，用来揭开 <code class="docutils literal"><span class="pre">fold</span></code> 的最后结果的生成器。</p>
 <p>由于 <code class="docutils literal"><span class="pre">fold</span></code> 是局部函数，我们不需要把 <code class="docutils literal"><span class="pre">foldTree</span></code> 的 <code class="docutils literal"><span class="pre">iter</span></code> 变量传给它，它可以直接访问外围作用域的变量，相似的， <code class="docutils literal"><span class="pre">walk</span></code> 也可以在它的外围作用域中部看到 <code class="docutils literal"><span class="pre">path</span></code> 。</p>
 <p>另一个需要指出的点是 <code class="docutils literal"><span class="pre">walk</span></code> 是一个尾递归，在我们最初的函数中用来替代一个匿名函数调用。通过自己把控，可以在任何需要的时候停止，这使得当 <code class="docutils literal"><span class="pre">iterator</span></code> 返回 <code class="docutils literal"><span class="pre">Done</span></code> 的时候就可以退出。</p>

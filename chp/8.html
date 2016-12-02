@@ -310,7 +310,7 @@ pack &quot;foo&quot; :: ByteString
 <span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">)]</span>
 </pre></div>
 </div>
-<p>不过，我们需要注意，文本匹配的结果必须于被匹配的字符串类型一致。让我们实践一下，看这是什么意思。</p>
+<p>不过，我们需要注意，文本匹配的结果必须与被匹配的字符串类型一致。让我们实践一下，看这是什么意思。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">pack</span> <span class="s">&quot;good food&quot;</span> <span class="o">=~</span> <span class="s">&quot;.ood&quot;</span> <span class="ow">::</span> <span class="p">[[</span><span class="kt">ByteString</span><span class="p">]]</span>
 <span class="p">[[</span><span class="s">&quot;good&quot;</span><span class="p">],[</span><span class="s">&quot;food&quot;</span><span class="p">]]</span>
 </pre></div>
@@ -568,7 +568,7 @@ Loading package filepath-1.1.0.0 ... linking ... done.
 <span class="p">(</span><span class="s">&quot;foo/&quot;</span><span class="p">,</span><span class="s">&quot;&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p class="last">你或许能够想想想象是什么促使我们加入这份注意事项。</p>
+<p class="last">你或许能够想象是什么促使我们加入这份注意事项。</p>
 </div>
 <p>最终，我们将每个目录中的匹配收集起来，得到一个由列表组成的列表，然后将它们连接为一个单独的由文件名组成的列表。</p>
 <p>上面那个函数中出现的陌生的 <code class="docutils literal"><span class="pre">forM</span></code> 函数，其行为有些像 “for” 循环：它将其第二个参数（一个动作）映射到其第一个参数（一个列表），并返回由其结果组成的列表。</p>

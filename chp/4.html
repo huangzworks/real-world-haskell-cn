@@ -115,7 +115,7 @@
 <span class="p">[</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="s">&quot;&quot;</span><span class="p">,</span><span class="s">&quot;bar&quot;</span><span class="p">]</span>
 </pre></div>
 </div>
-<p>尽管lines看上去有用，但它要工作的话仰赖于我们用“文本模式”去读一个文件。文本模式对于很多编程语言来说是一个很普遍的功能：当我们在Windows系统上读和写文件的时候它提供一个特别的行为。当我们用文本模式读取一个文件的时候，文件I/O库把行终止序列“rn”（回车后跟着一个换行）转换成“n”（单独一个换行），当我们写一个文件的时候，它（译注：文件I/O库）会做相反的事情。而在类Unix系统上，文本模式不会做任何的转换工作。这个不同之处会导致的结果是，如果我们在Windows系统上读取一个在类Unix系统上写入的文件，行终止符很可能会变得乱七八糟。（readFile和writeFile都在文本模式下操作的话）</p>
+<p>尽管lines看上去有用，但它要工作的话仰赖于我们用“文本模式”去读一个文件。文本模式对于很多编程语言来说是一个很普遍的功能：当我们在Windows系统上读和写文件的时候它提供一个特别的行为。当我们用文本模式读取一个文件的时候，文件I/O库把行终止序列“\r\n”（回车后跟着一个换行）转换成“\n”（单独一个换行），当我们写一个文件的时候，它（译注：文件I/O库）会做相反的事情。而在类Unix系统上，文本模式不会做任何的转换工作。这个不同之处会导致的结果是，如果我们在Windows系统上读取一个在类Unix系统上写入的文件，行终止符很可能会变得乱七八糟。（readFile和writeFile都在文本模式下操作的话）</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">lines</span> <span class="s">&quot;a</span><span class="se">\r\n</span><span class="s">b&quot;</span>
 <span class="p">[</span><span class="s">&quot;a</span><span class="se">\r</span><span class="s">&quot;</span><span class="p">,</span><span class="s">&quot;b&quot;</span><span class="p">]</span>
 </pre></div>
@@ -191,8 +191,8 @@ ghci&gt; break isUpper &quot;isUpper&quot;
 <p>这种创建和复用小的、强大的代码片段的方式是函数式编程的基础。</p>
 <div class="section" id="id4">
 <h3>一个行终止转换程序<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h3>
-<p>让我们把我们的splitLines函数和早先我们写的一个小框架联系起来。首先制作一份Interact.hs源文件的拷贝；让我们叫这个新文件FixLines.hs。把splitLines加到新的源码文件中。因为我们的函数必须产出一个单独的字符串，所以我们必须把这个表示行的列表拼接起来。Prelude提供一个unlines函数，它把一个字符串组成的列表串联起来，并且在每个字符串元素的末尾加上一个换行符。</p>
-<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/SplitLines.hs</span>
+<p>让我们把我们的splitLines函数和早先我们写的一个小框架联系起来。首先制作一份Interact.hs源文件的拷贝；让我们叫这个新文件FixLines.hs。把splitLines加到新的源码文件中。因为我们的函数必须产出一个单独的字符串，所以我们必须把这个表示行的列表拼接起来。Prelude提供一个unlines函数，它把一个字符串组成的列表串联起来，并且在每个字符串元素的末尾加上一个换行符。（译注：原文中代码注释命名有误，不是 SplitLines.hs 而是 FixLines.hs）</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/FixLines.hs</span>
 <span class="nf">fixLines</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
 <span class="nf">fixLines</span> <span class="n">input</span> <span class="ow">=</span> <span class="n">unlines</span> <span class="p">(</span><span class="n">splitLines</span> <span class="n">input</span><span class="p">)</span>
 </pre></div>
@@ -266,13 +266,6 @@ True
 </pre></div>
 </div>
 <p>没有一个硬性的规则指示你什么时候应该用中缀表示法或是前缀表示法，尽管使用前缀表示法要普遍得多。在具体情况下选择使你的代码更可读的那一种表示法就是最好的。</p>
-<dl class="docutils">
-<dt>::</dt>
-<dd>注意出现在不熟悉的语言中的常见符号
-一些其它的编程语言使用反引号，但是尽管看起来像，反引号在Haskell中的用途还是和Perl、Python以及Unix脚本中的用途不太像。
-在Haskell中，我们能用反引号做的唯一合法的事情是让它们包裹函数名称。我们不能，比如，用它们围绕一个值是一个函数的复杂表达式。
-如果我们能做这个可能是方便的，但那不是这个语言今天的模样。</dd>
-</dl>
 </div>
 <div class="section" id="id6">
 <h2>和列表打交道<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h2>
@@ -1125,7 +1118,7 @@ Prelude&gt; foldl (+) 0 [1..100000000]
 <p>]</p>
 <div class="section" id="id25">
 <h4>练习<a class="headerlink" href="#id25" title="Permalink to this headline">¶</a></h4>
-<p>1.运用 <code class="docutils literal"><span class="pre">fold</span></code> （运用合适的fold将会是你的代码更简单）重写并扩展位于＂显式递归＂章节的 <code class="docutils literal"><span class="pre">asInt</span></code> 函数．</p>
+<p>1.运用 <code class="docutils literal"><span class="pre">fold</span></code> （运用合适的fold将会使你的代码更简单）重写并扩展位于＂显式递归＂章节的 <code class="docutils literal"><span class="pre">asInt</span></code> 函数．</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch04/ch04.exercises.hs</span>
 <span class="nf">asInt_fold</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Int</span>
 </pre></div>

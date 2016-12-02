@@ -333,7 +333,13 @@
 <code class="docutils literal"><span class="pre">(==&gt;)</span></code> 函数把解析器串联起来。我们马上就会详细介绍这些函数。</p>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p>Hanging lambdas</p>
+<p>“悬挂”的匿名函数</p>
+<blockquote>
+<div><p><code class="docutils literal"><span class="pre">parseByte</span></code> 呈现出的风格是我们此前没有讨论过的。它包含了一些匿名函数。这些匿名函数的参数和 <code class="docutils literal"><span class="pre">-&gt;</span></code> 都
+写在一行的末尾，而函数的主体部分从下一行开始。</p>
+<p>这种风格的匿名函数布局没有官方的名字，所以我们不妨称它为 “悬挂” 的匿名函数。它主要的用途是为函数主体部分留出更多空间。
+它也让两个紧邻函数之间的关系更加明显：比如，第一个函数的结果常常作为参数传递给第二个函数。</p>
+</div></blockquote>
 <p class="last">TBD</p>
 </div>
 </div>
@@ -447,7 +453,7 @@
     <span class="n">fmap</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span>
 </pre></div>
 </div>
-<p>我们可以把 <code class="docutils literal"><span class="pre">fmap</span></code> 当做某种提升函数，就像我们在 Avoiding boilerplate with lifting(fix link) 一节中介绍的那样。
+<p>我们可以把 <code class="docutils literal"><span class="pre">fmap</span></code> 当做某种提升函数，就像我们在 <span class="xref std std-ref">avoiding-boilerplate-with-lifting</span> 一节中介绍的那样。
 它接受一个参数为普通值 <code class="docutils literal"><span class="pre">a</span> <span class="pre">-&gt;</span> <span class="pre">b</span></code> 的函数并把它提升为一个参数为容器 <code class="docutils literal"><span class="pre">f</span> <span class="pre">a</span> <span class="pre">-&gt;</span> <span class="pre">f</span> <span class="pre">b</span></code> 的函数。
 其中 <code class="docutils literal"><span class="pre">f</span></code> 是容器的类型。</p>
 <p>举个例子，如果我们用 <code class="docutils literal"><span class="pre">Tree</span></code> 替换类型变量 <code class="docutils literal"><span class="pre">f</span></code>，<code class="docutils literal"><span class="pre">fmap</span></code> 的类型就会跟 <code class="docutils literal"><span class="pre">treeMap</span></code> 的类型相同。
@@ -603,6 +609,7 @@ Failed, modules loaded: none.
 <span class="kt">Right</span> <span class="kt">False</span>
 </pre></div>
 </div>
+<p>[Forec 译注：在导入 GHCI 之前，你需要再添加一个 <code class="docutils literal"><span class="pre">{-#</span> <span class="pre">LANGUAGE</span> <span class="pre">OverlappingInstances</span> <span class="pre">#-}</span></code> 来通过编译，因为 <code class="docutils literal"><span class="pre">Data.Either</span></code> 已经为 <code class="docutils literal"><span class="pre">Either</span> <span class="pre">a</span></code> 类型定义了对应的 <code class="docutils literal"><span class="pre">fmap</span></code> 实例。]</p>
 </div>
 <div class="section" id="thinking-more-about-functors">
 <span id="id12"></span><h3>更多关于 Functor 的思考<a class="headerlink" href="#thinking-more-about-functors" title="Permalink to this headline">¶</a></h3>

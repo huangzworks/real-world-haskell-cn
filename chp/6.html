@@ -56,7 +56,7 @@
 在讨论到底类型类是什么之前，我想解释下他们的作用（the need for them）。</p>
 <div class="section" id="the-need-for-typeclasses">
 <span id="id2"></span><h2>类型类的作用<a class="headerlink" href="#the-need-for-typeclasses" title="Permalink to this headline">¶</a></h2>
-<p>因为某个原因，
+<p>假设因为某个原因，
 <code class="docutils literal"><span class="pre">Haskell</span></code> 语言的设计者拒绝实现相等性测试 <code class="docutils literal"><span class="pre">==</span></code> ，
 因此我们决定实现自己的 <code class="docutils literal"><span class="pre">==</span></code> 操作。
 你的应用由一个简单的 <code class="docutils literal"><span class="pre">Color</span></code> 类型组成。
@@ -477,7 +477,7 @@ Haskell程序员经常写自己的函数去格式化(format)数据以漂亮的�
 <code class="docutils literal"><span class="pre">Integer</span></code> 的解析器不能接受小数点，从而抛出一个异常。</p>
 <p><code class="docutils literal"><span class="pre">Read</span></code> 类型提供了一些相当复杂的解析器。
 你可以定义一个简单的解析器，通过提供 <code class="docutils literal"><span class="pre">readsPrec</span></code> 函数的实现。
-你的实现能返回一个列表(list)，其包含一个元组(tuple)在解析成功的时候，或者一个空列表在解析失败的时候。
+你的实现能返回一个列表(list)：该列表在解析成功时包含一个元组(tuple)，在解析失败时为空。
 下面是一个实现的例子。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/naiveeq.hs</span>
 <span class="kr">instance</span> <span class="kt">Read</span> <span class="kt">Color</span> <span class="kr">where</span>
@@ -1047,7 +1047,7 @@ N/A</td>
 <div class="admonition tip">
 <p class="first admonition-title">Tip</p>
 <p class="last"><code class="docutils literal"><span class="pre">Ord</span></code> 产生的排列顺序在某些时候是非常随意的，
-比如 <code class="docutils literal"><span class="pre">Maybe</span></code> 、 <code class="docutils literal"><span class="pre">Nothing</span></code> 就排在 <code class="docutils literal"><span class="pre">Just</span> <span class="pre">x</span></code> 之前，
+比如对于 <code class="docutils literal"><span class="pre">Maybe</span></code> 而言， <code class="docutils literal"><span class="pre">Nothing</span></code> 就排在 <code class="docutils literal"><span class="pre">Just</span> <span class="pre">x</span></code> 之前，
 这些都是随意决定的，
 并没有什么特殊的意义。</p>
 </div>
@@ -1091,7 +1091,7 @@ N/A</td>
 <p>注意 <code class="docutils literal"><span class="pre">Color</span></code> 类型的排序位置由定义类型时值构造器的排序决定，即对应上面例子就是 <code class="docutils literal"><span class="pre">Red</span> <span class="pre">|</span> <span class="pre">Green</span> <span class="pre">|</span> <span class="pre">Blue</span></code> 的顺序。</p>
 <p>自动派生并不总是可用的。
 比如说，如果定义类型 <code class="docutils literal"><span class="pre">data</span> <span class="pre">MyType</span> <span class="pre">=</span> <span class="pre">MyType</span> <span class="pre">(Int</span> <span class="pre">-&gt;</span> <span class="pre">Bool)</span></code> ，那么编译器就没办法派生 <code class="docutils literal"><span class="pre">MyType</span></code> 为 <code class="docutils literal"><span class="pre">Show</span></code> 的实例，因为它不知道该怎么渲染(render)一个函数。
-我们会得到一个造成编译错误在上面这种情况下。</p>
+在上面这种情况下，我们会得到一个编译错误。</p>
 <p>当我们自动派生某个类型类的一个实例时，在我们利用 <code class="docutils literal"><span class="pre">data</span></code> 关键词声明参考这个实例的类型时，也必须是给定类型类的实例（手动或自动地）。</p>
 <p>举个例子，以下代码不能使用自动派生：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/cant_ad.hs</span>
@@ -1270,6 +1270,7 @@ N/A</td>
 </pre></div>
 </div>
 <p>]</p>
+<p>[Forec译注：在 Haskell 8.0.1 中，即使不添加 <code class="docutils literal"><span class="pre">{-#</span> <span class="pre">LANGUAGE</span> <span class="pre">TypeSynonymInstances</span> <span class="pre">#-}</span></code> 也不会出现问题，但 <code class="docutils literal"><span class="pre">{-#</span> <span class="pre">LANGUAGE</span> <span class="pre">FlexibleInstances</span> <span class="pre">#-}</span></code> 这条编译选项仍然需要。]</p>
 </div>
 </div>
 <div class="section" id="living-in-an-open-world">
@@ -1378,6 +1379,12 @@ GHC 不会抱怨重叠实例的单单存在(mere existence)。
 <p>GHC 支持另外一个有用的语言扩展， <code class="docutils literal"><span class="pre">OverlappingInstances</span></code> （覆盖实例）。
 它解决(原文为address)了在处理重叠实例时候我们碰到的问题。
 如果存在多个重叠的实例去从中选择，这个扩展会&#8221;采摘&#8221;(pick)最相关的（specific）那一个。</p>
+<p>[Forec译注：在 Haskell 8.0 后， <code class="docutils literal"><span class="pre">OverlappingInstances</span></code> 已被抛弃，可替代的方法是在实例中加上 <code class="docutils literal"><span class="pre">{-#</span> <span class="pre">OVERLAPPABLE</span> <span class="pre">#-}</span></code> ，如：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kr">instance</span> <span class="cm">{-# OVERLAPPABLE -#} Foo a =&gt; Foo [a] where</span>
+<span class="cm">    foo = concat . intersperse &quot;, &quot; . map foo</span>
+</pre></div>
+</div>
+<p>]</p>
 <p>我们经常使用这个扩展，同 <code class="docutils literal"><span class="pre">TypeSynonymInstances</span></code> 一起。
 这里是一个例子。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch06/SimpleClass.hs</span>
@@ -1507,10 +1514,10 @@ GHC 不会抱怨重叠实例的单单存在(mere existence)。
 </div>
 <p>在此之上，还有另一个重要的区别于 <code class="docutils literal"><span class="pre">data</span></code> 和 <code class="docutils literal"><span class="pre">newtype</span></code> 之间。
 一个类型，由 <code class="docutils literal"><span class="pre">data</span></code> 关键字创建，有一个簿记保持（book-keeping）的开销在运行时。
-例如，追踪（track）那个构造器，而用它（那个构造器）一个值被创建。
+例如，追踪（track）某个值是由哪个值构造器创造的。
 而另一方面， <code class="docutils literal"><span class="pre">newtype</span></code> 只能有一个构造器，所以不需要这个额外开销。
 这使得它在运行时更省时间和空间。</p>
-<p>因为 <code class="docutils literal"><span class="pre">newtype</span></code> 的构造器只在编译时使用，运行时甚至不存在，所以类型匹配在 <code class="docutils literal"><span class="pre">undefined</span></code> 之上表现得不同，对于用 <code class="docutils literal"><span class="pre">newtype</span></code> 定义的类型和那些用 <code class="docutils literal"><span class="pre">data</span></code> 定义的类型来说。</p>
+<p>因为 <code class="docutils literal"><span class="pre">newtype</span></code> 的构造器只在编译时使用，运行时甚至不存在，所以对于用 <code class="docutils literal"><span class="pre">newtype</span></code> 定义的类型和那些用 <code class="docutils literal"><span class="pre">data</span></code> 定义的类型来说，类型匹配在 <code class="docutils literal"><span class="pre">undefined</span></code> 上的表现不同。</p>
 <p>为了理解这个不同点，让我们首先回顾一下，我们可能期望一个普通类型的什么行为。
 我们已经非常熟悉，如果在运行时 <code class="docutils literal"><span class="pre">undefined</span></code> 被求值会导致崩溃。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="n">undefined</span>

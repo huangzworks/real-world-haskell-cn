@@ -1208,8 +1208,8 @@ data Maybe a = Just a
 <p>8.使用我们在前面章节中定义的二叉树类型，写一个函数用于确定一棵二叉树的高度．高度的定义是从根节点到叶子节点经过的最大节点数．举个例子，<code class="docutils literal"><span class="pre">Empty</span></code> 这棵树的高度是0; <code class="docutils literal"><span class="pre">Node</span> <span class="pre">&quot;x&quot;</span> <span class="pre">Empty</span> <span class="pre">Empty</span></code> 这棵树的高度是1; <code class="docutils literal"><span class="pre">Node</span> <span class="pre">&quot;x&quot;</span> <span class="pre">Empty</span> <span class="pre">(Node</span> <span class="pre">&quot;y&quot;</span> <span class="pre">Empty</span> <span class="pre">Empty)</span></code> 这棵树的高度是2;依此类推．</p>
 <p>9.考虑三个二维的点 a, b，和c．如果我们观察沿着线段ＡＢ（由a,b节点组成）和线段ＢＣ（由b,c节点组成）形成的角度，它或者转向（turn）左边，或者转向右边，或者组成一条直线．定义一个 Direction（方向）的数据类型反映这些可能的情况．</p>
 <p>10.写一个函数，用于计算三个二维坐标点组成的转向（turn），并且返回其 Direction（方向）．</p>
-<p>11.定义一个函数，输入二维坐标点的序列并计算其每个连续三个的（方向）Direction．考虑一个点的序列 [a,b,c,d,e]，他应该开始计算 [a,b,c]的转向(turn), 接着计算 [b,c,d]的转向，再是[c,d,e]的．你的函数应该返回一个Dirction（方向）的序列．</p>
-<p>12.运用前面三个练习的代码，实现 Graham 扫描算法，用于扫描由二维点集构成的凸包．你能从Wikipedia上找到＂什么是凸包＂，以及＂Graham扫描算法是如何工作＂的完整解释．</p>
+<p>11.定义一个函数，输入二维坐标点的序列并计算其每个连续三个的（方向）Direction．考虑一个点的序列 [a,b,c,d,e]，他应该开始计算 [a,b,c]的转向(turn), 接着计算 [b,c,d]的转向，再是[c,d,e]的．你的函数应该返回一个Direction（方向）的序列．</p>
+<p>12.运用前面三个练习的代码，实现 Graham 扫描算法，用于扫描由二维点集构成的凸包．你能从 <a href="#id34"><span class="problematic" id="id35">`Wikipedia&lt;http://en.wikipedia.org/wiki/Convex_hull&gt;`_</span></a> 上找到＂什么是凸包＂，以及 <a href="#id36"><span class="problematic" id="id37">`＂Graham扫描算法＂&lt;http://en.wikipedia.org/wiki/Graham_scan&gt;`_</span></a> 的完整解释．</p>
 </div>
 </div>
 
