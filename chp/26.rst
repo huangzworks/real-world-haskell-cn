@@ -33,7 +33,7 @@
 使用场景与封装设计
 ------------------
 
-不是所有布隆过滤器的使用都有相同的需求。在某些使用场景中，只需要一次性创建布隆过滤器，之后只有查询。对其他应用，我们可能需要在创建布隆过滤器之后持续更新。我们通过把可变和不可变的 API 放在不同的模块中来对它们实施分离，其中 BloomFilter 用于实现不可变的布隆过滤器，而 BloomFilter.Mutable 则用于实现可变的布隆过滤器。
+不是所有布隆过滤器的使用都有相同的需求。在某些使用场景中，只需要一次性创建布隆过滤器，之后只有查询。对其他应用，我们可能需要在创建布隆过滤器之后持续更新。我们通过把可变和不可变的 API 放在不同的模块中来对它们实施分离，其中 ``BloomFilter`` 用于实现不可变的布隆过滤器，而 ``BloomFilter.Mutable`` 则用于实现可变的布隆过滤器。
 
 我们将可变与不可变的API分离，通过把他们放在不同的模块中： ``BloomFilter`` 用于不可变的代码，``BloomFilter.Mutable`` 用于可变代码。
 
@@ -64,7 +64,7 @@
         , blmArray :: UArray Word32 Bool
         }
 
-因为 BloomFilter.Internal 模块纯粹是为了控制名称的可见性而存在的，所以在创建 Cabal 包时，我们将不会导出这个模块。我们把 ``BloomFilter.Internal`` 导入可变和不可变的模块中，但是我们会从各个模块中重新导出和模块 API 相关的类型。
+因为 ``BloomFilter.Internal`` 模块纯粹是为了控制名称的可见性而存在的，所以在创建 Cabal 包时，我们将不会导出这个模块。我们把 ``BloomFilter.Internal`` 导入可变和不可变的模块中，但是我们会从各个模块中重新导出和模块 API 相关的类型。
 
 拆箱，提升和bottom
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -79,20 +79,22 @@
 
 一个未装箱的值没有这种间接性。通过未装箱可以获得性能，但是牺牲了表示形式程序或者 bottom 的能力。因为未装箱的数组可以比常规 Haskell 的数组更加紧凑，所以这对于大量数据和位来说是一个非常好的选择。
 
-  装箱和提升
+.. info::
 
-  与未装箱类型相对应的是使用了间接层的装箱类型。所有提升的值都是装箱的，但是一些底层的装箱类型没有被提升。比如，GHC 的运行时系统有一个底层数组类型用于装箱（例如，它维护了一个数组的指针）。如果它是一个数组引用，那么它知道数组肯定是存在的，所以它不需要关心 bottom 是否存在。所以这个数组类型是装箱的，但是未提升的。装箱但是未提升的类型仅展示了底层运行时的特殊实现（hacking）。在常规使用中我们不会遇到它们。
+	装箱和提升
+
+	与未装箱类型相对应的是使用了间接层的装箱类型。所有提升的值都是装箱的，但是一些底层的装箱类型没有被提升。比如，GHC 的运行时系统有一个底层数组类型用于装箱（例如，它维护了一个数组的指针）。如果它是一个数组引用，那么它知道数组肯定是存在的，所以它不需要关心 bottom 是否存在。所以这个数组类型是装箱的，但是未提升的。装箱但是未提升的类型仅展示了底层运行时的特殊实现（hacking）。在常规使用中我们不会遇到它们。
 
 GHC 通过将 8 个数组元素组装成 1 个字节，实现了一种 Bool 类型的 UArray 数组，这种数组非常适合我们的需求。
 
 ST monad
 ---------------------------
 
-正如前面的 :ref:modifying-array-elements 部分所说，因为修改一个不可变数组需要对整个数组进行复制，所以这种修改的代价是非常高的。即使使用 ``UArray`` ，这一问题仍然会存在，所以我们如何才能将复制不可变数组的代价降低到我们可以承受的水平呢？
+正如前面的 :ref:`modifying-array-elements` 部分所说，因为修改一个不可变数组需要对整个数组进行复制，所以这种修改的代价是非常高的。即使使用 ``UArray`` ，这一问题仍然会存在。那么我们如何才能将复制不可变数组的代价降低到我们可以承受的水平呢？
 
 在指令式语言中，我们可以简单地原地修改数组元素，并且在 Haskell 里面也可以这样做。
 
-Haskell 提供了一个特殊的 Monad，叫做 ``ST``  *（State Transformer）* 。 ``ST`` 允许我们安全地工作在可变状态下。与 ``State`` Monad 相比，它有一些强大的额外的功能。
+Haskell 提供了一个特殊的 Monad，叫做 ``ST`` [59]_ *（State Transformer）* 。 ``ST`` 允许我们安全地工作在可变状态下。与 ``State`` Monad 相比，它有一些强大的额外的功能。
 
 * 解冻一个不可变数组并得到一个可变数组，接着原地对可变数组进行修改，然后在修改完成之后冻结出一个新的不可变数组。
 * 通过 *可变引用（mutable references）* 可以构建出一种数据结构，这种数据结构允许用户像命令式语言一样随时对其进行修改。对于那些尚未找到高效纯函数替代的命令式数据结构和算法来说，这个功能尤为重要。
@@ -138,19 +140,174 @@ Haskell 提供了一个特殊的 Monad，叫做 ``ST``  *（State Transformer）
 虽然导出完全限定名称 ``BloomFilter.Mutable.length`` 能够消除歧义，但它看起来更丑陋。这个决定对使用模块的用户没有影响，它仅仅针对我们自己 —— 黑盒的设计者，所以这里一般不会导致混淆。
 
 创建一个可变的布隆过滤器
-------------------------
+---------------------------
 
+我们将可变布隆过滤器和不可变的 ``Bloom`` 类型均声明在 ``BloomFilter.Internal`` 模块中。
+
+::
+
+	-- file: BloomFilter/Internal.hs
+	data MutBloom s a = MB {
+		  mutHash :: (a -> [Word32])
+		, mutArray :: STUArray s Word32 Bool
+		}
+		
+``STUArray`` 类型提供了可以在 ``ST`` monad 中使用的可变数组，我们可以使用 ``newArray`` 函数创建一个 ``STUArray`` 。下面的 ``new`` 函数属于 ``BloomFilter.Mutable`` 模块（译注：此处应为 ``module`` ，原著中此处为 ``function`` ）。
+
+::
+
+	-- file: BloomFilter/Mutable.hs
+	new :: (a -> [Word32]) -> Word32 -> ST s (MutBloom s a)
+	new hash numBits = MB hash `liftM` newArray (0,numBits-1) False
+	
+``STUArray`` 的大多数方法实际上是 ``MArray`` 类型类（在 ``Data.Array.MArray`` 模块中定义）的实现。
+
+有两个因素导致我们自己定义的 ``length`` 函数略显复杂：函数依赖于位数组对自己边界的记录，且 ``MArray`` 实例的 ``getBounds`` 函数有一个 monadic 类型。此外最终的结果还需要加 1，因为数组的上限比实际长度小 1。
+
+当向布隆过滤器添加元素时，需要将哈希函数计算出的所有位置位。 ``mod`` 函数确保了所有计算出的哈希值都限制在位数组范围之内，并将计算位数组偏移量的代码独立为一个函数。（译注：这里使用 ``mod`` 函数最好保证散列的范围是取模的倍数，否则使用 ``mod`` 会使散列结果倾向于某种概率分布。由于布隆过滤器和散列通常基于概率，因此应当避免概率分布过分偏离平均）
+
+::
+
+	-- file: BloomFilter/Mutable.hs
+	insert :: MutBloom s a -> a -> ST s ()
+	insert filt elt = indices filt elt >>=
+					  mapM_ (\bit -> writeArray (mutArray filt) bit True)
+
+	indices :: MutBloom s a -> a -> ST s [Word32]
+	indices filt elt = do
+	  modulus <- length filt
+	  return $ map (`mod` modulus) (mutHash filt elt)
+	  
+判断一个元素是否属于布隆过滤器的成员非常简单：只要计算出哈希值对应的每一位都被置位，则可以认为这个元素已经位于布隆过滤器中。
+
+::
+
+	-- file: BloomFilter/Mutable.hs
+	elem, notElem :: a -> MutBloom s a -> ST s Bool
+
+	elem elt filt = indices filt elt >>=
+					allM (readArray (mutArray filt))
+
+	notElem elt filt = not `liftM` elem elt filt
+
+我们需要再编写一个简单的支持函数：monadic 版本的 ``all`` ，这里将其命名为 ``allM`` 。
+
+::
+	
+	-- file: BloomFilter/Mutable.hs
+	allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+	allM p (x:xs) = do
+	  ok <- p x
+	  if ok
+		then allM p xs
+		else return False
+	allM _ [] = return True
+	
 不可变的 API
--------------
+----------------
+
+我们为可变布隆过滤器保留的接口与不可变布隆过滤器的 API 有相同的结构：
+
+::
+
+	-- file: ch26/BloomFilter.hs
+	module BloomFilter
+		(
+		  Bloom
+		, length
+		, elem
+		, notElem
+		, fromList
+		) where
+
+	import BloomFilter.Internal
+	import BloomFilter.Mutable (insert, new)
+	import Data.Array.ST (runSTUArray)
+	import Data.Array.IArray ((!), bounds)
+	import Data.Word (Word32)
+	import Prelude hiding (elem, length, notElem)
+
+	length :: Bloom a -> Int
+	length = fromIntegral . len
+
+	len :: Bloom a -> Word32
+	len = succ . snd . bounds . blmArray
+
+	elem :: a -> Bloom a -> Bool
+	elt `elem` filt   = all test (blmHash filt elt)
+	  where test hash = blmArray filt ! (hash `mod` len filt)
+
+	notElem :: a -> Bloom a -> Bool
+	elt `notElem` filt = not (elt `elem` filt)
+
+我们还提供了一个易于使用的方法，用户可以通过 ``fromList`` 函数创建不可变的布隆过滤器。这个函数对用户隐藏了 ``ST`` monad，因此他们只能看到不可变类型。
+
+::
+
+	-- file: ch26/BloomFilter.hs
+	fromList :: (a -> [Word32])    -- family of hash functions to use
+			 -> Word32             -- number of bits in filter
+			 -> [a]                -- values to populate with
+			 -> Bloom a
+	fromList hash numBits values =
+		B hash . runSTUArray $
+		  do mb <- new hash numBits
+			 mapM_ (insert mb) values
+			 return (mutArray mb)
+			 
+[译注：上面的代码在 **GHC** 7.x 中无法通过编译，可以作如下修改来通过编译。
+
+::
+	
+	fromList hash numBits values =
+		(B hash . runSTUArray) (new hash numBits >>= \mb -> do
+		mapM_ (insert mb) values
+		return (mutArray mb))
+
+]
+			 
+``fromList`` 函数的关键在于 ``runSTUArray`` 。前面提过，为了从 ``ST`` monad 返回一个不可变数组，我们必须冻结一个可变数组，而 ``runSTUArray`` 函数将执行和冻结相结合。给定一个返回 ``STUArray`` 的动作， ``runSTUArray`` 会使用 ``runST`` 执行这个动作，之后冻结返回的 ``STUArray`` 并将结果作为 ``UArray`` 返回。
+
+``MArray`` 类型类同样提供了一个可用的冻结函数，不过 ``runSTUArray`` 更方便，也更有效。这是因为冻结必须将底层数据从 ``STUArray`` 复制到新的 ``UArray`` 以确保对 ``STUArray`` 的后续修改不会影响 ``UArray`` 。因为类型系统的存在， ``runSTUArray`` 可以在创建 ``UArray`` 的同时保证 ``STUArray`` 不能被访问。因此 ``runSTUArray`` 无需复制也可以共享两个数组之间的底层内容。
 
 创建友好的接口
 --------------
 
+一旦我们创建了一个布隆过滤器，上面的不可变布隆过滤器 API 就可以被直接使用。需要注意的是， ``fromList`` 函数还遗留了一些重要的决策没有完成。我们仍然要选择一个适合的哈希函数，并确定布隆过滤器的容量。
+
+::
+
+	-- file: BloomFilter/Easy.hs
+	easyList :: (Hashable a)
+			 => Double        -- false positive rate (between 0 and 1)
+			 -> [a]           -- values to populate the filter with
+			 -> Either String (B.Bloom a)
+
+这里有一种更 “友好” 的方式创建布隆过滤器：这种方式将计算哈希值的任务交给了 ``Hashable`` 类型类，并且允许我们将可容忍的错误率作为参数配置布隆过滤器。它还可以根据容错率和输入列表中的元素数量为我们自动选择合适的过滤器大小。
+
+当然，这种方式不是始终可用的。例如，它可能在输入列表的长度过长时失败。然而，这种方法的简便性使提供给用户的接口更加全面：我们必须为用户提供创建布隆过滤器时从完全命令到完全声明的一整套控制流程。
+
 导出更方便的名称
 ^^^^^^^^^^^^^^^^
 
+在模块的导出列表中，我们从基本的 ``BloomFilter`` 模块中重新导出了一些名称。这允许临时用户只导入 ``BloomFilter.Easy`` 模块，并访问他们可能需要的所有类型和功能。
+
+你可能会好奇，同时导入一个被 ``BloomFilter.Easy`` 和 ``BloomFilter`` 二者均导出的名称会带来什么后果。我们知道，如果不使用 ``qualified`` 导入 ``BloomFilter`` 并调用 ``length`` 函数，GHC 会发出一个有关歧义的错误，因为 ``Prelude`` 中也包含一个同名函数。
+
+Haskell 标准的实现要能够分辨出指向同一个 “事物” 的多个不同名称。例如， ``BloomFilter`` 和 ``BloomFilter.Easy`` 均导出了 ``Bloom`` 类型，如果我们同时导入了这两个模块并使用 ``Bloom`` ，GHC 将能够发现这两个模块导出的 ``Bloom`` 相同，并且不会报告歧义。
+
 哈希值
 ^^^^^^^
+
+一个布隆过滤器的性能取决于快速、高质量的哈希函数，然而编写一个兼具这两种属性的哈希函数非常困难。
+
+幸运的是，一个名为 Bob Jenkins 的开发人员编写了一些具有这些属性的哈希函数，并公开了代码（网址为 http://burtleburtle.net/bob/hash/doobs.html [59]_）。这些哈希函数使用 C 语言编写，可以通过 FFI 创建它们的绑定。在该网站上，我们需要的特定源文件名为 ``lookup3.c`` ，在本地创建一个 ``cbits`` 目录并将这个文件下载到该目录。
+
+.. info::
+
+	稍作编辑
+	
+	在刚刚下载的 ``lookup3.c`` 的第 36 行，有一个名为 ``SELF_TEST`` 的宏定义。要将这个源文件作为库使用必须将此行注释掉。如果你没有注释掉这部分代码，文件底部定义的主函数会取代任何试图链接这个库的 Haskell 程序。
 
 将两个哈希值转换为多个
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -190,3 +347,5 @@ Haskell 提供了一个特殊的 Monad，叫做 ``ST``  *（State Transformer）
 
 
 .. [Broder02] Andrei Broder. Michael Mitzenmacher. “Network applications of Bloom filters: a survey”. Internet Mathematics. 1. 4. 2005. 485-509. A K Peters Ltd..
+.. [59] ``ST`` 是 “状态变换器” （state transformer） 的缩写。
+.. [60] Jenkins 的哈希函数相比一些流行的非加密哈希函数（如 FNV 和 hashpjw）具有好的多的混合属性，因此我们建议避免使用它们。
