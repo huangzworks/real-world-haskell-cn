@@ -271,7 +271,7 @@ Haskell 提供了一个特殊的 Monad，叫做 ``ST`` [59]_ *（State Transform
 ``MArray`` 类型类同样提供了一个可用的冻结函数，不过 ``runSTUArray`` 更方便，也更有效。这是因为冻结必须将底层数据从 ``STUArray`` 复制到新的 ``UArray`` 以确保对 ``STUArray`` 的后续修改不会影响 ``UArray`` 。因为类型系统的存在， ``runSTUArray`` 可以在创建 ``UArray`` 的同时保证 ``STUArray`` 不能被访问。因此 ``runSTUArray`` 无需复制也可以共享两个数组之间的底层内容。
 
 创建友好的接口
---------------
+------------------
 
 一旦我们创建了一个布隆过滤器，上面的不可变布隆过滤器 API 就可以被直接使用。需要注意的是， ``fromList`` 函数还遗留了一些重要的决策没有完成。我们仍然要选择一个适合的哈希函数，并确定布隆过滤器的容量。
 
@@ -288,7 +288,7 @@ Haskell 提供了一个特殊的 Monad，叫做 ``ST`` [59]_ *（State Transform
 当然，这种方式不是始终可用的。例如，它可能在输入列表的长度过长时失败。然而，这种方法的简便性使提供给用户的接口更加全面：我们必须为用户提供创建布隆过滤器时从完全命令到完全声明的一整套控制流程。
 
 导出更方便的名称
-^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
 
 在模块的导出列表中，我们从基本的 ``BloomFilter`` 模块中重新导出了一些名称。这允许临时用户只导入 ``BloomFilter.Easy`` 模块，并访问他们可能需要的所有类型和功能。
 
@@ -494,14 +494,157 @@ C 语言编写的哈希函数会将计算出的哈希值写入 ``p1`` 和 ``p2``
 		
 由于惰性的 ``ByteString`` 类型是由一系列块表示的，我们必须留意块之间的边界。举个例子，字符串 ``foobar`` 可以通过五种不同方式表示，如 ``["foob", "ar"]`` 或者 ``["fo", "obar"]`` 。这一点对于多数用户不可见，但我们直接使用了底层的块。 ``rechunck`` 函数能够确保传递给 C 语言代码的块大小统一为 64 KB，所以无论原始边界在哪里，计算出的哈希值都是一致的。
 
-
-
-
 将两个哈希值转换为多个
-^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+正如前面所述，我们需要两个以上的哈希函数才能有效使用布隆过滤器。双重哈希技术能够组合 Jenkins 哈希函数计算出的两个值，并产生更多的哈希值。使用双重哈希技术产生的多个哈希值足够满足我们的需要，并且比计算多个不同的哈希值更容易。
+
+::
+
+	-- file: BloomFilter/Hash.hs
+	doubleHash :: Hashable a => Int -> a -> [Word32]
+	doubleHash numHashes value = [h1 + h2 * i | i <- [0..num]]
+		where h   = hashSalt 0x9150a946c4a8966e value
+			  h1  = fromIntegral (h `shiftR` 32) .&. maxBound
+			  h2  = fromIntegral h
+			  num = fromIntegral numHashes
+			  
+[Forec 译注：上面代码中的 ``maxBound`` 可以通过在 GHCI 中执行 ``maxBound::Word32`` 查看，结果为 4294967295。]
 
 实现简单的创建函数
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
+
+在 ``BloomFilter.Easy`` 模块中，我们使用新的 ``doubleHash`` 函数来定义之前已经定义过类型的 ``easyList`` 函数。
+
+::
+
+	-- file: BloomFilter/Easy.hs
+	module BloomFilter.Easy
+		(
+		  suggestSizing
+		, sizings
+		, easyList
+
+		-- re-export useful names from BloomFilter
+		, B.Bloom
+		, B.length
+		, B.elem
+		, B.notElem
+		) where
+
+	import BloomFilter.Hash (Hashable, doubleHash)
+	import Data.List (genericLength)
+	import Data.Maybe (catMaybes)
+	import Data.Word (Word32)
+	import qualified BloomFilter as B
+
+	easyList errRate values =
+		case suggestSizing (genericLength values) errRate of
+		  Left err            -> Left err
+		  Right (bits,hashes) -> Right filt
+			where filt = B.fromList (doubleHash hashes) bits values
+			
+上面的代码依赖于一个 ``suggestSizing`` 函数，这个函数能够根据用户要求的错误率和期望滤波器包含元素的最大数量来估计滤波器的大小和要计算的哈希值数量：
+
+::
+
+	-- file: BloomFilter/Easy.hs
+	suggestSizing
+		:: Integer       -- expected maximum capacity
+		-> Double        -- desired false positive rate
+		-> Either String (Word32,Int) -- (filter size, number of hashes)
+	suggestSizing capacity errRate
+		| capacity <= 0                = Left "capacity too small"
+		| errRate <= 0 || errRate >= 1 = Left "invalid error rate"
+		| null saneSizes               = Left "capacity too large"
+		| otherwise                    = Right (minimum saneSizes)
+	  where saneSizes = catMaybes . map sanitize $ sizings capacity errRate
+			sanitize (bits,hashes)
+			  | bits > maxWord32 - 1 = Nothing
+			  | otherwise            = Just (ceiling bits, truncate hashes)
+			  where maxWord32 = fromIntegral (maxBound :: Word32)
+
+	sizings :: Integer -> Double -> [(Double, Double)]
+	sizings capacity errRate =
+		[(((-k) * cap / log (1 - (errRate ** (1 / k)))), k) | k <- [1..50]]
+	  where cap = fromIntegral capacity
+
+[Forec 译注：关于上面代码中 ``errRate`` 的推导，可以参考维基百科上布隆过滤器的词条 http://en.wikipedia.org/wiki/Bloom_filter 。根据维基百科，有式 ``errRate = (1-e^(-k*cap/size))^k`` ，因为 ``suggestSizing`` 函数接受 ``k`` 、 ``cap`` 和 ``errRate`` ，我们可以重新整理方程，并得到 ``size = -k*cap/log(1 - errRate^(1/k))`` ，这就是代码中使用的公式。]
+	  
+我们对参数做了一定的规范。例如， ``sizings`` 函数虽然受到数组大小和哈希值数量的影响，但它并不验证这两个值。由于使用了 32 位哈希值，我们必须过滤掉太大的数组。
+
+在 ``suggestSizing`` 函数中，我们仅仅尝试最小化位数组的大小，而不考虑哈希值的数量。现在让我们通过 GHCI 交互地探索一下数组大小和哈希值数量的关系，并解释这种做法的缘由：
+
+假设要将一千万个元素插入布隆过滤器中，并希望误报率不超过 0.1 %。
+
+::
+
+	ghci> let kbytes (bits,hashes) = (ceiling bits `div` 8192, hashes)
+	ghci> :m +BloomFilter.Easy Data.List
+	Could not find module `BloomFilter.Easy':
+	  Use -v to see a list of the files searched for.
+	ghci> mapM_ (print . kbytes) . take 10 . sort $ sizings 10000000 0.001
+
+	(17550,10.0)
+	(17601,11.0)
+	(17608,9.0)
+	(17727,12.0)
+	(17831,8.0)
+	(17905,13.0)
+	(18122,14.0)
+	(18320,7.0)
+	(18368,15.0)
+	(18635,16.0)
+
+[Forec 译注：上面交互式代码在原著中是有误的，原著没有纠正这一错误，上面的结果由译者修改后计算。要想得到上面的结果，可以参考如下步骤：
+
+::
+
+	$ cd cbits
+	$ gcc -c -fPIC lookup3.c -o lookup3.o
+	$ gcc -shared -Wl,-soname,liblookup3.so.1 -o liblookup3.so.1.0.1 lookup3.o
+	$ ln -s liblookup3.so.1.0.1 liblookup3.so
+	$ cd ..
+	$ ghci -L./cbits -llookup3
+	Prelude> :l BloomFilter.Easy
+	*BloomFilter.Easy> :m +Data.List
+	*BloomFilter.Easy Data.List> let kb (bits,hashes) = (ceiling bits `div` 8192, hashes)
+	*BloomFilter.Easy Data.List> mapM_ (print . kb) . take 10 . sort $ sizings 10000000 0.001
+	Loading package array-0.4.0.0 ... linking ... done.
+	Loading package bytestring-0.9.2.1 ... linking ... done.
+	(17550,10.0)
+	(17601,11.0)
+	(17608,9.0)
+	(17727,12.0)
+	(17831,8.0)
+	(17905,13.0)
+	(18122,14.0)
+	(18320,7.0)
+	(18368,15.0)
+	(18635,16.0)
+
+]
+	
+通过计算 10 个哈希值，我们得到了一个非常紧凑的表（刚好超过 17 KB）。如果真的对数据进行反复的散列，则哈希值的数量可以减少到 7 个，空间消耗可以减少到 5%。因为 Jenkins 的哈希函数在一轮计算中得到两个哈希值，并通过双重哈希产生额外的哈希值，因此我们计算额外哈希值的成本非常小，所以选择最小的表大小。	
+
+如果将最高可容忍误报率增加十倍，变为 1%，则所需的空间和哈希值数量都会下降，尽管下降的幅度不太容易预测。
+
+::
+
+	ghci> mapM_ (print . kbytes) . take 10 . sort $ sizings 10000000 0.01
+	(11710,7.0)
+	(11739,6.0)
+	(11818,8.0)
+	(12006,9.0)
+	(12022,5.0)
+	(12245,10.0)
+	(12517,11.0)
+	(12810,12.0)
+	(12845,4.0)
+	(13118,13.0)
+
+[Forec 译注：上面的代码在原著中同样有误，计算结果由译者修改后给出，步骤同上。]
+	
 
 创建一个 Cabal 包
 -----------------
