@@ -255,7 +255,7 @@ Haskell 提供了一个特殊的 Monad，叫做 ``ST`` [59]_ *（State Transform
 			 mapM_ (insert mb) values
 			 return (mutArray mb)
 			 
-[译注：上面的代码在 **GHC** 7.x 中无法通过编译，可以作如下修改来通过编译。
+[Forec 译注：上面的代码在 **GHC** 7.x 中无法通过编译，可以作如下修改来通过编译。
 
 ::
 	
@@ -309,6 +309,194 @@ Haskell 标准的实现要能够分辨出指向同一个 “事物” 的多个�
 	
 	在刚刚下载的 ``lookup3.c`` 的第 36 行，有一个名为 ``SELF_TEST`` 的宏定义。要将这个源文件作为库使用必须将此行注释掉。如果你没有注释掉这部分代码，文件底部定义的主函数会取代任何试图链接这个库的 Haskell 程序。
 
+还剩下最后一个难题没有解决：我们可能经常需要七个、十个，甚至更多个散列函数，但又不想把这些不同功能的哈希函数混杂到一起。幸运的是，在实际应用中我们多数情况下只需要两个哈希函数，下面很快就会讲到如何实现。Jenkins 的散列库包含两个函数 ``hashword2`` 和 ``hashlittle2`` ，它们计算两个哈希值。这里有一个 C 语言的头文件，它描述了这两个函数的 API，我们将它保存为 ``cbits/lookup3.h`` 。
+
+::
+
+	/* save this file as lookup3.h */
+
+	#ifndef _lookup3_h
+	#define _lookup3_h
+
+	#include <stdint.h>
+	#include <sys/types.h>
+
+	/* only accepts uint32_t aligned arrays of uint32_t */
+	void hashword2(const uint32_t *key,  /* array of uint32_t */
+			   size_t length,	     /* number of uint32_t values */
+			   uint32_t *pc,	     /* in: seed1, out: hash1 */
+			   uint32_t *pb);	     /* in: seed2, out: hash2 */
+
+	/* handles arbitrarily aligned arrays of bytes */
+	void hashlittle2(const void *key,   /* array of bytes */
+			 size_t length,     /* number of bytes */
+			 uint32_t *pc,      /* in: seed1, out: hash1 */
+			 uint32_t *pb);     /* in: seed2, out: hash2 */
+
+	#endif /* _lookup3_h */
+	
+“盐” 是在计算哈希值时加入的干扰值。如果我们用某哈希函数求一个值的散列，并分别加入两个不同的盐，那么计算出的两个结果不同。因为即使是同一个哈希函数，接收了两个不同的盐值后，计算结果也会相去甚远。
+	
+下面的代码是对这两个函数的绑定：
+
+::
+
+	-- file: BloomFilter/Hash.hs
+	{-# LANGUAGE BangPatterns, ForeignFunctionInterface #-}
+	module BloomFilter.Hash
+		(
+		  Hashable(..)
+		, hash
+		, doubleHash
+		) where
+
+	import Data.Bits ((.&.), shiftR)
+	import Foreign.Marshal.Array (withArrayLen)
+	import Control.Monad (foldM)
+	import Data.Word (Word32, Word64)
+	import Foreign.C.Types (CSize)
+	import Foreign.Marshal.Utils (with)
+	import Foreign.Ptr (Ptr, castPtr, plusPtr)
+	import Foreign.Storable (Storable, peek, sizeOf)
+	import qualified Data.ByteString as Strict
+	import qualified Data.ByteString.Lazy as Lazy
+	import System.IO.Unsafe (unsafePerformIO)
+
+	foreign import ccall unsafe "lookup3.h hashword2" hashWord2
+		:: Ptr Word32 -> CSize -> Ptr Word32 -> Ptr Word32 -> IO ()
+
+	foreign import ccall unsafe "lookup3.h hashlittle2" hashLittle2
+		:: Ptr a -> CSize -> Ptr Word32 -> Ptr Word32 -> IO ()
+		
+[Forec 译注：上面的代码在 **GHC** 7.6 后无法通过编译，解决方法是将 ``import Foreign.C.Types (CSize)`` 修改为 ``import Foreign.C.Types (CSize(..))`` 或者 ``import Foreign.C.Types (CSize(CSize))`` 。]
+
+函数的定义可以查看我们刚刚创建的 ``lookup3.h`` 。
+
+出于对效率和便捷的考虑，我们将 Jenkins 散列函数所需的 32 位盐值和计算出的散列值组成单个 64 位值：
+
+::
+
+	-- file: BloomFilter/Hash.hs
+	hashIO :: Ptr a    -- value to hash
+		   -> CSize    -- number of bytes
+		   -> Word64   -- salt
+		   -> IO Word64
+	hashIO ptr bytes salt =
+		with (fromIntegral salt) $ \sp -> do
+		  let p1 = castPtr sp
+			  p2 = castPtr sp `plusPtr` 4
+		  go p1 p2
+		  peek sp
+	  where go p1 p2
+			  | bytes .&. 3 == 0 = hashWord2 (castPtr ptr) words p1 p2
+			  | otherwise        = hashLittle2 ptr bytes p1 p2
+			words = bytes `div` 4
+	
+[Forec 译注： ``with`` 在下面的段落中会有解释， ``castPtr`` 没有介绍过，你可以在 
+http://hackage.haskell.org/package/base-4.6.0.1/docs/Foreign-Marshal-Utils.html#v:with 查看 ``with`` 的文档，在 
+http://hackage.haskell.org/package/base-4.6.0.1/docs/Foreign-Ptr.html#v:castPtr 查看 ``castPtr`` 的文档。此外，这里使用 ``castPtr`` 并对 ``p1`` 和 ``p2`` 使用类型推断虽然简短了代码，但也降低了代码的可读性。]
+	
+上面的代码如果没有明确的类型来描述其功能，那么可能看起来就不是很清晰。 ``with`` 函数在 C 程序的堆栈段中为盐值分配了空间，并存储了当前的盐值，所以 ``sp`` 的类型是 ``Ptr Word64`` 。指针 ``p1`` 和 ``p2`` 的类型是 ``Ptr Word32`` ； ``p1`` 指向了 ``sp`` 的低位字， ``p2`` 指向了 ``sp`` 的高位字。这就是我们将一个 ``Word64`` 的盐值切分为两个 ``Ptr Word32`` 参数的方法。
+
+因为所有的数据指针均来自 Haskell 堆，所以它们会在一个能够安全传递给 ``hashWord2`` （只接受 32 位对齐地址）或者 ``hashLittle2`` 的地址上对齐。由于 ``hashWord2`` 是两个哈希函数中较快的，所以当我们在数据为 4 字节的倍数时调用 ``hashWord2`` ，否则调用 ``hashLittle2`` 。 [Forec 译注：这里原著拼写错误，将 ``hashWord2`` 误拼写为 ``hashWord32`` ]
+
+C 语言编写的哈希函数会将计算出的哈希值写入 ``p1`` 和 ``p2`` 指向的地址，我们可以通过 ``sp`` 直接检索计算结果。
+
+使用这个模块的客户不应当被低级细节困扰，所以我们通过类型类来提供一个干净、高级的接口：
+
+::
+
+	-- file: BloomFilter/Hash.hs
+	class Hashable a where
+		hashSalt :: Word64        -- ^ salt
+				 -> a             -- ^ value to hash
+				 -> Word64
+
+	hash :: Hashable a => a -> Word64
+	hash = hashSalt 0x106fc397cf62f64d3
+	
+我们还提供了一些这个类型类的实用的实现。要计算基本类型的哈希值，必须先编写一点样板代码：
+
+::
+
+	-- file: BloomFilter/Hash.hs
+	hashStorable :: Storable a => Word64 -> a -> Word64
+	hashStorable salt k = unsafePerformIO . with k $ \ptr ->
+						  hashIO ptr (fromIntegral (sizeOf k)) salt
+
+	instance Hashable Char   where hashSalt = hashStorable
+	instance Hashable Int    where hashSalt = hashStorable
+	instance Hashable Double where hashSalt = hashStorable
+	
+下面的代码使用 ``Storable`` 类型类将声明减少到一个：
+
+::
+
+	-- file: BloomFilter/Hash.hs
+	instance Storable a => Hashable a where
+		hashSalt = hashStorable
+
+[Forec 译注：上面使用 ``Storable`` 的代码需要添加 ``{-# LANGUAGE FlexibleInstances #-}`` 和 ``{-# LANGUAGE UndecidableInstances #-}`` 两个编译选项后才能通过编译。 ]
+
+不幸的是，Haskell 不允许编写这种形式的实例，因为它们会使类型系统无法判定：编译器的类型检查器可能会陷入无限循环中。对不可确定类型的限制使我们必须单独列出声明，但它对于上面的定义并不会造成什么影响。[Forec 译注：上面的例子中如果存在 ``instance Hashable a => Storable a`` 这样的代码（虽然这样的代码没什么意义），则编译器会陷入循环。但如果程序开发者能够保证这种情况不会发生，则可以开启编译选项并使用这一扩展功能。]
+
+::
+
+	-- file: BloomFilter/Hash.hs
+	hashList :: (Storable a) => Word64 -> [a] -> IO Word64
+	hashList salt xs =
+		withArrayLen xs $ \len ptr ->
+		  hashIO ptr (fromIntegral (len * sizeOf x)) salt
+	  where x = head xs
+
+	instance (Storable a) => Hashable [a] where
+		hashSalt salt xs = unsafePerformIO $ hashList salt xs
+		
+编译器会接受这个实例，因而我们能够对多种列表类型计算哈希值 [60]_ 。最重要的是，由于 ``Char`` 是 ``Storable`` 的一个实例，所以 ``String`` 类型的哈希值同样可以被计算。
+
+利用函数组合可以计算元组的哈希值：在组合管道的一端取盐，并将元组中每个元素的散列结果作为计算该元组中下一个元素使用的盐值。
+
+::
+
+	-- file: BloomFilter/Hash.hs
+	hash2 :: (Hashable a) => a -> Word64 -> Word64
+	hash2 k salt = hashSalt salt k
+
+	instance (Hashable a, Hashable b) => Hashable (a,b) where
+		hashSalt salt (a,b) = hash2 b . hash2 a $ salt
+
+	instance (Hashable a, Hashable b, Hashable c) => Hashable (a,b,c) where
+		hashSalt salt (a,b,c) = hash2 c . hash2 b . hash2 a $ salt
+
+要计算 ``ByteString`` 类型的哈希值，我们可以编写一个直接插入到 ``ByteString`` 类型内部的特殊实例，其效率非常出色：
+
+::
+
+	-- file: BloomFilter/Hash.hs
+	hashByteString :: Word64 -> Strict.ByteString -> IO Word64
+	hashByteString salt bs = Strict.useAsCStringLen bs $ \(ptr, len) ->
+							 hashIO ptr (fromIntegral len) salt
+
+	instance Hashable Strict.ByteString where
+		hashSalt salt bs = unsafePerformIO $ hashByteString salt bs
+
+	rechunk :: Lazy.ByteString -> [Strict.ByteString]
+	rechunk s
+		| Lazy.null s = []
+		| otherwise   = let (pre,suf) = Lazy.splitAt chunkSize s
+						in  repack pre : rechunk suf
+		where repack    = Strict.concat . Lazy.toChunks
+			  chunkSize = 64 * 1024
+
+	instance Hashable Lazy.ByteString where
+		hashSalt salt bs = unsafePerformIO $
+						   foldM hashByteString salt (rechunk bs)
+		
+由于惰性的 ``ByteString`` 类型是由一系列块表示的，我们必须留意块之间的边界。举个例子，字符串 ``foobar`` 可以通过五种不同方式表示，如 ``["foob", "ar"]`` 或者 ``["fo", "obar"]`` 。这一点对于多数用户不可见，但我们直接使用了底层的块。 ``rechunck`` 函数能够确保传递给 C 语言代码的块大小统一为 64 KB，所以无论原始边界在哪里，计算出的哈希值都是一致的。
+
+
+
+
 将两个哈希值转换为多个
 ^^^^^^^^^^^^^^^^^^^^^^
 
@@ -348,4 +536,4 @@ Haskell 标准的实现要能够分辨出指向同一个 “事物” 的多个�
 
 .. [Broder02] Andrei Broder. Michael Mitzenmacher. “Network applications of Bloom filters: a survey”. Internet Mathematics. 1. 4. 2005. 485-509. A K Peters Ltd..
 .. [59] ``ST`` 是 “状态变换器” （state transformer） 的缩写。
-.. [60] Jenkins 的哈希函数相比一些流行的非加密哈希函数（如 FNV 和 hashpjw）具有好的多的混合属性，因此我们建议避免使用它们。
+.. [60] Jenkins 的哈希函数相比一些流行的非加密哈希函数（如 FNV 和 hashpjw）具有好的多的混合属性，因此我们建议避免使用那些非加密哈希函数。
