@@ -272,11 +272,11 @@ Haskell提供了像 <code class="docutils literal"><span class="pre">hPutStrLn</
 <span class="nf">mainloop</span> <span class="ow">::</span> <span class="kt">Handle</span> <span class="ow">-&gt;</span> <span class="kt">Handle</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
 <span class="nf">mainloop</span> <span class="n">inh</span> <span class="n">outh</span> <span class="ow">=</span>
     <span class="kr">do</span> <span class="n">ineof</span> <span class="ow">&lt;-</span> <span class="n">hIsEOF</span> <span class="n">inh</span>
-        <span class="kr">if</span> <span class="n">ineof</span>
-        <span class="kr">then</span> <span class="n">return</span> <span class="nb">()</span>
-        <span class="kr">else</span> <span class="kr">do</span> <span class="n">inpStr</span> <span class="ow">&lt;-</span> <span class="n">hGetLine</span> <span class="n">inh</span>
-                <span class="n">hPutStrLn</span> <span class="n">outh</span> <span class="p">(</span><span class="n">map</span> <span class="n">toUpper</span> <span class="n">inpStr</span><span class="p">)</span>
-                <span class="n">mainloop</span> <span class="n">inh</span> <span class="n">outh</span>
+       <span class="kr">if</span> <span class="n">ineof</span>
+       <span class="kr">then</span> <span class="n">return</span> <span class="nb">()</span>
+       <span class="kr">else</span> <span class="kr">do</span> <span class="n">inpStr</span> <span class="ow">&lt;-</span> <span class="n">hGetLine</span> <span class="n">inh</span>
+               <span class="n">hPutStrLn</span> <span class="n">outh</span> <span class="p">(</span><span class="n">map</span> <span class="n">toUpper</span> <span class="n">inpStr</span><span class="p">)</span>
+               <span class="n">mainloop</span> <span class="n">inh</span> <span class="n">outh</span>
 </pre></div>
 </div>
 <p>像每一个Haskell程序一样，程序在 <code class="docutils literal"><span class="pre">main</span></code> 那里开始执行。
@@ -490,7 +490,7 @@ Haskell提供了一个方便的函数叫做 <code class="docutils literal"><span
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch07/tempfile.hs</span>
 <span class="kr">import</span> <span class="nn">System.IO</span>
 <span class="kr">import</span> <span class="nn">System.Directory</span><span class="p">(</span><span class="n">getTemporaryDirectory</span><span class="p">,</span> <span class="n">removeFile</span><span class="p">)</span>
-<span class="kr">import</span> <span class="nn">System.IO.Error</span><span class="p">(</span><span class="n">catch</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.IO.Error</span><span class="p">(</span><span class="n">catchIOError</span><span class="p">)</span>  <span class="c1">-- 译注：原文为 catch ，在现在的环境中无法正确运行</span>
 <span class="kr">import</span> <span class="nn">Control.Exception</span><span class="p">(</span><span class="n">finally</span><span class="p">)</span>
 
 <span class="c1">-- The main entry point.  Work with a temp file in myAction.</span>
@@ -556,7 +556,7 @@ Haskell提供了一个方便的函数叫做 <code class="docutils literal"><span
        <span class="c1">-- two functions: one to run, and a different one to run if the</span>
        <span class="c1">-- first raised an exception.  If getTemporaryDirectory raised an</span>
        <span class="c1">-- exception, just use &quot;.&quot; (the current working directory).</span>
-       <span class="n">tempdir</span> <span class="ow">&lt;-</span> <span class="n">catch</span> <span class="p">(</span><span class="n">getTemporaryDirectory</span><span class="p">)</span> <span class="p">(</span><span class="nf">\</span><span class="kr">_</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="s">&quot;.&quot;</span><span class="p">)</span>
+       <span class="n">tempdir</span> <span class="ow">&lt;-</span> <span class="n">catchIOError</span> <span class="p">(</span><span class="n">getTemporaryDirectory</span><span class="p">)</span> <span class="p">(</span><span class="nf">\</span><span class="kr">_</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="s">&quot;.&quot;</span><span class="p">)</span>
        <span class="p">(</span><span class="n">tempfile</span><span class="p">,</span> <span class="n">temph</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">openTempFile</span> <span class="n">tempdir</span> <span class="n">pattern</span>
 
        <span class="c1">-- Call (func tempfile temph) to perform the action on the temporary</span>
@@ -1002,7 +1002,7 @@ Monad是一种强大的将函数链在一起的方法，在 <a href="#id38"><spa
 还有，那些以下划线结尾的函数一般不管它们的返回值。</p>
 <dl class="docutils">
 <dt>为什么我们有了 <code class="docutils literal"><span class="pre">map</span></code> 还要有一个 <code class="docutils literal"><span class="pre">mapM</span></code> ，因为 <code class="docutils literal"><span class="pre">map</span></code> 是返回一个列表的纯函数，它实际上不直接执行也不能执行操作。</dt>
-<dd><code class="docutils literal"><span class="pre">maPM</span></code> 是一个 <code class="docutils literal"><span class="pre">IO</span></code> Monad里面的可以执行操作的实用程序。</dd>
+<dd><code class="docutils literal"><span class="pre">mapM</span></code> 是一个 <code class="docutils literal"><span class="pre">IO</span></code> Monad里面的可以执行操作的实用程序。</dd>
 <dt>现在回到 <code class="docutils literal"><span class="pre">main</span></code> ， <code class="docutils literal"><span class="pre">mapM_</span></code> 在 <code class="docutils literal"><span class="pre">numbers</span> <span class="pre">.</span> <span class="pre">show</span></code> 每个元素上应用 <code class="docutils literal"><span class="pre">(str2action</span> <span class="pre">.</span> <span class="pre">show)</span></code> ， <code class="docutils literal"><span class="pre">number</span> <span class="pre">.</span> <span class="pre">show</span></code> 把每个数字转换成一个 <code class="docutils literal"><span class="pre">String</span></code> ， <code class="docutils literal"><span class="pre">str2action</span></code> 把每个 <code class="docutils literal"><span class="pre">String</span></code> 转换成一个操作。</dt>
 <dd><code class="docutils literal"><span class="pre">mapM_</span></code> 把这些单独的操作组合成一个更大的操作，然后打印出这些行。</dd>
 </dl>
@@ -1182,7 +1182,7 @@ Haskell通过 <code class="docutils literal"><span class="pre">I/O</span></code>
 <dl class="docutils">
 <dt>如果你需要阅读环境变量，你可以使用 <code class="docutils literal"><span class="pre">System.Environment</span></code> 里面两个函数中的一个： <code class="docutils literal"><span class="pre">getEnv</span></code> 或者 <code class="docutils literal"><span class="pre">getEnvironment</span></code> 。</dt>
 <dd><code class="docutils literal"><span class="pre">getEnv</span></code> 查找指定的变量，如果不存在会抛出异常。
-<code class="docutils literal"><span class="pre">getEnvironment</span></code> 用一个 <code class="docutils literal"><span class="pre">[(String,</span> <span class="pre">String))]</span></code> 返回整个环境，然后你可以用 <code class="docutils literal"><span class="pre">lookup</span></code> 这样的函数来找你想要的环境条目。</dd>
+<code class="docutils literal"><span class="pre">getEnvironment</span></code> 用一个 <code class="docutils literal"><span class="pre">[(String,</span> <span class="pre">String)]</span></code> 返回整个环境，然后你可以用 <code class="docutils literal"><span class="pre">lookup</span></code> 这样的函数来找你想要的环境条目。</dd>
 </dl>
 <p>在Haskell设置环境变量没有采用跨平台的方式来定义。
 如果你在像Linux这样的POSIX平台上，你可以使用 <code class="docutils literal"><span class="pre">System.Posix.Env</span></code> 模块中的 <code class="docutils literal"><span class="pre">putEnv</span></code> 或者 <code class="docutils literal"><span class="pre">setEnv</span></code> 。
