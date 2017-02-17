@@ -243,11 +243,11 @@ Haskell提供了像 ``hPutStrLn`` 这样的函数，它用起来和 ``putStrLn``
    mainloop :: Handle -> Handle -> IO ()
    mainloop inh outh =
        do ineof <- hIsEOF inh
-           if ineof
-           then return ()
-           else do inpStr <- hGetLine inh
-                   hPutStrLn outh (map toUpper inpStr)
-                   mainloop inh outh
+          if ineof
+          then return ()
+          else do inpStr <- hGetLine inh
+                  hPutStrLn outh (map toUpper inpStr)
+                  mainloop inh outh
 
 像每一个Haskell程序一样，程序在 ``main`` 那里开始执行。
 两个文件被打开： ``input.txt`` 被打开用来读，还有一个 ``output.txt`` 被打开用来写。
