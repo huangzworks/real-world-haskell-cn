@@ -132,6 +132,8 @@
 
 .. 以下是指向各个贡献者的链接，如有需要请自行更改 ：）
 
+- `李立强 <https://github.com/kosl90>`_
+
 - `Binshuo Hu <https://github.com/bishophu>`_
 
 - `Tang Weinan <https://github.com/twn39>`_
