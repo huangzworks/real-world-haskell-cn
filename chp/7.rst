@@ -468,8 +468,8 @@ Haskell提供了一个方便的函数叫做 ``openTempFile`` （还有一个对�
    -- file: ch07/tempfile.hs
    import System.IO
    import System.Directory(getTemporaryDirectory, removeFile)
-   import System.IO.Error(catch)
-   import Control.Exception(finally)
+   import System.IO.Error(catchIOError)  -- 译注：原文为 catch ，在现在的环境中无法正确运行
+   import Control.Exception(finally)
 
    -- The main entry point.  Work with a temp file in myAction.
    main :: IO ()
@@ -534,7 +534,7 @@ Haskell提供了一个方便的函数叫做 ``openTempFile`` （还有一个对�
           -- two functions: one to run, and a different one to run if the
           -- first raised an exception.  If getTemporaryDirectory raised an
           -- exception, just use "." (the current working directory).
-          tempdir <- catch (getTemporaryDirectory) (\_ -> return ".")
+          tempdir <- catchIOError (getTemporaryDirectory) (\_ -> return ".")
           (tempfile, temph) <- openTempFile tempdir pattern
 
           -- Call (func tempfile temph) to perform the action on the temporary
