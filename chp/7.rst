@@ -1040,7 +1040,7 @@ Monad是一种强大的将函数链在一起的方法，在 `第十四章：Mona
 还有，那些以下划线结尾的函数一般不管它们的返回值。
 
 为什么我们有了 ``map`` 还要有一个 ``mapM`` ，因为 ``map`` 是返回一个列表的纯函数，它实际上不直接执行也不能执行操作。
- ``maPM`` 是一个 ``IO`` Monad里面的可以执行操作的实用程序。
+ ``mapM`` 是一个 ``IO`` Monad里面的可以执行操作的实用程序。
 
 现在回到 ``main`` ， ``mapM_`` 在 ``numbers . show`` 每个元素上应用 ``(str2action . show)`` ， ``number . show`` 把每个数字转换成一个 ``String`` ， ``str2action`` 把每个 ``String`` 转换成一个操作。
  ``mapM_`` 把这些单独的操作组合成一个更大的操作，然后打印出这些行。
@@ -1266,7 +1266,7 @@ Haskell中有3种不同的缓冲区模式，它们定义成 ``BufferMode`` 类�
 
 如果你需要阅读环境变量，你可以使用 ``System.Environment`` 里面两个函数中的一个： ``getEnv`` 或者 ``getEnvironment`` 。
  ``getEnv`` 查找指定的变量，如果不存在会抛出异常。
- ``getEnvironment`` 用一个 ``[(String, String))]`` 返回整个环境，然后你可以用 ``lookup`` 这样的函数来找你想要的环境条目。
+ ``getEnvironment`` 用一个 ``[(String, String)]`` 返回整个环境，然后你可以用 ``lookup`` 这样的函数来找你想要的环境条目。
 
 在Haskell设置环境变量没有采用跨平台的方式来定义。
 如果你在像Linux这样的POSIX平台上，你可以使用 ``System.Posix.Env`` 模块中的 ``putEnv`` 或者 ``setEnv`` 。
