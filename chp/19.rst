@@ -563,7 +563,7 @@ monad中的错误处理
     ghci> runParser (optional p) (B.pack "9a")
     Right (Just '9',"a")		
 
-级习
+练习
 ^^^^^^^^^^^^^^^^^^
 
 1. 写一个 ``many`` 解析器，类型是 ``Parser a -> Parser [a]`` 。它应该执行解析直到失败。
