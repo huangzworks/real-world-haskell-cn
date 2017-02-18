@@ -649,11 +649,135 @@ C 语言编写的哈希函数会将计算出的哈希值写入 ``p1`` 和 ``p2``
 创建一个 Cabal 包
 -----------------
 
+至此我们已经创建了一个不算太复杂的库，它包括四个公共模块和一个内部模块。现在让我们来创建一个 ``rwh-bloomfilter.cabal`` 文件，将这个库打包成容易发布的格式。
+
+Cabal 允许我们在一个包中描述几个库的信息。 ``.cabal`` 文件以所有库通用的信息开头，后面跟着各个库不同的部分。
+
+::
+
+	Name:               rwh-bloomfilter
+	Version:            0.1
+	License:            BSD3
+	License-File:       License.txt
+	Category:           Data
+	Stability:          experimental
+	Build-Type:         Simple
+
+由于 C 语言代码 ``lookup3.c`` 和库捆绑在一起，所以我们要将这个 C 语言源文件的信息告知 Cabal。
+
+::
+
+	Extra-Source-Files: cbits/lookup3.c cbits/lookup3.h
+	
+``Extra-Source-Files`` 指令对包的构建没有影响：它仅仅在我们运行 ``runhaskell Setup sdist`` 时指导 Cabal 绑定一些额外的文件，这条指令将创建一个用于发布的源码包。
+
+..info::
+
+	属性名称不区分大小写
+	
+	Cabal 在读取属性（ ``:`` 字符前面的文本）时会忽略大小写，因此 ``extra-source-files`` 和 ``Extra-Source-Files`` 是等价的。
+
 处理不同的构建设置
 ^^^^^^^^^^^^^^^^^^
 
+在 2007 年以前，Haskell 标准库被组织在少数几个规模较大的包中，其中最大的一个被命名为 ``base`` 。这个包将许多互不相关的库绑定到一起，因此 Haskell 社区将 ``base`` 包拆分成了几个模块化程度更高的库。
+
+Cabal 包需要指明自己构建时依赖的其它包。这些信息帮助 Cabal 的命令行接口在必要的情况下自动下载并构建包的依赖。我们希望编写的代码能够尽量兼容更多的 GHC 版本，不管这些版本是否具备 ``base`` 和许多其它包的现代布局。举个例子，我们的代码要能够在 ``array`` 包存在的时候说明自己依赖它，否则就只能依赖 ``base`` 包。
+
+Cabal 提供了一个通用的配置功能，它允许我们选择性地启用一个 ``.cabal`` 文件的某些部分。构建的配置信息由布尔类型的标识控制，标识为 ``True`` 时使用 ``if flag`` 指令后面的文本，否则使用对应 ``else`` 指令后的内容。
+
+::
+
+	Cabal-Version:      >= 1.2
+
+	Flag split-base
+	  Description: Has the base package been split up?
+	  Default: True
+
+	Flag bytestring-in-base
+	  Description: Is ByteString in the base or bytestring package?
+	  Default: False
+
+* 配置功能在 Cabal 的 1.2 版本中引入，因此上面指定 Cabal 版本不能低于 1.2。
+* ``split-base`` 标识的含义不言而喻。[Forec 译注：该标识表示 ``base`` 包是否被划分]
+* ``bytestring-in-base`` 标识处理一段更为曲折的历史：``bytestring`` 包在创建之初是和 GHC 6.4 捆绑的，并且它始终独立于 ``base`` 包；在 GHC 6.6 中，它被合并到了 ``base`` 包中；到了 GHC 6.8.1 版本，它又再次被独立出去。
+* 上面这些标识对构建包的开发者来说通常是不可见的，因为 Cabal 会自动处理它们。在我们进行下一步分析前，了解它们能够帮助理解 ``.cabal`` 文件中 ``Library`` 部分开头的内容。
+
+::
+
+	Library
+	  if flag(bytestring-in-base)
+		-- bytestring was in base-2.0 and 2.1.1
+		Build-Depends: base >= 2.0 && < 2.2
+	  else
+		-- in base 1.0 and 3.0, bytestring is a separate package
+		Build-Depends: base < 2.0 || >= 3, bytestring >= 0.9
+
+	  if flag(split-base)
+		Build-Depends: base >= 3.0, array
+	  else
+		Build-Depends: base < 3.0
+
+Cabal 使用标志的默认值（缺省的默认值是 True）创建包的描述信息。如果当前的配置能够构建成功（比如所有需要的包版本都可用）则这个配置将被采用，否则 Cabal 将尝试多种方式组合标识，直到它寻找到一个能够构建成功的配置，或者所有备选的配置都无法生效为止。
+
+例如，如果我们将 ``split-base`` 和 ``bytestring-in-base`` 设置为 ``True``，Cabal 会选择以下的包依赖项：
+
+::
+
+	Build-Depends: base >= 2.0 && < 2.2
+	Build-Depends: base >= 3.0, array
+	
+``base`` 包的版本无法同时又高于 3.0 又低于 2.2，所以 Cabal 出于一致性考虑会拒绝这个配置。对于现代版本的 GHC，在几次尝试后，它将产生如下配置：
+
+::
+
+	-- in base 1.0 and 3.0, bytestring is a separate package
+	Build-Depends: base < 2.0 || >= 3, bytestring >= 0.9
+	Build-Depends: base >= 3.0, array
+
+在运行 ``runhaskell Setup configure`` 时，我们可以使用 ``--flag`` 选项手动指定各标识的值，虽然实际中很少需要这么做。
+
+
 编译选项和针对 C 的接口
 ^^^^^^^^^^^^^^^^^^^^^^^
+
+下面让我们继续分析 ``.cabal`` 文件，并完成与 Haskell 相关的剩余细节。如果在构建过程中启用分析，我们希望所有的顶级函数都显示在分析的输出中。
+
+::
+
+	GHC-Prof-Options: -auto-all
+	
+``Other-Modules`` 属性列出了库中私有的 Haskell 模块，这些模块对使用此包的代码不可见。
+
+在 GHC 构建这个包时，Cabal 会将 ``GHC-Options`` 属性中的选项传递给编译器。
+
+``-O2`` 选项使 GHC 尽可能地优化我们的代码。不加以优化编译出的代码效率很低，所以在编译生产代码时应当始终使用 ``-O2`` 选项。
+
+为了写出更清晰的代码，我们通常添加 ``-Wall`` 选项，这个选项会启用 GHC 的所有警告。这将导致 GHC 在遇到潜在问题（例如重叠的模式匹配、未使用的函数参数等其它潜在障碍）时提出警告。尽管忽略这些警告一般是安全的，但我们应该尽量完善代码以消除它们。这一点小小的努力，将催生更容易阅读和维护的代码。
+
+普通情况下 GHC 会直接生成汇编语言代码，而在使用 ``-fvia-C`` 编译时，GHC 会生成 C 语言代码并使用系统的 C 编译器来编译它。这会减慢编译速度，但有时 C 编译器能够进一步改善 GHC 优化的代码，所以这也是值得的。
+
+我们这里提到 ``-fiva-C`` 主要是为了展示如何使用它编译。
+
+::
+
+	C-Sources:        cbits/lookup3.c  
+	CC-Options:       -O3
+	Include-Dirs:     cbits
+	Includes:         lookup3.h
+	Install-Includes: lookup3.h
+
+对于 ``C-Sources`` 属性，我们只需要列出必须编译到库中的文件。``CC-Options`` 包括 C 编译器的选项（``-O3`` 指定高级优化）。因为对 Jenkins 散列函数的 FFI 绑定引用了 ``lookup3.h`` 头文件，我们需要告诉 Cabal 在哪里可以找到该头文件。``Install-Includes`` 用来告诉 Cabal 安装这个头文件，否则在构建时客户端代码将无法找到头文件。
+
+..info::
+
+	``-fvia-C`` 在 FFI 中的价值
+
+	在编写 FFI 绑定时，``-fvia-C`` 编译选项能够在安全性上带来提升。如果在 FFI 声明中提到头文件（如外部导入 ``string.h memcpy``），那么 C 编译器会对生成的 Haskell 代码做类型检查，以确保其 C 函数的调用和头文件中的函数原型一致。
+	
+	如果不使用 ``-fvia-C`` ，我们将失去一层额外的安全保障。这将使 C 类型错误很容易混入我们的 Haskell 代码中。举个例子，在多数 64 位机器上，``CInt`` 是 32 位宽，而 ``CSize`` 是 64 位宽。如果我们不小心弄混了用来描述 FFI 绑定参数的类型，那么数据可能会损毁。
+
+[Forec 译注：遗憾的是，在较新版本的 GHC 中 ``-fvia-C`` 不会产生任何作用，并且它将在未来的 GHC 发布中被移除。所以本节关于 ``-fvia-C`` 选项的介绍已经成为历史了。]
 
 用 QuickCheck 测试
 ------------------
