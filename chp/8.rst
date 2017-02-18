@@ -347,10 +347,10 @@ Haskell 中的正则表达式
 
 .. code-block:: haskell
 
-   ghci> pack "good food" =~ ".ood" :: [[ByteString]]
+   ghci> packChars "good food" =~ ".ood" :: [[ByteString]]
    [["good"],["food"]]
 
-上面的例子中，我们使用 ``pack`` 将一个 ``String`` 转换为 ``ByteString`` 。这种情况可以通过类型检查，因为 ``ByteString`` 也是一种合法的结果类型。但是如果输入字符串类型为 ``String`` 类型，在尝试获得 ``ByteString`` 类型结果时将会失败。
+上面的例子中，我们使用 ``packChars`` 将一个 ``String`` 转换为 ``ByteString`` 。这种情况可以通过类型检查，因为 ``ByteString`` 也是一种合法的结果类型。但是如果输入字符串类型为 ``String`` 类型，在尝试获得 ``ByteString`` 类型结果时将会失败。[译注：原文中使用的 ``pack`` 会出现类型错误， 新代码中需要使用 ``Data.ByteString.Internal`` 模块中的 ``packChars``]
 
 .. code-block:: haskell
 
