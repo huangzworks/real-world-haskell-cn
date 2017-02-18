@@ -350,7 +350,9 @@ Haskell 中的正则表达式
    ghci> packChars "good food" =~ ".ood" :: [[ByteString]]
    [["good"],["food"]]
 
-上面的例子中，我们使用 ``packChars`` 将一个 ``String`` 转换为 ``ByteString`` 。这种情况可以通过类型检查，因为 ``ByteString`` 也是一种合法的结果类型。但是如果输入字符串类型为 ``String`` 类型，在尝试获得 ``ByteString`` 类型结果时将会失败。[译注：原文中使用的 ``pack`` 会出现类型错误， 新代码中需要使用 ``Data.ByteString.Internal`` 模块中的 ``packChars``]
+上面的例子中，我们使用 ``packChars`` 将一个 ``String`` 转换为 ``ByteString`` 。这种情况可以通过类型检查，因为 ``ByteString`` 也是一种合法的结果类型。但是如果输入字符串类型为 ``String`` 类型，在尝试获得 ``ByteString`` 类型结果时将会失败。
+
+[译注：原文中使用的 ``pack`` 会出现类型错误， 新代码中需要使用 ``Data.ByteString.Internal`` 模块中的 ``packChars``]
 
 .. code-block:: haskell
 
@@ -506,6 +508,8 @@ Hackage 上也有其他 Haskell 正则表达式包可供下载。其中一些比
    fnmatch :: (RegexLike Regex source1) => String -> source1 -> Bool
    ghci> fnmatch "d*" "myname"
    False
+   
+[译注：在 ghc 7.10.1+ 中需要使用 ``FlexibleContexts`` 扩展，即 ``ghci -XFlexibleContexts`` ，否则定义 ``fnmatch`` 时会报错，也可以给 ``name`` 指定一个特定类型如 ``String`` ]
 
 但是 ``fnmatch`` 没有真正的 “Haskell 味道”。目前为止，最常见的 Haskell 风格是赋予函数具有描述性的，“驼峰式” 命名。将单词连接为驼峰状，首字母小写后面每个单词的首字母大写。例如，“file name matches” 这几个词将转换为 ``fileNameMatch`` 这个名字。 “驼峰式” 这种说法来自与大写字母形成的“驼峰”。在我们的库中，将使用 ``matchesGlob`` 这个函数名。
 
