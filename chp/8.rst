@@ -311,7 +311,7 @@ Haskell 中的正则表达式
 
    ghci> "eleemosynary" =~ pat :: (Int,Int)
    (-1,0)
-   ghci> "mondegreen" =~ pat :: [(Int,Int)]
+   ghci> getAllMatches ("mondegreen" =~ pat) :: [(Int,Int)]
    []
 
 以上并非 ``RegexContext`` 类型类的内置实例的完整清单。完整的清单可以在 ``Text.Regex.Base.Context`` 模块的文档中找到。
