@@ -782,6 +782,73 @@ Cabal 使用标志的默认值（缺省的默认值是 True）创建包的描述
 用 QuickCheck 测试
 ------------------
 
+在进一步考虑性能之前，我们要确保布隆过滤器的正确性。使用 QuickCheck 可以轻松测试一些基本的属性。
+
+::
+
+	-- file: examples/BloomCheck.hs
+	{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+	module Main where
+
+	import BloomFilter.Hash (Hashable)
+	import Data.Word (Word8, Word32)
+	import System.Random (Random(..), RandomGen)
+	import Test.QuickCheck
+	import qualified BloomFilter.Easy as B
+	import qualified Data.ByteString as Strict
+	import qualified Data.ByteString.Lazy as Lazy
+
+普通的 ``quickCheck`` 函数对布隆过滤器属性的测试帮助不大，因为它产生的 100 个测试输入样例无法完整覆盖布隆过滤器的功能。因此我们编写自己的测试函数：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	handyCheck :: Testable a => Int -> a -> IO ()
+	handyCheck limit = check defaultConfig {
+						 configMaxTest = limit
+					   , configEvery   = \_ _ -> ""
+					   }
+	
+[Forec 译注：在较新版本的 QuickCheck 中，上面的代码应该写成：
+
+::
+	
+	handyCheck :: Testable a => Int -> a -> IO ()
+	handyCheck limit = quickCheckWith (stdArgs { maxSuccess = limit )
+
+]
+
+下面我们要完成的第一个任务是确保：无论用户选择多大的容错率，只要向布隆过滤器添加了一个任意值，则之后针对该值的成员测试都应得到 “值已存在” 的结果。
+
+我们将使用 ``easyList`` 函数来创建一个布隆过滤器。 ``Double`` 的 ``Random`` 实例能够生成 0 到 1 之间的随机数，因此 QuickCheck 可以提供任意大小的错误率。
+
+然而，测试生成的错误率应当排除 0 和 1。QuickCheck 提供了两种方法：
+
+* 通过结构：我们制定要生成的有效值的范围。QuickCheck 为此提供了 ``forAll`` 组合器。
+* 通过过滤：当 QuickCheck 生成一个任意值时，用 ``(=~>)`` 运算符过滤掉不符合标准的值。如果布隆过滤器通过这种方式拒绝一个输入值，测试将显示成功。
+
+如果以上两个方法都可以选择，那么最好采用通过结构的方法：假设 QuickCheck 生成了 1000 个任意值，其中 800 个由于某些原因被过滤掉。看起来我们似乎运行了 1000 次测试，但实际上只有 200 次做了有意义的事。
+
+出于这个原因，当需要产生错误率时，我们不会去消除 QuickCheck 提供的 0 或 1，而是在一个始终有效的区间中构造值：
+
+::
+
+	falsePositive :: Gen Double
+	falsePositive = choose (epsilon, 1 - epsilon)
+		where epsilon = 1e-6
+
+	(=~>) :: Either a b -> (b -> Bool) -> Bool
+	k =~> f = either (const True) f k
+
+	prop_one_present _ elt =
+		forAll falsePositive $ \errRate ->
+		  B.easyList errRate [elt] =~> \filt ->
+			elt `B.elem` filt
+
+[Forec 译注：原著作者似乎在这里犯了一点错误，根据代码， ``prop_one_present`` 的型别声明应为 ``(Hashable a) => t -> a -> Property`` ，但这无法通过编译，因为 ``prop_one_present`` 的第一个参数 ``_`` 隐藏着对类型 ``t`` 和 ``a`` 的约束，它们二者必须相等。有两种解决方法：一是不指定这个多余的 ``_`` 参数，二是将型别声明显式地指定为 ``(Hashable a) => a -> a -> Property`` 。]
+
+组合器 ``(=~>)`` 过滤了 ``easyList`` 失败的情况：如果失败了，测试会自动通过。
+
 多态测试
 ^^^^^^^^
 
