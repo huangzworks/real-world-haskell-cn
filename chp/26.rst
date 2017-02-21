@@ -852,9 +852,142 @@ Cabal 使用标志的默认值（缺省的默认值是 True）创建包的描述
 多态测试
 ^^^^^^^^
 
-为 ByteString 编写任意实例
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型需要测试，我们有必要设计一个方法，避免对每种类型都编写同样的测试。
 
+注意， ``prop_one_present`` 这个函数是多态的，但它忽略了第一个参数。我们可以借助这一点模拟单态性质：
+
+::
+
+	ghci> :load BloomCheck
+
+	BloomCheck.hs:9:17:
+		Could not find module `BloomFilter.Easy':
+		  Use -v to see a list of the files searched for.
+	Failed, modules loaded: none.
+	ghci> :t prop_one_present
+
+	<interactive>:1:0: Not in scope: `prop_one_present'
+	ghci> :t prop_one_present (undefined :: Int)   
+
+	<interactive>:1:0: Not in scope: `prop_one_present'
+	
+[Forec 译注：此处原著作者的代码无法加载。]
+
+任何值都可以作为 ``prop_one_present`` 的第一个参数。第二个参数的第一个元素的类型需要和第一个参数保持一致。
+
+::
+
+	ghci> handyCheck 5000 $ prop_one_present (undefined :: Int)
+
+	<interactive>:1:0: Not in scope: `handyCheck'
+
+	<interactive>:1:18: Not in scope: `prop_one_present'
+	ghci> handyCheck 5000 $ prop_one_present (undefined :: Double)
+
+	<interactive>:1:0: Not in scope: `handyCheck'
+
+	<interactive>:1:18: Not in scope: `prop_one_present'
+
+当向布隆过滤器中添加多个元素后，这些元素都应该能被识别出：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	prop_all_present _ xs =
+		forAll falsePositive $ \errRate ->
+		  B.easyList errRate xs =~> \filt ->
+			all (`B.elem` filt) xs
+
+测试依然成功：
+
+::
+
+	ghci> handyCheck 2000 $ prop_all_present (undefined :: Int)
+
+	<interactive>:1:0: Not in scope: `handyCheck'
+
+	<interactive>:1:18: Not in scope: `prop_all_present'
+
+[这地方的代码好气哦]
+
+为 ByteString 编写任意实例
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+QuickCheck 库没有为 ``ByteString`` 类型提供 ``Arbitary`` 的实例，因此我们必须自己编写。 ``pack`` 函数可从 ``[Word8]`` 创建一个 ``ByteString`` 。
+
+::
+
+	-- file: examples/BloomCheck.hs
+	instance Arbitrary Lazy.ByteString where
+		arbitrary = Lazy.pack `fmap` arbitrary
+		coarbitrary = coarbitrary . Lazy.unpack
+
+	instance Arbitrary Strict.ByteString where
+		arbitrary = Strict.pack `fmap` arbitrary
+		coarbitrary = coarbitrary . Strict.unpack
+
+QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类型的 ``Arbitary`` 实例。我们至少需要为 ``Word8`` 实现 ``Arbitary`` 实例：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	instance Random Word8 where
+	  randomR = integralRandomR
+	  random = randomR (minBound, maxBound)
+
+	instance Arbitrary Word8 where
+		arbitrary = choose (minBound, maxBound)
+		coarbitrary = integralCoarbitrary
+		
+我们用几个常用的函数支持这些实例，这样今后在为其它整型类型编写实例的时候可以重用它们：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	integralCoarbitrary n =
+		variant $ if m >= 0 then 2*m else 2*(-m) + 1
+	  where m = fromIntegral n
+
+	integralRandomR (a,b) g = case randomR (c,d) g of
+								(x,h) -> (fromIntegral x, h)
+		where (c,d) = (fromIntegral a :: Integer,
+					   fromIntegral b :: Integer)
+
+	instance Random Word32 where
+	  randomR = integralRandomR
+	  random = randomR (minBound, maxBound)
+
+	instance Arbitrary Word32 where
+		arbitrary = choose (minBound, maxBound)
+		coarbitrary = integralCoarbitrary
+
+
+创建了这些 ``Arbitary`` 实例后，我们就可以在 ``ByteString`` 类型上尝试现有的属性：
+
+::
+
+	ghci> handyCheck 1000 $ prop_one_present (undefined :: Lazy.ByteString)
+	
+	<interactive>:1:0: Not in scope: `handyCheck'
+
+	<interactive>:1:18: Not in scope: `prop_one_present'
+
+	<interactive>:1:49:
+		Failed to load interface for `Lazy':
+		  Use -v to see a list of the files searched for.
+	ghci> handyCheck 1000 $ prop_all_present (undefined :: Strict.ByteString)
+
+	<interactive>:1:0: Not in scope: `handyCheck'
+
+	<interactive>:1:18: Not in scope: `prop_all_present'
+
+	<interactive>:1:49:
+		Failed to load interface for `Strict':
+		  Use -v to see a list of the files searched for.
+
+[我服了这章了。。。To be fixed]
+		
+		
 推荐大小是正确的吗？
 ^^^^^^^^^^^^^^^^^^^
 
