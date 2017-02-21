@@ -103,12 +103,12 @@
 <span class="nf">divBy</span> <span class="n">numerator</span> <span class="n">denominators</span> <span class="ow">=</span> 
     <span class="n">mapM</span> <span class="p">(</span><span class="n">numerator</span> <span class="p">`</span><span class="n">safeDiv</span><span class="p">`)</span> <span class="n">denominators</span>
     <span class="kr">where</span> <span class="n">safeDiv</span> <span class="kr">_</span> <span class="mi">0</span> <span class="ow">=</span> <span class="kt">Nothing</span>
-          <span class="n">safeDiv</span> <span class="n">x</span> <span class="n">y</span> <span class="ow">=</span> <span class="n">x</span> <span class="p">`</span><span class="n">div</span><span class="p">`</span> <span class="n">y</span>
+          <span class="n">safeDiv</span> <span class="n">x</span> <span class="n">y</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="p">(</span><span class="n">x</span> <span class="p">`</span><span class="n">div</span><span class="p">`</span> <span class="n">y</span><span class="p">)</span>
 </pre></div>
 </div>
 <p class="last">出于简单考虑，在这章中我们会避免使用monadic实现，但是会指出有这种做法。</p>
 </div>
-<p>[译注:Tip中那段代码编译不过]</p>
+<p>[译注:原 Tip 中代码错误，在除以非0数字的情况下没有返回正确类型，因此编译不过，可以使用 <code class="docutils literal"><span class="pre">return</span></code> 或者 <code class="docutils literal"><span class="pre">Just</span></code> 来修正，此处使用 <code class="docutils literal"><span class="pre">Just</span></code>]</p>
 <div class="section" id="id3">
 <h4>丢失和保存惰性<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h4>
 <p>使用 <code class="docutils literal"><span class="pre">Maybe</span></code> 很方便，但是有代价。 <code class="docutils literal"><span class="pre">divBy</span></code> 将不能够再处理无限的链表输入。由于结果是一个 <code class="docutils literal"><span class="pre">Maybe</span> <span class="pre">[a]</span></code> ，必须要检查整个输入链表，我们才能确认不会因为存在零而返回 <code class="docutils literal"><span class="pre">Nothing</span></code> 。你可以尝试在之前的例子中验证这一点：</p>
@@ -690,7 +690,7 @@ ghci&gt; safePrint y
 </div>
 </div>
 <div class="section" id="id15">
-<h3>级习<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h3>
+<h3>练习<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h3>
 <ol class="arabic simple">
 <li>写一个 <code class="docutils literal"><span class="pre">many</span></code> 解析器，类型是 <code class="docutils literal"><span class="pre">Parser</span> <span class="pre">a</span> <span class="pre">-&gt;</span> <span class="pre">Parser</span> <span class="pre">[a]</span></code> 。它应该执行解析直到失败。</li>
 <li>使用 <code class="docutils literal"><span class="pre">many</span></code> 写一个 <code class="docutils literal"><span class="pre">int</span></code> 解析器，类型是 <code class="docutils literal"><span class="pre">Parser</span> <span class="pre">Int</span></code> 。它应该既能接受负数也能接受正数。</li>
