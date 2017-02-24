@@ -56,3 +56,28 @@ instance Random Word32 where
 instance Arbitrary Word32 where
 	arbitrary = choose (minBound, maxBound)
 	coarbitrary = integralCoarbitrary
+
+prop_suggest_try1 =
+  forAll falsePositive $ \errRate ->
+        forAll (choose (1,maxBound :: Word32)) $ \cap ->
+          case B.suggestSizing (fromIntegral cap) errRate of
+                Left err -> False
+                Right (bits,hashes) -> bits > 0 && bits < maxBound && hashes > 0
+
+prop_suggest_try2 =
+        forAll falsePositive $ \errRate ->
+          forAll (choose (1,fromIntegral maxWord32)) $ \cap ->
+                let bestSize = fst . minimum $ B.sizings cap errRate
+                in bestSize < fromIntegral maxWord32 ==>
+                   either (const False) sane $ B.suggestSizing cap errRate
+  where sane (bits,hashes) = bits > 0 && bits < maxBound && hashes > 0
+                maxWord32 = maxBound :: Word32
+
+prop_suggestions_sane =
+        forAll falsePositive $ \errRate ->
+          forAll (choose (1,fromIntegral maxWord32 `div` 8)) $ \cap ->
+                let size = fst . minimum $ B.sizings cap errRate
+                in size < fromIntegral maxWord32 ==>
+                   either (const False) sane $ B.suggestSizing cap errRate
+  where sane (bits,hashes) = bits > 0 && bits < maxBound && hashes > 0
+                maxWord32 = maxBound :: Word32

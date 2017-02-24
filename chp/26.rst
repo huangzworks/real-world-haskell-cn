@@ -856,7 +856,7 @@ Cabal 使用标志的默认值（缺省的默认值是 True）创建包的描述
 
 QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型需要测试，我们有必要设计一个方法，避免对每种类型都编写同样的测试。
 
-注意， ``prop_one_present`` 这个函数是多态的，但它忽略了第一个参数。我们可以借助这一点模拟单态性质：
+注意， ``prop_one_present`` 这个函数是多态的，但它忽略了第一个参数。我们可以借助这一点模拟单型性质：
 
 ::
 
@@ -870,7 +870,7 @@ QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型
 	ghci> :t prop_one_present (undefined :: Int)   
 	<interactive>:1:0: Not in scope: `prop_one_present'
 
-任何值都可以作为 ``prop_one_present`` 的第一个参数。第二个参数的第一个元素的类型需要和第一个参数保持一致。
+任何值都可以作为 ``prop_one_present`` 的第一个参数。第二个参数中第一个元素的类型需要和第一个参数保持一致。
 
 ::
 
@@ -902,7 +902,7 @@ QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型
 为 ByteString 编写任意实例
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-QuickCheck 库没有为 ``ByteString`` 类型提供 ``Arbitary`` 的实例，因此我们必须自己编写。 ``pack`` 函数可从 ``[Word8]`` 创建一个 ``ByteString`` 。
+QuickCheck 库没有为 ``ByteString`` 类型提供 ``Arbitary`` 的实例，因此我们必须自己编写。 ``pack`` 函数可基于 ``[Word8]`` 创建一个 ``ByteString`` 。
 
 ::
 
@@ -928,7 +928,7 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 		arbitrary = choose (minBound, maxBound)
 		coarbitrary = integralCoarbitrary
 		
-我们用几个常用的函数支持这些实例，这样今后在为其它整型类型编写实例的时候可以重用它们：
+编写几个常用的函数支持这些实例，这样今后在为其它整型类型编写实例的时候可以重用它们：
 
 ::
 
@@ -971,11 +971,11 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 推荐大小是正确的吗？
 ^^^^^^^^^^^^^^^^^^^
 
-随着待运行测试数量的增加，用于测试 ``easyList`` 属性开销也在快速增长。我们希望输入数据规模对 ``easyList`` 的性能没有影响。由于直接测试是不现实的，所以这里使用代理：面对极端的输入规模时， ``suggestSizing`` 是否仍能给出敏感的数组大小以及哈希值？
+随着待运行测试数量的增加，用于测试 ``easyList`` 性能的开销也在快速增长。我们希望输入数据规模对 ``easyList`` 的性能没有影响。直接测试是不现实的，所以这里使用另一个问题来衡量：面对极端的输入规模时， ``suggestSizing`` 是否仍能给出敏感的数组大小以及哈希值？
 
-检查这个属性略微有些棘手：我们需要同时改变期望的错误率和预期容量。根据 ``sizings`` 函数给出的结果，这些值之间的关系较难预测。
+检查这一特性略微有些棘手：我们需要同时改变期望的错误率和预期容量。根据 ``sizings`` 函数给出的结果，这些值之间的关系较难预测。
 
-尝试着忽略复杂性：
+尝试忽略复杂性：
 
 ::
 
@@ -998,7 +998,7 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 	<interactive>:1:0: Not in scope: `handyCheck'
 	<interactive>:1:18: Not in scope: `prop_suggest_try1'
 			
-将 QuickCheck 打印的反例交给 ``suggestSizing`` 时，我们会发现这些输入被拒绝了，因为它们会导致一个过于庞大的位数组。
+将 QuickCheck 打印的反例交给 ``suggestSizing`` 时，我们发现这些输入被拒绝了，因为它们会导致一个过于庞大的位数组。
 
 ::
 
@@ -1029,7 +1029,7 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 	<interactive>:1:0: Not in scope: `handyCheck'
 	<interactive>:1:18: Not in scope: `prop_suggest_try2'
 
-在过大的测试中，我们将过滤掉许多组合：
+在过大的测试中，许多组合都被过滤掉了：
 
 ::
 
@@ -1051,7 +1051,7 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 	  where sane (bits,hashes) = bits > 0 && bits < maxBound && hashes > 0
 			maxWord32 = maxBound :: Word32
 
-最终，我们使 ``prop_suggestions_sane`` 的性能更加健壮：
+最终，我们得到了更加健壮的性能：
 
 ::
 
