@@ -852,6 +852,8 @@ Cabal 使用标志的默认值（缺省的默认值是 True）创建包的描述
 多态测试
 ^^^^^^^^
 
+[Forec 译注：以下几节，原著作者给出的代码信息不全，在 ``GHCI`` 中均无法加载。]
+
 QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型需要测试，我们有必要设计一个方法，避免对每种类型都编写同样的测试。
 
 注意， ``prop_one_present`` 这个函数是多态的，但它忽略了第一个参数。我们可以借助这一点模拟单态性质：
@@ -859,33 +861,24 @@ QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型
 ::
 
 	ghci> :load BloomCheck
-
 	BloomCheck.hs:9:17:
 		Could not find module `BloomFilter.Easy':
 		  Use -v to see a list of the files searched for.
 	Failed, modules loaded: none.
 	ghci> :t prop_one_present
-
 	<interactive>:1:0: Not in scope: `prop_one_present'
 	ghci> :t prop_one_present (undefined :: Int)   
-
 	<interactive>:1:0: Not in scope: `prop_one_present'
-	
-[Forec 译注：此处原著作者的代码无法加载。]
 
 任何值都可以作为 ``prop_one_present`` 的第一个参数。第二个参数的第一个元素的类型需要和第一个参数保持一致。
 
 ::
 
 	ghci> handyCheck 5000 $ prop_one_present (undefined :: Int)
-
 	<interactive>:1:0: Not in scope: `handyCheck'
-
 	<interactive>:1:18: Not in scope: `prop_one_present'
 	ghci> handyCheck 5000 $ prop_one_present (undefined :: Double)
-
 	<interactive>:1:0: Not in scope: `handyCheck'
-
 	<interactive>:1:18: Not in scope: `prop_one_present'
 
 当向布隆过滤器中添加多个元素后，这些元素都应该能被识别出：
@@ -903,12 +896,8 @@ QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型
 ::
 
 	ghci> handyCheck 2000 $ prop_all_present (undefined :: Int)
-
 	<interactive>:1:0: Not in scope: `handyCheck'
-
-	<interactive>:1:18: Not in scope: `prop_all_present'
-
-[这地方的代码好气哦]
+	<interactive>:1:18: Not in scope: `prop_all_present
 
 为 ByteString 编写任意实例
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -967,29 +956,108 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 ::
 
 	ghci> handyCheck 1000 $ prop_one_present (undefined :: Lazy.ByteString)
-	
 	<interactive>:1:0: Not in scope: `handyCheck'
-
 	<interactive>:1:18: Not in scope: `prop_one_present'
-
 	<interactive>:1:49:
 		Failed to load interface for `Lazy':
 		  Use -v to see a list of the files searched for.
 	ghci> handyCheck 1000 $ prop_all_present (undefined :: Strict.ByteString)
-
 	<interactive>:1:0: Not in scope: `handyCheck'
-
 	<interactive>:1:18: Not in scope: `prop_all_present'
-
 	<interactive>:1:49:
 		Failed to load interface for `Strict':
 		  Use -v to see a list of the files searched for.
 
-[我服了这章了。。。To be fixed]
-		
-		
 推荐大小是正确的吗？
 ^^^^^^^^^^^^^^^^^^^
+
+随着待运行测试数量的增加，用于测试 ``easyList`` 属性开销也在快速增长。我们希望输入数据规模对 ``easyList`` 的性能没有影响。由于直接测试是不现实的，所以这里使用代理：面对极端的输入规模时， ``suggestSizing`` 是否仍能给出敏感的数组大小以及哈希值？
+
+检查这个属性略微有些棘手：我们需要同时改变期望的错误率和预期容量。根据 ``sizings`` 函数给出的结果，这些值之间的关系较难预测。
+
+尝试着忽略复杂性：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	prop_suggest_try1 =
+	  forAll falsePositive $ \errRate ->
+		forAll (choose (1,maxBound :: Word32)) $ \cap ->
+		  case B.suggestSizing (fromIntegral cap) errRate of
+			Left err -> False
+			Right (bits,hashes) -> bits > 0 && bits < maxBound && hashes > 0
+
+这实际上是一个没什么用的测试：
+
+::
+
+	ghci> handyCheck 1000 $ prop_suggest_try1
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:18: Not in scope: `prop_suggest_try1'
+	ghci> handyCheck 1000 $ prop_suggest_try1
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:18: Not in scope: `prop_suggest_try1'
+			
+将 QuickCheck 打印的反例交给 ``suggestSizing`` 时，我们会发现这些输入被拒绝了，因为它们会导致一个过于庞大的位数组。
+
+::
+
+	ghci> B.suggestSizing 1678125842 8.501133057303545e-3
+	<interactive>:1:0:
+		Failed to load interface for `B':
+		  Use -v to see a list of the files searched for.
+
+由于无法预测哪些组合会导致此问题，我们只能通过限制大小和错误率来防止异常：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	prop_suggest_try2 =
+		forAll falsePositive $ \errRate ->
+		  forAll (choose (1,fromIntegral maxWord32)) $ \cap ->
+			let bestSize = fst . minimum $ B.sizings cap errRate
+			in bestSize < fromIntegral maxWord32 ==>
+			   either (const False) sane $ B.suggestSizing cap errRate
+	  where sane (bits,hashes) = bits > 0 && bits < maxBound && hashes > 0
+			maxWord32 = maxBound :: Word32
+
+对其加以测试，看起来效果不错：
+
+::
+
+	ghci> handyCheck 1000 $ prop_suggest_try2
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:18: Not in scope: `prop_suggest_try2'
+
+在过大的测试中，我们将过滤掉许多组合：
+
+::
+
+	ghci> handyCheck 10000 $ prop_suggest_try2
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:19: Not in scope: `prop_suggest_try2'
+
+为了解决此问题，我们要尝试降低生成无效输入的可能性：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	prop_suggestions_sane =
+		forAll falsePositive $ \errRate ->
+		  forAll (choose (1,fromIntegral maxWord32 `div` 8)) $ \cap ->
+			let size = fst . minimum $ B.sizings cap errRate
+			in size < fromIntegral maxWord32 ==>
+			   either (const False) sane $ B.suggestSizing cap errRate
+	  where sane (bits,hashes) = bits > 0 && bits < maxBound && hashes > 0
+			maxWord32 = maxBound :: Word32
+
+最终，我们使 ``prop_suggestions_sane`` 的性能更加健壮：
+
+::
+
+	ghci> handyCheck 40000 $ prop_suggestions_sane
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:19: Not in scope: `prop_suggestions_sane'
 
 性能分析和调优
 --------------
