@@ -577,23 +577,336 @@ ghci&gt; mapM_ (print . kbytes) . take 10 . sort $ sizings 10000000 0.001
 </div>
 <div class="section" id="cabal">
 <h2>创建一个 Cabal 包<a class="headerlink" href="#cabal" title="Permalink to this headline">¶</a></h2>
+<p>至此我们已经创建了一个不算太复杂的库，它包括四个公共模块和一个内部模块。现在创建一个 <code class="docutils literal"><span class="pre">rwh-bloomfilter.cabal</span></code> 文件，将这个库打包成容易发布的格式。</p>
+<p>Cabal 允许我们在一个包中描述几个库的信息。 <code class="docutils literal"><span class="pre">.cabal</span></code> 文件的头部包含了所有库通用的信息，后面跟着各个库不同的部分。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Name:</span>               <span class="n">rwh</span><span class="o">-</span><span class="n">bloomfilter</span>
+<span class="kt">Version:</span>            <span class="mf">0.1</span>
+<span class="kt">License:</span>            <span class="kt">BSD3</span>
+<span class="kt">License</span><span class="o">-</span><span class="kt">File:</span>       <span class="kt">License</span><span class="o">.</span><span class="n">txt</span>
+<span class="kt">Category:</span>           <span class="kt">Data</span>
+<span class="kt">Stability:</span>          <span class="n">experimental</span>
+<span class="kt">Build</span><span class="o">-</span><span class="kt">Type:</span>         <span class="kt">Simple</span>
+</pre></div>
+</div>
+<p>由于 C 语言代码 <code class="docutils literal"><span class="pre">lookup3.c</span></code> 和库捆绑在一起，所以我们要将这个 C 语言源文件的信息告知 Cabal。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Extra</span><span class="o">-</span><span class="kt">Source</span><span class="o">-</span><span class="kt">Files:</span> <span class="n">cbits</span><span class="o">/</span><span class="n">lookup3</span><span class="o">.</span><span class="n">c</span> <span class="n">cbits</span><span class="o">/</span><span class="n">lookup3</span><span class="o">.</span><span class="n">h</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">Extra-Source-Files</span></code> 指令对包的构建没有影响：它仅仅在我们运行 <code class="docutils literal"><span class="pre">runhaskell</span> <span class="pre">Setup</span> <span class="pre">sdist</span></code> 时指导 Cabal 绑定一些额外的文件，这条指令将创建一个用于发布的源码包。</p>
+<p>..info:</p>
+<div class="highlight-haskell"><div class="highlight"><pre>属性名称不区分大小写
+
+Cabal 在读取属性（ &#39;:&#39; 字符前面的文本）时会忽略大小写，因此 ``extra-source-files`` 和 ``Extra-Source-Files`` 是等价的。
+</pre></div>
+</div>
 <div class="section" id="id16">
 <h3>处理不同的构建设置<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h3>
+<p>在 2007 年以前，Haskell 标准库被组织在少数几个规模较大的包中，其中最大的一个被命名为 <code class="docutils literal"><span class="pre">base</span></code> 。这个包将许多互不相关的库绑定到一起，因此 Haskell 社区将 <code class="docutils literal"><span class="pre">base</span></code> 包拆分成了几个模块化程度更高的库。</p>
+<p>Cabal 包需要指明自己构建时依赖的其它包，这些信息帮助 Cabal 的命令行接口在必要的情况下自动下载并构建包的依赖。我们希望，不管用户使用的 GHC 版本是否具备 <code class="docutils literal"><span class="pre">base</span></code> 和其它包的现代布局，我们的代码都能尽量兼容。举个例子，我们的代码要能够在 <code class="docutils literal"><span class="pre">array</span></code> 包存在的时候说明自己依赖它，否则就只能依赖 <code class="docutils literal"><span class="pre">base</span></code> 包。</p>
+<p>Cabal 提供了一个通用的配置功能，它允许我们选择性地启用一个 <code class="docutils literal"><span class="pre">.cabal</span></code> 文件的某些部分。构建的配置信息由布尔类型的标识控制，标识为 <code class="docutils literal"><span class="pre">True</span></code> 时使用 <code class="docutils literal"><span class="pre">if</span> <span class="pre">flag</span></code> 之后的文本，而标识为 <code class="docutils literal"><span class="pre">False</span></code> 时则使用跟在 <code class="docutils literal"><span class="pre">else</span></code> 之后的文本。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Cabal</span><span class="o">-</span><span class="kt">Version:</span>      <span class="o">&gt;=</span> <span class="mf">1.2</span>
+
+<span class="kt">Flag</span> <span class="n">split</span><span class="o">-</span><span class="n">base</span>
+  <span class="kt">Description:</span> <span class="kt">Has</span> <span class="n">the</span> <span class="n">base</span> <span class="n">package</span> <span class="n">been</span> <span class="n">split</span> <span class="n">up</span><span class="o">?</span>
+  <span class="kt">Default:</span> <span class="kt">True</span>
+
+<span class="kt">Flag</span> <span class="n">bytestring</span><span class="o">-</span><span class="kr">in</span><span class="o">-</span><span class="n">base</span>
+  <span class="kt">Description:</span> <span class="kt">Is</span> <span class="kt">ByteString</span> <span class="kr">in</span> <span class="n">the</span> <span class="n">base</span> <span class="n">or</span> <span class="n">bytestring</span> <span class="n">package</span><span class="o">?</span>
+  <span class="kt">Default:</span> <span class="kt">False</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li>配置功能在 Cabal 的 1.2 版本中引入，因此指定 Cabal 版本不能低于 1.2。</li>
+<li><code class="docutils literal"><span class="pre">split-base</span></code> 标识的含义不言而喻。[Forec 译注：该标识表示 <code class="docutils literal"><span class="pre">base</span></code> 包是否被划分]</li>
+<li><code class="docutils literal"><span class="pre">bytestring-in-base</span></code> 标识源于一段更为曲折的历史：<code class="docutils literal"><span class="pre">bytestring</span></code> 包在创建之初是和 GHC 6.4 捆绑的，并且它始终独立于 <code class="docutils literal"><span class="pre">base</span></code> 包；在 GHC 6.6 中，它被合并到了 <code class="docutils literal"><span class="pre">base</span></code> 包中；到了 GHC 6.8.1 版本，它又再次被独立出去。</li>
+<li>上面这些标识对构建包的开发者来说通常是不可见的，因为 Cabal 会自动处理它们。在我们进行下一步分析前，了解它们能够帮助理解 <code class="docutils literal"><span class="pre">.cabal</span></code> 文件中 <code class="docutils literal"><span class="pre">Library</span></code> 部分开头的内容。</li>
+</ul>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Library</span>
+  <span class="kr">if</span> <span class="n">flag</span><span class="p">(</span><span class="n">bytestring</span><span class="o">-</span><span class="kr">in</span><span class="o">-</span><span class="n">base</span><span class="p">)</span>
+        <span class="c1">-- bytestring was in base-2.0 and 2.1.1</span>
+        <span class="kt">Build</span><span class="o">-</span><span class="kt">Depends:</span> <span class="n">base</span> <span class="o">&gt;=</span> <span class="mf">2.0</span> <span class="o">&amp;&amp;</span> <span class="o">&lt;</span> <span class="mf">2.2</span>
+  <span class="kr">else</span>
+        <span class="c1">-- in base 1.0 and 3.0, bytestring is a separate package</span>
+        <span class="kt">Build</span><span class="o">-</span><span class="kt">Depends:</span> <span class="n">base</span> <span class="o">&lt;</span> <span class="mf">2.0</span> <span class="o">||</span> <span class="o">&gt;=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">bytestring</span> <span class="o">&gt;=</span> <span class="mf">0.9</span>
+
+  <span class="kr">if</span> <span class="n">flag</span><span class="p">(</span><span class="n">split</span><span class="o">-</span><span class="n">base</span><span class="p">)</span>
+        <span class="kt">Build</span><span class="o">-</span><span class="kt">Depends:</span> <span class="n">base</span> <span class="o">&gt;=</span> <span class="mf">3.0</span><span class="p">,</span> <span class="n">array</span>
+  <span class="kr">else</span>
+        <span class="kt">Build</span><span class="o">-</span><span class="kt">Depends:</span> <span class="n">base</span> <span class="o">&lt;</span> <span class="mf">3.0</span>
+</pre></div>
+</div>
+<p>Cabal 使用标识的默认值来创建包描述（该标识的默认值为 <code class="docutils literal"><span class="pre">True</span></code> ）。如果当前的配置能够构建成功（比如所有需要的包版本都可用）则这个配置将被采用，否则 Cabal 将尝试多种方式组合标识，直到它寻找到一个能够构建成功的配置，又或者所有备选的配置都无法生效为止。</p>
+<p>例如，如果我们将 <code class="docutils literal"><span class="pre">split-base</span></code> 和 <code class="docutils literal"><span class="pre">bytestring-in-base</span></code> 设置为 <code class="docutils literal"><span class="pre">True</span></code>，Cabal 会选择以下的包依赖项：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Build</span><span class="o">-</span><span class="kt">Depends:</span> <span class="n">base</span> <span class="o">&gt;=</span> <span class="mf">2.0</span> <span class="o">&amp;&amp;</span> <span class="o">&lt;</span> <span class="mf">2.2</span>
+<span class="kt">Build</span><span class="o">-</span><span class="kt">Depends:</span> <span class="n">base</span> <span class="o">&gt;=</span> <span class="mf">3.0</span><span class="p">,</span> <span class="n">array</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">base</span></code> 包的版本无法同时又高于 3.0 又低于 2.2，所以 Cabal 出于一致性考虑会拒绝这个配置。对于现代版本的 GHC，在几次尝试后，它将产生如下配置：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- in base 1.0 and 3.0, bytestring is a separate package</span>
+<span class="kt">Build</span><span class="o">-</span><span class="kt">Depends:</span> <span class="n">base</span> <span class="o">&lt;</span> <span class="mf">2.0</span> <span class="o">||</span> <span class="o">&gt;=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">bytestring</span> <span class="o">&gt;=</span> <span class="mf">0.9</span>
+<span class="kt">Build</span><span class="o">-</span><span class="kt">Depends:</span> <span class="n">base</span> <span class="o">&gt;=</span> <span class="mf">3.0</span><span class="p">,</span> <span class="n">array</span>
+</pre></div>
+</div>
+<p>在运行 <code class="docutils literal"><span class="pre">runhaskell</span> <span class="pre">Setup</span> <span class="pre">configure</span></code> 时，我们可以使用 <code class="docutils literal"><span class="pre">--flag</span></code> 选项手动指定各标识的值，虽然实际中很少需要这么做。</p>
 </div>
 <div class="section" id="c">
 <h3>编译选项和针对 C 的接口<a class="headerlink" href="#c" title="Permalink to this headline">¶</a></h3>
+<p>下面让我们继续分析 <code class="docutils literal"><span class="pre">.cabal</span></code> 文件，并完成与 Haskell 相关的剩余细节。如果在构建过程中启用分析，我们希望所有的顶级函数都显示在分析的输出中。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">GHC</span><span class="o">-</span><span class="kt">Prof</span><span class="o">-</span><span class="kt">Options:</span> <span class="o">-</span><span class="n">auto</span><span class="o">-</span><span class="n">all</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">Other-Modules</span></code> 属性列出了库中私有的 Haskell 模块，这些模块对使用此包的代码不可见。</p>
+<p>在 GHC 构建这个包时，Cabal 会将 <code class="docutils literal"><span class="pre">GHC-Options</span></code> 属性中的选项传递给编译器。</p>
+<p><code class="docutils literal"><span class="pre">-O2</span></code> 选项使 GHC 尽可能地优化我们的代码。不加以优化编译出的代码效率很低，所以在编译生产代码时应当始终使用 <code class="docutils literal"><span class="pre">-O2</span></code> 选项。</p>
+<p>为了写出更清晰的代码，我们通常添加 <code class="docutils literal"><span class="pre">-Wall</span></code> 选项，这个选项会启用 GHC 的所有警告。这将导致 GHC 在遇到潜在问题（例如重叠的模式匹配、未使用的函数参数等其它潜在障碍）时提出警告。尽管忽略这些警告一般是安全的，但我们应该尽量完善代码以消除它们。这一点小小的努力，将催生更容易阅读和维护的代码。</p>
+<p>普通情况下 GHC 会直接生成汇编语言代码，而在使用 <code class="docutils literal"><span class="pre">-fvia-C</span></code> 编译时，GHC 会生成 C 语言代码并使用系统的 C 编译器来编译它。这会减慢编译速度，但有时 C 编译器能够进一步改善 GHC 优化的代码，所以这也是值得的。</p>
+<p>我们这里提到 <code class="docutils literal"><span class="pre">-fiva-C</span></code> 主要是为了展示如何使用它编译。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">C</span><span class="o">-</span><span class="kt">Sources:</span>        <span class="n">cbits</span><span class="o">/</span><span class="n">lookup3</span><span class="o">.</span><span class="n">c</span>
+<span class="kt">CC</span><span class="o">-</span><span class="kt">Options:</span>       <span class="o">-</span><span class="kt">O3</span>
+<span class="kt">Include</span><span class="o">-</span><span class="kt">Dirs:</span>     <span class="n">cbits</span>
+<span class="kt">Includes:</span>         <span class="n">lookup3</span><span class="o">.</span><span class="n">h</span>
+<span class="kt">Install</span><span class="o">-</span><span class="kt">Includes:</span> <span class="n">lookup3</span><span class="o">.</span><span class="n">h</span>
+</pre></div>
+</div>
+<p>对于 <code class="docutils literal"><span class="pre">C-Sources</span></code> 属性，我们只需要列出必须编译到库中的文件。 <code class="docutils literal"><span class="pre">CC-Options</span></code> 属性包含了提供给 C 编译器的选项（其中选项 <code class="docutils literal"><span class="pre">-O3</span></code> 用于指定最高级别的优化）。因为对 Jenkins 散列函数的 FFI 绑定引用了 <code class="docutils literal"><span class="pre">lookup3.h</span></code> 头文件，我们需要告诉 Cabal 在哪里可以找到该头文件。<code class="docutils literal"><span class="pre">Install-Includes</span></code> 用来告诉 Cabal 安装这个头文件，否则在构建时客户端代码将无法找到头文件。</p>
+<p>..info:</p>
+<div class="highlight-haskell"><div class="highlight"><pre>``-fvia-C`` 在 FFI 中的价值
+
+在编写 FFI 绑定时，``-fvia-C`` 编译选项能够提升安全性。如果在 FFI 声明中提到头文件（如外部导入 ``string.h memcpy``），那么 C 编译器会对生成的 Haskell 代码做类型检查，以确保其 C 函数的调用和头文件中的函数原型一致。
+
+如果不使用 ``-fvia-C`` ，我们将失去一层额外的安全保障：C 类型错误很容易混入我们的 Haskell 代码中。举个例子，在多数 64 位机器上，``CInt`` 是 32 位宽，而 ``CSize`` 是 64 位宽。如果我们不小心弄混了用来描述 FFI 绑定参数的类型，那么数据可能会损毁。
+</pre></div>
+</div>
+<p>[Forec 译注：遗憾的是，在较新版本的 GHC 中 <code class="docutils literal"><span class="pre">-fvia-C</span></code> 不会产生任何作用，并且它将在未来的 GHC 发布中被移除。所以本节关于 <code class="docutils literal"><span class="pre">-fvia-C</span></code> 选项的介绍已经成为历史了。]</p>
 </div>
 </div>
 <div class="section" id="quickcheck">
 <h2>用 QuickCheck 测试<a class="headerlink" href="#quickcheck" title="Permalink to this headline">¶</a></h2>
+<p>在进一步考虑性能之前，我们要确保布隆过滤器的正确性。使用 QuickCheck 可以轻松测试一些基本的属性。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/BloomCheck.hs</span>
+<span class="cm">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span>
+<span class="kr">module</span> <span class="nn">Main</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">BloomFilter.Hash</span> <span class="p">(</span><span class="kt">Hashable</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Data.Word</span> <span class="p">(</span><span class="kt">Word8</span><span class="p">,</span> <span class="kt">Word32</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Random</span> <span class="p">(</span><span class="kt">Random</span><span class="p">(</span><span class="o">..</span><span class="p">),</span> <span class="kt">RandomGen</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Test.QuickCheck</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">BloomFilter.Easy</span> <span class="k">as</span> <span class="n">B</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.ByteString</span> <span class="k">as</span> <span class="n">Strict</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.ByteString.Lazy</span> <span class="k">as</span> <span class="n">Lazy</span>
+</pre></div>
+</div>
+<p>普通的 <code class="docutils literal"><span class="pre">quickCheck</span></code> 函数对布隆过滤器属性的测试帮助不大，因为它产生的 100 个测试输入样例无法完整覆盖布隆过滤器的功能。这里我们编写自己的测试函数：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/BloomCheck.hs</span>
+<span class="nf">handyCheck</span> <span class="ow">::</span> <span class="kt">Testable</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">handyCheck</span> <span class="n">limit</span> <span class="ow">=</span> <span class="n">check</span> <span class="n">defaultConfig</span> <span class="p">{</span>
+                                         <span class="n">configMaxTest</span> <span class="ow">=</span> <span class="n">limit</span>
+                                   <span class="p">,</span> <span class="n">configEvery</span>   <span class="ow">=</span> <span class="nf">\</span><span class="kr">_</span> <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="s">&quot;&quot;</span>
+                                   <span class="p">}</span>
+</pre></div>
+</div>
+<p>[Forec 译注：在较新版本的 QuickCheck 中，上面的代码应该写成：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">handyCheck</span> <span class="ow">::</span> <span class="kt">Testable</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">handyCheck</span> <span class="n">limit</span> <span class="ow">=</span> <span class="n">quickCheckWith</span> <span class="p">(</span><span class="n">stdArgs</span> <span class="p">{</span> <span class="n">maxSuccess</span> <span class="ow">=</span> <span class="n">limit</span> <span class="p">)</span>
+</pre></div>
+</div>
+<p>]</p>
+<p>下面我们要完成的第一个任务是确保：无论用户选择多大的容错率，只要向布隆过滤器添加了一个任意值，则之后针对该值的成员测试都应得到 “值已存在” 的结果。</p>
+<p>我们将使用 <code class="docutils literal"><span class="pre">easyList</span></code> 函数来创建一个布隆过滤器。 <code class="docutils literal"><span class="pre">Double</span></code> 的 <code class="docutils literal"><span class="pre">Random</span></code> 实例能够生成 0 到 1 之间的随机数，因此 QuickCheck 可以提供任意大小的错误率。</p>
+<p>然而，测试生成的错误率应当排除 0 和 1。QuickCheck 提供了两种方法：</p>
+<ul class="simple">
+<li>通过结构：指定要生成的有效值的范围。QuickCheck 为此提供了 <code class="docutils literal"><span class="pre">forAll</span></code> 组合器。</li>
+<li>通过过滤：当 QuickCheck 生成一个任意值时，用 <code class="docutils literal"><span class="pre">(=~&gt;)</span></code> 运算符过滤掉不符合标准的值。如果布隆过滤器通过这种方式拒绝一个输入值，测试将显示成功。</li>
+</ul>
+<p>如果以上两个方法都可以选择，那么最好采用通过结构的方法：假设 QuickCheck 生成了 1000 个任意值，其中 800 个由于某些原因被过滤掉。看起来我们似乎运行了 1000 次测试，但实际上只有 200 次做了有意义的事。</p>
+<p>出于这个原因，当需要产生错误率时，我们不会去消除 QuickCheck 提供的 0 或 1，而是在一个始终有效的区间中构造值：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">falsePositive</span> <span class="ow">::</span> <span class="kt">Gen</span> <span class="kt">Double</span>
+<span class="nf">falsePositive</span> <span class="ow">=</span> <span class="n">choose</span> <span class="p">(</span><span class="n">epsilon</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">epsilon</span><span class="p">)</span>
+        <span class="kr">where</span> <span class="n">epsilon</span> <span class="ow">=</span> <span class="mf">1e-6</span>
+
+<span class="p">(</span><span class="o">=~&gt;</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Either</span> <span class="n">a</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">b</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">k</span> <span class="o">=~&gt;</span> <span class="n">f</span> <span class="ow">=</span> <span class="n">either</span> <span class="p">(</span><span class="n">const</span> <span class="kt">True</span><span class="p">)</span> <span class="n">f</span> <span class="n">k</span>
+
+<span class="nf">prop_one_present</span> <span class="kr">_</span> <span class="n">elt</span> <span class="ow">=</span>
+        <span class="n">forAll</span> <span class="n">falsePositive</span> <span class="o">$</span> <span class="nf">\</span><span class="n">errRate</span> <span class="ow">-&gt;</span>
+          <span class="kt">B</span><span class="o">.</span><span class="n">easyList</span> <span class="n">errRate</span> <span class="p">[</span><span class="n">elt</span><span class="p">]</span> <span class="o">=~&gt;</span> <span class="nf">\</span><span class="n">filt</span> <span class="ow">-&gt;</span>
+                <span class="n">elt</span> <span class="p">`</span><span class="kt">B</span><span class="o">.</span><span class="n">elem</span><span class="p">`</span> <span class="n">filt</span>
+</pre></div>
+</div>
+<p>[Forec 译注：原著作者似乎在这里犯了一点错误，根据代码， <code class="docutils literal"><span class="pre">prop_one_present</span></code> 的型别声明应为 <code class="docutils literal"><span class="pre">(Hashable</span> <span class="pre">a)</span> <span class="pre">=&gt;</span> <span class="pre">t</span> <span class="pre">-&gt;</span> <span class="pre">a</span> <span class="pre">-&gt;</span> <span class="pre">Property</span></code> ，但这无法通过编译，因为 <code class="docutils literal"><span class="pre">prop_one_present</span></code> 的第一个参数 <code class="docutils literal"><span class="pre">_</span></code> 隐藏着对类型 <code class="docutils literal"><span class="pre">t</span></code> 和 <code class="docutils literal"><span class="pre">a</span></code> 的约束，它们二者必须相等。有两种解决方法：一是不指定这个多余的 <code class="docutils literal"><span class="pre">_</span></code> 参数，二是将型别声明显式地指定为 <code class="docutils literal"><span class="pre">(Hashable</span> <span class="pre">a)</span> <span class="pre">=&gt;</span> <span class="pre">a</span> <span class="pre">-&gt;</span> <span class="pre">a</span> <span class="pre">-&gt;</span> <span class="pre">Property</span></code> 。]</p>
+<p>组合器 <code class="docutils literal"><span class="pre">(=~&gt;)</span></code> 过滤了 <code class="docutils literal"><span class="pre">easyList</span></code> 失败的情况：如果失败了，测试会自动通过。</p>
 <div class="section" id="id17">
 <h3>多态测试<a class="headerlink" href="#id17" title="Permalink to this headline">¶</a></h3>
+<p>[Forec 译注：以下几节，原著作者给出的代码信息不全，在 <code class="docutils literal"><span class="pre">GHCI</span></code> 中均无法加载。]</p>
+<p>QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型需要测试，我们有必要设计一个方法，避免对每种类型都编写同样的测试。</p>
+<p>注意， <code class="docutils literal"><span class="pre">prop_one_present</span></code> 这个函数是多态的，但它忽略了第一个参数。我们可以借助这一点模拟单型性质：</p>
+<div class="highlight-haskell"><div class="highlight"><pre>ghci&gt; :load BloomCheck
+BloomCheck.hs:9:17:
+        Could not find module `BloomFilter.Easy&#39;:
+          Use -v to see a list of the files searched for.
+Failed, modules loaded: none.
+ghci&gt; :t prop_one_present
+&lt;interactive&gt;:1:0: Not in scope: `prop_one_present&#39;
+ghci&gt; :t prop_one_present (undefined :: Int)
+&lt;interactive&gt;:1:0: Not in scope: `prop_one_present&#39;
+</pre></div>
+</div>
+<p>任何值都可以作为 <code class="docutils literal"><span class="pre">prop_one_present</span></code> 的第一个参数。第二个参数中第一个元素的类型需要和第一个参数保持一致。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">5000</span> <span class="o">$</span> <span class="n">prop_one_present</span> <span class="p">(</span><span class="n">undefined</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">)</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">handyCheck&#39;</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">18</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">prop_one_present&#39;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">5000</span> <span class="o">$</span> <span class="n">prop_one_present</span> <span class="p">(</span><span class="n">undefined</span> <span class="ow">::</span> <span class="kt">Double</span><span class="p">)</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">handyCheck&#39;</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">18</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">prop_one_present&#39;</span>
+</pre></div>
+</div>
+<p>在向布隆过滤器添加多个元素之后，这些元素应该都能够被识别出来：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/BloomCheck.hs</span>
+<span class="nf">prop_all_present</span> <span class="kr">_</span> <span class="n">xs</span> <span class="ow">=</span>
+        <span class="n">forAll</span> <span class="n">falsePositive</span> <span class="o">$</span> <span class="nf">\</span><span class="n">errRate</span> <span class="ow">-&gt;</span>
+          <span class="kt">B</span><span class="o">.</span><span class="n">easyList</span> <span class="n">errRate</span> <span class="n">xs</span> <span class="o">=~&gt;</span> <span class="nf">\</span><span class="n">filt</span> <span class="ow">-&gt;</span>
+                <span class="n">all</span> <span class="p">(`</span><span class="kt">B</span><span class="o">.</span><span class="n">elem</span><span class="p">`</span> <span class="n">filt</span><span class="p">)</span> <span class="n">xs</span>
+</pre></div>
+</div>
+<p>测试依然成功：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">2000</span> <span class="o">$</span> <span class="n">prop_all_present</span> <span class="p">(</span><span class="n">undefined</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">)</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">handyCheck&#39;</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">18</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">prop_all_present</span>
+</pre></div>
+</div>
 </div>
 <div class="section" id="bytestring">
 <h3>为 ByteString 编写任意实例<a class="headerlink" href="#bytestring" title="Permalink to this headline">¶</a></h3>
+<p>QuickCheck 库没有为 <code class="docutils literal"><span class="pre">ByteString</span></code> 类型提供 <code class="docutils literal"><span class="pre">Arbitary</span></code> 的实例，因此我们必须自己编写。 <code class="docutils literal"><span class="pre">pack</span></code> 函数可基于 <code class="docutils literal"><span class="pre">[Word8]</span></code> 创建一个 <code class="docutils literal"><span class="pre">ByteString</span></code> 。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/BloomCheck.hs</span>
+<span class="kr">instance</span> <span class="kt">Arbitrary</span> <span class="kt">Lazy</span><span class="o">.</span><span class="kt">ByteString</span> <span class="kr">where</span>
+        <span class="n">arbitrary</span> <span class="ow">=</span> <span class="kt">Lazy</span><span class="o">.</span><span class="n">pack</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="n">arbitrary</span>
+        <span class="n">coarbitrary</span> <span class="ow">=</span> <span class="n">coarbitrary</span> <span class="o">.</span> <span class="kt">Lazy</span><span class="o">.</span><span class="n">unpack</span>
+
+<span class="kr">instance</span> <span class="kt">Arbitrary</span> <span class="kt">Strict</span><span class="o">.</span><span class="kt">ByteString</span> <span class="kr">where</span>
+        <span class="n">arbitrary</span> <span class="ow">=</span> <span class="kt">Strict</span><span class="o">.</span><span class="n">pack</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="n">arbitrary</span>
+        <span class="n">coarbitrary</span> <span class="ow">=</span> <span class="n">coarbitrary</span> <span class="o">.</span> <span class="kt">Strict</span><span class="o">.</span><span class="n">unpack</span>
+</pre></div>
+</div>
+<p>QuickCheck 中还缺少针对 <code class="docutils literal"><span class="pre">Data.Word</span></code> 和 <code class="docutils literal"><span class="pre">Data.Int</span></code> 中固定宽度类型的 <code class="docutils literal"><span class="pre">Arbitary</span></code> 实例。我们至少需要为 <code class="docutils literal"><span class="pre">Word8</span></code> 实现 <code class="docutils literal"><span class="pre">Arbitary</span></code> 实例：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/BloomCheck.hs</span>
+<span class="kr">instance</span> <span class="kt">Random</span> <span class="kt">Word8</span> <span class="kr">where</span>
+  <span class="n">randomR</span> <span class="ow">=</span> <span class="n">integralRandomR</span>
+  <span class="n">random</span> <span class="ow">=</span> <span class="n">randomR</span> <span class="p">(</span><span class="n">minBound</span><span class="p">,</span> <span class="n">maxBound</span><span class="p">)</span>
+
+<span class="kr">instance</span> <span class="kt">Arbitrary</span> <span class="kt">Word8</span> <span class="kr">where</span>
+        <span class="n">arbitrary</span> <span class="ow">=</span> <span class="n">choose</span> <span class="p">(</span><span class="n">minBound</span><span class="p">,</span> <span class="n">maxBound</span><span class="p">)</span>
+        <span class="n">coarbitrary</span> <span class="ow">=</span> <span class="n">integralCoarbitrary</span>
+</pre></div>
+</div>
+<p>为这些实例编写几个通用函数，以便在之后为其他整型类型编写实例时重用它们：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/BloomCheck.hs</span>
+<span class="nf">integralCoarbitrary</span> <span class="n">n</span> <span class="ow">=</span>
+        <span class="n">variant</span> <span class="o">$</span> <span class="kr">if</span> <span class="n">m</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="kr">then</span> <span class="mi">2</span><span class="o">*</span><span class="n">m</span> <span class="kr">else</span> <span class="mi">2</span><span class="o">*</span><span class="p">(</span><span class="o">-</span><span class="n">m</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+  <span class="kr">where</span> <span class="n">m</span> <span class="ow">=</span> <span class="n">fromIntegral</span> <span class="n">n</span>
+
+<span class="nf">integralRandomR</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">)</span> <span class="n">g</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">randomR</span> <span class="p">(</span><span class="n">c</span><span class="p">,</span><span class="n">d</span><span class="p">)</span> <span class="n">g</span> <span class="kr">of</span>
+                                                        <span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">h</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">fromIntegral</span> <span class="n">x</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span>
+        <span class="kr">where</span> <span class="p">(</span><span class="n">c</span><span class="p">,</span><span class="n">d</span><span class="p">)</span> <span class="ow">=</span> <span class="p">(</span><span class="n">fromIntegral</span> <span class="n">a</span> <span class="ow">::</span> <span class="kt">Integer</span><span class="p">,</span>
+                                   <span class="n">fromIntegral</span> <span class="n">b</span> <span class="ow">::</span> <span class="kt">Integer</span><span class="p">)</span>
+
+<span class="kr">instance</span> <span class="kt">Random</span> <span class="kt">Word32</span> <span class="kr">where</span>
+  <span class="n">randomR</span> <span class="ow">=</span> <span class="n">integralRandomR</span>
+  <span class="n">random</span> <span class="ow">=</span> <span class="n">randomR</span> <span class="p">(</span><span class="n">minBound</span><span class="p">,</span> <span class="n">maxBound</span><span class="p">)</span>
+
+<span class="kr">instance</span> <span class="kt">Arbitrary</span> <span class="kt">Word32</span> <span class="kr">where</span>
+        <span class="n">arbitrary</span> <span class="ow">=</span> <span class="n">choose</span> <span class="p">(</span><span class="n">minBound</span><span class="p">,</span> <span class="n">maxBound</span><span class="p">)</span>
+        <span class="n">coarbitrary</span> <span class="ow">=</span> <span class="n">integralCoarbitrary</span>
+</pre></div>
+</div>
+<p>创建了这些 <code class="docutils literal"><span class="pre">Arbitary</span></code> 实例后，我们就可以在 <code class="docutils literal"><span class="pre">ByteString</span></code> 类型上尝试现有的属性：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">1000</span> <span class="o">$</span> <span class="n">prop_one_present</span> <span class="p">(</span><span class="n">undefined</span> <span class="ow">::</span> <span class="kt">Lazy</span><span class="o">.</span><span class="kt">ByteString</span><span class="p">)</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">handyCheck&#39;</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">18</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">prop_one_present&#39;</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">49</span><span class="kt">:</span>
+        <span class="kt">Failed</span> <span class="n">to</span> <span class="n">load</span> <span class="n">interface</span> <span class="n">for</span> <span class="p">`</span><span class="kt">Lazy&#39;:</span>
+          <span class="kt">Use</span> <span class="o">-</span><span class="n">v</span> <span class="n">to</span> <span class="n">see</span> <span class="n">a</span> <span class="n">list</span> <span class="kr">of</span> <span class="n">the</span> <span class="n">files</span> <span class="n">searched</span> <span class="n">for</span><span class="o">.</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">1000</span> <span class="o">$</span> <span class="n">prop_all_present</span> <span class="p">(</span><span class="n">undefined</span> <span class="ow">::</span> <span class="kt">Strict</span><span class="o">.</span><span class="kt">ByteString</span><span class="p">)</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">handyCheck&#39;</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">18</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">prop_all_present&#39;</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">49</span><span class="kt">:</span>
+        <span class="kt">Failed</span> <span class="n">to</span> <span class="n">load</span> <span class="n">interface</span> <span class="n">for</span> <span class="p">`</span><span class="kt">Strict&#39;:</span>
+          <span class="kt">Use</span> <span class="o">-</span><span class="n">v</span> <span class="n">to</span> <span class="n">see</span> <span class="n">a</span> <span class="n">list</span> <span class="kr">of</span> <span class="n">the</span> <span class="n">files</span> <span class="n">searched</span> <span class="n">for</span><span class="o">.</span>
+</pre></div>
+</div>
 </div>
 <div class="section" id="id18">
 <h3>推荐大小是正确的吗？<a class="headerlink" href="#id18" title="Permalink to this headline">¶</a></h3>
+<p>随着待运行测试数量的增加，用于测试 <code class="docutils literal"><span class="pre">easyList</span></code> 性能的开销也在快速增长。我们希望输入数据规模对 <code class="docutils literal"><span class="pre">easyList</span></code> 的性能没有影响。直接测试是不现实的，所以这里使用另一个问题来衡量：面对极端的输入规模时， <code class="docutils literal"><span class="pre">suggestSizing</span></code> 是否仍能给出敏感的数组大小以及哈希值？</p>
+<p>检查这一特性略微有些棘手：我们需要同时改变期望的错误率和预期容量。根据 <code class="docutils literal"><span class="pre">sizings</span></code> 函数给出的结果，这些值之间的关系较难预测。</p>
+<p>我们可以尝试忽略复杂性：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/BloomCheck.hs</span>
+<span class="nf">prop_suggest_try1</span> <span class="ow">=</span>
+  <span class="n">forAll</span> <span class="n">falsePositive</span> <span class="o">$</span> <span class="nf">\</span><span class="n">errRate</span> <span class="ow">-&gt;</span>
+        <span class="n">forAll</span> <span class="p">(</span><span class="n">choose</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">maxBound</span> <span class="ow">::</span> <span class="kt">Word32</span><span class="p">))</span> <span class="o">$</span> <span class="nf">\</span><span class="n">cap</span> <span class="ow">-&gt;</span>
+          <span class="kr">case</span> <span class="kt">B</span><span class="o">.</span><span class="n">suggestSizing</span> <span class="p">(</span><span class="n">fromIntegral</span> <span class="n">cap</span><span class="p">)</span> <span class="n">errRate</span> <span class="kr">of</span>
+                <span class="kt">Left</span> <span class="n">err</span> <span class="ow">-&gt;</span> <span class="kt">False</span>
+                <span class="kt">Right</span> <span class="p">(</span><span class="n">bits</span><span class="p">,</span><span class="n">hashes</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">bits</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">bits</span> <span class="o">&lt;</span> <span class="n">maxBound</span> <span class="o">&amp;&amp;</span> <span class="n">hashes</span> <span class="o">&gt;</span> <span class="mi">0</span>
+</pre></div>
+</div>
+<p>正如我们所料，这一做法只会带来一个没有实际作用的测试：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">1000</span> <span class="o">$</span> <span class="n">prop_suggest_try1</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">handyCheck&#39;</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">18</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">prop_suggest_try1&#39;</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">1000</span> <span class="o">$</span> <span class="n">prop_suggest_try1</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">handyCheck&#39;</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">18</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">prop_suggest_try1&#39;</span>
+</pre></div>
+</div>
+<p>将 QuickCheck 打印的反例交给 <code class="docutils literal"><span class="pre">suggestSizing</span></code> 时，我们发现这些输入被拒绝了，因为它们会导致一个过于庞大的位数组。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">B</span><span class="o">.</span><span class="n">suggestSizing</span> <span class="mi">1678125842</span> <span class="mf">8.501133057303545e-3</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span>
+        <span class="kt">Failed</span> <span class="n">to</span> <span class="n">load</span> <span class="n">interface</span> <span class="n">for</span> <span class="p">`</span><span class="kt">B&#39;:</span>
+          <span class="kt">Use</span> <span class="o">-</span><span class="n">v</span> <span class="n">to</span> <span class="n">see</span> <span class="n">a</span> <span class="n">list</span> <span class="kr">of</span> <span class="n">the</span> <span class="n">files</span> <span class="n">searched</span> <span class="n">for</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>由于无法预测哪些组合会导致此问题，我们只能通过限制大小和错误率来防止异常：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/BloomCheck.hs</span>
+<span class="nf">prop_suggest_try2</span> <span class="ow">=</span>
+        <span class="n">forAll</span> <span class="n">falsePositive</span> <span class="o">$</span> <span class="nf">\</span><span class="n">errRate</span> <span class="ow">-&gt;</span>
+          <span class="n">forAll</span> <span class="p">(</span><span class="n">choose</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">fromIntegral</span> <span class="n">maxWord32</span><span class="p">))</span> <span class="o">$</span> <span class="nf">\</span><span class="n">cap</span> <span class="ow">-&gt;</span>
+                <span class="kr">let</span> <span class="n">bestSize</span> <span class="ow">=</span> <span class="n">fst</span> <span class="o">.</span> <span class="n">minimum</span> <span class="o">$</span> <span class="kt">B</span><span class="o">.</span><span class="n">sizings</span> <span class="n">cap</span> <span class="n">errRate</span>
+                <span class="kr">in</span> <span class="n">bestSize</span> <span class="o">&lt;</span> <span class="n">fromIntegral</span> <span class="n">maxWord32</span> <span class="o">==&gt;</span>
+                   <span class="n">either</span> <span class="p">(</span><span class="n">const</span> <span class="kt">False</span><span class="p">)</span> <span class="n">sane</span> <span class="o">$</span> <span class="kt">B</span><span class="o">.</span><span class="n">suggestSizing</span> <span class="n">cap</span> <span class="n">errRate</span>
+  <span class="kr">where</span> <span class="n">sane</span> <span class="p">(</span><span class="n">bits</span><span class="p">,</span><span class="n">hashes</span><span class="p">)</span> <span class="ow">=</span> <span class="n">bits</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">bits</span> <span class="o">&lt;</span> <span class="n">maxBound</span> <span class="o">&amp;&amp;</span> <span class="n">hashes</span> <span class="o">&gt;</span> <span class="mi">0</span>
+                <span class="n">maxWord32</span> <span class="ow">=</span> <span class="n">maxBound</span> <span class="ow">::</span> <span class="kt">Word32</span>
+</pre></div>
+</div>
+<p>对其加以测试，看起来效果不错：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">1000</span> <span class="o">$</span> <span class="n">prop_suggest_try2</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">handyCheck&#39;</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">18</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">prop_suggest_try2&#39;</span>
+</pre></div>
+</div>
+<p>在过大的测试中，许多组合都被过滤掉了：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">10000</span> <span class="o">$</span> <span class="n">prop_suggest_try2</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">handyCheck&#39;</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">19</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">prop_suggest_try2&#39;</span>
+</pre></div>
+</div>
+<p>为了解决此问题，我们要尝试降低生成无效输入的可能性：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/BloomCheck.hs</span>
+<span class="nf">prop_suggestions_sane</span> <span class="ow">=</span>
+        <span class="n">forAll</span> <span class="n">falsePositive</span> <span class="o">$</span> <span class="nf">\</span><span class="n">errRate</span> <span class="ow">-&gt;</span>
+          <span class="n">forAll</span> <span class="p">(</span><span class="n">choose</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">fromIntegral</span> <span class="n">maxWord32</span> <span class="p">`</span><span class="n">div</span><span class="p">`</span> <span class="mi">8</span><span class="p">))</span> <span class="o">$</span> <span class="nf">\</span><span class="n">cap</span> <span class="ow">-&gt;</span>
+                <span class="kr">let</span> <span class="n">size</span> <span class="ow">=</span> <span class="n">fst</span> <span class="o">.</span> <span class="n">minimum</span> <span class="o">$</span> <span class="kt">B</span><span class="o">.</span><span class="n">sizings</span> <span class="n">cap</span> <span class="n">errRate</span>
+                <span class="kr">in</span> <span class="n">size</span> <span class="o">&lt;</span> <span class="n">fromIntegral</span> <span class="n">maxWord32</span> <span class="o">==&gt;</span>
+                   <span class="n">either</span> <span class="p">(</span><span class="n">const</span> <span class="kt">False</span><span class="p">)</span> <span class="n">sane</span> <span class="o">$</span> <span class="kt">B</span><span class="o">.</span><span class="n">suggestSizing</span> <span class="n">cap</span> <span class="n">errRate</span>
+  <span class="kr">where</span> <span class="n">sane</span> <span class="p">(</span><span class="n">bits</span><span class="p">,</span><span class="n">hashes</span><span class="p">)</span> <span class="ow">=</span> <span class="n">bits</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">bits</span> <span class="o">&lt;</span> <span class="n">maxBound</span> <span class="o">&amp;&amp;</span> <span class="n">hashes</span> <span class="o">&gt;</span> <span class="mi">0</span>
+                <span class="n">maxWord32</span> <span class="ow">=</span> <span class="n">maxBound</span> <span class="ow">::</span> <span class="kt">Word32</span>
+</pre></div>
+</div>
+<p>最终，我们得到了更加健壮的性能：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">40000</span> <span class="o">$</span> <span class="n">prop_suggestions_sane</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">handyCheck&#39;</span>
+<span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">19</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">prop_suggestions_sane&#39;</span>
+</pre></div>
+</div>
 </div>
 </div>
 <div class="section" id="id19">
