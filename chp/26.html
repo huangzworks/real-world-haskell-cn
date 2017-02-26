@@ -593,12 +593,6 @@ ghci&gt; mapM_ (print . kbytes) . take 10 . sort $ sizings 10000000 0.001
 </pre></div>
 </div>
 <p><code class="docutils literal"><span class="pre">Extra-Source-Files</span></code> 指令对包的构建没有影响：它仅仅在我们运行 <code class="docutils literal"><span class="pre">runhaskell</span> <span class="pre">Setup</span> <span class="pre">sdist</span></code> 时指导 Cabal 绑定一些额外的文件，这条指令将创建一个用于发布的源码包。</p>
-<p>..info:</p>
-<div class="highlight-haskell"><div class="highlight"><pre>属性名称不区分大小写
-
-Cabal 在读取属性（ &#39;:&#39; 字符前面的文本）时会忽略大小写，因此 ``extra-source-files`` 和 ``Extra-Source-Files`` 是等价的。
-</pre></div>
-</div>
 <div class="section" id="id16">
 <h3>处理不同的构建设置<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h3>
 <p>在 2007 年以前，Haskell 标准库被组织在少数几个规模较大的包中，其中最大的一个被命名为 <code class="docutils literal"><span class="pre">base</span></code> 。这个包将许多互不相关的库绑定到一起，因此 Haskell 社区将 <code class="docutils literal"><span class="pre">base</span></code> 包拆分成了几个模块化程度更高的库。</p>
@@ -669,14 +663,6 @@ Cabal 在读取属性（ &#39;:&#39; 字符前面的文本）时会忽略大小�
 </pre></div>
 </div>
 <p>对于 <code class="docutils literal"><span class="pre">C-Sources</span></code> 属性，我们只需要列出必须编译到库中的文件。 <code class="docutils literal"><span class="pre">CC-Options</span></code> 属性包含了提供给 C 编译器的选项（其中选项 <code class="docutils literal"><span class="pre">-O3</span></code> 用于指定最高级别的优化）。因为对 Jenkins 散列函数的 FFI 绑定引用了 <code class="docutils literal"><span class="pre">lookup3.h</span></code> 头文件，我们需要告诉 Cabal 在哪里可以找到该头文件。<code class="docutils literal"><span class="pre">Install-Includes</span></code> 用来告诉 Cabal 安装这个头文件，否则在构建时客户端代码将无法找到头文件。</p>
-<p>..info:</p>
-<div class="highlight-haskell"><div class="highlight"><pre>``-fvia-C`` 在 FFI 中的价值
-
-在编写 FFI 绑定时，``-fvia-C`` 编译选项能够提升安全性。如果在 FFI 声明中提到头文件（如外部导入 ``string.h memcpy``），那么 C 编译器会对生成的 Haskell 代码做类型检查，以确保其 C 函数的调用和头文件中的函数原型一致。
-
-如果不使用 ``-fvia-C`` ，我们将失去一层额外的安全保障：C 类型错误很容易混入我们的 Haskell 代码中。举个例子，在多数 64 位机器上，``CInt`` 是 32 位宽，而 ``CSize`` 是 64 位宽。如果我们不小心弄混了用来描述 FFI 绑定参数的类型，那么数据可能会损毁。
-</pre></div>
-</div>
 <p>[Forec 译注：遗憾的是，在较新版本的 GHC 中 <code class="docutils literal"><span class="pre">-fvia-C</span></code> 不会产生任何作用，并且它将在未来的 GHC 发布中被移除。所以本节关于 <code class="docutils literal"><span class="pre">-fvia-C</span></code> 选项的介绍已经成为历史了。]</p>
 </div>
 </div>
