@@ -649,23 +649,415 @@ C 语言编写的哈希函数会将计算出的哈希值写入 ``p1`` 和 ``p2``
 创建一个 Cabal 包
 -----------------
 
+至此我们已经创建了一个不算太复杂的库，它包括四个公共模块和一个内部模块。现在创建一个 ``rwh-bloomfilter.cabal`` 文件，将这个库打包成容易发布的格式。
+
+Cabal 允许我们在一个包中描述几个库的信息。 ``.cabal`` 文件的头部包含了所有库通用的信息，后面跟着各个库不同的部分。
+
+::
+
+	Name:               rwh-bloomfilter
+	Version:            0.1
+	License:            BSD3
+	License-File:       License.txt
+	Category:           Data
+	Stability:          experimental
+	Build-Type:         Simple
+
+由于 C 语言代码 ``lookup3.c`` 和库捆绑在一起，所以我们要将这个 C 语言源文件的信息告知 Cabal。
+
+::
+
+	Extra-Source-Files: cbits/lookup3.c cbits/lookup3.h
+	
+``Extra-Source-Files`` 指令对包的构建没有影响：它仅仅在我们运行 ``runhaskell Setup sdist`` 时指导 Cabal 绑定一些额外的文件，这条指令将创建一个用于发布的源码包。
+
+..info::
+
+	属性名称不区分大小写
+	
+	Cabal 在读取属性（ ':' 字符前面的文本）时会忽略大小写，因此 ``extra-source-files`` 和 ``Extra-Source-Files`` 是等价的。
+
 处理不同的构建设置
 ^^^^^^^^^^^^^^^^^^
+
+在 2007 年以前，Haskell 标准库被组织在少数几个规模较大的包中，其中最大的一个被命名为 ``base`` 。这个包将许多互不相关的库绑定到一起，因此 Haskell 社区将 ``base`` 包拆分成了几个模块化程度更高的库。
+
+Cabal 包需要指明自己构建时依赖的其它包，这些信息帮助 Cabal 的命令行接口在必要的情况下自动下载并构建包的依赖。我们希望，不管用户使用的 GHC 版本是否具备 ``base`` 和其它包的现代布局，我们的代码都能尽量兼容。举个例子，我们的代码要能够在 ``array`` 包存在的时候说明自己依赖它，否则就只能依赖 ``base`` 包。
+
+Cabal 提供了一个通用的配置功能，它允许我们选择性地启用一个 ``.cabal`` 文件的某些部分。构建的配置信息由布尔类型的标识控制，标识为 ``True`` 时使用 ``if flag`` 之后的文本，而标识为 ``False`` 时则使用跟在 ``else`` 之后的文本。
+
+::
+
+	Cabal-Version:      >= 1.2
+
+	Flag split-base
+	  Description: Has the base package been split up?
+	  Default: True
+
+	Flag bytestring-in-base
+	  Description: Is ByteString in the base or bytestring package?
+	  Default: False
+
+* 配置功能在 Cabal 的 1.2 版本中引入，因此指定 Cabal 版本不能低于 1.2。
+* ``split-base`` 标识的含义不言而喻。[Forec 译注：该标识表示 ``base`` 包是否被划分]
+* ``bytestring-in-base`` 标识源于一段更为曲折的历史：``bytestring`` 包在创建之初是和 GHC 6.4 捆绑的，并且它始终独立于 ``base`` 包；在 GHC 6.6 中，它被合并到了 ``base`` 包中；到了 GHC 6.8.1 版本，它又再次被独立出去。
+* 上面这些标识对构建包的开发者来说通常是不可见的，因为 Cabal 会自动处理它们。在我们进行下一步分析前，了解它们能够帮助理解 ``.cabal`` 文件中 ``Library`` 部分开头的内容。
+
+::
+
+	Library
+	  if flag(bytestring-in-base)
+		-- bytestring was in base-2.0 and 2.1.1
+		Build-Depends: base >= 2.0 && < 2.2
+	  else
+		-- in base 1.0 and 3.0, bytestring is a separate package
+		Build-Depends: base < 2.0 || >= 3, bytestring >= 0.9
+
+	  if flag(split-base)
+		Build-Depends: base >= 3.0, array
+	  else
+		Build-Depends: base < 3.0
+
+Cabal 使用标识的默认值来创建包描述（该标识的默认值为 ``True`` ）。如果当前的配置能够构建成功（比如所有需要的包版本都可用）则这个配置将被采用，否则 Cabal 将尝试多种方式组合标识，直到它寻找到一个能够构建成功的配置，又或者所有备选的配置都无法生效为止。
+
+例如，如果我们将 ``split-base`` 和 ``bytestring-in-base`` 设置为 ``True``，Cabal 会选择以下的包依赖项：
+
+::
+
+	Build-Depends: base >= 2.0 && < 2.2
+	Build-Depends: base >= 3.0, array
+	
+``base`` 包的版本无法同时又高于 3.0 又低于 2.2，所以 Cabal 出于一致性考虑会拒绝这个配置。对于现代版本的 GHC，在几次尝试后，它将产生如下配置：
+
+::
+
+	-- in base 1.0 and 3.0, bytestring is a separate package
+	Build-Depends: base < 2.0 || >= 3, bytestring >= 0.9
+	Build-Depends: base >= 3.0, array
+
+在运行 ``runhaskell Setup configure`` 时，我们可以使用 ``--flag`` 选项手动指定各标识的值，虽然实际中很少需要这么做。
+
 
 编译选项和针对 C 的接口
 ^^^^^^^^^^^^^^^^^^^^^^^
 
+下面让我们继续分析 ``.cabal`` 文件，并完成与 Haskell 相关的剩余细节。如果在构建过程中启用分析，我们希望所有的顶级函数都显示在分析的输出中。
+
+::
+
+	GHC-Prof-Options: -auto-all
+	
+``Other-Modules`` 属性列出了库中私有的 Haskell 模块，这些模块对使用此包的代码不可见。
+
+在 GHC 构建这个包时，Cabal 会将 ``GHC-Options`` 属性中的选项传递给编译器。
+
+``-O2`` 选项使 GHC 尽可能地优化我们的代码。不加以优化编译出的代码效率很低，所以在编译生产代码时应当始终使用 ``-O2`` 选项。
+
+为了写出更清晰的代码，我们通常添加 ``-Wall`` 选项，这个选项会启用 GHC 的所有警告。这将导致 GHC 在遇到潜在问题（例如重叠的模式匹配、未使用的函数参数等其它潜在障碍）时提出警告。尽管忽略这些警告一般是安全的，但我们应该尽量完善代码以消除它们。这一点小小的努力，将催生更容易阅读和维护的代码。
+
+普通情况下 GHC 会直接生成汇编语言代码，而在使用 ``-fvia-C`` 编译时，GHC 会生成 C 语言代码并使用系统的 C 编译器来编译它。这会减慢编译速度，但有时 C 编译器能够进一步改善 GHC 优化的代码，所以这也是值得的。
+
+我们这里提到 ``-fiva-C`` 主要是为了展示如何使用它编译。
+
+::
+
+	C-Sources:        cbits/lookup3.c  
+	CC-Options:       -O3
+	Include-Dirs:     cbits
+	Includes:         lookup3.h
+	Install-Includes: lookup3.h
+
+对于 ``C-Sources`` 属性，我们只需要列出必须编译到库中的文件。 ``CC-Options`` 属性包含了提供给 C 编译器的选项（其中选项 ``-O3`` 用于指定最高级别的优化）。因为对 Jenkins 散列函数的 FFI 绑定引用了 ``lookup3.h`` 头文件，我们需要告诉 Cabal 在哪里可以找到该头文件。``Install-Includes`` 用来告诉 Cabal 安装这个头文件，否则在构建时客户端代码将无法找到头文件。
+
+..info::
+
+	``-fvia-C`` 在 FFI 中的价值
+
+	在编写 FFI 绑定时，``-fvia-C`` 编译选项能够提升安全性。如果在 FFI 声明中提到头文件（如外部导入 ``string.h memcpy``），那么 C 编译器会对生成的 Haskell 代码做类型检查，以确保其 C 函数的调用和头文件中的函数原型一致。
+	
+	如果不使用 ``-fvia-C`` ，我们将失去一层额外的安全保障：C 类型错误很容易混入我们的 Haskell 代码中。举个例子，在多数 64 位机器上，``CInt`` 是 32 位宽，而 ``CSize`` 是 64 位宽。如果我们不小心弄混了用来描述 FFI 绑定参数的类型，那么数据可能会损毁。
+
+[Forec 译注：遗憾的是，在较新版本的 GHC 中 ``-fvia-C`` 不会产生任何作用，并且它将在未来的 GHC 发布中被移除。所以本节关于 ``-fvia-C`` 选项的介绍已经成为历史了。]
+
 用 QuickCheck 测试
 ------------------
+
+在进一步考虑性能之前，我们要确保布隆过滤器的正确性。使用 QuickCheck 可以轻松测试一些基本的属性。
+
+::
+
+	-- file: examples/BloomCheck.hs
+	{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+	module Main where
+
+	import BloomFilter.Hash (Hashable)
+	import Data.Word (Word8, Word32)
+	import System.Random (Random(..), RandomGen)
+	import Test.QuickCheck
+	import qualified BloomFilter.Easy as B
+	import qualified Data.ByteString as Strict
+	import qualified Data.ByteString.Lazy as Lazy
+
+普通的 ``quickCheck`` 函数对布隆过滤器属性的测试帮助不大，因为它产生的 100 个测试输入样例无法完整覆盖布隆过滤器的功能。这里我们编写自己的测试函数：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	handyCheck :: Testable a => Int -> a -> IO ()
+	handyCheck limit = check defaultConfig {
+						 configMaxTest = limit
+					   , configEvery   = \_ _ -> ""
+					   }
+	
+[Forec 译注：在较新版本的 QuickCheck 中，上面的代码应该写成：
+
+::
+	
+	handyCheck :: Testable a => Int -> a -> IO ()
+	handyCheck limit = quickCheckWith (stdArgs { maxSuccess = limit )
+
+]
+
+下面我们要完成的第一个任务是确保：无论用户选择多大的容错率，只要向布隆过滤器添加了一个任意值，则之后针对该值的成员测试都应得到 “值已存在” 的结果。
+
+我们将使用 ``easyList`` 函数来创建一个布隆过滤器。 ``Double`` 的 ``Random`` 实例能够生成 0 到 1 之间的随机数，因此 QuickCheck 可以提供任意大小的错误率。
+
+然而，测试生成的错误率应当排除 0 和 1。QuickCheck 提供了两种方法：
+
+* 通过结构：指定要生成的有效值的范围。QuickCheck 为此提供了 ``forAll`` 组合器。
+* 通过过滤：当 QuickCheck 生成一个任意值时，用 ``(=~>)`` 运算符过滤掉不符合标准的值。如果布隆过滤器通过这种方式拒绝一个输入值，测试将显示成功。
+
+如果以上两个方法都可以选择，那么最好采用通过结构的方法：假设 QuickCheck 生成了 1000 个任意值，其中 800 个由于某些原因被过滤掉。看起来我们似乎运行了 1000 次测试，但实际上只有 200 次做了有意义的事。
+
+出于这个原因，当需要产生错误率时，我们不会去消除 QuickCheck 提供的 0 或 1，而是在一个始终有效的区间中构造值：
+
+::
+
+	falsePositive :: Gen Double
+	falsePositive = choose (epsilon, 1 - epsilon)
+		where epsilon = 1e-6
+
+	(=~>) :: Either a b -> (b -> Bool) -> Bool
+	k =~> f = either (const True) f k
+
+	prop_one_present _ elt =
+		forAll falsePositive $ \errRate ->
+		  B.easyList errRate [elt] =~> \filt ->
+			elt `B.elem` filt
+
+[Forec 译注：原著作者似乎在这里犯了一点错误，根据代码， ``prop_one_present`` 的型别声明应为 ``(Hashable a) => t -> a -> Property`` ，但这无法通过编译，因为 ``prop_one_present`` 的第一个参数 ``_`` 隐藏着对类型 ``t`` 和 ``a`` 的约束，它们二者必须相等。有两种解决方法：一是不指定这个多余的 ``_`` 参数，二是将型别声明显式地指定为 ``(Hashable a) => a -> a -> Property`` 。]
+
+组合器 ``(=~>)`` 过滤了 ``easyList`` 失败的情况：如果失败了，测试会自动通过。
 
 多态测试
 ^^^^^^^^
 
+[Forec 译注：以下几节，原著作者给出的代码信息不全，在 ``GHCI`` 中均无法加载。]
+
+QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型需要测试，我们有必要设计一个方法，避免对每种类型都编写同样的测试。
+
+注意， ``prop_one_present`` 这个函数是多态的，但它忽略了第一个参数。我们可以借助这一点模拟单型性质：
+
+::
+
+	ghci> :load BloomCheck
+	BloomCheck.hs:9:17:
+		Could not find module `BloomFilter.Easy':
+		  Use -v to see a list of the files searched for.
+	Failed, modules loaded: none.
+	ghci> :t prop_one_present
+	<interactive>:1:0: Not in scope: `prop_one_present'
+	ghci> :t prop_one_present (undefined :: Int)   
+	<interactive>:1:0: Not in scope: `prop_one_present'
+
+任何值都可以作为 ``prop_one_present`` 的第一个参数。第二个参数中第一个元素的类型需要和第一个参数保持一致。
+
+::
+
+	ghci> handyCheck 5000 $ prop_one_present (undefined :: Int)
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:18: Not in scope: `prop_one_present'
+	ghci> handyCheck 5000 $ prop_one_present (undefined :: Double)
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:18: Not in scope: `prop_one_present'
+
+在向布隆过滤器添加多个元素之后，这些元素应该都能够被识别出来：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	prop_all_present _ xs =
+		forAll falsePositive $ \errRate ->
+		  B.easyList errRate xs =~> \filt ->
+			all (`B.elem` filt) xs
+
+测试依然成功：
+
+::
+
+	ghci> handyCheck 2000 $ prop_all_present (undefined :: Int)
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:18: Not in scope: `prop_all_present
+
 为 ByteString 编写任意实例
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+QuickCheck 库没有为 ``ByteString`` 类型提供 ``Arbitary`` 的实例，因此我们必须自己编写。 ``pack`` 函数可基于 ``[Word8]`` 创建一个 ``ByteString`` 。
+
+::
+
+	-- file: examples/BloomCheck.hs
+	instance Arbitrary Lazy.ByteString where
+		arbitrary = Lazy.pack `fmap` arbitrary
+		coarbitrary = coarbitrary . Lazy.unpack
+
+	instance Arbitrary Strict.ByteString where
+		arbitrary = Strict.pack `fmap` arbitrary
+		coarbitrary = coarbitrary . Strict.unpack
+
+QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类型的 ``Arbitary`` 实例。我们至少需要为 ``Word8`` 实现 ``Arbitary`` 实例：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	instance Random Word8 where
+	  randomR = integralRandomR
+	  random = randomR (minBound, maxBound)
+
+	instance Arbitrary Word8 where
+		arbitrary = choose (minBound, maxBound)
+		coarbitrary = integralCoarbitrary
+		
+为这些实例编写几个通用函数，以便在之后为其他整型类型编写实例时重用它们：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	integralCoarbitrary n =
+		variant $ if m >= 0 then 2*m else 2*(-m) + 1
+	  where m = fromIntegral n
+
+	integralRandomR (a,b) g = case randomR (c,d) g of
+								(x,h) -> (fromIntegral x, h)
+		where (c,d) = (fromIntegral a :: Integer,
+					   fromIntegral b :: Integer)
+
+	instance Random Word32 where
+	  randomR = integralRandomR
+	  random = randomR (minBound, maxBound)
+
+	instance Arbitrary Word32 where
+		arbitrary = choose (minBound, maxBound)
+		coarbitrary = integralCoarbitrary
+
+
+创建了这些 ``Arbitary`` 实例后，我们就可以在 ``ByteString`` 类型上尝试现有的属性：
+
+::
+
+	ghci> handyCheck 1000 $ prop_one_present (undefined :: Lazy.ByteString)
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:18: Not in scope: `prop_one_present'
+	<interactive>:1:49:
+		Failed to load interface for `Lazy':
+		  Use -v to see a list of the files searched for.
+	ghci> handyCheck 1000 $ prop_all_present (undefined :: Strict.ByteString)
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:18: Not in scope: `prop_all_present'
+	<interactive>:1:49:
+		Failed to load interface for `Strict':
+		  Use -v to see a list of the files searched for.
 
 推荐大小是正确的吗？
 ^^^^^^^^^^^^^^^^^^^
+
+随着待运行测试数量的增加，用于测试 ``easyList`` 性能的开销也在快速增长。我们希望输入数据规模对 ``easyList`` 的性能没有影响。直接测试是不现实的，所以这里使用另一个问题来衡量：面对极端的输入规模时， ``suggestSizing`` 是否仍能给出敏感的数组大小以及哈希值？
+
+检查这一特性略微有些棘手：我们需要同时改变期望的错误率和预期容量。根据 ``sizings`` 函数给出的结果，这些值之间的关系较难预测。
+
+我们可以尝试忽略复杂性：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	prop_suggest_try1 =
+	  forAll falsePositive $ \errRate ->
+		forAll (choose (1,maxBound :: Word32)) $ \cap ->
+		  case B.suggestSizing (fromIntegral cap) errRate of
+			Left err -> False
+			Right (bits,hashes) -> bits > 0 && bits < maxBound && hashes > 0
+
+正如我们所料，这一做法只会带来一个没有实际作用的测试：
+
+::
+
+	ghci> handyCheck 1000 $ prop_suggest_try1
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:18: Not in scope: `prop_suggest_try1'
+	ghci> handyCheck 1000 $ prop_suggest_try1
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:18: Not in scope: `prop_suggest_try1'
+			
+将 QuickCheck 打印的反例交给 ``suggestSizing`` 时，我们发现这些输入被拒绝了，因为它们会导致一个过于庞大的位数组。
+
+::
+
+	ghci> B.suggestSizing 1678125842 8.501133057303545e-3
+	<interactive>:1:0:
+		Failed to load interface for `B':
+		  Use -v to see a list of the files searched for.
+
+由于无法预测哪些组合会导致此问题，我们只能通过限制大小和错误率来防止异常：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	prop_suggest_try2 =
+		forAll falsePositive $ \errRate ->
+		  forAll (choose (1,fromIntegral maxWord32)) $ \cap ->
+			let bestSize = fst . minimum $ B.sizings cap errRate
+			in bestSize < fromIntegral maxWord32 ==>
+			   either (const False) sane $ B.suggestSizing cap errRate
+	  where sane (bits,hashes) = bits > 0 && bits < maxBound && hashes > 0
+			maxWord32 = maxBound :: Word32
+
+对其加以测试，看起来效果不错：
+
+::
+
+	ghci> handyCheck 1000 $ prop_suggest_try2
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:18: Not in scope: `prop_suggest_try2'
+
+在过大的测试中，许多组合都被过滤掉了：
+
+::
+
+	ghci> handyCheck 10000 $ prop_suggest_try2
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:19: Not in scope: `prop_suggest_try2'
+
+为了解决此问题，我们要尝试降低生成无效输入的可能性：
+
+::
+
+	-- file: examples/BloomCheck.hs
+	prop_suggestions_sane =
+		forAll falsePositive $ \errRate ->
+		  forAll (choose (1,fromIntegral maxWord32 `div` 8)) $ \cap ->
+			let size = fst . minimum $ B.sizings cap errRate
+			in size < fromIntegral maxWord32 ==>
+			   either (const False) sane $ B.suggestSizing cap errRate
+	  where sane (bits,hashes) = bits > 0 && bits < maxBound && hashes > 0
+			maxWord32 = maxBound :: Word32
+
+最终，我们得到了更加健壮的性能：
+
+::
+
+	ghci> handyCheck 40000 $ prop_suggestions_sane
+	<interactive>:1:0: Not in scope: `handyCheck'
+	<interactive>:1:19: Not in scope: `prop_suggestions_sane'
 
 性能分析和调优
 --------------
