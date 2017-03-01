@@ -852,7 +852,7 @@ Cabal 使用标识的默认值来创建包描述（该标识的默认值为 ``Tr
 多态测试
 ^^^^^^^^
 
-[Forec 译注：以下几节，原著作者给出的代码信息不全，在 ``GHCI`` 中均无法加载。]
+[Forec 译注：以下几节，原著作者给出的代码在新版本 GHC 中无法通过编译，如需在 GHC 中运行，请按照译注中的说明修改对应文件。译文仅对代码和部分运行结果进行一定修正。]
 
 QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型需要测试，我们有必要设计一个方法，避免对每种类型都编写同样的测试。
 
@@ -869,6 +869,15 @@ QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型
 	<interactive>:1:0: Not in scope: `prop_one_present'
 	ghci> :t prop_one_present (undefined :: Int)   
 	<interactive>:1:0: Not in scope: `prop_one_present'
+	
+[Forec 译注：原著给出的代码无法正确运行，要想正确运行需要对 ``BloomCheck.hs`` 做如下修改：
+
+* 按上面译注里所述，将 ``handyCheck limit`` 部分修改；
+* 移除 ``Random Word8`` 、 ``Arbitary Word8`` 、 ``Random Word32`` 以及 ``Arbitary Word32`` 的实例；
+* 删除 ``Arbitary`` 的 ``Lazy.ByteString`` 实例中 ``coarbitrary`` 所属行；
+* 删除 ``Arbitary`` 的 ``Strict.ByteString`` 实例中 ``coarbitrary`` 所属行；
+
+]
 
 任何值都可以作为 ``prop_one_present`` 的第一个参数。第二个参数中第一个元素的类型需要和第一个参数保持一致。
 
@@ -881,6 +890,31 @@ QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型
 	<interactive>:1:0: Not in scope: `handyCheck'
 	<interactive>:1:18: Not in scope: `prop_one_present'
 
+[Forec 译注：请留意本节译注中对 ``prop_one_present`` 的修正，我们需要显式声明 ``prop_one_present`` 的类型，或者移除 ``prop_one_present`` 的 ``_`` 参数。
+这里采取第二种方法，定义函数 ``prop_one_present'`` ，它与 ``prop_one_present`` 的唯一区别在于它没有匿名参数：
+
+::
+	
+	prop_one_present' elt =
+		forAll falsePositive $ \errRate ->
+		B.easyList errRate [elt] =~> \filt ->
+		elt `B.elem` filt
+
+载入修改后的文件，并显式指定 ``prop_one_present'`` 的型别：
+
+::
+
+	ghci> handyCheck 2 $ (prop_one_present' :: String -> Property)
+	Passed: 
+	""
+	7.053216229843191e-2
+	Passed: 
+	"\n9UP'\161O%~S"
+	0.5021342445896073
+
+本节剩余部分在 GHCI 中执行 ``handyCheck`` 指令均需做类似的修正。下面的译文不再对原著的运行结果予以更正。
+]
+	
 在向布隆过滤器添加多个元素之后，这些元素应该都能够被识别出来：
 
 ::
@@ -915,6 +949,19 @@ QuickCheck 库没有为 ``ByteString`` 类型提供 ``Arbitary`` 的实例，因
 		arbitrary = Strict.pack `fmap` arbitrary
 		coarbitrary = coarbitrary . Strict.unpack
 
+[Forec 译注：原著编写时的 ``Arbitary`` 类型类到今天已经发生了变化， ``coarbitrary`` 函数现在属于 ``CoArbitrary`` 类型类。上面的代码需要修正为：
+
+::
+
+	instance Arbitrary Lazy.ByteString where
+	arbitrary = Lazy.pack `fmap` arbitrary
+
+	instance CoArbitrary Lazy.ByteString where
+	coarbitrary = coarbitrary . Lazy.unpack
+
+``Strict.ByteString`` 也要做同样的修改。
+]
+
 QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类型的 ``Arbitary`` 实例。我们至少需要为 ``Word8`` 实现 ``Arbitary`` 实例：
 
 ::
@@ -927,6 +974,8 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 	instance Arbitrary Word8 where
 		arbitrary = choose (minBound, maxBound)
 		coarbitrary = integralCoarbitrary
+		
+[Forec 译注： ``Word8`` 的实例不需要定义。当前的 ``QuickCheck`` 库已经默认实现了这些实例。]
 		
 为这些实例编写几个通用函数，以便在之后为其他整型类型编写实例时重用它们：
 
@@ -949,7 +998,8 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 	instance Arbitrary Word32 where
 		arbitrary = choose (minBound, maxBound)
 		coarbitrary = integralCoarbitrary
-
+		
+[Forec 译注：上面这部分代码也是不需要的，``QuickCheck`` 库已经实现了它们。]
 
 创建了这些 ``Arbitary`` 实例后，我们就可以在 ``ByteString`` 类型上尝试现有的属性：
 
@@ -997,7 +1047,24 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 	ghci> handyCheck 1000 $ prop_suggest_try1
 	<interactive>:1:0: Not in scope: `handyCheck'
 	<interactive>:1:18: Not in scope: `prop_suggest_try1'
-			
+
+[Forec 译注：一个仅供参考的运行结果如下：
+
+::
+
+	ghci> handyCheck 1000 $ prop_suggest_try1
+	Passed: 
+	0.840272094122386
+	1533634864
+	Failed: 
+	0.13172750223946617
+	3002287708
+	*** Failed! Falsifiable (after 2 tests): 
+	0.13172750223946617
+	3002287708
+
+]
+	
 将 QuickCheck 打印的反例交给 ``suggestSizing`` 时，我们发现这些输入被拒绝了，因为它们会导致一个过于庞大的位数组。
 
 ::
@@ -1006,6 +1073,15 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 	<interactive>:1:0:
 		Failed to load interface for `B':
 		  Use -v to see a list of the files searched for.
+		  
+[Forec 译注：运行结果如下：
+
+::
+
+	ghci> B.suggestSizing 1678125842 8.501133057303545e-3
+	Left "capacity too large"
+	
+]
 
 由于无法预测哪些组合会导致此问题，我们只能通过限制大小和错误率来防止异常：
 
@@ -1028,6 +1104,15 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 	ghci> handyCheck 1000 $ prop_suggest_try2
 	<interactive>:1:0: Not in scope: `handyCheck'
 	<interactive>:1:18: Not in scope: `prop_suggest_try2'
+
+[Forec 译注：预期的运行结果为：
+
+::
+
+	ghci> handyCheck 1000 $ prop_suggest_try2	
+	+++ OK, passed 1000 tests.
+
+]
 
 在过大的测试中，许多组合都被过滤掉了：
 
@@ -1061,6 +1146,103 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 
 性能分析和调优
 --------------
+
+通过 ``QuickCheck`` 测试是一条表明代码正确的 “基准线”。当我们开始调整性能时，可以随时重新运行测试来防止无意中导致的破坏。
+
+第一步，编写一个用于计时的小程序：
+
+::
+
+	-- file: examples/WordTest.hs
+	module Main where
+
+	import Control.Parallel.Strategies (NFData(..))
+	import Control.Monad (forM_, mapM_)
+	import qualified BloomFilter.Easy as B
+	import qualified Data.ByteString.Char8 as BS
+	import Data.Time.Clock (diffUTCTime, getCurrentTime)
+	import System.Environment (getArgs)
+	import System.Exit (exitFailure)
+
+	timed :: (NFData a) => String -> IO a -> IO a
+	timed desc act = do
+		start <- getCurrentTime
+		ret <- act
+		end <- rnf ret `seq` getCurrentTime
+		putStrLn $ show (diffUTCTime end start) ++ " to " ++ desc
+		return ret
+
+	instance NFData BS.ByteString where
+		rnf _ = ()
+
+	instance NFData (B.Bloom a) where
+		rnf filt = B.length filt `seq` ()
+
+[Forec 译注：编译过时的代码总是不尽人意，需要做如下修改：
+
+* ``NFData`` 已经被移动到 ``Control.DeepSeq`` ，因此需将首行的 ``import`` 修改为 ``import Control.DeepSeq (NFData(..))`` ；
+* 将 ``rnf`` 替换为 ``rdeepsep`` ，具体原因可参考 http://hackage.haskell.org/package/parallel-2.2.0.1/docs/Control-Parallel-Strategies.html ；
+* 在 ``GHC 7.6`` 之后，所有的 ``ByteString`` 均已成为 ``NFData`` 的实例，所以上面针对 ``BS.ByteString`` 的实例定义需要被移除。
+
+]
+
+上面的小程序中，我们使用了 24 章中 “将求值从算法中分离” 一节介绍的 ``rnf`` 函数来实现简单的时间约束。输出用时这一动作能够确保计算完成，从而准确地评估运算成本。
+
+主程序根据指定文件创建一个布隆过滤器：它将文件中每一行视为一个要添加到布隆过滤器中的元素。
+
+::
+
+	-- file: examples/WordTest.hs
+	main = do
+	  args <- getArgs
+	  let files | null args = ["/usr/share/dict/words"]
+				| otherwise = args
+	  forM_ files $ \file -> do
+
+		words <- timed "read words" $
+		  BS.lines `fmap` BS.readFile file
+
+		let len = length words
+			errRate = 0.01
+
+		putStrLn $ show len ++ " words"
+		putStrLn $ "suggested sizings: " ++
+				   show (B.suggestSizing (fromIntegral len) errRate)
+
+		filt <- timed "construct filter" $
+		  case B.easyList errRate words of
+			Left errmsg -> do
+			  putStrLn $ "Error: " ++ errmsg
+			  exitFailure
+			Right filt -> return filt
+
+		timed "query every element" $
+		  mapM_ print $ filter (not . (`B.elem` filt)) words
+		  
+[Forec 译注：显然原著给出的程序需要在 Linux 环境下运行，并且在 ``/usr/share/dict`` 路径下存在 ``words`` 文件用于提供输入数据。]
+
+``timed`` 函数用来计算三个不同阶段的成本；读取并按行分割数据、 填充布隆过滤器和查询其中的每个元素。
+
+如果将上述程序编译运行几次，就可以发现执行时间足够长，但多次运行之间的时长差距很小。至此，我们创建了一个看似可信的微基准测试：
+
+::
+
+	$ ghc -O2  --make WordTest
+	[1 of 1] Compiling Main             ( WordTest.hs, WordTest.o )
+	Linking WordTest ...
+	$ ./WordTest
+	0.196347s to read words
+	479829 words
+	1.063537s to construct filter
+	4602978 bits
+	0.766899s to query every element
+	$ ./WordTest
+	0.179284s to read words
+	479829 words
+	1.069363s to construct filter
+	4602978 bits
+	0.780079s to query every element
+
 
 配置驱动的性能调优
 ^^^^^^^^^^^^^^^^^^
