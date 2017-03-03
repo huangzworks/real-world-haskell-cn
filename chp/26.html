@@ -115,7 +115,7 @@
 <h2>ST monad<a class="headerlink" href="#st-monad" title="Permalink to this headline">¶</a></h2>
 <p>正如前面的 <a class="reference internal" href="12.html#modifying-array-elements"><span>修改数组元素</span></a> 部分所说，因为修改一个不可变数组需要对整个数组进行复制，所以这种修改的代价是非常高的。即使使用 <code class="docutils literal"><span class="pre">UArray</span></code> ，这一问题仍然会存在。那么我们如何才能将复制不可变数组的代价降低至我们可以承受的水平呢？</p>
 <p>在指令式语言中，我们可以简单地原地修改数组元素，并且在 Haskell 里面也可以这样做。</p>
-<p>Haskell 提供了一个特殊的 Monad，叫做 <code class="docutils literal"><span class="pre">ST</span></code> <a class="footnote-reference" href="#id22" id="id6">[59]</a> <em>（State Transformer）</em> 。 <code class="docutils literal"><span class="pre">ST</span></code> 允许我们安全地工作在可变状态下。与 <code class="docutils literal"><span class="pre">State</span></code> Monad 相比，它有一些强大的额外的功能。</p>
+<p>Haskell 提供了一个特殊的 Monad，叫做 <code class="docutils literal"><span class="pre">ST</span></code> <a class="footnote-reference" href="#id22" id="id6">[58]</a> <em>（State Transformer）</em> 。 <code class="docutils literal"><span class="pre">ST</span></code> 允许我们安全地工作在可变状态下。与 <code class="docutils literal"><span class="pre">State</span></code> Monad 相比，<code class="docutils literal"><span class="pre">ST</span></code> Monad 有一些额外的强大功能。</p>
 <ul class="simple">
 <li>解冻一个不可变数组并得到一个可变数组，接着原地对可变数组进行修改，然后在修改完成之后冻结出一个新的不可变数组。</li>
 <li>通过 <em>可变引用（mutable references）</em> 可以构建出一种数据结构，这种数据结构允许用户像命令式语言一样随时对其进行修改。对于那些尚未找到高效纯函数替代的命令式数据结构和算法来说，这个功能尤为重要。</li>
@@ -283,7 +283,7 @@
 <div class="section" id="id11">
 <h3>哈希值<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
 <p>一个布隆过滤器的性能取决于快速、高质量的哈希函数，然而编写一个兼具这两种属性的哈希函数非常困难。</p>
-<p>幸运的是，一个名为 Bob Jenkins 的开发人员编写了一些具有这些属性的哈希函数，并公开了代码（网址为 <a class="reference external" href="http://burtleburtle.net/bob/hash/doobs.html">http://burtleburtle.net/bob/hash/doobs.html</a> <a class="footnote-reference" href="#id22" id="id12">[59]</a>）。这些哈希函数使用 C 语言编写，可以通过 FFI 创建它们的绑定。在该网站上，我们需要的特定源文件名为 <code class="docutils literal"><span class="pre">lookup3.c</span></code> ，在本地创建一个 <code class="docutils literal"><span class="pre">cbits</span></code> 目录并将这个文件下载到该目录。</p>
+<p>幸运的是，一个名为 Bob Jenkins 的开发人员编写了一些具有这些属性的哈希函数，并公开了代码（网址为 <a class="reference external" href="http://burtleburtle.net/bob/hash/doobs.html">http://burtleburtle.net/bob/hash/doobs.html</a> <a class="footnote-reference" href="#id23" id="id12">[59]</a>）。这些哈希函数使用 C 语言编写，可以通过 FFI 创建它们的绑定。在该网站上，我们需要的特定源文件名为 <code class="docutils literal"><span class="pre">lookup3.c</span></code> ，在本地创建一个 <code class="docutils literal"><span class="pre">cbits</span></code> 目录并将这个文件下载到该目录。</p>
 <p>还剩下最后一个难题没有解决：我们可能经常需要七个、十个，甚至更多个散列函数，但又不想把这些不同功能的哈希函数混杂到一起。幸运的是，在实际应用中我们多数情况下只需要两个哈希函数，下面很快就会讲到如何实现。Jenkins 的散列库包含两个函数 <code class="docutils literal"><span class="pre">hashword2</span></code> 和 <code class="docutils literal"><span class="pre">hashlittle2</span></code> ，它们计算两个哈希值。这里有一个 C 语言的头文件，它描述了这两个函数的 API，我们将它保存为 <code class="docutils literal"><span class="pre">cbits/lookup3.h</span></code> 。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="o">/*</span> <span class="n">save</span> <span class="n">this</span> <span class="n">file</span> <span class="n">as</span> <span class="n">lookup3</span><span class="o">.</span><span class="n">h</span> <span class="o">*/</span>
 
@@ -405,7 +405,7 @@
         <span class="n">hashSalt</span> <span class="n">salt</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">unsafePerformIO</span> <span class="o">$</span> <span class="n">hashList</span> <span class="n">salt</span> <span class="n">xs</span>
 </pre></div>
 </div>
-<p>编译器会接受这个实例，因而我们能够对多种列表类型计算哈希值 <a class="footnote-reference" href="#id23" id="id13">[60]</a> 。最重要的是，由于 <code class="docutils literal"><span class="pre">Char</span></code> 是 <code class="docutils literal"><span class="pre">Storable</span></code> 的一个实例，所以 <code class="docutils literal"><span class="pre">String</span></code> 类型的哈希值同样可以被计算。</p>
+<p>编译器会接受这个实例，因而我们能够对多种列表类型计算哈希值 <a class="footnote-reference" href="#id24" id="id13">[60]</a> 。最重要的是，由于 <code class="docutils literal"><span class="pre">Char</span></code> 是 <code class="docutils literal"><span class="pre">Storable</span></code> 的一个实例，所以 <code class="docutils literal"><span class="pre">String</span></code> 类型的哈希值同样可以被计算。</p>
 <p>利用函数组合可以计算元组的哈希值：在组合管道的一端取盐，并将元组中每个元素的散列结果作为计算该元组中下一个元素使用的盐值。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: BloomFilter/Hash.hs</span>
 <span class="nf">hash2</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Hashable</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Word64</span> <span class="ow">-&gt;</span> <span class="kt">Word64</span>
@@ -723,7 +723,7 @@ ghci&gt; mapM_ (print . kbytes) . take 10 . sort $ sizings 10000000 0.001
 <p>组合器 <code class="docutils literal"><span class="pre">(=~&gt;)</span></code> 过滤了 <code class="docutils literal"><span class="pre">easyList</span></code> 失败的情况：如果失败了，测试会自动通过。</p>
 <div class="section" id="id17">
 <h3>多态测试<a class="headerlink" href="#id17" title="Permalink to this headline">¶</a></h3>
-<p>[Forec 译注：以下几节，原著作者给出的代码信息不全，在 <code class="docutils literal"><span class="pre">GHCI</span></code> 中均无法加载。]</p>
+<p>[Forec 译注：以下几节，原著作者给出的代码在新版本 GHC 中无法通过编译，如需在 GHC 中运行，请按照译注中的说明修改对应文件。译文仅对代码和部分运行结果进行一定修正。]</p>
 <p>QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型需要测试，我们有必要设计一个方法，避免对每种类型都编写同样的测试。</p>
 <p>注意， <code class="docutils literal"><span class="pre">prop_one_present</span></code> 这个函数是多态的，但它忽略了第一个参数。我们可以借助这一点模拟单型性质：</p>
 <div class="highlight-haskell"><div class="highlight"><pre>ghci&gt; :load BloomCheck
@@ -737,6 +737,14 @@ ghci&gt; :t prop_one_present (undefined :: Int)
 &lt;interactive&gt;:1:0: Not in scope: `prop_one_present&#39;
 </pre></div>
 </div>
+<p>[Forec 译注：原著给出的代码无法正确运行，要想正确运行需要对 <code class="docutils literal"><span class="pre">BloomCheck.hs</span></code> 做如下修改：</p>
+<ul class="simple">
+<li>按上面译注里所述，将 <code class="docutils literal"><span class="pre">handyCheck</span> <span class="pre">limit</span></code> 部分修改；</li>
+<li>移除 <code class="docutils literal"><span class="pre">Random</span> <span class="pre">Word8</span></code> 、 <code class="docutils literal"><span class="pre">Arbitary</span> <span class="pre">Word8</span></code> 、 <code class="docutils literal"><span class="pre">Random</span> <span class="pre">Word32</span></code> 以及 <code class="docutils literal"><span class="pre">Arbitary</span> <span class="pre">Word32</span></code> 的实例；</li>
+<li>删除 <code class="docutils literal"><span class="pre">Arbitary</span></code> 的 <code class="docutils literal"><span class="pre">Lazy.ByteString</span></code> 实例中 <code class="docutils literal"><span class="pre">coarbitrary</span></code> 所属行；</li>
+<li>删除 <code class="docutils literal"><span class="pre">Arbitary</span></code> 的 <code class="docutils literal"><span class="pre">Strict.ByteString</span></code> 实例中 <code class="docutils literal"><span class="pre">coarbitrary</span></code> 所属行；</li>
+</ul>
+<p>]</p>
 <p>任何值都可以作为 <code class="docutils literal"><span class="pre">prop_one_present</span></code> 的第一个参数。第二个参数中第一个元素的类型需要和第一个参数保持一致。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">5000</span> <span class="o">$</span> <span class="n">prop_one_present</span> <span class="p">(</span><span class="n">undefined</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">)</span>
 <span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">handyCheck&#39;</span>
@@ -746,6 +754,26 @@ ghci&gt; :t prop_one_present (undefined :: Int)
 <span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">18</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">prop_one_present&#39;</span>
 </pre></div>
 </div>
+<p>[Forec 译注：请留意本节译注中对 <code class="docutils literal"><span class="pre">prop_one_present</span></code> 的修正，我们需要显式声明 <code class="docutils literal"><span class="pre">prop_one_present</span></code> 的类型，或者移除 <code class="docutils literal"><span class="pre">prop_one_present</span></code> 的 <code class="docutils literal"><span class="pre">_</span></code> 参数。
+这里采取第二种方法，定义函数 <code class="docutils literal"><span class="pre">prop_one_present'</span></code> ，它与 <code class="docutils literal"><span class="pre">prop_one_present</span></code> 的唯一区别在于它没有匿名参数：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">prop_one_present&#39;</span> <span class="n">elt</span> <span class="ow">=</span>
+        <span class="n">forAll</span> <span class="n">falsePositive</span> <span class="o">$</span> <span class="nf">\</span><span class="n">errRate</span> <span class="ow">-&gt;</span>
+        <span class="kt">B</span><span class="o">.</span><span class="n">easyList</span> <span class="n">errRate</span> <span class="p">[</span><span class="n">elt</span><span class="p">]</span> <span class="o">=~&gt;</span> <span class="nf">\</span><span class="n">filt</span> <span class="ow">-&gt;</span>
+        <span class="n">elt</span> <span class="p">`</span><span class="kt">B</span><span class="o">.</span><span class="n">elem</span><span class="p">`</span> <span class="n">filt</span>
+</pre></div>
+</div>
+<p>载入修改后的文件，并显式指定 <code class="docutils literal"><span class="pre">prop_one_present'</span></code> 的型别：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">2</span> <span class="o">$</span> <span class="p">(</span><span class="n">prop_one_present&#39;</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Property</span><span class="p">)</span>
+<span class="kt">Passed:</span>
+<span class="s">&quot;&quot;</span>
+<span class="mf">7.053216229843191e-2</span>
+<span class="kt">Passed:</span>
+<span class="s">&quot;</span><span class="se">\n</span><span class="s">9UP&#39;</span><span class="se">\161</span><span class="s">O%~S&quot;</span>
+<span class="mf">0.5021342445896073</span>
+</pre></div>
+</div>
+<p>本节剩余部分在 GHCI 中执行 <code class="docutils literal"><span class="pre">handyCheck</span></code> 指令均需做类似的修正。下面的译文不再对原著的运行结果予以更正。
+]</p>
 <p>在向布隆过滤器添加多个元素之后，这些元素应该都能够被识别出来：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/BloomCheck.hs</span>
 <span class="nf">prop_all_present</span> <span class="kr">_</span> <span class="n">xs</span> <span class="ow">=</span>
@@ -774,6 +802,16 @@ ghci&gt; :t prop_one_present (undefined :: Int)
         <span class="n">coarbitrary</span> <span class="ow">=</span> <span class="n">coarbitrary</span> <span class="o">.</span> <span class="kt">Strict</span><span class="o">.</span><span class="n">unpack</span>
 </pre></div>
 </div>
+<p>[Forec 译注：原著编写时的 <code class="docutils literal"><span class="pre">Arbitary</span></code> 类型类到今天已经发生了变化， <code class="docutils literal"><span class="pre">coarbitrary</span></code> 函数现在属于 <code class="docutils literal"><span class="pre">CoArbitrary</span></code> 类型类。上面的代码需要修正为：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kr">instance</span> <span class="kt">Arbitrary</span> <span class="kt">Lazy</span><span class="o">.</span><span class="kt">ByteString</span> <span class="kr">where</span>
+<span class="nf">arbitrary</span> <span class="ow">=</span> <span class="kt">Lazy</span><span class="o">.</span><span class="n">pack</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="n">arbitrary</span>
+
+<span class="kr">instance</span> <span class="kt">CoArbitrary</span> <span class="kt">Lazy</span><span class="o">.</span><span class="kt">ByteString</span> <span class="kr">where</span>
+<span class="nf">coarbitrary</span> <span class="ow">=</span> <span class="n">coarbitrary</span> <span class="o">.</span> <span class="kt">Lazy</span><span class="o">.</span><span class="n">unpack</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">Strict.ByteString</span></code> 也要做同样的修改。
+]</p>
 <p>QuickCheck 中还缺少针对 <code class="docutils literal"><span class="pre">Data.Word</span></code> 和 <code class="docutils literal"><span class="pre">Data.Int</span></code> 中固定宽度类型的 <code class="docutils literal"><span class="pre">Arbitary</span></code> 实例。我们至少需要为 <code class="docutils literal"><span class="pre">Word8</span></code> 实现 <code class="docutils literal"><span class="pre">Arbitary</span></code> 实例：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/BloomCheck.hs</span>
 <span class="kr">instance</span> <span class="kt">Random</span> <span class="kt">Word8</span> <span class="kr">where</span>
@@ -785,6 +823,7 @@ ghci&gt; :t prop_one_present (undefined :: Int)
         <span class="n">coarbitrary</span> <span class="ow">=</span> <span class="n">integralCoarbitrary</span>
 </pre></div>
 </div>
+<p>[Forec 译注： <code class="docutils literal"><span class="pre">Word8</span></code> 的实例不需要定义。当前的 <code class="docutils literal"><span class="pre">QuickCheck</span></code> 库已经默认实现了这些实例。]</p>
 <p>为这些实例编写几个通用函数，以便在之后为其他整型类型编写实例时重用它们：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/BloomCheck.hs</span>
 <span class="nf">integralCoarbitrary</span> <span class="n">n</span> <span class="ow">=</span>
@@ -805,6 +844,7 @@ ghci&gt; :t prop_one_present (undefined :: Int)
         <span class="n">coarbitrary</span> <span class="ow">=</span> <span class="n">integralCoarbitrary</span>
 </pre></div>
 </div>
+<p>[Forec 译注：上面这部分代码也是不需要的，<code class="docutils literal"><span class="pre">QuickCheck</span></code> 库已经实现了它们。]</p>
 <p>创建了这些 <code class="docutils literal"><span class="pre">Arbitary</span></code> 实例后，我们就可以在 <code class="docutils literal"><span class="pre">ByteString</span></code> 类型上尝试现有的属性：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">1000</span> <span class="o">$</span> <span class="n">prop_one_present</span> <span class="p">(</span><span class="n">undefined</span> <span class="ow">::</span> <span class="kt">Lazy</span><span class="o">.</span><span class="kt">ByteString</span><span class="p">)</span>
 <span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">handyCheck&#39;</span>
@@ -844,6 +884,20 @@ ghci&gt; :t prop_one_present (undefined :: Int)
 <span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">18</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">prop_suggest_try1&#39;</span>
 </pre></div>
 </div>
+<p>[Forec 译注：一个仅供参考的运行结果如下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">1000</span> <span class="o">$</span> <span class="n">prop_suggest_try1</span>
+<span class="kt">Passed:</span>
+<span class="mf">0.840272094122386</span>
+<span class="mi">1533634864</span>
+<span class="kt">Failed:</span>
+<span class="mf">0.13172750223946617</span>
+<span class="mi">3002287708</span>
+<span class="o">***</span> <span class="kt">Failed</span><span class="o">!</span> <span class="kt">Falsifiable</span> <span class="p">(</span><span class="n">after</span> <span class="mi">2</span> <span class="n">tests</span><span class="p">)</span><span class="kt">:</span>
+<span class="mf">0.13172750223946617</span>
+<span class="mi">3002287708</span>
+</pre></div>
+</div>
+<p>]</p>
 <p>将 QuickCheck 打印的反例交给 <code class="docutils literal"><span class="pre">suggestSizing</span></code> 时，我们发现这些输入被拒绝了，因为它们会导致一个过于庞大的位数组。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">B</span><span class="o">.</span><span class="n">suggestSizing</span> <span class="mi">1678125842</span> <span class="mf">8.501133057303545e-3</span>
 <span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span>
@@ -851,6 +905,12 @@ ghci&gt; :t prop_one_present (undefined :: Int)
           <span class="kt">Use</span> <span class="o">-</span><span class="n">v</span> <span class="n">to</span> <span class="n">see</span> <span class="n">a</span> <span class="n">list</span> <span class="kr">of</span> <span class="n">the</span> <span class="n">files</span> <span class="n">searched</span> <span class="n">for</span><span class="o">.</span>
 </pre></div>
 </div>
+<p>[Forec 译注：运行结果如下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">B</span><span class="o">.</span><span class="n">suggestSizing</span> <span class="mi">1678125842</span> <span class="mf">8.501133057303545e-3</span>
+<span class="kt">Left</span> <span class="s">&quot;capacity too large&quot;</span>
+</pre></div>
+</div>
+<p>]</p>
 <p>由于无法预测哪些组合会导致此问题，我们只能通过限制大小和错误率来防止异常：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/BloomCheck.hs</span>
 <span class="nf">prop_suggest_try2</span> <span class="ow">=</span>
@@ -869,6 +929,12 @@ ghci&gt; :t prop_one_present (undefined :: Int)
 <span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">18</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">prop_suggest_try2&#39;</span>
 </pre></div>
 </div>
+<p>[Forec 译注：预期的运行结果为：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">1000</span> <span class="o">$</span> <span class="n">prop_suggest_try2</span>
+<span class="o">+++</span> <span class="kt">OK</span><span class="p">,</span> <span class="n">passed</span> <span class="mi">1000</span> <span class="n">tests</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>]</p>
 <p>在过大的测试中，许多组合都被过滤掉了：</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">handyCheck</span> <span class="mi">10000</span> <span class="o">$</span> <span class="n">prop_suggest_try2</span>
 <span class="o">&lt;</span><span class="n">interactive</span><span class="o">&gt;:</span><span class="mi">1</span><span class="kt">:</span><span class="mi">0</span><span class="kt">:</span> <span class="kt">Not</span> <span class="kr">in</span> <span class="n">scope</span><span class="kt">:</span> <span class="p">`</span><span class="n">handyCheck&#39;</span>
@@ -897,12 +963,275 @@ ghci&gt; :t prop_one_present (undefined :: Int)
 </div>
 <div class="section" id="id19">
 <h2>性能分析和调优<a class="headerlink" href="#id19" title="Permalink to this headline">¶</a></h2>
+<p>我们可以将程序通过 <code class="docutils literal"><span class="pre">QuickCheck</span></code> 测试视为一条证明代码正确的 “基准线”。在调整性能时，随时重新运行测试能够防止修改过程中不小心导致的破坏。</p>
+<p>第一步，编写一个用于计时的小程序：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/WordTest.hs</span>
+<span class="kr">module</span> <span class="nn">Main</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">Control.Parallel.Strategies</span> <span class="p">(</span><span class="kt">NFData</span><span class="p">(</span><span class="o">..</span><span class="p">))</span>
+<span class="kr">import</span> <span class="nn">Control.Monad</span> <span class="p">(</span><span class="nf">forM_</span><span class="p">,</span> <span class="nf">mapM_</span><span class="p">)</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">BloomFilter.Easy</span> <span class="k">as</span> <span class="n">B</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.ByteString.Char8</span> <span class="k">as</span> <span class="n">BS</span>
+<span class="kr">import</span> <span class="nn">Data.Time.Clock</span> <span class="p">(</span><span class="nf">diffUTCTime</span><span class="p">,</span> <span class="nf">getCurrentTime</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Environment</span> <span class="p">(</span><span class="nf">getArgs</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Exit</span> <span class="p">(</span><span class="nf">exitFailure</span><span class="p">)</span>
+
+<span class="nf">timed</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">NFData</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">a</span>
+<span class="nf">timed</span> <span class="n">desc</span> <span class="n">act</span> <span class="ow">=</span> <span class="kr">do</span>
+        <span class="n">start</span> <span class="ow">&lt;-</span> <span class="n">getCurrentTime</span>
+        <span class="n">ret</span> <span class="ow">&lt;-</span> <span class="n">act</span>
+        <span class="n">end</span> <span class="ow">&lt;-</span> <span class="n">rnf</span> <span class="n">ret</span> <span class="p">`</span><span class="n">seq</span><span class="p">`</span> <span class="n">getCurrentTime</span>
+        <span class="n">putStrLn</span> <span class="o">$</span> <span class="n">show</span> <span class="p">(</span><span class="n">diffUTCTime</span> <span class="n">end</span> <span class="n">start</span><span class="p">)</span> <span class="o">++</span> <span class="s">&quot; to &quot;</span> <span class="o">++</span> <span class="n">desc</span>
+        <span class="n">return</span> <span class="n">ret</span>
+
+<span class="kr">instance</span> <span class="kt">NFData</span> <span class="kt">BS</span><span class="o">.</span><span class="kt">ByteString</span> <span class="kr">where</span>
+        <span class="n">rnf</span> <span class="kr">_</span> <span class="ow">=</span> <span class="nb">()</span>
+
+<span class="kr">instance</span> <span class="kt">NFData</span> <span class="p">(</span><span class="kt">B</span><span class="o">.</span><span class="kt">Bloom</span> <span class="n">a</span><span class="p">)</span> <span class="kr">where</span>
+        <span class="n">rnf</span> <span class="n">filt</span> <span class="ow">=</span> <span class="kt">B</span><span class="o">.</span><span class="n">length</span> <span class="n">filt</span> <span class="p">`</span><span class="n">seq</span><span class="p">`</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>[Forec 译注：编译过时的代码总是不尽人意，需要做如下修改：</p>
+<ul class="simple">
+<li><code class="docutils literal"><span class="pre">NFData</span></code> 已经被移动到 <code class="docutils literal"><span class="pre">Control.DeepSeq</span></code> ，因此需将首行的 <code class="docutils literal"><span class="pre">import</span></code> 修改为 <code class="docutils literal"><span class="pre">import</span> <span class="pre">Control.DeepSeq</span> <span class="pre">(NFData(..))</span></code> ；</li>
+<li>将 <code class="docutils literal"><span class="pre">rnf</span></code> 替换为 <code class="docutils literal"><span class="pre">rdeepsep</span></code> ，具体原因可参考 <a class="reference external" href="http://hackage.haskell.org/package/parallel-2.2.0.1/docs/Control-Parallel-Strategies.html">http://hackage.haskell.org/package/parallel-2.2.0.1/docs/Control-Parallel-Strategies.html</a> ；</li>
+<li>在 <code class="docutils literal"><span class="pre">GHC</span> <span class="pre">7.6</span></code> 之后，所有的 <code class="docutils literal"><span class="pre">ByteString</span></code> 均已成为 <code class="docutils literal"><span class="pre">NFData</span></code> 的实例，所以上面针对 <code class="docutils literal"><span class="pre">BS.ByteString</span></code> 的实例定义需要被移除。</li>
+</ul>
+<p>]</p>
+<p>上面的小程序中，我们使用了 24 章中 “将求值从算法中分离” 一节介绍的 <code class="docutils literal"><span class="pre">rnf</span></code> 函数来实现简单的时间约束。输出用时这一动作能够确保计算完成，从而准确地评估运算成本。</p>
+<p>[Note: 24 章该节尚未翻译，翻译完成后应当将此处替换为 reference。]</p>
+<p>主程序根据指定文件创建一个布隆过滤器，它将文件中每一行视为一个要添加到布隆过滤器中的元素：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: examples/WordTest.hs</span>
+<span class="nf">main</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">args</span> <span class="ow">&lt;-</span> <span class="n">getArgs</span>
+  <span class="kr">let</span> <span class="n">files</span> <span class="o">|</span> <span class="n">null</span> <span class="n">args</span> <span class="ow">=</span> <span class="p">[</span><span class="s">&quot;/usr/share/dict/words&quot;</span><span class="p">]</span>
+                        <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="n">args</span>
+  <span class="n">forM_</span> <span class="n">files</span> <span class="o">$</span> <span class="nf">\</span><span class="n">file</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+
+        <span class="n">words</span> <span class="ow">&lt;-</span> <span class="n">timed</span> <span class="s">&quot;read words&quot;</span> <span class="o">$</span>
+          <span class="kt">BS</span><span class="o">.</span><span class="n">lines</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="kt">BS</span><span class="o">.</span><span class="n">readFile</span> <span class="n">file</span>
+
+        <span class="kr">let</span> <span class="n">len</span> <span class="ow">=</span> <span class="n">length</span> <span class="n">words</span>
+                <span class="n">errRate</span> <span class="ow">=</span> <span class="mf">0.01</span>
+
+        <span class="n">putStrLn</span> <span class="o">$</span> <span class="n">show</span> <span class="n">len</span> <span class="o">++</span> <span class="s">&quot; words&quot;</span>
+        <span class="n">putStrLn</span> <span class="o">$</span> <span class="s">&quot;suggested sizings: &quot;</span> <span class="o">++</span>
+                           <span class="n">show</span> <span class="p">(</span><span class="kt">B</span><span class="o">.</span><span class="n">suggestSizing</span> <span class="p">(</span><span class="n">fromIntegral</span> <span class="n">len</span><span class="p">)</span> <span class="n">errRate</span><span class="p">)</span>
+
+        <span class="n">filt</span> <span class="ow">&lt;-</span> <span class="n">timed</span> <span class="s">&quot;construct filter&quot;</span> <span class="o">$</span>
+          <span class="kr">case</span> <span class="kt">B</span><span class="o">.</span><span class="n">easyList</span> <span class="n">errRate</span> <span class="n">words</span> <span class="kr">of</span>
+                <span class="kt">Left</span> <span class="n">errmsg</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+                  <span class="n">putStrLn</span> <span class="o">$</span> <span class="s">&quot;Error: &quot;</span> <span class="o">++</span> <span class="n">errmsg</span>
+                  <span class="n">exitFailure</span>
+                <span class="kt">Right</span> <span class="n">filt</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="n">filt</span>
+
+        <span class="n">timed</span> <span class="s">&quot;query every element&quot;</span> <span class="o">$</span>
+          <span class="n">mapM_</span> <span class="n">print</span> <span class="o">$</span> <span class="n">filter</span> <span class="p">(</span><span class="n">not</span> <span class="o">.</span> <span class="p">(`</span><span class="kt">B</span><span class="o">.</span><span class="n">elem</span><span class="p">`</span> <span class="n">filt</span><span class="p">))</span> <span class="n">words</span>
+</pre></div>
+</div>
+<p>[Forec 译注：显然，原著给出的程序需要在类 Linux 环境下运行，并且 <code class="docutils literal"><span class="pre">/usr/share/dict</span></code> 路径下要存在 <code class="docutils literal"><span class="pre">words</span></code> 文件，该文件用于为程序提供输入。]</p>
+<p><code class="docutils literal"><span class="pre">timed</span></code> 函数用来计算程序执行中三个不同阶段的成本；读取并按行分割数据、 填充布隆过滤器和查询其中的每个元素。</p>
+<p>如果将上述程序编译运行几次，就可以发现执行时间比较长，但多次运行之间的时长差距很小。至此，我们创建了一个看似可信的微基准测试：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="kt">O2</span>  <span class="c1">--make WordTest</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">WordTest</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="kt">WordTest</span><span class="o">.</span><span class="n">o</span> <span class="p">)</span>
+<span class="kt">Linking</span> <span class="kt">WordTest</span> <span class="o">...</span>
+<span class="o">$</span> <span class="o">./</span><span class="kt">WordTest</span>
+<span class="mf">0.196347</span><span class="n">s</span> <span class="n">to</span> <span class="n">read</span> <span class="n">words</span>
+<span class="mi">479829</span> <span class="n">words</span>
+<span class="mf">1.063537</span><span class="n">s</span> <span class="n">to</span> <span class="n">construct</span> <span class="n">filter</span>
+<span class="mi">4602978</span> <span class="n">bits</span>
+<span class="mf">0.766899</span><span class="n">s</span> <span class="n">to</span> <span class="n">query</span> <span class="n">every</span> <span class="n">element</span>
+<span class="o">$</span> <span class="o">./</span><span class="kt">WordTest</span>
+<span class="mf">0.179284</span><span class="n">s</span> <span class="n">to</span> <span class="n">read</span> <span class="n">words</span>
+<span class="mi">479829</span> <span class="n">words</span>
+<span class="mf">1.069363</span><span class="n">s</span> <span class="n">to</span> <span class="n">construct</span> <span class="n">filter</span>
+<span class="mi">4602978</span> <span class="n">bits</span>
+<span class="mf">0.780079</span><span class="n">s</span> <span class="n">to</span> <span class="n">query</span> <span class="n">every</span> <span class="n">element</span>
+</pre></div>
+</div>
 <div class="section" id="id20">
 <h3>配置驱动的性能调优<a class="headerlink" href="#id20" title="Permalink to this headline">¶</a></h3>
+<p>下面重新构建这个程序，并在启用分析的情况下运行，以观察哪些调优能够改善它的性能。</p>
+<p>因为此前我们已经构建了 <code class="docutils literal"><span class="pre">WordTest</span></code> 且没有对源码做任何改动，如果仅仅重新运行 GHC，GHC 会认为已存在的二进制文件足够新，从而跳过重新构建。我们必须强制重新构建此程序，这里可以通过编辑源文件以更新文件系统来实现。</p>
+<p>[Forec 译注：也可以使用 <code class="docutils literal"><span class="pre">=fforce-recomp</span></code> 标识，它会强迫 GHC 重新构建。]</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">touch</span> <span class="kt">WordTest</span><span class="o">.</span><span class="n">hs</span>
+<span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="kt">O2</span> <span class="o">-</span><span class="n">prof</span> <span class="o">-</span><span class="n">auto</span><span class="o">-</span><span class="n">all</span> <span class="c1">--make WordTest</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">WordTest</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="kt">WordTest</span><span class="o">.</span><span class="n">o</span> <span class="p">)</span>
+<span class="kt">Linking</span> <span class="kt">WordTest</span> <span class="o">...</span>
+
+<span class="o">$</span> <span class="o">./</span><span class="kt">WordTest</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">p</span>
+<span class="mf">0.322675</span><span class="n">s</span> <span class="n">to</span> <span class="n">read</span> <span class="n">words</span>
+<span class="mi">479829</span> <span class="n">words</span>
+<span class="nf">suggested</span> <span class="n">sizings</span><span class="kt">:</span> <span class="kt">Right</span> <span class="p">(</span><span class="mi">4602978</span><span class="p">,</span><span class="mi">7</span><span class="p">)</span>
+<span class="mf">2.475339</span><span class="n">s</span> <span class="n">to</span> <span class="n">construct</span> <span class="n">filter</span>
+<span class="mf">1.964404</span><span class="n">s</span> <span class="n">to</span> <span class="n">query</span> <span class="n">every</span> <span class="n">element</span>
+
+<span class="o">$</span> <span class="n">head</span> <span class="o">-</span><span class="mi">20</span> <span class="kt">WordTest</span><span class="o">.</span><span class="n">prof</span>
+<span class="nf">total</span> <span class="n">time</span>  <span class="ow">=</span>          <span class="mf">4.10</span> <span class="n">secs</span>   <span class="p">(</span><span class="mi">205</span> <span class="n">ticks</span> <span class="o">@</span> <span class="mi">20</span> <span class="n">ms</span><span class="p">)</span>
+<span class="nf">total</span> <span class="n">alloc</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span><span class="mi">752</span><span class="p">,</span><span class="mi">287</span><span class="p">,</span><span class="mi">168</span> <span class="n">bytes</span>  <span class="p">(</span><span class="n">excludes</span> <span class="n">profiling</span> <span class="n">overheads</span><span class="p">)</span>
+
+<span class="kt">COST</span> <span class="kt">CENTRE</span>                    <span class="kt">MODULE</span>               <span class="o">%</span><span class="n">time</span> <span class="o">%</span><span class="n">alloc</span>
+
+<span class="nf">doubleHash</span>                     <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Hash</span>      <span class="mf">48.8</span>   <span class="mf">66.4</span>
+<span class="nf">indices</span>                        <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Mutable</span>   <span class="mf">13.7</span>   <span class="mf">15.8</span>
+<span class="nf">elem</span>                           <span class="kt">BloomFilter</span>            <span class="mf">9.8</span>    <span class="mf">1.3</span>
+<span class="nf">hashByteString</span>                 <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Hash</span>       <span class="mf">6.8</span>    <span class="mf">3.8</span>
+<span class="nf">easyList</span>                       <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Easy</span>       <span class="mf">5.9</span>    <span class="mf">0.3</span>
+<span class="nf">hashIO</span>                         <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Hash</span>       <span class="mf">4.4</span>    <span class="mf">5.3</span>
+<span class="nf">main</span>                           <span class="kt">Main</span>                   <span class="mf">4.4</span>    <span class="mf">3.8</span>
+<span class="nf">insert</span>                         <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Mutable</span>    <span class="mf">2.9</span>    <span class="mf">0.0</span>
+<span class="nf">len</span>                            <span class="kt">BloomFilter</span>            <span class="mf">2.0</span>    <span class="mf">2.4</span>
+<span class="nf">length</span>                         <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Mutable</span>    <span class="mf">1.5</span>    <span class="mf">1.0</span>
+</pre></div>
+</div>
+<p>可以看出， <code class="docutils literal"><span class="pre">doubleHash</span></code> 占用了巨大的时空资源。</p>
+<p>回忆一下，<code class="docutils literal"><span class="pre">doubleHash</span></code> 函数的主体功能是无副作用的列表解析：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: BloomFilter/Hash.hs</span>
+<span class="nf">doubleHash</span> <span class="ow">::</span> <span class="kt">Hashable</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Word32</span><span class="p">]</span>
+<span class="nf">doubleHash</span> <span class="n">numHashes</span> <span class="n">value</span> <span class="ow">=</span> <span class="p">[</span><span class="n">h1</span> <span class="o">+</span> <span class="n">h2</span> <span class="o">*</span> <span class="n">i</span> <span class="o">|</span> <span class="n">i</span> <span class="ow">&lt;-</span> <span class="p">[</span><span class="mi">0</span><span class="o">..</span><span class="n">num</span><span class="p">]]</span>
+        <span class="kr">where</span> <span class="n">h</span>   <span class="ow">=</span> <span class="n">hashSalt</span> <span class="mh">0x9150a946c4a8966e</span> <span class="n">value</span>
+                  <span class="n">h1</span>  <span class="ow">=</span> <span class="n">fromIntegral</span> <span class="p">(</span><span class="n">h</span> <span class="p">`</span><span class="n">shiftR</span><span class="p">`</span> <span class="mi">32</span><span class="p">)</span> <span class="o">.&amp;.</span> <span class="n">maxBound</span>
+                  <span class="n">h2</span>  <span class="ow">=</span> <span class="n">fromIntegral</span> <span class="n">h</span>
+                  <span class="n">num</span> <span class="ow">=</span> <span class="n">fromIntegral</span> <span class="n">numHashes</span>
+</pre></div>
+</div>
+<p>鉴于 <code class="docutils literal"><span class="pre">doubleHash</span></code> 的返回值是列表，它占这么大内存似乎有点道理。但是这么简单的代码却表现出如此之差的性能，难免让人怀疑。</p>
+<p>面对这么一个性能上的谜团，我们自然会想到检查编译器的输出。这里并不需要通过汇编语言转储来分析，从更高层次开始会更容易。</p>
+<p>GHC 的 <code class="docutils literal"><span class="pre">-ddump-simpl</span></code> 选项会打印出执行所有高级优化后生成的代码：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="kt">O2</span> <span class="o">-</span><span class="n">c</span> <span class="o">-</span><span class="n">ddump</span><span class="o">-</span><span class="n">simpl</span> <span class="c1">--make BloomFilter/Hash.hs &gt; dump.txt</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Hash</span> <span class="p">(</span> <span class="kt">BloomFilter</span><span class="o">/</span><span class="kt">Hash</span><span class="o">.</span><span class="n">hs</span> <span class="p">)</span>
+</pre></div>
+</div>
+<p>产生的 <code class="docutils literal"><span class="pre">dump.txt</span></code> 大约有一千行，其中多数名字是根据原始 Haskell 表示自动生成的。即使如此，搜索 <code class="docutils literal"><span class="pre">doubleHash</span></code> 仍然可以帮助我们立刻定位到函数的定义。下面这个例子说明了如何在 Unix Shell 中寻找到函数的定义：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">less</span> <span class="o">+/</span><span class="n">doubleHash</span> <span class="n">dump</span><span class="o">.</span><span class="n">txt</span>
+</pre></div>
+</div>
+<p>刚开始阅读 GHC 简化器的输出会有些困难。这些输出包含了许多自动生成的名称，并且代码中有许多不明显的注释。我们可以忽略掉自己不了解的东西，将注意力集中在看起来很熟悉的部分上。普通的 Haskell 和 Core 语言在语法特性上有一定相似之处，尤其是类型签名、用于变量绑定的 <code class="docutils literal"><span class="pre">let</span></code> 和模式匹配的 <code class="docutils literal"><span class="pre">case</span></code> 。</p>
+<p>如果去除 <code class="docutils literal"><span class="pre">doubleHash</span></code> 定义之外的部分，我们将得到类似如下所示的代码：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">__letrec</span> <span class="p">{</span> <span class="o">&lt;</span><span class="mi">1</span><span class="o">&gt;</span>
+  <span class="n">go_s1YC</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.</span><span class="kt">Word32</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.</span><span class="kt">Word32</span><span class="p">]</span> <span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span>
+  <span class="p">[</span><span class="kt">Arity</span> <span class="mi">1</span>
+   <span class="kt">Str:</span> <span class="kt">DmdType</span> <span class="kt">S</span><span class="p">]</span>
+  <span class="n">go_s1YC</span> <span class="ow">=</span>
+        <span class="nf">\</span> <span class="p">(</span><span class="n">ds_a1DR</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.</span><span class="kt">Word32</span><span class="p">])</span> <span class="ow">-&gt;</span>
+          <span class="kr">case</span> <span class="n">ds_a1DR</span> <span class="kr">of</span> <span class="n">wild_a1DS</span> <span class="p">{</span>
+        <span class="kt">[]</span> <span class="ow">-&gt;</span> <span class="kt">GHC</span><span class="o">.</span><span class="kt">Base</span><span class="o">.</span><span class="kt">[]</span> <span class="o">@</span> <span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.</span><span class="kt">Word32</span><span class="p">;</span> <span class="o">&lt;</span><span class="mi">3</span><span class="o">&gt;</span>
+        <span class="kt">:</span> <span class="n">y_a1DW</span> <span class="n">ys_a1DX</span> <span class="ow">-&gt;</span> <span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span>
+          <span class="kt">GHC</span><span class="o">.</span><span class="kt">Base</span><span class="o">.:</span> <span class="o">@</span> <span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.</span><span class="kt">Word32</span> <span class="o">&lt;</span><span class="mi">5</span><span class="o">&gt;</span>
+                <span class="p">(</span><span class="kr">case</span> <span class="n">h1_s1YA</span> <span class="kr">of</span> <span class="n">wild1_a1Mk</span> <span class="p">{</span> <span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.</span><span class="kt">W32</span><span class="o">#</span> <span class="n">x</span><span class="o">#</span><span class="n">_a1Mm</span> <span class="ow">-&gt;</span> <span class="o">&lt;</span><span class="mi">6</span><span class="o">&gt;</span>
+                 <span class="kr">case</span> <span class="n">h2_s1Yy</span> <span class="kr">of</span> <span class="n">wild2_a1Mu</span> <span class="p">{</span> <span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.</span><span class="kt">W32</span><span class="o">#</span> <span class="n">x</span><span class="o">#</span><span class="mi">1</span><span class="n">_a1Mw</span> <span class="ow">-&gt;</span>
+                 <span class="kr">case</span> <span class="n">y_a1DW</span> <span class="kr">of</span> <span class="n">wild11_a1My</span> <span class="p">{</span> <span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.</span><span class="kt">W32</span><span class="o">#</span> <span class="n">y</span><span class="o">#</span><span class="n">_a1MA</span> <span class="ow">-&gt;</span>
+                 <span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.</span><span class="kt">W32</span><span class="o">#</span> <span class="o">&lt;</span><span class="mi">7</span><span class="o">&gt;</span>
+                   <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="n">narrow32Word</span><span class="o">#</span>
+                  <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="n">plusWord</span><span class="o">#</span> <span class="o">&lt;</span><span class="mi">8</span><span class="o">&gt;</span>
+                         <span class="n">x</span><span class="o">#</span><span class="n">_a1Mm</span> <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="n">narrow32Word</span><span class="o">#</span>
+                                                          <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="n">timesWord</span><span class="o">#</span> <span class="n">x</span><span class="o">#</span><span class="mi">1</span><span class="n">_a1Mw</span> <span class="n">y</span><span class="o">#</span><span class="n">_a1MA</span><span class="p">))))</span>
+                 <span class="p">}</span>
+                 <span class="p">}</span>
+                 <span class="p">})</span>
+                <span class="p">(</span><span class="n">go_s1YC</span> <span class="n">ys_a1DX</span><span class="p">)</span> <span class="o">&lt;</span><span class="mi">9</span><span class="o">&gt;</span>
+          <span class="p">};</span>
+<span class="p">}</span> <span class="kr">in</span>
+  <span class="n">go_s1YC</span> <span class="o">&lt;</span><span class="mi">10</span><span class="o">&gt;</span>
+        <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.$</span><span class="n">w</span><span class="o">$</span><span class="n">dmenumFromTo2</span>
+           <span class="n">__word</span> <span class="mi">0</span> <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="n">narrow32Word</span><span class="o">#</span> <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="n">int2Word</span><span class="o">#</span> <span class="n">ww_s1X3</span><span class="p">)))</span>
+</pre></div>
+</div>
+<p>[Forec 译注：原著中给出的代码包含了图片，译文使用 <code class="docutils literal"><span class="pre">&lt;编号&gt;</span></code> 这样的标识代替图片，并在下面给出对应的注释。]</p>
+<p>这是列表分析部分的主体。看起来似乎令人生畏，但我们可以逐步分析它。你会发现它并非那么复杂：</p>
+<ol class="arabic simple">
+<li><code class="docutils literal"><span class="pre">__letrec</span></code> 等价于 Haskell 中的 <code class="docutils literal"><span class="pre">let</span></code> ；</li>
+<li>GHC 将列表解析的主体部分编译成了一个名为 <code class="docutils literal"><span class="pre">go_s1YC</span></code> 的循环；</li>
+<li>如果 <code class="docutils literal"><span class="pre">case</span></code> 表达式匹配了空列表，我们就返回空列表。是不是看起来很熟悉？</li>
+<li>这个模式在 Haskell 中读作 <code class="docutils literal"><span class="pre">(y_a1DW:ys_a1DX)</span></code> 。<code class="docutils literal"><span class="pre">(:)</span></code> 构造器之所以出现在操作数之前，是因为 Core 语言出于简单起见使用了前缀表达式；</li>
+<li>这是 <code class="docutils literal"><span class="pre">(:)</span></code> 构造器的一种应用。符号 <code class="docutils literal"><span class="pre">&#64;</span></code> 表明第一个操作数的类型是 <code class="docutils literal"><span class="pre">Word32</span></code> ；</li>
+<li>三个 <code class="docutils literal"><span class="pre">case</span></code> 表达式分别对一个 <code class="docutils literal"><span class="pre">Word32</span></code> 值拆箱以取出其中包含的原始值。首先处理的是 <code class="docutils literal"><span class="pre">h1</span></code> （这里命名为 <code class="docutils literal"><span class="pre">h1_s1YA</span></code> ），然后是 <code class="docutils literal"><span class="pre">h2</span></code> ，最后是当前列表元素 <code class="docutils literal"><span class="pre">y</span></code> 。拆箱是通过模式匹配实现的：<code class="docutils literal"><span class="pre">W32#</span></code> 是用于将原始值装箱的构造函数。按照惯例，原始类型、值以及使用它们的函数在命名时都会包含一个 <code class="docutils literal"><span class="pre">#</span></code>；</li>
+<li>这里我们将 <code class="docutils literal"><span class="pre">W32#</span></code> 构造器应用于 <code class="docutils literal"><span class="pre">Word32#</span></code> 类型的原始值，从而给出类型为 <code class="docutils literal"><span class="pre">Word32</span></code> 的正常值；</li>
+<li><code class="docutils literal"><span class="pre">plusWord#</span></code> 和 <code class="docutils literal"><span class="pre">timesWord#</span></code> 函数分别对原始的无符号整数做添加和相乘操作；</li>
+<li>这是 <code class="docutils literal"><span class="pre">(:)</span></code> 构造器的第二个参数，其中 <code class="docutils literal"><span class="pre">go_s1YC</span></code> 函数以递归的方式调用自身；</li>
+<li>这里调用了列表解析函数。它的参数是用 Core 语言表示的 <code class="docutils literal"><span class="pre">[0..n]</span></code> 。</li>
+</ol>
+<p>阅读这段代码，我们发现了两处有趣的行为：</p>
+<ul class="simple">
+<li>我们创建了一个列表，并且立刻在 <code class="docutils literal"><span class="pre">go_s1YC</span></code> 循环中解构它。GHC 通常可以检查出这种生产后立刻消费的模式，并将其转化为一个不包含资源分配的循环。这类变换称为 <em>融合</em> ，因为生产者和消费者被融合到了一起。不幸的是，在上面的代码中 GHC 并没有为我们实现这一点。</li>
+<li>在循环体中重复对 <code class="docutils literal"><span class="pre">h1</span></code> 和 <code class="docutils literal"><span class="pre">he</span></code> 开箱的行为非常浪费资源。</li>
+</ul>
+<p>为了解决这些问题，我们对 <code class="docutils literal"><span class="pre">doubleHash</span></code> 函数做了一些细微的修改：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: BloomFilter/Hash.hs</span>
+<span class="nf">doubleHash</span> <span class="ow">::</span> <span class="kt">Hashable</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Word32</span><span class="p">]</span>
+<span class="nf">doubleHash</span> <span class="n">numHashes</span> <span class="n">value</span> <span class="ow">=</span> <span class="n">go</span> <span class="mi">0</span>
+        <span class="kr">where</span> <span class="n">go</span> <span class="n">n</span> <span class="o">|</span> <span class="n">n</span> <span class="o">==</span> <span class="n">num</span>  <span class="ow">=</span> <span class="kt">[]</span>
+                           <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="n">h1</span> <span class="o">+</span> <span class="n">h2</span> <span class="o">*</span> <span class="n">n</span> <span class="kt">:</span> <span class="n">go</span> <span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+
+                  <span class="o">!</span><span class="n">h1</span> <span class="ow">=</span> <span class="n">fromIntegral</span> <span class="p">(</span><span class="n">h</span> <span class="p">`</span><span class="n">shiftR</span><span class="p">`</span> <span class="mi">32</span><span class="p">)</span> <span class="o">.&amp;.</span> <span class="n">maxBound</span>
+                  <span class="o">!</span><span class="n">h2</span> <span class="ow">=</span> <span class="n">fromIntegral</span> <span class="n">h</span>
+
+                  <span class="n">h</span>   <span class="ow">=</span> <span class="n">hashSalt</span> <span class="mh">0x9150a946c4a8966e</span> <span class="n">value</span>
+                  <span class="n">num</span> <span class="ow">=</span> <span class="n">fromIntegral</span> <span class="n">numHashes</span>
+</pre></div>
+</div>
+<p>上面的代码中，我们手动将 <code class="docutils literal"><span class="pre">[0..num]</span></code> 表达式和 “消费” 它的代码合并成单个循环，并为 <code class="docutils literal"><span class="pre">h1</span></code> 和 <code class="docutils literal"><span class="pre">h2</span></code> 添加了严格注释。这些修改将 6 行代码变成 8 行，除此之外没有任何其它变动。它们会对 Core 的输出有什么影响呢？</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">__letrec</span> <span class="p">{</span>
+  <span class="o">$</span><span class="n">wgo_s1UH</span> <span class="ow">::</span> <span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="kt">Word</span><span class="o">#</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.</span><span class="kt">Word32</span><span class="p">]</span>
+  <span class="p">[</span><span class="kt">Arity</span> <span class="mi">1</span>
+   <span class="kt">Str:</span> <span class="kt">DmdType</span> <span class="kt">L</span><span class="p">]</span>
+  <span class="o">$</span><span class="n">wgo_s1UH</span> <span class="ow">=</span>
+        <span class="nf">\</span> <span class="p">(</span><span class="n">ww2_s1St</span> <span class="ow">::</span> <span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="kt">Word</span><span class="o">#</span><span class="p">)</span> <span class="ow">-&gt;</span>
+          <span class="kr">case</span> <span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="n">eqWord</span><span class="o">#</span> <span class="n">ww2_s1St</span> <span class="n">a_s1T1</span> <span class="kr">of</span> <span class="n">wild1_X2m</span> <span class="p">{</span>
+        <span class="kt">GHC</span><span class="o">.</span><span class="kt">Base</span><span class="o">.</span><span class="kt">False</span> <span class="ow">-&gt;</span>
+          <span class="kt">GHC</span><span class="o">.</span><span class="kt">Base</span><span class="o">.:</span> <span class="o">@</span> <span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.</span><span class="kt">Word32</span>
+                <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.</span><span class="kt">W32</span><span class="o">#</span>
+                 <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="n">narrow32Word</span><span class="o">#</span>
+                  <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="n">plusWord</span><span class="o">#</span>
+                   <span class="n">ipv_s1B2</span>
+                   <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="n">narrow32Word</span><span class="o">#</span>
+                <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="n">timesWord</span><span class="o">#</span> <span class="n">ipv1_s1AZ</span> <span class="n">ww2_s1St</span><span class="p">)))))</span>
+                <span class="p">(</span><span class="o">$</span><span class="n">wgo_s1UH</span> <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="n">narrow32Word</span><span class="o">#</span>
+                                                <span class="p">(</span><span class="kt">GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="n">plusWord</span><span class="o">#</span> <span class="n">ww2_s1St</span> <span class="n">__word</span> <span class="mi">1</span><span class="p">)));</span>
+        <span class="kt">GHC</span><span class="o">.</span><span class="kt">Base</span><span class="o">.</span><span class="kt">True</span> <span class="ow">-&gt;</span> <span class="kt">GHC</span><span class="o">.</span><span class="kt">Base</span><span class="o">.</span><span class="kt">[]</span> <span class="o">@</span> <span class="kt">GHC</span><span class="o">.</span><span class="kt">Word</span><span class="o">.</span><span class="kt">Word32</span>
+          <span class="p">};</span>
+<span class="p">}</span> <span class="kr">in</span>  <span class="o">$</span><span class="n">wgo_s1UH</span> <span class="n">__word</span> <span class="mi">0</span>
+</pre></div>
+</div>
+<p>新函数被编译成了简单的计数循环。多么令人兴奋！来看看它的实际运行效果：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">touch</span> <span class="kt">WordTest</span><span class="o">.</span><span class="n">hs</span>
+<span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="kt">O2</span> <span class="o">-</span><span class="n">prof</span> <span class="o">-</span><span class="n">auto</span><span class="o">-</span><span class="n">all</span> <span class="c1">--make WordTest</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">WordTest</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="kt">WordTest</span><span class="o">.</span><span class="n">o</span> <span class="p">)</span>
+<span class="kt">Linking</span> <span class="kt">WordTest</span> <span class="o">...</span>
+
+<span class="o">$</span> <span class="o">./</span><span class="kt">WordTest</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="n">p</span>
+<span class="mf">0.304352</span><span class="n">s</span> <span class="n">to</span> <span class="n">read</span> <span class="n">words</span>
+<span class="mi">479829</span> <span class="n">words</span>
+<span class="nf">suggested</span> <span class="n">sizings</span><span class="kt">:</span> <span class="kt">Right</span> <span class="p">(</span><span class="mi">4602978</span><span class="p">,</span><span class="mi">7</span><span class="p">)</span>
+<span class="mf">1.516229</span><span class="n">s</span> <span class="n">to</span> <span class="n">construct</span> <span class="n">filter</span>
+<span class="mf">1.069305</span><span class="n">s</span> <span class="n">to</span> <span class="n">query</span> <span class="n">every</span> <span class="n">element</span>
+<span class="o">~/</span><span class="n">src</span><span class="o">/</span><span class="n">darcs</span><span class="o">/</span><span class="n">book</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">ch27</span><span class="o">/</span><span class="n">examples</span> <span class="o">$</span> <span class="n">head</span> <span class="o">-</span><span class="mi">20</span> <span class="kt">WordTest</span><span class="o">.</span><span class="n">prof</span>
+<span class="nf">total</span> <span class="n">time</span>  <span class="ow">=</span>        <span class="mf">3.68</span> <span class="n">secs</span>    <span class="p">(</span><span class="mi">184</span> <span class="n">ticks</span> <span class="o">@</span> <span class="mi">20</span> <span class="n">ms</span><span class="p">)</span>
+<span class="nf">total</span> <span class="n">alloc</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span><span class="mi">644</span><span class="p">,</span><span class="mi">805</span><span class="p">,</span><span class="mi">536</span> <span class="n">bytes</span> <span class="p">(</span><span class="n">excludes</span> <span class="n">profiling</span> <span class="n">overheads</span><span class="p">)</span>
+
+<span class="kt">COST</span> <span class="kt">CENTRE</span>                    <span class="kt">MODULE</span>               <span class="o">%</span><span class="n">time</span> <span class="o">%</span><span class="n">alloc</span>
+
+<span class="nf">doubleHash</span>                     <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Hash</span>      <span class="mf">45.1</span>   <span class="mf">65.0</span>
+<span class="nf">indices</span>                        <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Mutable</span>   <span class="mf">19.0</span>   <span class="mf">16.4</span>
+<span class="nf">elem</span>                           <span class="kt">BloomFilter</span>           <span class="mf">12.5</span>    <span class="mf">1.3</span>
+<span class="nf">insert</span>                         <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Mutable</span>    <span class="mf">7.6</span>    <span class="mf">0.0</span>
+<span class="nf">easyList</span>                       <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Easy</span>       <span class="mf">4.3</span>    <span class="mf">0.3</span>
+<span class="nf">len</span>                            <span class="kt">BloomFilter</span>            <span class="mf">3.3</span>    <span class="mf">2.5</span>
+<span class="nf">hashByteString</span>                 <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Hash</span>       <span class="mf">3.3</span>    <span class="mf">4.0</span>
+<span class="nf">main</span>                           <span class="kt">Main</span>                   <span class="mf">2.7</span>    <span class="mf">4.0</span>
+<span class="nf">hashIO</span>                         <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Hash</span>       <span class="mf">2.2</span>    <span class="mf">5.5</span>
+<span class="nf">length</span>                         <span class="kt">BloomFilter</span><span class="o">.</span><span class="kt">Mutable</span>    <span class="mf">0.0</span>    <span class="mf">1.0</span>
+</pre></div>
+</div>
+<p>针对 <code class="docutils literal"><span class="pre">doubleHash</span></code> 的调整使性能提高了约 11%。对于仅仅添加两行代码的变动来说已经相当不错了。</p>
 </div>
 </div>
 <div class="section" id="id21">
 <h2>练习<a class="headerlink" href="#id21" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><code class="docutils literal"><span class="pre">easyList</span></code> 中使用的 <code class="docutils literal"><span class="pre">genericLength</span></code> 在处理无限列表时会导致函数陷入无限循环。如何修正此问题？</li>
+<li><em>困难</em> ：编写一个 <code class="docutils literal"><span class="pre">QuickCheck</span></code> 属性以检查观察到的错误率是否接近用户可容忍的错误率。</li>
+</ul>
 <table class="docutils citation" frame="void" id="broder02" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
@@ -912,13 +1241,19 @@ ghci&gt; :t prop_one_present (undefined :: Int)
 <table class="docutils footnote" frame="void" id="id22" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label">[59]</td><td><em>(<a class="fn-backref" href="#id6">1</a>, <a class="fn-backref" href="#id12">2</a>)</em> <code class="docutils literal"><span class="pre">ST</span></code> 是 “状态变换器” （state transformer） 的缩写。</td></tr>
+<tr><td class="label"><a class="fn-backref" href="#id6">[58]</a></td><td><code class="docutils literal"><span class="pre">ST</span></code> 是 “状态变换器” （state transformer） 的缩写。</td></tr>
 </tbody>
 </table>
 <table class="docutils footnote" frame="void" id="id23" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id13">[60]</a></td><td>Jenkins 的哈希函数相比一些流行的非加密哈希函数（如 FNV 和 hashpjw）具有好的多的混合属性，因此我们建议避免使用那些非加密哈希函数。</td></tr>
+<tr><td class="label"><a class="fn-backref" href="#id12">[59]</a></td><td>与流行的非加密哈希函数（如 FNV 和 hashpjw）相比，Jenkins 的哈希函数的混合属性要好得多，因此我们建议避免使用那些非加密哈希函数。</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id24" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id13">[60]</a></td><td>遗憾的是，详细讨论这些情况能否判断不属于本书范畴。</td></tr>
 </tbody>
 </table>
 </div>
