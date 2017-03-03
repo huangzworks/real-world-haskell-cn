@@ -94,7 +94,7 @@ ST monad
 
 在指令式语言中，我们可以简单地原地修改数组元素，并且在 Haskell 里面也可以这样做。
 
-Haskell 提供了一个特殊的 Monad，叫做 ``ST`` [59]_ *（State Transformer）* 。 ``ST`` 允许我们安全地工作在可变状态下。与 ``State`` Monad 相比，它有一些强大的额外的功能。
+Haskell 提供了一个特殊的 Monad，叫做 ``ST`` [58]_ *（State Transformer）* 。 ``ST`` 允许我们安全地工作在可变状态下。与 ``State`` Monad 相比，``ST`` Monad 有一些额外的强大功能。
 
 * 解冻一个不可变数组并得到一个可变数组，接着原地对可变数组进行修改，然后在修改完成之后冻结出一个新的不可变数组。
 * 通过 *可变引用（mutable references）* 可以构建出一种数据结构，这种数据结构允许用户像命令式语言一样随时对其进行修改。对于那些尚未找到高效纯函数替代的命令式数据结构和算法来说，这个功能尤为重要。
@@ -852,7 +852,7 @@ Cabal 使用标识的默认值来创建包描述（该标识的默认值为 ``Tr
 多态测试
 ^^^^^^^^
 
-[Forec 译注：以下几节，原著作者给出的代码信息不全，在 ``GHCI`` 中均无法加载。]
+[Forec 译注：以下几节，原著作者给出的代码在新版本 GHC 中无法通过编译，如需在 GHC 中运行，请按照译注中的说明修改对应文件。译文仅对代码和部分运行结果进行一定修正。]
 
 QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型需要测试，我们有必要设计一个方法，避免对每种类型都编写同样的测试。
 
@@ -869,6 +869,15 @@ QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型
 	<interactive>:1:0: Not in scope: `prop_one_present'
 	ghci> :t prop_one_present (undefined :: Int)   
 	<interactive>:1:0: Not in scope: `prop_one_present'
+	
+[Forec 译注：原著给出的代码无法正确运行，要想正确运行需要对 ``BloomCheck.hs`` 做如下修改：
+
+* 按上面译注里所述，将 ``handyCheck limit`` 部分修改；
+* 移除 ``Random Word8`` 、 ``Arbitary Word8`` 、 ``Random Word32`` 以及 ``Arbitary Word32`` 的实例；
+* 删除 ``Arbitary`` 的 ``Lazy.ByteString`` 实例中 ``coarbitrary`` 所属行；
+* 删除 ``Arbitary`` 的 ``Strict.ByteString`` 实例中 ``coarbitrary`` 所属行；
+
+]
 
 任何值都可以作为 ``prop_one_present`` 的第一个参数。第二个参数中第一个元素的类型需要和第一个参数保持一致。
 
@@ -881,6 +890,31 @@ QuickCheck 要求属性必须是单型的。鉴于目前有多种可散列类型
 	<interactive>:1:0: Not in scope: `handyCheck'
 	<interactive>:1:18: Not in scope: `prop_one_present'
 
+[Forec 译注：请留意本节译注中对 ``prop_one_present`` 的修正，我们需要显式声明 ``prop_one_present`` 的类型，或者移除 ``prop_one_present`` 的 ``_`` 参数。
+这里采取第二种方法，定义函数 ``prop_one_present'`` ，它与 ``prop_one_present`` 的唯一区别在于它没有匿名参数：
+
+::
+	
+	prop_one_present' elt =
+		forAll falsePositive $ \errRate ->
+		B.easyList errRate [elt] =~> \filt ->
+		elt `B.elem` filt
+
+载入修改后的文件，并显式指定 ``prop_one_present'`` 的型别：
+
+::
+
+	ghci> handyCheck 2 $ (prop_one_present' :: String -> Property)
+	Passed: 
+	""
+	7.053216229843191e-2
+	Passed: 
+	"\n9UP'\161O%~S"
+	0.5021342445896073
+
+本节剩余部分在 GHCI 中执行 ``handyCheck`` 指令均需做类似的修正。下面的译文不再对原著的运行结果予以更正。
+]
+	
 在向布隆过滤器添加多个元素之后，这些元素应该都能够被识别出来：
 
 ::
@@ -915,6 +949,19 @@ QuickCheck 库没有为 ``ByteString`` 类型提供 ``Arbitary`` 的实例，因
 		arbitrary = Strict.pack `fmap` arbitrary
 		coarbitrary = coarbitrary . Strict.unpack
 
+[Forec 译注：原著编写时的 ``Arbitary`` 类型类到今天已经发生了变化， ``coarbitrary`` 函数现在属于 ``CoArbitrary`` 类型类。上面的代码需要修正为：
+
+::
+
+	instance Arbitrary Lazy.ByteString where
+	arbitrary = Lazy.pack `fmap` arbitrary
+
+	instance CoArbitrary Lazy.ByteString where
+	coarbitrary = coarbitrary . Lazy.unpack
+
+``Strict.ByteString`` 也要做同样的修改。
+]
+
 QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类型的 ``Arbitary`` 实例。我们至少需要为 ``Word8`` 实现 ``Arbitary`` 实例：
 
 ::
@@ -927,6 +974,8 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 	instance Arbitrary Word8 where
 		arbitrary = choose (minBound, maxBound)
 		coarbitrary = integralCoarbitrary
+		
+[Forec 译注： ``Word8`` 的实例不需要定义。当前的 ``QuickCheck`` 库已经默认实现了这些实例。]
 		
 为这些实例编写几个通用函数，以便在之后为其他整型类型编写实例时重用它们：
 
@@ -949,7 +998,8 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 	instance Arbitrary Word32 where
 		arbitrary = choose (minBound, maxBound)
 		coarbitrary = integralCoarbitrary
-
+		
+[Forec 译注：上面这部分代码也是不需要的，``QuickCheck`` 库已经实现了它们。]
 
 创建了这些 ``Arbitary`` 实例后，我们就可以在 ``ByteString`` 类型上尝试现有的属性：
 
@@ -997,7 +1047,24 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 	ghci> handyCheck 1000 $ prop_suggest_try1
 	<interactive>:1:0: Not in scope: `handyCheck'
 	<interactive>:1:18: Not in scope: `prop_suggest_try1'
-			
+
+[Forec 译注：一个仅供参考的运行结果如下：
+
+::
+
+	ghci> handyCheck 1000 $ prop_suggest_try1
+	Passed: 
+	0.840272094122386
+	1533634864
+	Failed: 
+	0.13172750223946617
+	3002287708
+	*** Failed! Falsifiable (after 2 tests): 
+	0.13172750223946617
+	3002287708
+
+]
+	
 将 QuickCheck 打印的反例交给 ``suggestSizing`` 时，我们发现这些输入被拒绝了，因为它们会导致一个过于庞大的位数组。
 
 ::
@@ -1006,6 +1073,15 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 	<interactive>:1:0:
 		Failed to load interface for `B':
 		  Use -v to see a list of the files searched for.
+		  
+[Forec 译注：运行结果如下：
+
+::
+
+	ghci> B.suggestSizing 1678125842 8.501133057303545e-3
+	Left "capacity too large"
+	
+]
 
 由于无法预测哪些组合会导致此问题，我们只能通过限制大小和错误率来防止异常：
 
@@ -1028,6 +1104,15 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 	ghci> handyCheck 1000 $ prop_suggest_try2
 	<interactive>:1:0: Not in scope: `handyCheck'
 	<interactive>:1:18: Not in scope: `prop_suggest_try2'
+
+[Forec 译注：预期的运行结果为：
+
+::
+
+	ghci> handyCheck 1000 $ prop_suggest_try2	
+	+++ OK, passed 1000 tests.
+
+]
 
 在过大的测试中，许多组合都被过滤掉了：
 
@@ -1062,13 +1147,320 @@ QuickCheck 中还缺少针对 ``Data.Word`` 和 ``Data.Int`` 中固定宽度类�
 性能分析和调优
 --------------
 
+我们可以将程序通过 ``QuickCheck`` 测试视为一条证明代码正确的 “基准线”。在调整性能时，随时重新运行测试能够防止修改过程中不小心导致的破坏。
+
+第一步，编写一个用于计时的小程序：
+
+::
+
+	-- file: examples/WordTest.hs
+	module Main where
+
+	import Control.Parallel.Strategies (NFData(..))
+	import Control.Monad (forM_, mapM_)
+	import qualified BloomFilter.Easy as B
+	import qualified Data.ByteString.Char8 as BS
+	import Data.Time.Clock (diffUTCTime, getCurrentTime)
+	import System.Environment (getArgs)
+	import System.Exit (exitFailure)
+
+	timed :: (NFData a) => String -> IO a -> IO a
+	timed desc act = do
+		start <- getCurrentTime
+		ret <- act
+		end <- rnf ret `seq` getCurrentTime
+		putStrLn $ show (diffUTCTime end start) ++ " to " ++ desc
+		return ret
+
+	instance NFData BS.ByteString where
+		rnf _ = ()
+
+	instance NFData (B.Bloom a) where
+		rnf filt = B.length filt `seq` ()
+
+[Forec 译注：编译过时的代码总是不尽人意，需要做如下修改：
+
+* ``NFData`` 已经被移动到 ``Control.DeepSeq`` ，因此需将首行的 ``import`` 修改为 ``import Control.DeepSeq (NFData(..))`` ；
+* 将 ``rnf`` 替换为 ``rdeepsep`` ，具体原因可参考 http://hackage.haskell.org/package/parallel-2.2.0.1/docs/Control-Parallel-Strategies.html ；
+* 在 ``GHC 7.6`` 之后，所有的 ``ByteString`` 均已成为 ``NFData`` 的实例，所以上面针对 ``BS.ByteString`` 的实例定义需要被移除。
+
+]
+
+上面的小程序中，我们使用了 24 章中 “将求值从算法中分离” 一节介绍的 ``rnf`` 函数来实现简单的时间约束。输出用时这一动作能够确保计算完成，从而准确地评估运算成本。
+
+[Note: 24 章该节尚未翻译，翻译完成后应当将此处替换为 reference。]
+
+
+主程序根据指定文件创建一个布隆过滤器，它将文件中每一行视为一个要添加到布隆过滤器中的元素：
+
+::
+
+	-- file: examples/WordTest.hs
+	main = do
+	  args <- getArgs
+	  let files | null args = ["/usr/share/dict/words"]
+				| otherwise = args
+	  forM_ files $ \file -> do
+
+		words <- timed "read words" $
+		  BS.lines `fmap` BS.readFile file
+
+		let len = length words
+			errRate = 0.01
+
+		putStrLn $ show len ++ " words"
+		putStrLn $ "suggested sizings: " ++
+				   show (B.suggestSizing (fromIntegral len) errRate)
+
+		filt <- timed "construct filter" $
+		  case B.easyList errRate words of
+			Left errmsg -> do
+			  putStrLn $ "Error: " ++ errmsg
+			  exitFailure
+			Right filt -> return filt
+
+		timed "query every element" $
+		  mapM_ print $ filter (not . (`B.elem` filt)) words
+		  
+[Forec 译注：显然，原著给出的程序需要在类 Linux 环境下运行，并且 ``/usr/share/dict`` 路径下要存在 ``words`` 文件，该文件用于为程序提供输入。]
+
+``timed`` 函数用来计算程序执行中三个不同阶段的成本；读取并按行分割数据、 填充布隆过滤器和查询其中的每个元素。
+
+如果将上述程序编译运行几次，就可以发现执行时间比较长，但多次运行之间的时长差距很小。至此，我们创建了一个看似可信的微基准测试：
+
+::
+
+	$ ghc -O2  --make WordTest
+	[1 of 1] Compiling Main             ( WordTest.hs, WordTest.o )
+	Linking WordTest ...
+	$ ./WordTest
+	0.196347s to read words
+	479829 words
+	1.063537s to construct filter
+	4602978 bits
+	0.766899s to query every element
+	$ ./WordTest
+	0.179284s to read words
+	479829 words
+	1.069363s to construct filter
+	4602978 bits
+	0.780079s to query every element
+
 配置驱动的性能调优
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
+
+下面重新构建这个程序，并在启用分析的情况下运行，以观察哪些调优能够改善它的性能。
+
+因为此前我们已经构建了 ``WordTest`` 且没有对源码做任何改动，如果仅仅重新运行 GHC，GHC 会认为已存在的二进制文件足够新，从而跳过重新构建。我们必须强制重新构建此程序，这里可以通过编辑源文件以更新文件系统来实现。
+
+[Forec 译注：也可以使用 ``=fforce-recomp`` 标识，它会强迫 GHC 重新构建。]
+
+::
+
+	$ touch WordTest.hs
+	$ ghc -O2 -prof -auto-all --make WordTest
+	[1 of 1] Compiling Main             ( WordTest.hs, WordTest.o )
+	Linking WordTest ...
+
+	$ ./WordTest +RTS -p
+	0.322675s to read words
+	479829 words
+	suggested sizings: Right (4602978,7)
+	2.475339s to construct filter
+	1.964404s to query every element
+
+	$ head -20 WordTest.prof
+	total time  =          4.10 secs   (205 ticks @ 20 ms)
+	total alloc = 2,752,287,168 bytes  (excludes profiling overheads)
+
+	COST CENTRE                    MODULE               %time %alloc
+
+	doubleHash                     BloomFilter.Hash      48.8   66.4
+	indices                        BloomFilter.Mutable   13.7   15.8
+	elem                           BloomFilter            9.8    1.3
+	hashByteString                 BloomFilter.Hash       6.8    3.8
+	easyList                       BloomFilter.Easy       5.9    0.3
+	hashIO                         BloomFilter.Hash       4.4    5.3
+	main                           Main                   4.4    3.8
+	insert                         BloomFilter.Mutable    2.9    0.0
+	len                            BloomFilter            2.0    2.4
+	length                         BloomFilter.Mutable    1.5    1.0
+
+可以看出， ``doubleHash`` 占用了巨大的时空资源。
+
+.. info::
+
+	总在调优之前运行性能分析！
+	
+	在开启性能分析之前，我们压根没有预料到 ``doubleHash`` 函数会出现在十大 “热门” 函数中，更不用说它排在第一位了。如果没有性能分析，我们也许会在一些与性能几乎无关的函数身上下大力气。
+
+回忆一下，``doubleHash`` 函数的主体功能是无副作用的列表解析：
+
+::
+
+	-- file: BloomFilter/Hash.hs
+	doubleHash :: Hashable a => Int -> a -> [Word32]
+	doubleHash numHashes value = [h1 + h2 * i | i <- [0..num]]
+		where h   = hashSalt 0x9150a946c4a8966e value
+			  h1  = fromIntegral (h `shiftR` 32) .&. maxBound
+			  h2  = fromIntegral h
+			  num = fromIntegral numHashes
+	
+鉴于 ``doubleHash`` 的返回值是列表，它占这么大内存似乎有点道理。但是这么简单的代码却表现出如此之差的性能，难免让人怀疑。
+
+面对这么一个性能上的谜团，我们自然会想到检查编译器的输出。这里并不需要通过汇编语言转储来分析，从更高层次开始会更容易。
+
+GHC 的 ``-ddump-simpl`` 选项会打印出执行所有高级优化后生成的代码：
+
+::
+
+	$ ghc -O2 -c -ddump-simpl --make BloomFilter/Hash.hs > dump.txt
+	[1 of 1] Compiling BloomFilter.Hash ( BloomFilter/Hash.hs )
+
+产生的 ``dump.txt`` 大约有一千行，其中多数名字是根据原始 Haskell 表示自动生成的。即使如此，搜索 ``doubleHash`` 仍然可以帮助我们立刻定位到函数的定义。下面这个例子说明了如何在 Unix Shell 中寻找到函数的定义：
+
+::
+
+	$ less +/doubleHash dump.txt
+	
+刚开始阅读 GHC 简化器的输出会有些困难。这些输出包含了许多自动生成的名称，并且代码中有许多不明显的注释。我们可以忽略掉自己不了解的东西，将注意力集中在看起来很熟悉的部分上。普通的 Haskell 和 Core 语言在语法特性上有一定相似之处，尤其是类型签名、用于变量绑定的 ``let`` 和模式匹配的 ``case`` 。
+
+如果去除 ``doubleHash`` 定义之外的部分，我们将得到类似如下所示的代码：
+
+::
+
+	__letrec { <1>
+	  go_s1YC :: [GHC.Word.Word32] -> [GHC.Word.Word32] <2>
+	  [Arity 1
+	   Str: DmdType S]
+	  go_s1YC =
+		\ (ds_a1DR :: [GHC.Word.Word32]) ->
+		  case ds_a1DR of wild_a1DS {
+		[] -> GHC.Base.[] @ GHC.Word.Word32; <3>
+		: y_a1DW ys_a1DX -> <4>
+		  GHC.Base.: @ GHC.Word.Word32 <5>
+			(case h1_s1YA of wild1_a1Mk { GHC.Word.W32# x#_a1Mm -> <6>
+			 case h2_s1Yy of wild2_a1Mu { GHC.Word.W32# x#1_a1Mw ->
+			 case y_a1DW of wild11_a1My { GHC.Word.W32# y#_a1MA ->
+			 GHC.Word.W32# <7>
+			   (GHC.Prim.narrow32Word#
+			  (GHC.Prim.plusWord# <8>
+				 x#_a1Mm (GHC.Prim.narrow32Word#
+								  (GHC.Prim.timesWord# x#1_a1Mw y#_a1MA))))
+			 }
+			 }
+			 })
+			(go_s1YC ys_a1DX) <9>
+		  };
+	} in 
+	  go_s1YC <10>
+		(GHC.Word.$w$dmenumFromTo2
+		   __word 0 (GHC.Prim.narrow32Word# (GHC.Prim.int2Word# ww_s1X3)))
+
+[Forec 译注：原著中给出的代码包含了图片，译文使用 ``<编号>`` 这样的标识代替图片，并在下面给出对应的注释。]
+
+这是列表分析部分的主体。看起来似乎令人生畏，但我们可以逐步分析它。你会发现它并非那么复杂：
+
+1. ``__letrec`` 等价于 Haskell 中的 ``let`` ；
+2. GHC 将列表解析的主体部分编译成了一个名为 ``go_s1YC`` 的循环；
+3. 如果 ``case`` 表达式匹配了空列表，我们就返回空列表。是不是看起来很熟悉？
+4. 这个模式在 Haskell 中读作 ``(y_a1DW:ys_a1DX)`` 。``(:)`` 构造器之所以出现在操作数之前，是因为 Core 语言出于简单起见使用了前缀表达式；
+5. 这是 ``(:)`` 构造器的一种应用。符号 ``@`` 表明第一个操作数的类型是 ``Word32`` ；
+6. 三个 ``case`` 表达式分别对一个 ``Word32`` 值拆箱以取出其中包含的原始值。首先处理的是 ``h1`` （这里命名为 ``h1_s1YA`` ），然后是 ``h2`` ，最后是当前列表元素 ``y`` 。拆箱是通过模式匹配实现的：``W32#`` 是用于将原始值装箱的构造函数。按照惯例，原始类型、值以及使用它们的函数在命名时都会包含一个 ``#``；
+7. 这里我们将 ``W32#`` 构造器应用于 ``Word32#`` 类型的原始值，从而给出类型为 ``Word32`` 的正常值；
+8. ``plusWord#`` 和 ``timesWord#`` 函数分别对原始的无符号整数做添加和相乘操作；
+9. 这是 ``(:)`` 构造器的第二个参数，其中 ``go_s1YC`` 函数以递归的方式调用自身；
+10. 这里调用了列表解析函数。它的参数是用 Core 语言表示的 ``[0..n]`` 。
+
+阅读这段代码，我们发现了两处有趣的行为：
+
+* 我们创建了一个列表，并且立刻在 ``go_s1YC`` 循环中解构它。GHC 通常可以检查出这种生产后立刻消费的模式，并将其转化为一个不包含资源分配的循环。这类变换称为 *融合* ，因为生产者和消费者被融合到了一起。不幸的是，在上面的代码中 GHC 并没有为我们实现这一点。
+* 在循环体中重复对 ``h1`` 和 ``he`` 开箱的行为非常浪费资源。
+
+为了解决这些问题，我们对 ``doubleHash`` 函数做了一些细微的修改：
+
+::
+
+	-- file: BloomFilter/Hash.hs
+	doubleHash :: Hashable a => Int -> a -> [Word32]
+	doubleHash numHashes value = go 0
+		where go n | n == num  = []
+				   | otherwise = h1 + h2 * n : go (n + 1)
+
+			  !h1 = fromIntegral (h `shiftR` 32) .&. maxBound
+			  !h2 = fromIntegral h
+
+			  h   = hashSalt 0x9150a946c4a8966e value
+			  num = fromIntegral numHashes
+
+			  
+上面的代码中，我们手动将 ``[0..num]`` 表达式和 “消费” 它的代码合并成单个循环，并为 ``h1`` 和 ``h2`` 添加了严格注释。这些修改将 6 行代码变成 8 行，除此之外没有任何其它变动。它们会对 Core 的输出有什么影响呢？
+
+::
+
+	__letrec {
+	  $wgo_s1UH :: GHC.Prim.Word# -> [GHC.Word.Word32]
+	  [Arity 1
+	   Str: DmdType L]
+	  $wgo_s1UH =
+		\ (ww2_s1St :: GHC.Prim.Word#) ->
+		  case GHC.Prim.eqWord# ww2_s1St a_s1T1 of wild1_X2m {
+		GHC.Base.False ->
+		  GHC.Base.: @ GHC.Word.Word32
+			(GHC.Word.W32#
+			 (GHC.Prim.narrow32Word#
+			  (GHC.Prim.plusWord#
+			   ipv_s1B2
+			   (GHC.Prim.narrow32Word#
+			(GHC.Prim.timesWord# ipv1_s1AZ ww2_s1St)))))
+			($wgo_s1UH (GHC.Prim.narrow32Word#
+							(GHC.Prim.plusWord# ww2_s1St __word 1)));
+		GHC.Base.True -> GHC.Base.[] @ GHC.Word.Word32
+		  };
+	} in  $wgo_s1UH __word 0
+
+新函数被编译成了简单的计数循环。多么令人兴奋！来看看它的实际运行效果：
+
+::
+
+	$ touch WordTest.hs
+	$ ghc -O2 -prof -auto-all --make WordTest
+	[1 of 1] Compiling Main             ( WordTest.hs, WordTest.o )
+	Linking WordTest ...
+
+	$ ./WordTest +RTS -p
+	0.304352s to read words
+	479829 words
+	suggested sizings: Right (4602978,7)
+	1.516229s to construct filter
+	1.069305s to query every element
+	~/src/darcs/book/examples/ch27/examples $ head -20 WordTest.prof 
+	total time  =        3.68 secs    (184 ticks @ 20 ms)
+	total alloc = 2,644,805,536 bytes (excludes profiling overheads)
+
+	COST CENTRE                    MODULE               %time %alloc
+
+	doubleHash                     BloomFilter.Hash      45.1   65.0
+	indices                        BloomFilter.Mutable   19.0   16.4
+	elem                           BloomFilter           12.5    1.3
+	insert                         BloomFilter.Mutable    7.6    0.0
+	easyList                       BloomFilter.Easy       4.3    0.3
+	len                            BloomFilter            3.3    2.5
+	hashByteString                 BloomFilter.Hash       3.3    4.0
+	main                           Main                   2.7    4.0
+	hashIO                         BloomFilter.Hash       2.2    5.5
+	length                         BloomFilter.Mutable    0.0    1.0
+
+针对 ``doubleHash`` 的调整使性能提高了约 11%。对于仅仅添加两行代码的变动来说已经相当不错了。
 
 练习
 ----
 
+* ``easyList`` 中使用的 ``genericLength`` 在处理无限列表时会导致函数陷入无限循环。如何修正此问题？
+* *困难* ：编写一个 ``QuickCheck`` 属性以检查观察到的错误率是否接近用户可容忍的错误率。
+
 
 .. [Broder02] Andrei Broder. Michael Mitzenmacher. “Network applications of Bloom filters: a survey”. Internet Mathematics. 1. 4. 2005. 485-509. A K Peters Ltd..
-.. [59] ``ST`` 是 “状态变换器” （state transformer） 的缩写。
-.. [60] Jenkins 的哈希函数相比一些流行的非加密哈希函数（如 FNV 和 hashpjw）具有好的多的混合属性，因此我们建议避免使用那些非加密哈希函数。
+.. [58] ``ST`` 是 “状态变换器” （state transformer） 的缩写。
+.. [59] 与流行的非加密哈希函数（如 FNV 和 hashpjw）相比，Jenkins 的哈希函数的混合属性要好得多，因此我们建议避免使用那些非加密哈希函数。
+.. [60] 遗憾的是，详细讨论这些情况能否判断不属于本书范畴。
