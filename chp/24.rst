@@ -198,6 +198,9 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
    
    -- | 阻塞，直到所有被管理线程终结 
    waitAll :: ThreadManager -> IO ()
+   
+[Forec 译注：需要对代码做一些改动。在新版本 ``Control.Exception`` 中，``Exception`` 的 kind 是 ``* -> *``，需要提供一个具体型别作为参数。
+可以将代码中的两处 ``Exception`` 替换为 ``SomeException``。]
 
 我们使用一个常见的方法来实现 ``ThreadManager`` 的类型抽象：将其包裹进一个 ``newtype`` ，并防止使用者直接创建这个类型的值。在模块的导出声明中，我们列出了一个创建线程管理器的 IO 动作，但是并不直接导出类型构造器。
 
@@ -373,6 +376,27 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
    -- file: ch24/NiceFork.hs
    waitAll (Mgr mgr) = modifyMVar mgr elems >>= mapM_ takeMVar
        where elems m = return (M.empty, M.elems m)
+
+[Forec 译注：注意 ``waitAll`` 函数其实是有缺陷的，它仅仅能够等待在执行 ``waitAll`` 之前创建的所有线程。如果在等待期间存在某个线程异步启动， ``waitAll`` 是无法获知其状态的。
+
+至此，这个简单的 ``ThreadManager`` 基本可以运行了，你可以在 GHCI 中通过如下方式检测一下：
+
+::
+
+	Prelude> :l NiceFork.hs
+	[1 of 1] Compiling NiceFork         ( NiceFork.hs, interpreted )
+	Ok, modules loaded: NiceFork.
+	*NiceFork> let calc = do { calc; return ()}
+	*NiceFork> manager <- newManager
+	*NiceFork> tid <- forkManaged manager calc
+	*NiceFork> ans <- getStatus manager tid
+	*NiceFork> :m +Data.Maybe
+	*NiceFork Data.Maybe> fromJust ans
+	Threw stack overflow
+	
+我们通过一个反复调用自身的 ``calc`` 函数构造栈溢出，线程管理器成功地返回了这一结果。
+
+]	   
 
 编写更紧凑的代码
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
