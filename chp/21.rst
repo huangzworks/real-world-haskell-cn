@@ -86,6 +86,14 @@ HDBC 包和所有其他驱动都可以通过 `Hackage <http://hackage.haskell.or
 HDBC 的主页上面列出了指向已有 HDBC 后端驱动的链接，
 针对 Sqlite 3 的驱动也可以通过 Hackage 下载到。
 
+[Forec 译注：
+配置此章环境需要加载 ``HDBC`` 和 ``HDBC-Sqlite3`` 两个包。Windows 用户在安装 ``HDBC-Sqlite3`` 时需要 Sqlite3 的源码和动态链接库。
+以 cabal 用户为例，在 http://sqlite.org/download.html 下载 ``sqlite-amalgamation-xxxx.zip`` ，将其解压到某个目录如
+``/usr/hdbc``，下载 ``sqlite-dll-xxxx.zip``，解压到 ``/usr/hdbc_lib``。执行 ``cabal install HDBC-Sqlite3 --extra-include-dirs=/usr/hdbc --extra-lib-dirs=/usr/hdbc_lib`` 。
+Linux 用户以 Debian 源为例，需先通过 ``apt`` 安装 sqlite3 和 libsqlite3-dev，之后再执行 ``cabal install`` 。
+如果这里的译注对你的环境仍不适用，可以在 https://github.com/hdbc/hdbc/wiki/FrequentlyAskedQuestions 寻找有无对应解决方案。
+]
+
 如果读者打算使用 HDBC 去处理其他数据库，
 那么可以在 http://software.complete.org/hdbc/wiki/KnownDrivers 查看 HDBC 已有的驱动：
 上面展示的 ODBC 绑定（binding）基本上可以让你在任何平台（Windows、POSIX等等）上面连接任何数据库；
