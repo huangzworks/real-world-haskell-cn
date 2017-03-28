@@ -74,6 +74,37 @@ GHC 的运行时组件并不按特定顺序执行多个线程。所以，上面�
               main
      where compressFile path = L.writeFile (path ++ ".gz") . compress
 
+[
+Forec 译注：
+原著代码稍微有点瑕疵，上面是修正后的版本。
+此外，在部分 GHC 中执行上述程序可能遇到 ``System.Console.Readline`` 包无法导入的情况。``Readline`` 是 ``GNU readline`` 库的 ``Haskell`` 绑定，你可以在 http://www.gnu.org/software/readline/ 获取稳定版本的 readline 库。
+另一种解决方法是使用 ``haskeline`` 代替 ``readline`` ，它的文档位于 http://hackage.haskell.org/package/haskeline-0.7.3.1/docs/System-Console-Haskeline.html ：
+
+::
+
+	import Control.Concurrent (forkIO)
+	import Control.Exception (handle, SomeException)
+	import qualified Data.ByteString.Lazy as L
+	import System.Console.Haskeline (runInputT, defaultSettings, getInputLine)
+
+	-- Provided by the 'zlib' package on http://hackage.haskell.org/
+	import Codec.Compression.GZip (compress)
+
+	main :: IO ()
+	main = do
+	  maybeLine <- runInputT defaultSettings $ getInputLine "Enter a file to compress> "
+	  case maybeLine of
+	    Nothing -> return () -- user entered EOF
+	    Just "" -> return () -- treat no name as "want to quit"
+	    Just name -> do
+	      handle (print :: SomeException -> IO ()) $ do
+	        content <- L.readFile name
+	        forkIO (compressFile name content)
+	        return ()
+	      main
+
+]
+
 
 因为使用了惰性的 ``ByteString``  I/O ，主线程中做仅仅是打开文件。真正读取文件内容发生在子线程中。
 
@@ -171,6 +202,9 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
    -- | 阻塞，直到所有被管理线程终结 
    waitAll :: ThreadManager -> IO ()
 
+[Forec 译注：需要对代码做一些改动。在新版本 ``Control.Exception`` 中，``Exception`` 的 kind 是 ``* -> *``，需要提供一个具体型别作为参数。
+可以将代码中的两处 ``Exception`` 替换为 ``SomeException``。]
+
 我们使用一个常见的方法来实现 ``ThreadManager`` 的类型抽象：将其包裹进一个 ``newtype`` ，并防止使用者直接创建这个类型的值。在模块的导出声明中，我们列出了一个创建线程管理器的 IO 动作，但是并不直接导出类型构造器。
 
 ::
@@ -214,6 +248,11 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
            putMVar state (either Threw (const Finished) result)
          return (M.insert tid state m, tid)
 
+[Forec 译注：
+上面这段代码中有一些对读者而言可能相对生疏的函数，在此稍作解释：``try`` 的型别声明是 ``Exception e => IO a -> IO (Either e a)`` ，它执行一个 IO 操作，若执行过程中发生异常则返回 ``Left e``，否则返回 ``Right``。
+``either`` 的型别声明是 ``(a -> c) -> (b -> c) -> Either a b -> c``，如果 ``try`` 返回的是 ``Left`` 类型，``either`` 会用 ``Threw`` 将异常值包裹，否则无论 ``Right`` 中包含的值是什么，都返回 ``Finished`` 的状态。
+关于 ``modifyMVar`` ，请看下一节的介绍。它的返回值是一个 tuple，这个 tuple 的第一个元素将被放回到 ``mgr`` 中，而第二个元素会作为返回值。
+]
 
 安全的修改 MVar
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -266,6 +305,21 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
        return r
 
 这种模式很容易用于你的特定需求，无论是处理网络连接，数据库句柄，或者被 ``C`` 库函数管理的数据。
+
+
+[Forec 译注：``block`` 和 ``unblock`` 在很久以前就已经被弃置了。最新 base 包中 ``modifyMVar`` 的实现如下：
+
+::
+
+	modifyMVar :: MVar a -> (a -> IO (a,b)) -> IO b
+	modifyMVar m io =
+	  mask $ \restore -> do
+		a      <- takeMVar m
+		(a',b) <- restore (io a >>= evaluate) `onException` putMVar m a
+		putMVar m a'
+		return b
+		
+]
 
 查看线程状态
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -326,6 +380,27 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
    -- file: ch24/NiceFork.hs
    waitAll (Mgr mgr) = modifyMVar mgr elems >>= mapM_ takeMVar
        where elems m = return (M.empty, M.elems m)
+
+[Forec 译注：注意 ``waitAll`` 函数其实是有缺陷的，它仅仅能够等待在执行 ``waitAll`` 之前创建的所有线程。如果在等待期间存在某个线程异步启动， ``waitAll`` 是无法获知其状态的。
+
+至此，这个简单的 ``ThreadManager`` 基本可以运行了，你可以在 GHCI 中通过如下方式检测一下：
+
+::
+
+	Prelude> :l NiceFork.hs
+	[1 of 1] Compiling NiceFork         ( NiceFork.hs, interpreted )
+	Ok, modules loaded: NiceFork.
+	*NiceFork> let calc = do { calc; return ()}
+	*NiceFork> manager <- newManager
+	*NiceFork> tid <- forkManaged manager calc
+	*NiceFork> ans <- getStatus manager tid
+	*NiceFork> :m +Data.Maybe
+	*NiceFork Data.Maybe> fromJust ans
+	Threw stack overflow
+	
+我们通过一个反复调用自身的 ``calc`` 函数构造栈溢出，线程管理器成功地返回了这一结果。
+
+]
 
 编写更紧凑的代码
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -426,6 +501,29 @@ MVar 和 Chan 是非严格的
      !b <- unblock (io a) `catch` \e ->
            putMVar m a >> throw e
      putMVar m b
+
+[Forec 译注：``block`` 和 ``unblock`` 不被建议使用，更好的方式是使用 ``mask`` 。此外，上面的模式匹配仅仅将表达式求值为 WHNF（弱首范式），关于
+弱首范式的内容将在本章后半部分讨论。你暂时可以简单地将其理解为 “剥去表达式的一层”，例如 ``1 + 2`` 将被求值为 3，而 ``"ab" ++ "bc"`` 则仅仅被求值为
+``('a': ("b" ++ "bc"))``。所以这里代码的 “严格” 是有缺陷的。
+一个可行但不太符合工程应用的做法是使用 ``Control.DeepSeq`` 中的 ``rnf`` 方法，该方法将表达式求值为范式。建议将原著代码修改如下：
+
+::
+
+   -- file: ch24/ModifyMVarStrict.hs
+   {-# LANGUAGE BangPatterns #-}
+   
+   import Control.Concurrent (MVar, putMVar, takeMVar)
+   import Control.Exception (catch, throw, mask)
+   import Prelude hiding (catch)
+   
+   modifyMVar_strict :: MVar a -> (a -> IO a) -> IO ()
+   modifyMVar_strict m io = mask $ \restore -> do
+     a <- takeMVar m
+     b <- restore (io a) `catch` \e -> 
+           putMVar m a >> throw e
+	 rnf b `seq` putMVar m b
+
+]
 
 
 .. note::
