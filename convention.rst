@@ -209,11 +209,13 @@ monad栈      monad transformer stack / monad stack
 
 基本数据类型 primitive data types
 
-范式 normal form
+bang patterns
 
-弱首范式 weak head normal form
+normal form
 
-融合 fusion
+weak head normal form
+
+fusion
 
 
 第二十六章

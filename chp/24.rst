@@ -14,7 +14,7 @@
 
 另一个有效区分并行和并发的点在于他们如何与外部世界交互。由定义，并发程序连续不断的处理网络协议和数据库之类的东西。典型的并行程序可能更专注：其接收流入的数据，咀嚼一会儿（间或有点 I/O），然后将需要返回的数据流吐出来。
 
-许多传统编程语言进一步模糊了并发和并行之间已经难以辨认的边界，这些语言强制程序员使用相同的基础设施创建这两种程序。
+许多传统编程语言进一步模糊了并发和并行之间已经难以辨认的边界，这些语言强制程序员使用相同的基础设施投监这两种程序。
 
 本章将涉及在单个操作系统进程内进行并发和并行编程。
 
@@ -23,7 +23,8 @@
 
 作为并发编程的基础，大多数语言提供了创建多个多线程的方法。 ``Haskell`` 也不例外，尽管使用 ``Haskell`` 进行线程编程看起来和其他语言有些不同。
 
-在 ``Haskell`` 中，线程是彼此独立的 IO 操作。``Control.Concurrent`` 模块中的 ``forkIO`` 函数提供了创建线程的功能：
+In Haskell, a thread is an IO action that executes independently from other threads. To create a thread, we import the Control.Concurrent module and use the forkIO function
+``Haskell`` 中，线程是互相独立的 ``IO`` 动作。为创建线程，需要导入 ``Control.Concurrent`` 模块并使用其中的 ``forkIO`` 函数
 
 ::
 
@@ -50,7 +51,8 @@ GHC 的运行时组件并不按特定顺序执行多个线程。所以，上面�
    
    -- file: ch24/Compressor.hs
    import Control.Concurrent (forkIO)
-   import Control.Exception (handle, SomeException)
+   import Control.Exception (handle)
+   import Control.Monad (forever)
    import qualified Data.ByteString.Lazy as L
    import System.Console.Readline (readline)
    
@@ -72,36 +74,6 @@ GHC 的运行时组件并不按特定顺序执行多个线程。所以，上面�
               main
      where compressFile path = L.writeFile (path ++ ".gz") . compress
 
-[
-Forec 译注：
-原著代码稍微有点瑕疵，上面是修正后的版本。
-此外，在部分 GHC 中执行上述程序可能遇到 ``System.Console.Readline`` 包无法导入的情况。``Readline`` 是 ``GNU readline`` 库的 ``Haskell`` 绑定，你可以在 http://www.gnu.org/software/readline/ 获取稳定版本的 readline 库。
-另一种解决方法是使用 ``haskeline`` 代替 ``readline`` ，它的文档位于 http://hackage.haskell.org/package/haskeline-0.7.3.1/docs/System-Console-Haskeline.html ：
-
-::
-
-	import Control.Concurrent (forkIO)
-	import Control.Exception (handle, SomeException)
-	import qualified Data.ByteString.Lazy as L
-	import System.Console.Haskeline (runInputT, defaultSettings, getInputLine)
-
-	-- Provided by the 'zlib' package on http://hackage.haskell.org/
-	import Codec.Compression.GZip (compress)
-
-	main :: IO ()
-	main = do
-	  maybeLine <- runInputT defaultSettings $ getInputLine "Enter a file to compress> "
-	  case maybeLine of
-	    Nothing -> return () -- user entered EOF
-	    Just "" -> return () -- treat no name as "want to quit"
-	    Just name -> do
-	      handle (print :: SomeException -> IO ()) $ do
-	        content <- L.readFile name
-	        forkIO (compressFile name content)
-	        return ()
-	      main
-
-]
 
 因为使用了惰性的 ``ByteString``  I/O ，主线程中做仅仅是打开文件。真正读取文件内容发生在子线程中。
 
@@ -198,9 +170,6 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
    
    -- | 阻塞，直到所有被管理线程终结 
    waitAll :: ThreadManager -> IO ()
-   
-[Forec 译注：需要对代码做一些改动。在新版本 ``Control.Exception`` 中，``Exception`` 的 kind 是 ``* -> *``，需要提供一个具体型别作为参数。
-可以将代码中的两处 ``Exception`` 替换为 ``SomeException``。]
 
 我们使用一个常见的方法来实现 ``ThreadManager`` 的类型抽象：将其包裹进一个 ``newtype`` ，并防止使用者直接创建这个类型的值。在模块的导出声明中，我们列出了一个创建线程管理器的 IO 动作，但是并不直接导出类型构造器。
 
@@ -245,11 +214,6 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
            putMVar state (either Threw (const Finished) result)
          return (M.insert tid state m, tid)
 
-[Forec 译注：
-上面这段代码中有一些对读者而言可能相对生疏的函数，在此稍作解释：``try`` 的型别声明是 ``Exception e => IO a -> IO (Either e a)`` ，它执行一个 IO 操作，若执行过程中发生异常则返回 ``Left e``，否则返回 ``Right``。
-``either`` 的型别声明是 ``(a -> c) -> (b -> c) -> Either a b -> c``，如果 ``try`` 返回的是 ``Left`` 类型，``either`` 会用 ``Threw`` 将异常值包裹，否则无论 ``Right`` 中包含的值是什么，都返回 ``Finished`` 的状态。
-关于 ``modifyMVar`` ，请看下一节的介绍。它的返回值是一个 tuple，这个 tuple 的第一个元素将被放回到 ``mgr`` 中，而第二个元素会作为返回值。
-]
 
 安全的修改 MVar
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -301,21 +265,7 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
        putMVar m b
        return r
 
-这种模式很容易用于你的特定需求，无论是处理网络连接，数据库句柄，或者是被 ``C`` 库函数管理的数据。
-
-[Forec 译注：``block`` 和 ``unblock`` 在很久以前就已经被弃置了。最新 base 包中 ``modifyMVar`` 的实现如下：
-
-::
-
-	modifyMVar :: MVar a -> (a -> IO (a,b)) -> IO b
-	modifyMVar m io =
-	  mask $ \restore -> do
-		a      <- takeMVar m
-		(a',b) <- restore (io a >>= evaluate) `onException` putMVar m a
-		putMVar m a'
-		return b
-		
-]
+这种模式很容易用于你的特定需求，无论是处理网络连接，数据库句柄，或者被 ``C`` 库函数管理的数据。
 
 查看线程状态
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -358,7 +308,7 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
        Nothing -> return Nothing
        Just st -> Just `fmap` takeMVar st
 
-首先，若保存线程状态的 ``MVar`` 存在则从中读取状态。 ``Map`` 类型的 ``updateLookupWithKey`` 函数很有用：它将查找某个值与更新或移除组合起来。
+首先读取保存线程状态的 ``MVar`` ，若其存在。 ``Map`` 类型的 ``updateLookupWithKey`` 函数很有用：它将查找某个值与更新或移除组合起来。
 
 ::
 
@@ -367,7 +317,7 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
    updateLookupWithKey :: (Ord k) =>
                           (k -> a -> Maybe a) -> k -> Map k a -> (Maybe a, Map k a)
 
-在此处，我们希望若保存线程状态的 ``MVar`` 存在，则将其从 Map 中移除，这样线程管理器将再在管理这个线程。若从其中取到了值，则从中取出线程的退出状态，并将其返回。
+在此处，我们希望若保存线程状态的 ``MVar`` 存在，则将其从 Map 中移除，这样线线程管理器将不在管理这个线程。若从其中取到了值，则从中取出线程的退出状态，并将其返回。
 
 我们的最后一个实用函数简单的等待所有当前被管理的线程完成，且忽略他们的退出状态。
 
@@ -376,27 +326,6 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
    -- file: ch24/NiceFork.hs
    waitAll (Mgr mgr) = modifyMVar mgr elems >>= mapM_ takeMVar
        where elems m = return (M.empty, M.elems m)
-
-[Forec 译注：注意 ``waitAll`` 函数其实是有缺陷的，它仅仅能够等待在执行 ``waitAll`` 之前创建的所有线程。如果在等待期间存在某个线程异步启动， ``waitAll`` 是无法获知其状态的。
-
-至此，这个简单的 ``ThreadManager`` 基本可以运行了，你可以在 GHCI 中通过如下方式检测一下：
-
-::
-
-	Prelude> :l NiceFork.hs
-	[1 of 1] Compiling NiceFork         ( NiceFork.hs, interpreted )
-	Ok, modules loaded: NiceFork.
-	*NiceFork> let calc = do { calc; return ()}
-	*NiceFork> manager <- newManager
-	*NiceFork> tid <- forkManaged manager calc
-	*NiceFork> ans <- getStatus manager tid
-	*NiceFork> :m +Data.Maybe
-	*NiceFork Data.Maybe> fromJust ans
-	Threw stack overflow
-	
-我们通过一个反复调用自身的 ``calc`` 函数构造栈溢出，线程管理器成功地返回了这一结果。
-
-]
 
 编写更紧凑的代码
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -453,7 +382,7 @@ MVar 和 Chan 是非严格的
 
 正如其他容器类型，误认为 ``MVar`` 和 ``Chan`` 是严格的会导致空间和性能的泄漏。考虑一下这个很可能发生的情况：
 
-我们分离一个线程以在另一个核上执行一些开销较大的计算：
+我们分离一个线程以在另一个核上执行一些开销较大的计算
 
 ::
 
@@ -462,11 +391,11 @@ MVar 和 Chan 是非严格的
    
    notQuiteRight = do
      mv <- newEmptyMVar
-     forkIO $ expensiveComputation mv
+     forkIO $ expensiveComputation_stricter mv
      someOtherActivity
      result <- takeMVar mv
      print result
-	 
+
 它看上去做了一些事情并将结果存入 ``MVar`` 。
 
 ::
@@ -497,29 +426,6 @@ MVar 和 Chan 是非严格的
      !b <- unblock (io a) `catch` \e ->
            putMVar m a >> throw e
      putMVar m b
-	 
-[Forec 译注：``block`` 和 ``unblock`` 不被建议使用，更好的方式是使用 ``mask`` 。此外，上面的模式匹配仅仅将表达式求值为 WHNF（弱首范式），关于
-弱首范式的内容将在本章后半部分讨论。你暂时可以简单地将其理解为 “剥去表达式的一层”，例如 ``1 + 2`` 将被求值为 3，而 ``"ab" ++ "bc"`` 则仅仅被求值为
-``('a': ("b" ++ "bc"))``。所以这里代码的 “严格” 是有缺陷的。
-一个可行但不太符合工程应用的做法是使用 ``Control.DeepSeq`` 中的 ``rnf`` 方法，该方法将表达式求值为范式。建议将原著代码修改如下：
-
-::
-
-   -- file: ch24/ModifyMVarStrict.hs
-   {-# LANGUAGE BangPatterns #-}
-   
-   import Control.Concurrent (MVar, putMVar, takeMVar)
-   import Control.Exception (catch, throw, mask)
-   import Prelude hiding (catch)
-   
-   modifyMVar_strict :: MVar a -> (a -> IO a) -> IO ()
-   modifyMVar_strict m io = mask $ \restore -> do
-     a <- takeMVar m
-     b <- restore (io a) `catch` \e -> 
-           putMVar m a >> throw e
-	 rnf b `seq` putMVar m b
-
-]
 
 
 .. note::
@@ -534,7 +440,7 @@ MVar 和 Chan 是非严格的
 Chan 是无边界的
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-因为 ``writeChan`` 总是立即成功，所以在使用 ``Chan`` 时有潜在风险。若对某个 ``Chan`` 的写入多于其读取，则对未读消息的读取将远远落后于其增长。``Chan`` 占用的内存会不断增长，直到耗尽可用内存。
+因为 ``writeChan`` 总是立即成功，所以在使用 ``Chan`` 时有潜在风险。若对某个 ``Chan`` 的写入多于其读取， ``Chan`` 将用不检查的方法增长：对未读消息的读取将远远落后于其增长。
 
 
 共享状态的并发仍不容易
@@ -604,14 +510,14 @@ Chan 是无边界的
 
     * “threaded” 库使用多个操作系统线程运行 ``Haskell`` 线程。它在创建线程和使用 ``MVar`` 时具有更高的开销。
 
-若我们向编译器传递 ``-threaded`` 参数，它将使用 ``threaded`` 运行时库链接我们的程序。在编译库和源码文件时无需指定 ``-threaded`` ，只是在最终生成可执行文件时需要指定。
+若我们在向编译器传递 ``-threadedoption`` 参数，它将使用 ``threaded`` 运行时库链接我们的程序。在编译库和源码文件时无需指定 ``-threaded`` ，只是在最终生成可执行文件时需要指定。
 
 即使为程序指定了 ``threaded`` 运行时，默认情况下它仍将只使用一个核运行。必须明确告诉运行时使用多少个核。
 
 运行时选项
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-运行程序时可以向 GHC 的运行时系统传递命令行参数。在将控制权交给我们的代码前，运行时扫描程序的参数，看是否有命令行选项 ``+RTS`` 。其后跟随的所有选项都被运行时解释，直到特殊的选项 ``-RTS`` ，这些选项都是提供给运行时系统的，不为我们的程序。运行时会对我们的代码隐藏所有这些选项。当我们使用 ``System.Environment`` 模块的 ``getArgs`` 函数来获得我们的命令行参数是，我们不会在其中获得运行时选项。
+运行程序时可以向 GHC 的运行时系统传递命令行参数。在将控制权交给我们的代码前，运行时扫描程序的参数，看是否有命令行选项 ``+RTS`` 。其后跟随的所有选项都被运行时解释，直到特殊的选项 ``-RTS`` ，这些选项都是提供给运行时系统的，不为我们的程序。运行时会对我们的代码隐藏所有这些选项。当我们使用 ``System.Environment`` 模块的 ``getArgsfunction`` 来获得我们的命令行参数是，我们不会在其中获得运行时选项。
 
 ``threaded`` 运行时接受参数 ``-N`` [55]_ 。 其接受一个参数，指定了 ``GHC`` 的运行时系统将使用的核数。这个选项对输入很挑剔： ``-N`` 和参数之间必须没有空格。 ``-N4`` 可被接受， ``-N 4`` 则不被接受。
 
@@ -619,7 +525,7 @@ Chan 是无边界的
 找出 Haskell 可以使用多少核
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-``GHC.Conc`` 模块输出一个变量， ``numCapabilities`` ，它会告诉我们运行时系统被 ``-N`` 选项指定了多少核。
+``GHC.Conc`` 模块输出一个变量， ``numCapabilities`` ，它会告诉我们运行时系统被 ``-NRTS`` 选项指定了多少核。
 
 ::
 
@@ -647,14 +553,14 @@ Chan 是无边界的
 
 选择正确的运行时需要花点心思。 ``threaded`` 运行时可以使用多核，但是也有相应的代价：线程间共享数据的成本比 ``non-threaded`` 运行时更大。
 
-目前为止， GHC 的 6.8.3 版本使用的垃圾收集器是单线程的：它执行时暂停其他所有线程，而且它是在单核上执行。这限制了我们在使用多核的时候希望看到的性能改进 [56]_ 。
+目前为止， GHC 的 6.8.3 版本使用的垃圾收集器是单线程的：它执行时暂停其他所有线程，而且它是在单核上执行。这限制了我们在使用多核的时候希望看到的性能改进[56]_。
 
 很多真实世界中的并发程序中，一个单独的线程多数时间实在等待一个网络请求或响应。这些情况下，若以一个单独的 ``Haskell`` 程序为数万并发客户端提供服务，使用低开销的 ``non-threaded`` 运行时很可能是合适的。例如，与其用 4 个核跑 threaded 运行时的单个服务器程序，可能同时跑 4 个 non-threaded 运行时的相同服务器程序性能更好。
 
 我们的目的并不是阻止你使用 ``threaded`` 运行时。相对于 ``non-threaded`` 运行时它并没有特别大的开销：相对于其他编程语言，线程依旧惊人的轻量。我们仅是希望说明 ``threaded`` 运行时并不是在所有场景都是最佳选择。
 
 
-Haskell 中的并行编程
+Parallel programming in Haskell
 ----------------------------------
 
 现在让我们来关注一下并行编程。对很多计算密集型问题，可以通过分解问题，并在多个核上求值来更快的计算出结果。多核计算机已经普及，甚至在最新的笔记本上都有，但是很少有程序可以利用这一优势。
@@ -664,325 +570,13 @@ Haskell 中的并行编程
 但是我们可以确定，使用 ``Haskell`` 的并发特性开发并行代码时，有许多更简单的方法。在一个普通的 Haskell 函数上稍加变化，就可以并行求值。
 
 
-范式和首范式
+Normal form and head normal form
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-``seq`` 函数将一个表达式求值为首范式（简称 HNF）。``seq`` 一旦到达最外层的构造函数（也就是 “首部”）就会停止，这与范式不同（NF），
-被称作范式的表达式必然是被完全求值的，而非仅仅 “剥离” 掉最外层的构造函数。
+TBD
 
-你可能会经常听到 Haskell 程序员提到弱首范式（WHNF）。对一般数据来说，弱首范式和首范式相同。它们仅仅在功能上有些许区别，
-这里我们就不过多关注了。
 
-[
-Forec 译注：读者只需要记住范式和弱首范式这两个概念的区别，HNF 几乎可以忽略。以下两个链接可以帮助更好的理解，
-这部分内容与并行编程关系不是非常紧密，因此不在此处过多叙述：  
-* Haskell Wiki: https://en.wikibooks.org/wiki/Haskell/Laziness#Thunks_and_Weak_head_normal_form
-* StackOverflow: http://stackoverflow.com/questions/6872898/haskell-what-is-weak-head-normal-form
-]
-
-排序
-^^^^^^^^
-
-这是一个使用分治算法实现的 Haskell 排序函数：
-
-::
-
-	-- file: ch24/Sorting.hs
-	sort :: (Ord a) => [a] -> [a]
-	sort (x:xs) = lesser ++ x:greater
-		where lesser  = sort [y | y <- xs, y <  x]
-			  greater = sort [y | y <- xs, y >= x]
-	sort _ = []
-
-``sort`` 函数实现了著名的快速排序算法，很多 Haskell 程序员将其视作经典：
-在早期的 Haskell 教程中，用一行代码实现的 ``sort`` 经常作为示例向读者展示 Haskell 强大的表达能力。
-这里我们将代码切分为几行以方便比较串行和并行版本。
-
-下面是对 ``sort`` 工作流程的简要介绍：
-
-1. 从列表中取出一个元素，这个元素被称为 “轴心”（或哨兵）。每个元素都要和轴心比较。上面的代码简单地通过模式匹配选取列表的第一个元素作为轴心；
-2. 使用原始列表中除轴心外的其它元素构造一个子列表，子列表中元素的值全部小于轴心，并递归地处理子列表；
-3. 与 2 类似，构造另一个子列表，但子列表中元素的值均大于或等于轴心的值，递归处理这个子列表；
-4. 将 2、3 两步中排序后的子列表通过轴心连接。
-
-将代码变换为并行版本
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-并行版本的排序函数相对要复杂一些：
-
-::
-
-	-- file: ch24/Sorting.hs
-	module Sorting where
-
-	import Control.Parallel (par, pseq)
-
-	parSort :: (Ord a) => [a] -> [a]
-	parSort (x:xs)    = force greater `par` (force lesser `pseq` (lesser ++ x:greater))
-		where lesser  = parSort [y | y <- xs, y <  x]
-			  greater = parSort [y | y <- xs, y >= x]
-	parSort _         = []
-
-不过我们并没有改变代码的结构。``parSort`` 仅仅多使用了三个函数： ``par``、``pseq`` 和 ``force``。
-
-``par`` 函数由 ``Control.Parallel`` 模块提供。它与 ``seq`` 目的类似：将左侧参数求值为弱首范式并返回右侧参数。
-``par`` 的名字很好地阐述了它的功能：``par`` 能够在其它运算执行的同时并行地对其左侧参数求值。
-
-``pseq`` 也和 ``seq`` 类似：它在返回右侧表达式之前将左侧表达式求值为弱首范式。这二者之间的区别很微妙，
-但对于并行编程而言非常重要：编译器不保证 ``seq`` 的求值顺序，即如果编译器认为首先对右侧参数求值能够提高性能，则
-它将先计算右侧参数。对于单核执行的程序来说，这种灵活性很有必要，但对多核代码而言不够健壮。
-相比之下，编译器能够保证 ``pseq`` 左侧参数的求值过程早于右侧参数。
-
-下面这些改动对代码来说是非常显著的，这里我们就不过多讨论了。
-
-* 使用多少核心
-* 线程之间如何通信
-* 如何将工作分配给多个可用核心
-* 哪些数据将在线程之间共享，哪些又该是线程私有的
-* 如何确定所有任务均已完成
-
-
-明确在并行中执行什么
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-并行的 Haskell 代码之所以能够表现出更优秀的性能，是因为计算过程中有大量重复、独立、可并行计算的工作。
-非严格求值会阻碍并行程序的执行，因此我们会在并行代码中使用 ``force`` 函数。下面通过一个错误的例子解释 ``force`` 函数的功能：
-	
-::
-
-	-- file: ch24/Sorting.hs
-	sillySort (x:xs) = greater `par` (lesser `pseq` (lesser ++ x:greater))
-		where lesser   = sillySort [y | y <- xs, y <  x]
-			  greater  = sillySort [y | y <- xs, y >= x]
-	sillySort _        = []
-
-注意，我们在 ``par`` 和 ``pseq`` 两处用普通求值取代了 ``force lesser`` 和 ``force greater``。
-
-回忆一下，对弱首范式的求值会在 “看到” 表达式的外部构造器时停止。在错误的例子中，我们将每个有序的子列表求值为 WHNF。
-因为最外层的构造器仅仅是一个列表构造器，上面的代码实际上仅仅强制对每个排序子列表的第一个元素做了求值，
-每个排序子列表剩余的元素仍未被完全求值。换句话说，上面代码在并行部分执行时几乎没有做任何有效计算，
-``sillySort`` 的执行过程和完全顺序的代码没什么差别。
-
-[Forec 译注：考虑此前译注给出的例子，``"ab" ++ "bc"`` 的弱首范式仅仅是 ``'a' : ("b" ++ "bc")``。
-以待排序列表 ``[3, 2, 5, 1, 3]`` 为例，``sillySort`` 试图在 ``par`` 包装的并行操作中计算出排序好的两个子列表。
-假设轴心元素为 3，则小于轴心的待排序子列表应为 ``[2, 1]``，而 ``par`` 中的并行操作在计算出第一个满足条件的
-元素 2 后，得到 ``lesser = (2: _)``，已经遇到了最外层的列表构造器，因此停止计算。
-真正求出完整待排序子列表是在后续顺序操作 ``++`` 时，因为需要列表中所有元素，这时程序才开始计算。
-
-这里给出一个译者认为更容易理解弱首范式的例子：在 GHCI 中执行如下指令。
-
-::
-
-	> let list = [1..10]
-	> let whnfList = map (+1) list
-	> :sprint whnfList
-	whnfList = _
-	> length whnfList
-	10
-	> :sprint whnfList
-	whnfList = [_, _, _, _, _, _, _, _, _, _]
-	
-可以看出，``length`` 操作仅需要 ``whnfList`` 中元素的数量，并没有对其中元素进行更深层次的求值。
-
-]
-
-我们使用 ``force`` 函数，在构造函数返回前遍历整个列表以避免这种情况出现。
-
-::
-
-	-- file: ch24/Sorting.hs
-	force :: [a] -> ()
-	force xs = go xs `pseq` ()
-		where go (_:xs) = go xs
-			  go [] = 1
-			  
-注意，我们并不在乎列表中具体有什么，而是仅仅把列表遍历一遍，遍历之后再调用 ``pseq`` 。
-因为我们会在 ``par`` 或者 ``pseq`` 的左侧使用 ``force``，所以返回值无所谓。
-
-当然，很多情况下我们会需要对列表中的个别元素强制求值。下面会介绍一个基于类型类的解决方案。
-
-par 提供什么保证？
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-实际上，``par`` 函数并不保证会将表达式并行求值，它只在对表达式并行求值有意义的时候才这么做。
-在并行编程中，这种行为比保证并行执行更有效。它允许运行时系统遇到 ``par`` 时智能调度。
-
-举个例子，运行时系统可能发现表达式过于简单，并行求值带来的性能提升远低于并行操作本身的额外开销。
-或者，运行时系统发现所有的计算核心均正在工作，而启动一个新的并行运算仅仅会增加待运行线程的数量。
-
-这个潜规则影响了我们如何编写并行代码。假设系统性能不会因为线程间争夺核心资源下降，
-考虑到 par 在运行时可以智能调度，我们就可以将它应用到任何想应用的地方。
-
-运行并测试性能
-^^^^^^^^^^^^^^^^^^
-
-将 ``sort``、``parSort`` 和 ``parSort2`` 保存到 ``Sorting.hs`` 中并封装为 ``Sorting`` 模块。
-我们创建一个驱动程序以计算这些排序函数的性能：
-
-::
-
-	-- file: ch24/SortMain.hs
-
-	module Main where
-
-	import Data.Time.Clock (diffUTCTime, getCurrentTime)
-	import System.Environment (getArgs)
-	import System.Random (StdGen, getStdGen, randoms)
-
-	import Sorting
-
-	-- testFunction = sort
-	-- testFunction = seqSort
-	testFunction = parSort
-	-- testFunction = parSort2 2
-
-	randomInts :: Int -> StdGen -> [Int]
-	randomInts k g = let result = take k (randoms g)
-					 in force result `seq` result
-
-	main = do
-	  args <- getArgs
-	  let count | null args = 500000
-				| otherwise = read (head args)
-	  input <- randomInts count `fmap` getStdGen
-	  putStrLn $ "We have " ++ show (length input) ++ " elements to sort."
-	  start <- getCurrentTime
-	  let sorted = testFunction input
-	  putStrLn $ "Sorted all " ++ show (length sorted) ++ " elements."
-	  end <- getCurrentTime
-	  putStrLn $ show (end `diffUTCTime` start) ++ " elapsed."
-
-简单起见，我们使用 ``testFunction`` 变量选择用于基准测试的排序函数。
-
-上面的程序接受一个可选的命令行参数，用于指定待排序随机数组的长度。
-
-非严格求值是性能测量和分析中要注意的 “雷区”。下面是驱动程序中特别要避免的一些潜在问题：
-
-* *非严格求值会使测量单一行为变为测量多个行为。* Haskell 默认的随机数产生器（PRNG）很慢，而且 ``random`` 函数仅仅在需要的时候才产生下一个随机数。我们在记录开始时间之前对输入列表的每个元素进行了强制求值，并且打印了列表的长度：这保证了程序在计算之前就已经生成了全部的随机数。如果我们忽略了这一步，则并行计算的过程会包含随机数的生成，进而导致测量出的时间变为生成随机数和数据排序所用时间之和，而非数据排序本身的耗时。
-
-* *隐含的数据依赖。* 在产生随机数列表时，只打印列表的长度并不会对列表完全求值。``length`` 函数只会遍历列表的结构而非列表内的每个元素。因此，在排序操作执行前，列表中并没有生成好的随机数。这一行为可能严重拖慢性能。每个随机数的产生都取决于列表中前一个随机数的值，但并行的数据排序已经将列表元素分散到了不同的处理器内核中。如果排序前没有对输入的随机数列表完全求值，那么运行时就会遭遇可怕的 “乒乓” 效应：计算会在核心之间不停跳跃，导致性能的迅速下降。尝试删除 ``main`` 函数中应用在随机数列表上的 ``force`` ：你会发现并行代码比顺序执行的程序慢了三倍。[Forec 译注：原著作者似乎忘记在代码中使用 ``force``。可以在运算开始前加入 ``force input``。]
-
-* *让我们错误地认为代码执行了有意义的工作。* 为了保证数据排序的执行，我们在记录结束时间之前将结果列表的长度打印到了屏幕上。如果没有 ``putStrLn`` 强制要求列表长度，排序压根就不会执行。
-
-在构建程序时开启优化和 GHC 的运行时线程支持：
-
-::
-
-	$ ghc -threaded -O2 --make SortMain
-	[1 of 2] Compiling Sorting          ( Sorting.hs, Sorting.o )
-	[2 of 2] Compiling Main             ( SortMain.hs, SortMain.o )
-	Linking SortMain ...
-
-在程序运行时告知 GHC 的运行时系统使用多少核心。首先测试最原始的 ``sort`` 函数，看看基础性能如何：
-
-::
-
-	$ ./Sorting +RTS -N1 -RTS 700000
-	We have 700000 elements to sort.
-	Sorted all 700000 elements.
-	3.178941s elapsed.
-
-启用两个核心并不会提升顺序执行代码的性能：
-
-::
-
-	$ ./Sorting +RTS -N2 -RTS 700000
-	We have 700000 elements to sort.
-	Sorted all 700000 elements.
-	3.259869s elapsed.
-		
-如果重新编译，测试 ``parSort`` 的性能，就会发现结果还不如顺序代码：
-
-::
-
-	$ ./Sorting +RTS -N1 -RTS 700000
-	We have 700000 elements to sort.
-	Sorted all 700000 elements.
-	3.915818s elapsed.
-	$ ./Sorting +RTS -N2 -RTS 700000
-	We have 700000 elements to sort.
-	Sorted all 700000 elements.
-	4.029781s elapsed.
-	
-性能上没有任何提升。这看起来是以下两个原因之一造成的：要么是 ``par`` 本身的开销过大，
-要么是我们滥用了 ``par`` 。为了鉴别究竟哪个才是罪魁祸首，
-我们编写了一个类似 ``parSort`` 的函数 ``seqSort``，它使用 ``pseq`` 代替 ``par`` ：
-
-::
-
-	seqSort :: (Ord a) => [a] -> [a]
-	seqSort (x:xs) = lesser `pseq` (greater `pseq` (lesser ++ x:greater))
-		where lesser  = seqSort [y | y <- xs, y <  x]
-			  greater = seqSort [y | y <- xs, y >= x]
-	seqSort _ = []
-
-我们还删去了 ``parSort`` 中对 ``force`` 的调用。所以将 ``seqSort`` 和 ``sort`` 比较就可以观察到只应用 ``pseq`` 的性能：
-
-::
-
-	$ ./Sorting +RTS -N1 -RTS 700000
-	We have 700000 elements to sort.
-	Sorted all 700000 elements.
-	3.848295s elapsed.
-
-上面的运行结果说明 ``par`` 和 ``pseq`` 耗时相似。我们该如何改进性能呢？
-
-性能调优
-^^^^^^^^^^^^^^^^^^^
-
-在 ``parSort`` 中，调用 ``par`` 的次数是待排序数据数量的两倍。尽管 ``par`` 的开销很小，但它毕竟也不是 “免费” 的。
-当递归调用 ``parSort`` 时，我们最终将 ``par`` 应用到了单个元素上。在这种细微的粒度下，使用 ``par`` 的成本远超其带来的增益。
-为了减少这种影响，我们在待排序数据数量小于某个阈值时采用非并行排序。
-
-::
-
-	-- file: ch24/Sorting.hs
-	parSort2 :: (Ord a) => Int -> [a] -> [a]
-	parSort2 d list@(x:xs)
-	  | d <= 0     = sort list
-	  | otherwise = force greater `par` (force lesser `pseq`
-										 (lesser ++ x:greater))
-		  where lesser      = parSort2 d' [y | y <- xs, y <  x]
-				greater     = parSort2 d' [y | y <- xs, y >= x]
-				d' = d - 1
-	parSort2 _ _              = []
-
-``parSort2`` 在到达可控深度时停止递归以及创建新的并行计算。如果待处理数据的规模已知，程序就能在剩余工作数量足够少的时刻停止
-并行计算并切换到非并行代码。
-
-::
-
-	$ ./Sorting +RTS -N2 -RTS 700000
-	We have 700000 elements to sort.
-	Sorted all 700000 elements.
-	2.947872s elapsed.
-
-在双核系统中，这一改进将运行速度提升了大约 25%。性能的提升并不高，但想想我们对代码所做的改变：几句注解而已就让速度提升了四分之一。
-
-上面的排序函数难以获得良好的并行性能。它执行了大量内存分配，导致垃圾回收器频繁运行。``-sstderr`` 
-这一 RTS 选项能够将垃圾回收统计信息打印到屏幕，反馈信息显示程序大约有 40% 的时间用于回收垃圾。
-由于 GHC 6.8 中的垃圾回收器会停止所有线程并运行在单个内核上，这一点也就成为了程序的瓶颈。
-
-将 ``par`` 应用在内存分配不频繁的代码中可能会带来明显的性能改进。我们已经看到，相比单核运算，
-上面的基准测试在双核系统上能够取得 1.8 倍加速。在这本书编写时，GHC 正在开发一个并行的垃圾回收器，
-届时在多核系统上执行大量内存分配的代码也能获得令人满意的性能。
-
-.. info::
-
-	留意 GHC 6.8.2 中的垃圾回收 bug
-	
-	GHC 6.8.2 release 版本中的垃圾回收器存在一个会导致 ``par`` 阻塞的 bug。如果你想使用 ``par``，我们建议你至少升级到 GHC 6.8.3。
-	
-[Forec 译注：翻译此处时 GHC 的最新版本为 8.0.2，已支持多核系统的垃圾回收。实际测试表明，
-即使支持多核 GC，并行编程的主要瓶颈在很多时候还是垃圾回收。]
-
-练习
-^^^^^^
-
-1. 决定什么时候从 ``parSort2`` 切换到 ``sort`` 不是一件容易的事。我们上面实现的方法是根据递归的深度选择，另一种方法是根据待排序子列表的长度决定。重写 ``parSort2`` 使其在待排序子列表长度小于某个数的时候切换到 ``sort``。
-2. 测试基于列表长度切换的 ``parSort2`` 的性能，并于基于递归深度的版本比较。哪一个性能更好？
-	
-并行策略和 Map Reduce
+Parallel strategies and MapReduce
 ---------------------------------------
 
 TBD
