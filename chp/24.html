@@ -107,6 +107,34 @@
   <span class="kr">where</span> <span class="n">compressFile</span> <span class="n">path</span> <span class="ow">=</span> <span class="kt">L</span><span class="o">.</span><span class="n">writeFile</span> <span class="p">(</span><span class="n">path</span> <span class="o">++</span> <span class="s">&quot;.gz&quot;</span><span class="p">)</span> <span class="o">.</span> <span class="n">compress</span>
 </pre></div>
 </div>
+<p>[
+Forec 译注：
+原著代码稍微有点瑕疵，上面是修正后的版本。
+此外，在部分 GHC 中执行上述程序可能遇到 <code class="docutils literal"><span class="pre">System.Console.Readline</span></code> 包无法导入的情况。<code class="docutils literal"><span class="pre">Readline</span></code> 是 <code class="docutils literal"><span class="pre">GNU</span> <span class="pre">readline</span></code> 库的 <code class="docutils literal"><span class="pre">Haskell</span></code> 绑定，你可以在 <a class="reference external" href="http://www.gnu.org/software/readline/">http://www.gnu.org/software/readline/</a> 获取稳定版本的 readline 库。
+另一种解决方法是使用 <code class="docutils literal"><span class="pre">haskeline</span></code> 代替 <code class="docutils literal"><span class="pre">readline</span></code> ，它的文档位于 <a class="reference external" href="http://hackage.haskell.org/package/haskeline-0.7.3.1/docs/System-Console-Haskeline.html">http://hackage.haskell.org/package/haskeline-0.7.3.1/docs/System-Console-Haskeline.html</a> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kr">import</span> <span class="nn">Control.Concurrent</span> <span class="p">(</span><span class="nf">forkIO</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Control.Exception</span> <span class="p">(</span><span class="nf">handle</span><span class="p">,</span> <span class="kt">SomeException</span><span class="p">)</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.ByteString.Lazy</span> <span class="k">as</span> <span class="n">L</span>
+<span class="kr">import</span> <span class="nn">System.Console.Haskeline</span> <span class="p">(</span><span class="nf">runInputT</span><span class="p">,</span> <span class="nf">defaultSettings</span><span class="p">,</span> <span class="nf">getInputLine</span><span class="p">)</span>
+
+<span class="c1">-- Provided by the &#39;zlib&#39; package on http://hackage.haskell.org/</span>
+<span class="kr">import</span> <span class="nn">Codec.Compression.GZip</span> <span class="p">(</span><span class="nf">compress</span><span class="p">)</span>
+
+<span class="nf">main</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">main</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">maybeLine</span> <span class="ow">&lt;-</span> <span class="n">runInputT</span> <span class="n">defaultSettings</span> <span class="o">$</span> <span class="n">getInputLine</span> <span class="s">&quot;Enter a file to compress&gt; &quot;</span>
+  <span class="kr">case</span> <span class="n">maybeLine</span> <span class="kr">of</span>
+    <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="nb">()</span> <span class="c1">-- user entered EOF</span>
+    <span class="kt">Just</span> <span class="s">&quot;&quot;</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="nb">()</span> <span class="c1">-- treat no name as &quot;want to quit&quot;</span>
+    <span class="kt">Just</span> <span class="n">name</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+      <span class="n">handle</span> <span class="p">(</span><span class="n">print</span> <span class="ow">::</span> <span class="kt">SomeException</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span><span class="p">)</span> <span class="o">$</span> <span class="kr">do</span>
+        <span class="n">content</span> <span class="ow">&lt;-</span> <span class="kt">L</span><span class="o">.</span><span class="n">readFile</span> <span class="n">name</span>
+        <span class="n">forkIO</span> <span class="p">(</span><span class="n">compressFile</span> <span class="n">name</span> <span class="n">content</span><span class="p">)</span>
+        <span class="n">return</span> <span class="nb">()</span>
+      <span class="n">main</span>
+</pre></div>
+</div>
+<p>]</p>
 <p>因为使用了惰性的 <code class="docutils literal"><span class="pre">ByteString</span></code>  I/O ，主线程中做仅仅是打开文件。真正读取文件内容发生在子线程中。</p>
 <p>当用户输入的文件名并不存在时将发生异常， <code class="docutils literal"><span class="pre">handle</span> <span class="pre">(print</span> <span class="pre">::</span> <span class="pre">(SomeException-&gt;</span> <span class="pre">IO</span> <span class="pre">()))</span></code> 是一个低成本的打印错误信息的方式。</p>
 </div>
@@ -114,7 +142,7 @@
 <div class="section" id="id6">
 <h2>线程间的简单通信<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h2>
 <p>在两个线程之间共享信息最简单的方法是，让它们使用同一个变量。上面文件压缩的例子中， <code class="docutils literal"><span class="pre">main</span></code> 线程与子线程共享了文件名和文件内容。 <code class="docutils literal"><span class="pre">Haskell</span></code> 的数据默认是不可变的，所以这样共享不会有问题，两个线程都无法修改另一个线程中的文件名和文件内容。</p>
-<p>线程经常需要和其他线程进行活跃的通信。例如， <code class="docutils literal"><span class="pre">GHC</span></code>  没有提供查看其他线程是否还在执行、执行完毕、或者崩溃的方法 <a class="footnote-reference" href="#id22" id="id7">[54]</a> 。可是，其提供了同步变量类型， <code class="docutils literal"><span class="pre">MVar</span></code> ，我们可以通过它自己实现上述功能。</p>
+<p>线程经常需要和其他线程进行活跃的通信。例如， <code class="docutils literal"><span class="pre">GHC</span></code>  没有提供查看其他线程是否还在执行、执行完毕、或者崩溃的方法 <a class="footnote-reference" href="#id30" id="id7">[54]</a> 。可是，其提供了同步变量类型， <code class="docutils literal"><span class="pre">MVar</span></code> ，我们可以通过它自己实现上述功能。</p>
 <p><code class="docutils literal"><span class="pre">MVar</span></code> 的行为类似一个单元素的箱子：其可以为满或空。将一些东西扔进箱子，使其填满，或者从中拿出一些东西，使其变空。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">putMVar</span>
 <span class="nf">putMVar</span> <span class="ow">::</span> <span class="kt">MVar</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
@@ -189,6 +217,8 @@
 <span class="nf">waitAll</span> <span class="ow">::</span> <span class="kt">ThreadManager</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
 </pre></div>
 </div>
+<p>[Forec 译注：需要对代码做一些改动。在新版本 <code class="docutils literal"><span class="pre">Control.Exception</span></code> 中，<code class="docutils literal"><span class="pre">Exception</span></code> 的 kind 是 <code class="docutils literal"><span class="pre">*</span> <span class="pre">-&gt;</span> <span class="pre">*</span></code>，需要提供一个具体型别作为参数。
+可以将代码中的两处 <code class="docutils literal"><span class="pre">Exception</span></code> 替换为 <code class="docutils literal"><span class="pre">SomeException</span></code>。]</p>
 <p>我们使用一个常见的方法来实现 <code class="docutils literal"><span class="pre">ThreadManager</span></code> 的类型抽象：将其包裹进一个 <code class="docutils literal"><span class="pre">newtype</span></code> ，并防止使用者直接创建这个类型的值。在模块的导出声明中，我们列出了一个创建线程管理器的 IO 动作，但是并不直接导出类型构造器。</p>
 <div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch24/NiceFork.hs</span>
 <span class="kr">module</span> <span class="nn">NiceFork</span>
@@ -224,6 +254,11 @@
       <span class="n">return</span> <span class="p">(</span><span class="kt">M</span><span class="o">.</span><span class="n">insert</span> <span class="n">tid</span> <span class="n">state</span> <span class="n">m</span><span class="p">,</span> <span class="n">tid</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>[Forec 译注：
+上面这段代码中有一些对读者而言可能相对生疏的函数，在此稍作解释：<code class="docutils literal"><span class="pre">try</span></code> 的型别声明是 <code class="docutils literal"><span class="pre">Exception</span> <span class="pre">e</span> <span class="pre">=&gt;</span> <span class="pre">IO</span> <span class="pre">a</span> <span class="pre">-&gt;</span> <span class="pre">IO</span> <span class="pre">(Either</span> <span class="pre">e</span> <span class="pre">a)</span></code> ，它执行一个 IO 操作，若执行过程中发生异常则返回 <code class="docutils literal"><span class="pre">Left</span> <span class="pre">e</span></code>，否则返回 <code class="docutils literal"><span class="pre">Right</span></code>。
+<code class="docutils literal"><span class="pre">either</span></code> 的型别声明是 <code class="docutils literal"><span class="pre">(a</span> <span class="pre">-&gt;</span> <span class="pre">c)</span> <span class="pre">-&gt;</span> <span class="pre">(b</span> <span class="pre">-&gt;</span> <span class="pre">c)</span> <span class="pre">-&gt;</span> <span class="pre">Either</span> <span class="pre">a</span> <span class="pre">b</span> <span class="pre">-&gt;</span> <span class="pre">c</span></code>，如果 <code class="docutils literal"><span class="pre">try</span></code> 返回的是 <code class="docutils literal"><span class="pre">Left</span></code> 类型，<code class="docutils literal"><span class="pre">either</span></code> 会用 <code class="docutils literal"><span class="pre">Threw</span></code> 将异常值包裹，否则无论 <code class="docutils literal"><span class="pre">Right</span></code> 中包含的值是什么，都返回 <code class="docutils literal"><span class="pre">Finished</span></code> 的状态。
+关于 <code class="docutils literal"><span class="pre">modifyMVar</span></code> ，请看下一节的介绍。它的返回值是一个 tuple，这个 tuple 的第一个元素将被放回到 <code class="docutils literal"><span class="pre">mgr</span></code> 中，而第二个元素会作为返回值。
+]</p>
 <div class="section" id="mvar">
 <h3>安全的修改 MVar<a class="headerlink" href="#mvar" title="Permalink to this headline">¶</a></h3>
 <p><code class="docutils literal"><span class="pre">forkManaged</span></code> 中使用的 <code class="docutils literal"><span class="pre">modifyMVar</span></code> 函数很实用：它将 <code class="docutils literal"><span class="pre">takeMVar</span></code> 和 <code class="docutils literal"><span class="pre">putMVar</span></code> 安全的组合在一起。</p>
@@ -269,6 +304,17 @@
 </pre></div>
 </div>
 <p>这种模式很容易用于你的特定需求，无论是处理网络连接，数据库句柄，或者被 <code class="docutils literal"><span class="pre">C</span></code> 库函数管理的数据。</p>
+<p>[Forec 译注：<code class="docutils literal"><span class="pre">block</span></code> 和 <code class="docutils literal"><span class="pre">unblock</span></code> 在很久以前就已经被弃置了。最新 base 包中 <code class="docutils literal"><span class="pre">modifyMVar</span></code> 的实现如下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">modifyMVar</span> <span class="ow">::</span> <span class="kt">MVar</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">))</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">b</span>
+<span class="nf">modifyMVar</span> <span class="n">m</span> <span class="n">io</span> <span class="ow">=</span>
+  <span class="n">mask</span> <span class="o">$</span> <span class="nf">\</span><span class="n">restore</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+  <span class="n">a</span>      <span class="ow">&lt;-</span> <span class="n">takeMVar</span> <span class="n">m</span>
+  <span class="p">(</span><span class="n">a&#39;</span><span class="p">,</span><span class="n">b</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">restore</span> <span class="p">(</span><span class="n">io</span> <span class="n">a</span> <span class="o">&gt;&gt;=</span> <span class="n">evaluate</span><span class="p">)</span> <span class="p">`</span><span class="n">onException</span><span class="p">`</span> <span class="n">putMVar</span> <span class="n">m</span> <span class="n">a</span>
+  <span class="n">putMVar</span> <span class="n">m</span> <span class="n">a&#39;</span>
+  <span class="n">return</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>]</p>
 </div>
 <div class="section" id="id10">
 <h3>查看线程状态<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
@@ -316,6 +362,22 @@
     <span class="kr">where</span> <span class="n">elems</span> <span class="n">m</span> <span class="ow">=</span> <span class="n">return</span> <span class="p">(</span><span class="kt">M</span><span class="o">.</span><span class="n">empty</span><span class="p">,</span> <span class="kt">M</span><span class="o">.</span><span class="n">elems</span> <span class="n">m</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>[Forec 译注：注意 <code class="docutils literal"><span class="pre">waitAll</span></code> 函数其实是有缺陷的，它仅仅能够等待在执行 <code class="docutils literal"><span class="pre">waitAll</span></code> 之前创建的所有线程。如果在等待期间存在某个线程异步启动， <code class="docutils literal"><span class="pre">waitAll</span></code> 是无法获知其状态的。</p>
+<p>至此，这个简单的 <code class="docutils literal"><span class="pre">ThreadManager</span></code> 基本可以运行了，你可以在 GHCI 中通过如下方式检测一下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="kt">Prelude</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="kt">NiceFork</span><span class="o">.</span><span class="n">hs</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">1</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">NiceFork</span>         <span class="p">(</span> <span class="kt">NiceFork</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="n">interpreted</span> <span class="p">)</span>
+<span class="kt">Ok</span><span class="p">,</span> <span class="n">modules</span> <span class="n">loaded</span><span class="kt">:</span> <span class="kt">NiceFork</span><span class="o">.</span>
+<span class="o">*</span><span class="kt">NiceFork</span><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">calc</span> <span class="ow">=</span> <span class="kr">do</span> <span class="p">{</span> <span class="n">calc</span><span class="p">;</span> <span class="n">return</span> <span class="nb">()</span><span class="p">}</span>
+<span class="o">*</span><span class="kt">NiceFork</span><span class="o">&gt;</span> <span class="n">manager</span> <span class="ow">&lt;-</span> <span class="n">newManager</span>
+<span class="o">*</span><span class="kt">NiceFork</span><span class="o">&gt;</span> <span class="n">tid</span> <span class="ow">&lt;-</span> <span class="n">forkManaged</span> <span class="n">manager</span> <span class="n">calc</span>
+<span class="o">*</span><span class="kt">NiceFork</span><span class="o">&gt;</span> <span class="n">ans</span> <span class="ow">&lt;-</span> <span class="n">getStatus</span> <span class="n">manager</span> <span class="n">tid</span>
+<span class="o">*</span><span class="kt">NiceFork</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">m</span> <span class="o">+</span><span class="kt">Data</span><span class="o">.</span><span class="kt">Maybe</span>
+<span class="o">*</span><span class="kt">NiceFork</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Maybe</span><span class="o">&gt;</span> <span class="n">fromJust</span> <span class="n">ans</span>
+<span class="kt">Threw</span> <span class="n">stack</span> <span class="n">overflow</span>
+</pre></div>
+</div>
+<p>我们通过一个反复调用自身的 <code class="docutils literal"><span class="pre">calc</span></code> 函数构造栈溢出，线程管理器成功地返回了这一结果。</p>
+<p>]</p>
 </div>
 <div class="section" id="id11">
 <h3>编写更紧凑的代码<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
@@ -399,6 +461,26 @@
   <span class="n">putMVar</span> <span class="n">m</span> <span class="n">b</span>
 </pre></div>
 </div>
+<p>[Forec 译注：<code class="docutils literal"><span class="pre">block</span></code> 和 <code class="docutils literal"><span class="pre">unblock</span></code> 不被建议使用，更好的方式是使用 <code class="docutils literal"><span class="pre">mask</span></code> 。此外，上面的模式匹配仅仅将表达式求值为 WHNF（弱首范式），关于
+弱首范式的内容将在本章后半部分讨论。你暂时可以简单地将其理解为 “剥去表达式的一层”，例如 <code class="docutils literal"><span class="pre">1</span> <span class="pre">+</span> <span class="pre">2</span></code> 将被求值为 3，而 <code class="docutils literal"><span class="pre">&quot;ab&quot;</span> <span class="pre">++</span> <span class="pre">&quot;bc&quot;</span></code> 则仅仅被求值为
+<code class="docutils literal"><span class="pre">('a':</span> <span class="pre">(&quot;b&quot;</span> <span class="pre">++</span> <span class="pre">&quot;bc&quot;))</span></code>。所以这里代码的 “严格” 是有缺陷的。
+一个可行但不太符合工程应用的做法是使用 <code class="docutils literal"><span class="pre">Control.DeepSeq</span></code> 中的 <code class="docutils literal"><span class="pre">rnf</span></code> 方法，该方法将表达式求值为范式。建议将原著代码修改如下：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch24/ModifyMVarStrict.hs</span>
+<span class="cm">{-# LANGUAGE BangPatterns #-}</span>
+
+<span class="kr">import</span> <span class="nn">Control.Concurrent</span> <span class="p">(</span><span class="kt">MVar</span><span class="p">,</span> <span class="nf">putMVar</span><span class="p">,</span> <span class="nf">takeMVar</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Control.Exception</span> <span class="p">(</span><span class="nf">catch</span><span class="p">,</span> <span class="nf">throw</span><span class="p">,</span> <span class="nf">mask</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Prelude</span> <span class="k">hiding</span> <span class="p">(</span><span class="nf">catch</span><span class="p">)</span>
+
+<span class="nf">modifyMVar_strict</span> <span class="ow">::</span> <span class="kt">MVar</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">a</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">modifyMVar_strict</span> <span class="n">m</span> <span class="n">io</span> <span class="ow">=</span> <span class="n">mask</span> <span class="o">$</span> <span class="nf">\</span><span class="n">restore</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+  <span class="n">a</span> <span class="ow">&lt;-</span> <span class="n">takeMVar</span> <span class="n">m</span>
+  <span class="n">b</span> <span class="ow">&lt;-</span> <span class="n">restore</span> <span class="p">(</span><span class="n">io</span> <span class="n">a</span><span class="p">)</span> <span class="p">`</span><span class="n">catch</span><span class="p">`</span> <span class="nf">\</span><span class="n">e</span> <span class="ow">-&gt;</span>
+        <span class="n">putMVar</span> <span class="n">m</span> <span class="n">a</span> <span class="o">&gt;&gt;</span> <span class="n">throw</span> <span class="n">e</span>
+<span class="nf">rnf</span> <span class="n">b</span> <span class="p">`</span><span class="n">seq</span><span class="p">`</span> <span class="n">putMVar</span> <span class="n">m</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>]</p>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p>查看 <code class="docutils literal"><span class="pre">Hackage</span></code> 始终是值得的。</p>
@@ -472,7 +554,7 @@
 <div class="section" id="id19">
 <h3>运行时选项<a class="headerlink" href="#id19" title="Permalink to this headline">¶</a></h3>
 <p>运行程序时可以向 GHC 的运行时系统传递命令行参数。在将控制权交给我们的代码前，运行时扫描程序的参数，看是否有命令行选项 <code class="docutils literal"><span class="pre">+RTS</span></code> 。其后跟随的所有选项都被运行时解释，直到特殊的选项 <code class="docutils literal"><span class="pre">-RTS</span></code> ，这些选项都是提供给运行时系统的，不为我们的程序。运行时会对我们的代码隐藏所有这些选项。当我们使用 <code class="docutils literal"><span class="pre">System.Environment</span></code> 模块的 <code class="docutils literal"><span class="pre">getArgsfunction</span></code> 来获得我们的命令行参数是，我们不会在其中获得运行时选项。</p>
-<p><code class="docutils literal"><span class="pre">threaded</span></code> 运行时接受参数 <code class="docutils literal"><span class="pre">-N</span></code> <a class="footnote-reference" href="#id23" id="id20">[55]</a> 。 其接受一个参数，指定了 <code class="docutils literal"><span class="pre">GHC</span></code> 的运行时系统将使用的核数。这个选项对输入很挑剔： <code class="docutils literal"><span class="pre">-N</span></code> 和参数之间必须没有空格。 <code class="docutils literal"><span class="pre">-N4</span></code> 可被接受， <code class="docutils literal"><span class="pre">-N</span> <span class="pre">4</span></code> 则不被接受。</p>
+<p><code class="docutils literal"><span class="pre">threaded</span></code> 运行时接受参数 <code class="docutils literal"><span class="pre">-N</span></code> <a class="footnote-reference" href="#id31" id="id20">[55]</a> 。 其接受一个参数，指定了 <code class="docutils literal"><span class="pre">GHC</span></code> 的运行时系统将使用的核数。这个选项对输入很挑剔： <code class="docutils literal"><span class="pre">-N</span></code> 和参数之间必须没有空格。 <code class="docutils literal"><span class="pre">-N4</span></code> 可被接受， <code class="docutils literal"><span class="pre">-N</span> <span class="pre">4</span></code> 则不被接受。</p>
 </div>
 <div class="section" id="haskell">
 <h3>找出 Haskell 可以使用多少核<a class="headerlink" href="#haskell" title="Permalink to this headline">¶</a></h3>
@@ -503,32 +585,284 @@
 <p>我们的目的并不是阻止你使用 <code class="docutils literal"><span class="pre">threaded</span></code> 运行时。相对于 <code class="docutils literal"><span class="pre">non-threaded</span></code> 运行时它并没有特别大的开销：相对于其他编程语言，线程依旧惊人的轻量。我们仅是希望说明 <code class="docutils literal"><span class="pre">threaded</span></code> 运行时并不是在所有场景都是最佳选择。</p>
 </div>
 </div>
-<div class="section" id="parallel-programming-in-haskell">
-<h2>Parallel programming in Haskell<a class="headerlink" href="#parallel-programming-in-haskell" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id22">
+<h2>Haskell 中的并行编程<a class="headerlink" href="#id22" title="Permalink to this headline">¶</a></h2>
 <p>现在让我们来关注一下并行编程。对很多计算密集型问题，可以通过分解问题，并在多个核上求值来更快的计算出结果。多核计算机已经普及，甚至在最新的笔记本上都有，但是很少有程序可以利用这一优势。</p>
 <p>大部分原因是因为传统观念认为并行编程非常困难。在一门典型的编程语言中，我们将用处理并发程序相同的库和设施处理并发程序。这是我们的注意力集中在处理一些熟悉的问题比如死锁、竞争条件、饥饿和陡峭的复杂性。</p>
 <p>但是我们可以确定，使用 <code class="docutils literal"><span class="pre">Haskell</span></code> 的并发特性开发并行代码时，有许多更简单的方法。在一个普通的 Haskell 函数上稍加变化，就可以并行求值。</p>
-<div class="section" id="normal-form-and-head-normal-form">
-<h3>Normal form and head normal form<a class="headerlink" href="#normal-form-and-head-normal-form" title="Permalink to this headline">¶</a></h3>
-<p>TBD</p>
+<div class="section" id="id23">
+<h3>范式和首范式<a class="headerlink" href="#id23" title="Permalink to this headline">¶</a></h3>
+<p><code class="docutils literal"><span class="pre">seq</span></code> 函数将一个表达式求值为首范式（简称 HNF）。<code class="docutils literal"><span class="pre">seq</span></code> 一旦到达最外层的构造函数（也就是 “首部”）就会停止，这与范式不同（NF），
+被称作范式的表达式必然是被完全求值的，而非仅仅 “剥离” 掉最外层的构造函数。</p>
+<p>你可能会经常听到 Haskell 程序员提到弱首范式（WHNF）。对一般数据来说，弱首范式和首范式相同。它们仅仅在功能上有些许区别，
+这里我们就不过多关注了。</p>
+<p>[
+Forec 译注：读者只需要记住范式和弱首范式这两个概念的区别，HNF 几乎可以忽略。以下两个链接可以帮助更好的理解，
+这部分内容与并行编程关系不是非常紧密，因此不在此处过多叙述：
+* Haskell Wiki: <a class="reference external" href="https://en.wikibooks.org/wiki/Haskell/Laziness#Thunks_and_Weak_head_normal_form">https://en.wikibooks.org/wiki/Haskell/Laziness#Thunks_and_Weak_head_normal_form</a>
+* StackOverflow: <a class="reference external" href="http://stackoverflow.com/questions/6872898/haskell-what-is-weak-head-normal-form">http://stackoverflow.com/questions/6872898/haskell-what-is-weak-head-normal-form</a>
+]</p>
+</div>
+<div class="section" id="id24">
+<h3>排序<a class="headerlink" href="#id24" title="Permalink to this headline">¶</a></h3>
+<p>这是一个使用分治算法实现的 Haskell 排序函数：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch24/Sorting.hs</span>
+<span class="nf">sort</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Ord</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">sort</span> <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="ow">=</span> <span class="n">lesser</span> <span class="o">++</span> <span class="n">x</span><span class="kt">:</span><span class="n">greater</span>
+  <span class="kr">where</span> <span class="n">lesser</span>  <span class="ow">=</span> <span class="n">sort</span> <span class="p">[</span><span class="n">y</span> <span class="o">|</span> <span class="n">y</span> <span class="ow">&lt;-</span> <span class="n">xs</span><span class="p">,</span> <span class="n">y</span> <span class="o">&lt;</span>  <span class="n">x</span><span class="p">]</span>
+        <span class="n">greater</span> <span class="ow">=</span> <span class="n">sort</span> <span class="p">[</span><span class="n">y</span> <span class="o">|</span> <span class="n">y</span> <span class="ow">&lt;-</span> <span class="n">xs</span><span class="p">,</span> <span class="n">y</span> <span class="o">&gt;=</span> <span class="n">x</span><span class="p">]</span>
+<span class="nf">sort</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">sort</span></code> 函数实现了著名的快速排序算法，很多 Haskell 程序员将其视作经典：
+在早期的 Haskell 教程中，用一行代码实现的 <code class="docutils literal"><span class="pre">sort</span></code> 经常作为示例向读者展示 Haskell 强大的表达能力。
+这里我们将代码切分为几行以方便比较串行和并行版本。</p>
+<p>下面是对 <code class="docutils literal"><span class="pre">sort</span></code> 工作流程的简要介绍：</p>
+<ol class="arabic simple">
+<li>从列表中取出一个元素，这个元素被称为 “轴心”（或哨兵）。每个元素都要和轴心比较。上面的代码简单地通过模式匹配选取列表的第一个元素作为轴心；</li>
+<li>使用原始列表中除轴心外的其它元素构造一个子列表，子列表中元素的值全部小于轴心，并递归地处理子列表；</li>
+<li>与 2 类似，构造另一个子列表，但子列表中元素的值均大于或等于轴心的值，递归处理这个子列表；</li>
+<li>将 2、3 两步中排序后的子列表通过轴心进行连接。</li>
+</ol>
+</div>
+<div class="section" id="id25">
+<h3>将代码变换为并行版本<a class="headerlink" href="#id25" title="Permalink to this headline">¶</a></h3>
+<p>并行版本的排序函数相对要复杂一些：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch24/Sorting.hs</span>
+<span class="kr">module</span> <span class="nn">Sorting</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">Control.Parallel</span> <span class="p">(</span><span class="nf">par</span><span class="p">,</span> <span class="nf">pseq</span><span class="p">)</span>
+
+<span class="nf">parSort</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Ord</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">parSort</span> <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span>    <span class="ow">=</span> <span class="n">force</span> <span class="n">greater</span> <span class="p">`</span><span class="n">par</span><span class="p">`</span> <span class="p">(</span><span class="n">force</span> <span class="n">lesser</span> <span class="p">`</span><span class="n">pseq</span><span class="p">`</span> <span class="p">(</span><span class="n">lesser</span> <span class="o">++</span> <span class="n">x</span><span class="kt">:</span><span class="n">greater</span><span class="p">))</span>
+  <span class="kr">where</span> <span class="n">lesser</span>  <span class="ow">=</span> <span class="n">parSort</span> <span class="p">[</span><span class="n">y</span> <span class="o">|</span> <span class="n">y</span> <span class="ow">&lt;-</span> <span class="n">xs</span><span class="p">,</span> <span class="n">y</span> <span class="o">&lt;</span>  <span class="n">x</span><span class="p">]</span>
+        <span class="n">greater</span> <span class="ow">=</span> <span class="n">parSort</span> <span class="p">[</span><span class="n">y</span> <span class="o">|</span> <span class="n">y</span> <span class="ow">&lt;-</span> <span class="n">xs</span><span class="p">,</span> <span class="n">y</span> <span class="o">&gt;=</span> <span class="n">x</span><span class="p">]</span>
+<span class="nf">parSort</span> <span class="kr">_</span>         <span class="ow">=</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+<p>不过我们并没有改变代码的结构。<code class="docutils literal"><span class="pre">parSort</span></code> 仅仅多使用了三个函数： <code class="docutils literal"><span class="pre">par</span></code>、<code class="docutils literal"><span class="pre">pseq</span></code> 和 <code class="docutils literal"><span class="pre">force</span></code>。</p>
+<p><code class="docutils literal"><span class="pre">par</span></code> 函数由 <code class="docutils literal"><span class="pre">Control.Parallel</span></code> 模块提供。它与 <code class="docutils literal"><span class="pre">seq</span></code> 目的类似：将左侧参数求值为弱首范式并返回右侧参数。
+<code class="docutils literal"><span class="pre">par</span></code> 的名字很好地阐述了它的功能：<code class="docutils literal"><span class="pre">par</span></code> 能够在其它运算执行的同时并行地对其左侧参数求值。</p>
+<p><code class="docutils literal"><span class="pre">pseq</span></code> 也和 <code class="docutils literal"><span class="pre">seq</span></code> 类似：它在返回右侧表达式之前将左侧表达式求值为弱首范式。这二者之间的区别很微妙，
+但对于并行编程而言非常重要：编译器不保证 <code class="docutils literal"><span class="pre">seq</span></code> 的求值顺序，即如果编译器认为首先对右侧参数求值能够提高性能，则
+它将先计算右侧参数。对于单核执行的程序来说，这种灵活性很有必要，但对多核代码而言不够健壮。
+相比之下，编译器能够保证 <code class="docutils literal"><span class="pre">pseq</span></code> 左侧参数的求值过程早于右侧参数。</p>
+<p>以上修改将对一些我们没有提到的方面产生巨大的影响，比如说：</p>
+<ul class="simple">
+<li>使用多少个核心</li>
+<li>线程间如何通信</li>
+<li>如何将工作分配给多个可用核心</li>
+<li>明确哪些数据将在线程间共享，哪些属于线程私有</li>
+<li>如何确定所有任务均已完成</li>
+</ul>
+</div>
+<div class="section" id="id26">
+<h3>明确在并行中执行什么<a class="headerlink" href="#id26" title="Permalink to this headline">¶</a></h3>
+<p>并行的 Haskell 代码之所以能够表现出更优秀的性能，是因为计算过程中有大量重复、独立、可并行计算的工作。
+非严格求值会阻碍并行程序的执行，因此我们会在并行代码中使用 <code class="docutils literal"><span class="pre">force</span></code> 函数。下面通过一个错误的例子解释 <code class="docutils literal"><span class="pre">force</span></code> 函数的功能：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch24/Sorting.hs</span>
+<span class="nf">sillySort</span> <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="ow">=</span> <span class="n">greater</span> <span class="p">`</span><span class="n">par</span><span class="p">`</span> <span class="p">(</span><span class="n">lesser</span> <span class="p">`</span><span class="n">pseq</span><span class="p">`</span> <span class="p">(</span><span class="n">lesser</span> <span class="o">++</span> <span class="n">x</span><span class="kt">:</span><span class="n">greater</span><span class="p">))</span>
+  <span class="kr">where</span> <span class="n">lesser</span>   <span class="ow">=</span> <span class="n">sillySort</span> <span class="p">[</span><span class="n">y</span> <span class="o">|</span> <span class="n">y</span> <span class="ow">&lt;-</span> <span class="n">xs</span><span class="p">,</span> <span class="n">y</span> <span class="o">&lt;</span>  <span class="n">x</span><span class="p">]</span>
+        <span class="n">greater</span>  <span class="ow">=</span> <span class="n">sillySort</span> <span class="p">[</span><span class="n">y</span> <span class="o">|</span> <span class="n">y</span> <span class="ow">&lt;-</span> <span class="n">xs</span><span class="p">,</span> <span class="n">y</span> <span class="o">&gt;=</span> <span class="n">x</span><span class="p">]</span>
+<span class="nf">sillySort</span> <span class="kr">_</span>        <span class="ow">=</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+<p>注意，我们在 <code class="docutils literal"><span class="pre">par</span></code> 和 <code class="docutils literal"><span class="pre">pseq</span></code> 两处用普通求值取代了 <code class="docutils literal"><span class="pre">force</span> <span class="pre">lesser</span></code> 和 <code class="docutils literal"><span class="pre">force</span> <span class="pre">greater</span></code>。</p>
+<p>回忆一下，对弱首范式的求值会在 “看到” 表达式的外部构造器时停止。在错误的例子中，我们将每个有序的子列表求值为 WHNF。
+因为最外层的构造器仅仅是一个列表构造器，上面的代码实际上仅仅强制对每个排序子列表的第一个元素做了求值，
+每个排序子列表剩余的元素仍未被完全求值。换句话说，上面代码在并行部分执行时几乎没有做任何有效计算，
+<code class="docutils literal"><span class="pre">sillySort</span></code> 的执行过程和完全顺序的代码没什么差别。</p>
+<p>[Forec 译注：考虑此前译注给出的例子，<code class="docutils literal"><span class="pre">&quot;ab&quot;</span> <span class="pre">++</span> <span class="pre">&quot;bc&quot;</span></code> 的弱首范式仅仅是 <code class="docutils literal"><span class="pre">'a'</span> <span class="pre">:</span> <span class="pre">(&quot;b&quot;</span> <span class="pre">++</span> <span class="pre">&quot;bc&quot;)</span></code>。
+以待排序列表 <code class="docutils literal"><span class="pre">[3,</span> <span class="pre">2,</span> <span class="pre">5,</span> <span class="pre">1,</span> <span class="pre">3]</span></code> 为例，<code class="docutils literal"><span class="pre">sillySort</span></code> 试图在 <code class="docutils literal"><span class="pre">par</span></code> 包装的并行操作中计算出排序好的两个子列表。
+假设轴心元素为 3，则小于轴心的待排序子列表应为 <code class="docutils literal"><span class="pre">[2,</span> <span class="pre">1]</span></code>，而 <code class="docutils literal"><span class="pre">par</span></code> 中的并行操作在计算出第一个满足条件的
+元素 2 后，得到 <code class="docutils literal"><span class="pre">lesser</span> <span class="pre">=</span> <span class="pre">(2:</span> <span class="pre">_)</span></code>，已经遇到了最外层的列表构造器，因此停止计算。
+真正求出完整待排序子列表是在后续顺序操作 <code class="docutils literal"><span class="pre">++</span></code> 时，因为需要列表中所有元素，这时程序才开始计算。</p>
+<p>这里给出一个译者认为更容易理解弱首范式的例子：在 GHCI 中执行如下指令。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">&gt;</span> <span class="kr">let</span> <span class="n">list</span> <span class="ow">=</span> <span class="p">[</span><span class="mi">1</span><span class="o">..</span><span class="mi">10</span><span class="p">]</span>
+<span class="o">&gt;</span> <span class="kr">let</span> <span class="n">whnfList</span> <span class="ow">=</span> <span class="n">map</span> <span class="p">(</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="n">list</span>
+<span class="o">&gt;</span> <span class="kt">:</span><span class="n">sprint</span> <span class="n">whnfList</span>
+<span class="nf">whnfList</span> <span class="ow">=</span> <span class="kr">_</span>
+<span class="o">&gt;</span> <span class="n">length</span> <span class="n">whnfList</span>
+<span class="mi">10</span>
+<span class="o">&gt;</span> <span class="kt">:</span><span class="n">sprint</span> <span class="n">whnfList</span>
+<span class="nf">whnfList</span> <span class="ow">=</span> <span class="p">[</span><span class="kr">_</span><span class="p">,</span> <span class="kr">_</span><span class="p">,</span> <span class="kr">_</span><span class="p">,</span> <span class="kr">_</span><span class="p">,</span> <span class="kr">_</span><span class="p">,</span> <span class="kr">_</span><span class="p">,</span> <span class="kr">_</span><span class="p">,</span> <span class="kr">_</span><span class="p">,</span> <span class="kr">_</span><span class="p">,</span> <span class="kr">_</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>可以看出，<code class="docutils literal"><span class="pre">length</span></code> 操作仅需要 <code class="docutils literal"><span class="pre">whnfList</span></code> 中元素的数量，并没有对其中元素进行更深层次的求值。</p>
+<p>]</p>
+<p>我们使用 <code class="docutils literal"><span class="pre">force</span></code> 函数，在构造函数返回前遍历整个列表以避免这种情况出现。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch24/Sorting.hs</span>
+<span class="nf">force</span> <span class="ow">::</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="nb">()</span>
+<span class="nf">force</span> <span class="n">xs</span> <span class="ow">=</span> <span class="n">go</span> <span class="n">xs</span> <span class="p">`</span><span class="n">pseq</span><span class="p">`</span> <span class="nb">()</span>
+  <span class="kr">where</span> <span class="n">go</span> <span class="p">(</span><span class="kr">_</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="ow">=</span> <span class="n">go</span> <span class="n">xs</span>
+        <span class="n">go</span> <span class="kt">[]</span> <span class="ow">=</span> <span class="mi">1</span>
+</pre></div>
+</div>
+<p>注意，我们并不在乎列表中具体有什么，而是仅仅把列表遍历一遍，遍历之后再调用 <code class="docutils literal"><span class="pre">pseq</span></code> 。
+因为我们会在 <code class="docutils literal"><span class="pre">par</span></code> 或者 <code class="docutils literal"><span class="pre">pseq</span></code> 的左侧使用 <code class="docutils literal"><span class="pre">force</span></code>，所以返回值无所谓。</p>
+<p>当然，很多情况下我们会需要对列表中的个别元素强制求值。下面会介绍一个基于类型类的解决方案。</p>
+</div>
+<div class="section" id="par">
+<h3>par 提供什么保证？<a class="headerlink" href="#par" title="Permalink to this headline">¶</a></h3>
+<p>实际上，<code class="docutils literal"><span class="pre">par</span></code> 函数并不保证会将表达式并行求值，它只在对表达式并行求值有意义的时候才这么做。
+在并行编程中，这种行为比保证并行执行更有效。它允许运行时系统遇到 <code class="docutils literal"><span class="pre">par</span></code> 时智能调度。</p>
+<p>举个例子，运行时系统可能发现表达式过于简单，并行求值带来的性能提升远低于并行操作本身的额外开销。
+或者，运行时系统发现所有的计算核心均正在工作，而启动一个新的并行运算仅仅会增加待运行线程的数量。</p>
+<p>这个潜规则影响了我们如何编写并行代码。假设系统性能不会因为线程间争夺核心资源下降，
+考虑到 par 在运行时可以智能调度，我们就可以将它应用到任何想应用的地方。</p>
+</div>
+<div class="section" id="id27">
+<h3>运行并测试性能<a class="headerlink" href="#id27" title="Permalink to this headline">¶</a></h3>
+<p>将 <code class="docutils literal"><span class="pre">sort</span></code>、<code class="docutils literal"><span class="pre">parSort</span></code> 和 <code class="docutils literal"><span class="pre">parSort2</span></code> 保存到 <code class="docutils literal"><span class="pre">Sorting.hs</span></code> 中并封装为 <code class="docutils literal"><span class="pre">Sorting</span></code> 模块。
+我们创建一个驱动程序以计算这些排序函数的性能：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch24/SortMain.hs</span>
+
+<span class="kr">module</span> <span class="nn">Main</span> <span class="kr">where</span>
+
+<span class="kr">import</span> <span class="nn">Data.Time.Clock</span> <span class="p">(</span><span class="nf">diffUTCTime</span><span class="p">,</span> <span class="nf">getCurrentTime</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Environment</span> <span class="p">(</span><span class="nf">getArgs</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Random</span> <span class="p">(</span><span class="kt">StdGen</span><span class="p">,</span> <span class="nf">getStdGen</span><span class="p">,</span> <span class="nf">randoms</span><span class="p">)</span>
+
+<span class="kr">import</span> <span class="nn">Sorting</span>
+
+<span class="c1">-- testFunction = sort</span>
+<span class="c1">-- testFunction = seqSort</span>
+<span class="nf">testFunction</span> <span class="ow">=</span> <span class="n">parSort</span>
+<span class="c1">-- testFunction = parSort2 2</span>
+
+<span class="nf">randomInts</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">StdGen</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Int</span><span class="p">]</span>
+<span class="nf">randomInts</span> <span class="n">k</span> <span class="n">g</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">result</span> <span class="ow">=</span> <span class="n">take</span> <span class="n">k</span> <span class="p">(</span><span class="n">randoms</span> <span class="n">g</span><span class="p">)</span>
+         <span class="kr">in</span> <span class="n">force</span> <span class="n">result</span> <span class="p">`</span><span class="n">seq</span><span class="p">`</span> <span class="n">result</span>
+
+<span class="nf">main</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="n">args</span> <span class="ow">&lt;-</span> <span class="n">getArgs</span>
+  <span class="kr">let</span> <span class="n">count</span> <span class="o">|</span> <span class="n">null</span> <span class="n">args</span> <span class="ow">=</span> <span class="mi">500000</span>
+            <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="n">read</span> <span class="p">(</span><span class="n">head</span> <span class="n">args</span><span class="p">)</span>
+  <span class="n">input</span> <span class="ow">&lt;-</span> <span class="n">randomInts</span> <span class="n">count</span> <span class="p">`</span><span class="n">fmap</span><span class="p">`</span> <span class="n">getStdGen</span>
+  <span class="n">putStrLn</span> <span class="o">$</span> <span class="s">&quot;We have &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="p">(</span><span class="n">length</span> <span class="n">input</span><span class="p">)</span> <span class="o">++</span> <span class="s">&quot; elements to sort.&quot;</span>
+  <span class="n">start</span> <span class="ow">&lt;-</span> <span class="n">getCurrentTime</span>
+  <span class="kr">let</span> <span class="n">sorted</span> <span class="ow">=</span> <span class="n">testFunction</span> <span class="n">input</span>
+  <span class="n">putStrLn</span> <span class="o">$</span> <span class="s">&quot;Sorted all &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="p">(</span><span class="n">length</span> <span class="n">sorted</span><span class="p">)</span> <span class="o">++</span> <span class="s">&quot; elements.&quot;</span>
+  <span class="n">end</span> <span class="ow">&lt;-</span> <span class="n">getCurrentTime</span>
+  <span class="n">putStrLn</span> <span class="o">$</span> <span class="n">show</span> <span class="p">(</span><span class="n">end</span> <span class="p">`</span><span class="n">diffUTCTime</span><span class="p">`</span> <span class="n">start</span><span class="p">)</span> <span class="o">++</span> <span class="s">&quot; elapsed.&quot;</span>
+</pre></div>
+</div>
+<p>简单起见，我们使用 <code class="docutils literal"><span class="pre">testFunction</span></code> 变量选择用于基准测试的排序函数。</p>
+<p>上面的程序接受一个可选的命令行参数，用于指定待排序随机数组的长度。</p>
+<p>非严格求值是性能测量和分析中要注意的 “雷区”。下面是驱动程序中特别要避免的一些潜在问题：</p>
+<ul class="simple">
+<li><em>非严格求值会使测量单一行为变为测量多个行为。</em> Haskell 默认的随机数产生器（PRNG）很慢，而且 <code class="docutils literal"><span class="pre">random</span></code> 函数仅仅在需要的时候才产生下一个随机数。我们在记录开始时间之前对输入列表的每个元素进行了强制求值，并且打印了列表的长度：这保证了程序在计算之前就已经生成了全部的随机数。如果我们忽略了这一步，则并行计算的过程会包含随机数的生成，进而导致测量出的时间变为生成随机数和数据排序所用时间之和，而非数据排序本身的耗时。</li>
+<li><em>隐含的数据依赖。</em> 在产生随机数列表时，只打印列表的长度并不会对列表完全求值。<code class="docutils literal"><span class="pre">length</span></code> 函数只会遍历列表的结构而非列表内的每个元素。因此，在排序操作执行前，列表中并没有生成好的随机数。这一行为可能严重拖慢性能。每个随机数的产生都取决于列表中前一个随机数的值，但并行的数据排序已经将列表元素分散到了不同的处理器内核中。如果排序前没有对输入的随机数列表完全求值，那么运行时就会遭遇可怕的 “乒乓” 效应：计算会在核心之间不停跳跃，导致性能的迅速下降。尝试删除 <code class="docutils literal"><span class="pre">main</span></code> 函数中应用在随机数列表上的 <code class="docutils literal"><span class="pre">force</span></code> ：你会发现并行代码比顺序执行的程序慢了三倍。[Forec 译注：原著作者似乎忘记在代码中使用 <code class="docutils literal"><span class="pre">force</span></code>。可以在运算开始前加入 <code class="docutils literal"><span class="pre">force</span> <span class="pre">input</span></code>。]</li>
+<li><em>让我们错误地认为代码执行了有意义的工作。</em> 为了保证数据排序的执行，我们在记录结束时间之前将结果列表的长度打印到了屏幕上。如果没有 <code class="docutils literal"><span class="pre">putStrLn</span></code> 强制要求列表长度，排序压根就不会执行。</li>
+</ul>
+<p>在构建程序时开启优化和 GHC 的运行时线程支持：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="n">ghc</span> <span class="o">-</span><span class="n">threaded</span> <span class="o">-</span><span class="kt">O2</span> <span class="c1">--make SortMain</span>
+<span class="p">[</span><span class="mi">1</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Sorting</span>          <span class="p">(</span> <span class="kt">Sorting</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="kt">Sorting</span><span class="o">.</span><span class="n">o</span> <span class="p">)</span>
+<span class="p">[</span><span class="mi">2</span> <span class="kr">of</span> <span class="mi">2</span><span class="p">]</span> <span class="kt">Compiling</span> <span class="kt">Main</span>             <span class="p">(</span> <span class="kt">SortMain</span><span class="o">.</span><span class="n">hs</span><span class="p">,</span> <span class="kt">SortMain</span><span class="o">.</span><span class="n">o</span> <span class="p">)</span>
+<span class="kt">Linking</span> <span class="kt">SortMain</span> <span class="o">...</span>
+</pre></div>
+</div>
+<p>在程序运行时告知 GHC 的运行时系统使用多少核心。首先测试最原始的 <code class="docutils literal"><span class="pre">sort</span></code> 函数，看看基础性能如何：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="o">./</span><span class="kt">Sorting</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="kt">N1</span> <span class="o">-</span><span class="kt">RTS</span> <span class="mi">700000</span>
+<span class="kt">We</span> <span class="n">have</span> <span class="mi">700000</span> <span class="n">elements</span> <span class="n">to</span> <span class="n">sort</span><span class="o">.</span>
+<span class="kt">Sorted</span> <span class="n">all</span> <span class="mi">700000</span> <span class="n">elements</span><span class="o">.</span>
+<span class="mf">3.178941</span><span class="n">s</span> <span class="n">elapsed</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>启用两个核心并不会提升顺序执行代码的性能：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="o">./</span><span class="kt">Sorting</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="kt">N2</span> <span class="o">-</span><span class="kt">RTS</span> <span class="mi">700000</span>
+<span class="kt">We</span> <span class="n">have</span> <span class="mi">700000</span> <span class="n">elements</span> <span class="n">to</span> <span class="n">sort</span><span class="o">.</span>
+<span class="kt">Sorted</span> <span class="n">all</span> <span class="mi">700000</span> <span class="n">elements</span><span class="o">.</span>
+<span class="mf">3.259869</span><span class="n">s</span> <span class="n">elapsed</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>如果重新编译，测试 <code class="docutils literal"><span class="pre">parSort</span></code> 的性能，就会发现结果还不如顺序代码：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="o">./</span><span class="kt">Sorting</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="kt">N1</span> <span class="o">-</span><span class="kt">RTS</span> <span class="mi">700000</span>
+<span class="kt">We</span> <span class="n">have</span> <span class="mi">700000</span> <span class="n">elements</span> <span class="n">to</span> <span class="n">sort</span><span class="o">.</span>
+<span class="kt">Sorted</span> <span class="n">all</span> <span class="mi">700000</span> <span class="n">elements</span><span class="o">.</span>
+<span class="mf">3.915818</span><span class="n">s</span> <span class="n">elapsed</span><span class="o">.</span>
+<span class="o">$</span> <span class="o">./</span><span class="kt">Sorting</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="kt">N2</span> <span class="o">-</span><span class="kt">RTS</span> <span class="mi">700000</span>
+<span class="kt">We</span> <span class="n">have</span> <span class="mi">700000</span> <span class="n">elements</span> <span class="n">to</span> <span class="n">sort</span><span class="o">.</span>
+<span class="kt">Sorted</span> <span class="n">all</span> <span class="mi">700000</span> <span class="n">elements</span><span class="o">.</span>
+<span class="mf">4.029781</span><span class="n">s</span> <span class="n">elapsed</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>性能上没有任何提升。这看起来是以下两个原因之一造成的：要么是 <code class="docutils literal"><span class="pre">par</span></code> 本身的开销过大，
+要么是我们滥用了 <code class="docutils literal"><span class="pre">par</span></code> 。为了鉴别究竟哪个才是罪魁祸首，
+我们编写了一个类似 <code class="docutils literal"><span class="pre">parSort</span></code> 的函数 <code class="docutils literal"><span class="pre">seqSort</span></code>，它使用 <code class="docutils literal"><span class="pre">pseq</span></code> 代替 <code class="docutils literal"><span class="pre">par</span></code> ：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="nf">seqSort</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Ord</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">seqSort</span> <span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span> <span class="ow">=</span> <span class="n">lesser</span> <span class="p">`</span><span class="n">pseq</span><span class="p">`</span> <span class="p">(</span><span class="n">greater</span> <span class="p">`</span><span class="n">pseq</span><span class="p">`</span> <span class="p">(</span><span class="n">lesser</span> <span class="o">++</span> <span class="n">x</span><span class="kt">:</span><span class="n">greater</span><span class="p">))</span>
+  <span class="kr">where</span> <span class="n">lesser</span>  <span class="ow">=</span> <span class="n">seqSort</span> <span class="p">[</span><span class="n">y</span> <span class="o">|</span> <span class="n">y</span> <span class="ow">&lt;-</span> <span class="n">xs</span><span class="p">,</span> <span class="n">y</span> <span class="o">&lt;</span>  <span class="n">x</span><span class="p">]</span>
+        <span class="n">greater</span> <span class="ow">=</span> <span class="n">seqSort</span> <span class="p">[</span><span class="n">y</span> <span class="o">|</span> <span class="n">y</span> <span class="ow">&lt;-</span> <span class="n">xs</span><span class="p">,</span> <span class="n">y</span> <span class="o">&gt;=</span> <span class="n">x</span><span class="p">]</span>
+<span class="nf">seqSort</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+<p>我们还删去了 <code class="docutils literal"><span class="pre">parSort</span></code> 中对 <code class="docutils literal"><span class="pre">force</span></code> 的调用。所以将 <code class="docutils literal"><span class="pre">seqSort</span></code> 和 <code class="docutils literal"><span class="pre">sort</span></code> 比较就可以观察到只应用 <code class="docutils literal"><span class="pre">pseq</span></code> 的性能：</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="o">./</span><span class="kt">Sorting</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="kt">N1</span> <span class="o">-</span><span class="kt">RTS</span> <span class="mi">700000</span>
+<span class="kt">We</span> <span class="n">have</span> <span class="mi">700000</span> <span class="n">elements</span> <span class="n">to</span> <span class="n">sort</span><span class="o">.</span>
+<span class="kt">Sorted</span> <span class="n">all</span> <span class="mi">700000</span> <span class="n">elements</span><span class="o">.</span>
+<span class="mf">3.848295</span><span class="n">s</span> <span class="n">elapsed</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>上面的运行结果说明 <code class="docutils literal"><span class="pre">par</span></code> 和 <code class="docutils literal"><span class="pre">pseq</span></code> 耗时相似。我们该如何改进性能呢？</p>
+</div>
+<div class="section" id="id28">
+<h3>性能调优<a class="headerlink" href="#id28" title="Permalink to this headline">¶</a></h3>
+<p>在 <code class="docutils literal"><span class="pre">parSort</span></code> 中，调用 <code class="docutils literal"><span class="pre">par</span></code> 的次数是待排序数据数量的两倍。尽管 <code class="docutils literal"><span class="pre">par</span></code> 的开销很小，但它毕竟也不是 “免费” 的。
+当递归调用 <code class="docutils literal"><span class="pre">parSort</span></code> 时，我们最终将 <code class="docutils literal"><span class="pre">par</span></code> 应用到了单个元素上。在这种细微的粒度下，使用 <code class="docutils literal"><span class="pre">par</span></code> 的成本远超其带来的增益。
+为了减少这种影响，我们在待排序数据数量小于某个阈值时采用非并行排序。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="c1">-- file: ch24/Sorting.hs</span>
+<span class="nf">parSort2</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Ord</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+<span class="nf">parSort2</span> <span class="n">d</span> <span class="n">list</span><span class="o">@</span><span class="p">(</span><span class="n">x</span><span class="kt">:</span><span class="n">xs</span><span class="p">)</span>
+  <span class="o">|</span> <span class="n">d</span> <span class="o">&lt;=</span> <span class="mi">0</span>     <span class="ow">=</span> <span class="n">sort</span> <span class="n">list</span>
+  <span class="o">|</span> <span class="n">otherwise</span>  <span class="ow">=</span> <span class="n">force</span> <span class="n">greater</span> <span class="p">`</span><span class="n">par</span><span class="p">`</span> <span class="p">(</span><span class="n">force</span> <span class="n">lesser</span> <span class="p">`</span><span class="n">pseq</span><span class="p">`</span> <span class="p">(</span><span class="n">lesser</span> <span class="o">++</span> <span class="n">x</span><span class="kt">:</span><span class="n">greater</span><span class="p">))</span>
+    <span class="kr">where</span> <span class="n">lesser</span>      <span class="ow">=</span> <span class="n">parSort2</span> <span class="n">d&#39;</span> <span class="p">[</span><span class="n">y</span> <span class="o">|</span> <span class="n">y</span> <span class="ow">&lt;-</span> <span class="n">xs</span><span class="p">,</span> <span class="n">y</span> <span class="o">&lt;</span>  <span class="n">x</span><span class="p">]</span>
+          <span class="n">greater</span>     <span class="ow">=</span> <span class="n">parSort2</span> <span class="n">d&#39;</span> <span class="p">[</span><span class="n">y</span> <span class="o">|</span> <span class="n">y</span> <span class="ow">&lt;-</span> <span class="n">xs</span><span class="p">,</span> <span class="n">y</span> <span class="o">&gt;=</span> <span class="n">x</span><span class="p">]</span>
+          <span class="n">d&#39;</span> <span class="ow">=</span> <span class="n">d</span> <span class="o">-</span> <span class="mi">1</span>
+<span class="nf">parSort2</span> <span class="kr">_</span> <span class="kr">_</span>              <span class="ow">=</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">parSort2</span></code> 在到达可控深度时停止递归以及创建新的并行计算。如果待处理数据的规模已知，程序就能在剩余工作数量足够少的时刻停止
+并行计算并切换到非并行代码。</p>
+<div class="highlight-haskell"><div class="highlight"><pre><span class="o">$</span> <span class="o">./</span><span class="kt">Sorting</span> <span class="o">+</span><span class="kt">RTS</span> <span class="o">-</span><span class="kt">N2</span> <span class="o">-</span><span class="kt">RTS</span> <span class="mi">700000</span>
+<span class="kt">We</span> <span class="n">have</span> <span class="mi">700000</span> <span class="n">elements</span> <span class="n">to</span> <span class="n">sort</span><span class="o">.</span>
+<span class="kt">Sorted</span> <span class="n">all</span> <span class="mi">700000</span> <span class="n">elements</span><span class="o">.</span>
+<span class="mf">2.947872</span><span class="n">s</span> <span class="n">elapsed</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>在双核系统中，这一改进将运行速度提升了大约 25%。性能的提升并不高，但想想我们对代码所做的改变：几句注解而已就让速度提升了四分之一。</p>
+<p>上面的排序函数难以获得良好的并行性能。它执行了大量内存分配，导致垃圾回收器频繁运行。<code class="docutils literal"><span class="pre">-sstderr</span></code>
+这一 RTS 选项能够将垃圾回收统计信息打印到屏幕，反馈信息显示程序大约有 40% 的时间用于回收垃圾。
+由于 GHC 6.8 中的垃圾回收器会停止所有线程并运行在单个内核上，这一点也就成为了程序的瓶颈。</p>
+<p>将 <code class="docutils literal"><span class="pre">par</span></code> 应用在内存分配不频繁的代码中可能会带来明显的性能改进。我们已经看到，相比单核运算，
+上面的基准测试在双核系统上能够取得 1.8 倍加速。在这本书编写时，GHC 正在开发一个并行的垃圾回收器，
+届时在多核系统上执行大量内存分配的代码也能获得令人满意的性能。</p>
+<p>[Forec 译注：翻译此处时 GHC 的最新版本为 8.0.2，已支持多核系统的垃圾回收。实际测试表明，
+即使支持多核 GC，并行编程的主要瓶颈在很多时候还是垃圾回收。]</p>
+</div>
+<div class="section" id="id29">
+<h3>练习<a class="headerlink" href="#id29" title="Permalink to this headline">¶</a></h3>
+<ol class="arabic simple">
+<li>决定什么时候从 <code class="docutils literal"><span class="pre">parSort2</span></code> 切换到 <code class="docutils literal"><span class="pre">sort</span></code> 不是一件容易的事。我们上面实现的方法是根据递归的深度选择，另一种方法是根据待排序子列表的长度决定。重写 <code class="docutils literal"><span class="pre">parSort2</span></code> 使其在待排序子列表长度小于某个数的时候切换到 <code class="docutils literal"><span class="pre">sort</span></code>。</li>
+<li>测试基于列表长度切换的 <code class="docutils literal"><span class="pre">parSort2</span></code> 的性能，并于基于递归深度的版本比较。哪一个性能更好？</li>
+</ol>
 </div>
 </div>
-<div class="section" id="parallel-strategies-and-mapreduce">
-<h2>Parallel strategies and MapReduce<a class="headerlink" href="#parallel-strategies-and-mapreduce" title="Permalink to this headline">¶</a></h2>
-<p>TBD</p>
-<table class="docutils footnote" frame="void" id="id22" rules="none">
+<div class="section" id="map-reduce">
+<h2>并行策略和 Map Reduce<a class="headerlink" href="#map-reduce" title="Permalink to this headline">¶</a></h2>
+<table class="docutils footnote" frame="void" id="id30" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id7">[54]</a></td><td>在稍后将展示，GHC 的线程异常轻量。如果运行时提供检查每个线程状态的方法，每个线程的开销将增加，哪怕永远不会用到这些信息。</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id23" rules="none">
+<table class="docutils footnote" frame="void" id="id31" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id20">[55]</a></td><td><code class="docutils literal"><span class="pre">non-threaded</span></code> 运行时不接受这个选项，会用一条错误信息拒绝它。</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id24" rules="none">
+<table class="docutils footnote" frame="void" id="id32" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label">[56]</td><td>此书撰写时，垃圾收集器已经开始重新编写以利用多核，但是我们不确定它在未来的效果。</td></tr>
