@@ -82,26 +82,26 @@ Forec 译注：
 
 ::
 
-	import Control.Concurrent (forkIO)
-	import Control.Exception (handle, SomeException)
-	import qualified Data.ByteString.Lazy as L
-	import System.Console.Haskeline (runInputT, defaultSettings, getInputLine)
+  import Control.Concurrent (forkIO)
+  import Control.Exception (handle, SomeException)
+  import qualified Data.ByteString.Lazy as L
+  import System.Console.Haskeline (runInputT, defaultSettings, getInputLine)
 
-	-- Provided by the 'zlib' package on http://hackage.haskell.org/
-	import Codec.Compression.GZip (compress)
+  -- Provided by the 'zlib' package on http://hackage.haskell.org/
+  import Codec.Compression.GZip (compress)
 
-	main :: IO ()
-	main = do
-	  maybeLine <- runInputT defaultSettings $ getInputLine "Enter a file to compress> "
-	  case maybeLine of
-	    Nothing -> return () -- user entered EOF
-	    Just "" -> return () -- treat no name as "want to quit"
-	    Just name -> do
-	      handle (print :: SomeException -> IO ()) $ do
-	        content <- L.readFile name
-	        forkIO (compressFile name content)
-	        return ()
-	      main
+  main :: IO ()
+  main = do
+    maybeLine <- runInputT defaultSettings $ getInputLine "Enter a file to compress> "
+    case maybeLine of
+      Nothing -> return () -- user entered EOF
+      Just "" -> return () -- treat no name as "want to quit"
+      Just name -> do
+        handle (print :: SomeException -> IO ()) $ do
+          content <- L.readFile name
+          forkIO (compressFile name content)
+          return ()
+        main
 
 ]
 
@@ -311,14 +311,14 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
 
 ::
 
-	modifyMVar :: MVar a -> (a -> IO (a,b)) -> IO b
-	modifyMVar m io =
-	  mask $ \restore -> do
-		a      <- takeMVar m
-		(a',b) <- restore (io a >>= evaluate) `onException` putMVar m a
-		putMVar m a'
-		return b
-		
+  modifyMVar :: MVar a -> (a -> IO (a,b)) -> IO b
+  modifyMVar m io =
+    mask $ \restore -> do
+    a      <- takeMVar m
+    (a',b) <- restore (io a >>= evaluate) `onException` putMVar m a
+    putMVar m a'
+    return b
+    
 ]
 
 查看线程状态
@@ -387,17 +387,17 @@ GHC 的运行时系统对主线程的控制与其他线程不同。主线程结�
 
 ::
 
-	Prelude> :l NiceFork.hs
-	[1 of 1] Compiling NiceFork         ( NiceFork.hs, interpreted )
-	Ok, modules loaded: NiceFork.
-	*NiceFork> let calc = do { calc; return ()}
-	*NiceFork> manager <- newManager
-	*NiceFork> tid <- forkManaged manager calc
-	*NiceFork> ans <- getStatus manager tid
-	*NiceFork> :m +Data.Maybe
-	*NiceFork Data.Maybe> fromJust ans
-	Threw stack overflow
-	
+  Prelude> :l NiceFork.hs
+  [1 of 1] Compiling NiceFork         ( NiceFork.hs, interpreted )
+  Ok, modules loaded: NiceFork.
+  *NiceFork> let calc = do { calc; return ()}
+  *NiceFork> manager <- newManager
+  *NiceFork> tid <- forkManaged manager calc
+  *NiceFork> ans <- getStatus manager tid
+  *NiceFork> :m +Data.Maybe
+  *NiceFork Data.Maybe> fromJust ans
+  Threw stack overflow
+  
 我们通过一个反复调用自身的 ``calc`` 函数构造栈溢出，线程管理器成功地返回了这一结果。
 
 ]
@@ -521,7 +521,7 @@ MVar 和 Chan 是非严格的
      a <- takeMVar m
      b <- restore (io a) `catch` \e -> 
            putMVar m a >> throw e
-	 rnf b `seq` putMVar m b
+   rnf b `seq` putMVar m b
 
 ]
 
@@ -691,12 +691,12 @@ Forec 译注：读者只需要记住范式和弱首范式这两个概念的区�
 
 ::
 
-	-- file: ch24/Sorting.hs
-	sort :: (Ord a) => [a] -> [a]
-	sort (x:xs) = lesser ++ x:greater
-		where lesser  = sort [y | y <- xs, y <  x]
-			    greater = sort [y | y <- xs, y >= x]
-	sort _ = []
+  -- file: ch24/Sorting.hs
+  sort :: (Ord a) => [a] -> [a]
+  sort (x:xs) = lesser ++ x:greater
+    where lesser  = sort [y | y <- xs, y <  x]
+          greater = sort [y | y <- xs, y >= x]
+  sort _ = []
 
 ``sort`` 函数实现了著名的快速排序算法，很多 Haskell 程序员将其视作经典：
 在早期的 Haskell 教程中，用一行代码实现的 ``sort`` 经常作为示例向读者展示 Haskell 强大的表达能力。
@@ -716,16 +716,16 @@ Forec 译注：读者只需要记住范式和弱首范式这两个概念的区�
 
 ::
 
-	-- file: ch24/Sorting.hs
-	module Sorting where
+  -- file: ch24/Sorting.hs
+  module Sorting where
 
-	import Control.Parallel (par, pseq)
+  import Control.Parallel (par, pseq)
 
-	parSort :: (Ord a) => [a] -> [a]
-	parSort (x:xs)    = force greater `par` (force lesser `pseq` (lesser ++ x:greater))
-		where lesser  = parSort [y | y <- xs, y <  x]
-			    greater = parSort [y | y <- xs, y >= x]
-	parSort _         = []
+  parSort :: (Ord a) => [a] -> [a]
+  parSort (x:xs)    = force greater `par` (force lesser `pseq` (lesser ++ x:greater))
+    where lesser  = parSort [y | y <- xs, y <  x]
+          greater = parSort [y | y <- xs, y >= x]
+  parSort _         = []
 
 不过我们并没有改变代码的结构。``parSort`` 仅仅多使用了三个函数： ``par``、``pseq`` 和 ``force``。
 
@@ -739,10 +739,10 @@ Forec 译注：读者只需要记住范式和弱首范式这两个概念的区�
 
 以上修改将对一些我们没有提到的方面产生巨大的影响，比如说：
 
-* 使用核心的数量
+* 使用多少个核心
 * 线程间如何通信
 * 如何将工作分配给多个可用核心
-* 明确哪些数据将在线程间共享，哪些该属于线程私有
+* 明确哪些数据将在线程间共享，哪些属于线程私有
 * 如何确定所有任务均已完成
 
 
@@ -751,14 +751,14 @@ Forec 译注：读者只需要记住范式和弱首范式这两个概念的区�
 
 并行的 Haskell 代码之所以能够表现出更优秀的性能，是因为计算过程中有大量重复、独立、可并行计算的工作。
 非严格求值会阻碍并行程序的执行，因此我们会在并行代码中使用 ``force`` 函数。下面通过一个错误的例子解释 ``force`` 函数的功能：
-	
+  
 ::
 
-	-- file: ch24/Sorting.hs
-	sillySort (x:xs) = greater `par` (lesser `pseq` (lesser ++ x:greater))
-		where lesser   = sillySort [y | y <- xs, y <  x]
-			    greater  = sillySort [y | y <- xs, y >= x]
-	sillySort _        = []
+  -- file: ch24/Sorting.hs
+  sillySort (x:xs) = greater `par` (lesser `pseq` (lesser ++ x:greater))
+    where lesser   = sillySort [y | y <- xs, y <  x]
+          greater  = sillySort [y | y <- xs, y >= x]
+  sillySort _        = []
 
 注意，我们在 ``par`` 和 ``pseq`` 两处用普通求值取代了 ``force lesser`` 和 ``force greater``。
 
@@ -777,15 +777,15 @@ Forec 译注：读者只需要记住范式和弱首范式这两个概念的区�
 
 ::
 
-	> let list = [1..10]
-	> let whnfList = map (+1) list
-	> :sprint whnfList
-	whnfList = _
-	> length whnfList
-	10
-	> :sprint whnfList
-	whnfList = [_, _, _, _, _, _, _, _, _, _]
-	
+  > let list = [1..10]
+  > let whnfList = map (+1) list
+  > :sprint whnfList
+  whnfList = _
+  > length whnfList
+  10
+  > :sprint whnfList
+  whnfList = [_, _, _, _, _, _, _, _, _, _]
+  
 可以看出，``length`` 操作仅需要 ``whnfList`` 中元素的数量，并没有对其中元素进行更深层次的求值。
 
 ]
@@ -794,12 +794,12 @@ Forec 译注：读者只需要记住范式和弱首范式这两个概念的区�
 
 ::
 
-	-- file: ch24/Sorting.hs
-	force :: [a] -> ()
-	force xs = go xs `pseq` ()
-		where go (_:xs) = go xs
-		  	  go [] = 1
-			  
+  -- file: ch24/Sorting.hs
+  force :: [a] -> ()
+  force xs = go xs `pseq` ()
+    where go (_:xs) = go xs
+          go [] = 1
+        
 注意，我们并不在乎列表中具体有什么，而是仅仅把列表遍历一遍，遍历之后再调用 ``pseq`` 。
 因为我们会在 ``par`` 或者 ``pseq`` 的左侧使用 ``force``，所以返回值无所谓。
 
@@ -825,36 +825,36 @@ par 提供什么保证？
 
 ::
 
-	-- file: ch24/SortMain.hs
+  -- file: ch24/SortMain.hs
 
-	module Main where
+  module Main where
 
-	import Data.Time.Clock (diffUTCTime, getCurrentTime)
-	import System.Environment (getArgs)
-	import System.Random (StdGen, getStdGen, randoms)
+  import Data.Time.Clock (diffUTCTime, getCurrentTime)
+  import System.Environment (getArgs)
+  import System.Random (StdGen, getStdGen, randoms)
 
-	import Sorting
+  import Sorting
 
-	-- testFunction = sort
-	-- testFunction = seqSort
-	testFunction = parSort
-	-- testFunction = parSort2 2
+  -- testFunction = sort
+  -- testFunction = seqSort
+  testFunction = parSort
+  -- testFunction = parSort2 2
 
-	randomInts :: Int -> StdGen -> [Int]
-	randomInts k g = let result = take k (randoms g)
-					 in force result `seq` result
+  randomInts :: Int -> StdGen -> [Int]
+  randomInts k g = let result = take k (randoms g)
+           in force result `seq` result
 
-	main = do
-	  args <- getArgs
-	  let count | null args = 500000
-				      | otherwise = read (head args)
-	  input <- randomInts count `fmap` getStdGen
-	  putStrLn $ "We have " ++ show (length input) ++ " elements to sort."
-	  start <- getCurrentTime
-	  let sorted = testFunction input
-	  putStrLn $ "Sorted all " ++ show (length sorted) ++ " elements."
-	  end <- getCurrentTime
-	  putStrLn $ show (end `diffUTCTime` start) ++ " elapsed."
+  main = do
+    args <- getArgs
+    let count | null args = 500000
+              | otherwise = read (head args)
+    input <- randomInts count `fmap` getStdGen
+    putStrLn $ "We have " ++ show (length input) ++ " elements to sort."
+    start <- getCurrentTime
+    let sorted = testFunction input
+    putStrLn $ "Sorted all " ++ show (length sorted) ++ " elements."
+    end <- getCurrentTime
+    putStrLn $ show (end `diffUTCTime` start) ++ " elapsed."
 
 简单起见，我们使用 ``testFunction`` 变量选择用于基准测试的排序函数。
 
@@ -872,62 +872,62 @@ par 提供什么保证？
 
 ::
 
-	$ ghc -threaded -O2 --make SortMain
-	[1 of 2] Compiling Sorting          ( Sorting.hs, Sorting.o )
-	[2 of 2] Compiling Main             ( SortMain.hs, SortMain.o )
-	Linking SortMain ...
+  $ ghc -threaded -O2 --make SortMain
+  [1 of 2] Compiling Sorting          ( Sorting.hs, Sorting.o )
+  [2 of 2] Compiling Main             ( SortMain.hs, SortMain.o )
+  Linking SortMain ...
 
 在程序运行时告知 GHC 的运行时系统使用多少核心。首先测试最原始的 ``sort`` 函数，看看基础性能如何：
 
 ::
 
-	$ ./Sorting +RTS -N1 -RTS 700000
-	We have 700000 elements to sort.
-	Sorted all 700000 elements.
-	3.178941s elapsed.
+  $ ./Sorting +RTS -N1 -RTS 700000
+  We have 700000 elements to sort.
+  Sorted all 700000 elements.
+  3.178941s elapsed.
 
 启用两个核心并不会提升顺序执行代码的性能：
 
 ::
 
-	$ ./Sorting +RTS -N2 -RTS 700000
-	We have 700000 elements to sort.
-	Sorted all 700000 elements.
-	3.259869s elapsed.
-		
+  $ ./Sorting +RTS -N2 -RTS 700000
+  We have 700000 elements to sort.
+  Sorted all 700000 elements.
+  3.259869s elapsed.
+    
 如果重新编译，测试 ``parSort`` 的性能，就会发现结果还不如顺序代码：
 
 ::
 
-	$ ./Sorting +RTS -N1 -RTS 700000
-	We have 700000 elements to sort.
-	Sorted all 700000 elements.
-	3.915818s elapsed.
-	$ ./Sorting +RTS -N2 -RTS 700000
-	We have 700000 elements to sort.
-	Sorted all 700000 elements.
-	4.029781s elapsed.
-	
+  $ ./Sorting +RTS -N1 -RTS 700000
+  We have 700000 elements to sort.
+  Sorted all 700000 elements.
+  3.915818s elapsed.
+  $ ./Sorting +RTS -N2 -RTS 700000
+  We have 700000 elements to sort.
+  Sorted all 700000 elements.
+  4.029781s elapsed.
+  
 性能上没有任何提升。这看起来是以下两个原因之一造成的：要么是 ``par`` 本身的开销过大，
 要么是我们滥用了 ``par`` 。为了鉴别究竟哪个才是罪魁祸首，
 我们编写了一个类似 ``parSort`` 的函数 ``seqSort``，它使用 ``pseq`` 代替 ``par`` ：
 
 ::
 
-	seqSort :: (Ord a) => [a] -> [a]
-	seqSort (x:xs) = lesser `pseq` (greater `pseq` (lesser ++ x:greater))
-		where lesser  = seqSort [y | y <- xs, y <  x]
-			    greater = seqSort [y | y <- xs, y >= x]
-	seqSort _ = []
+  seqSort :: (Ord a) => [a] -> [a]
+  seqSort (x:xs) = lesser `pseq` (greater `pseq` (lesser ++ x:greater))
+    where lesser  = seqSort [y | y <- xs, y <  x]
+          greater = seqSort [y | y <- xs, y >= x]
+  seqSort _ = []
 
 我们还删去了 ``parSort`` 中对 ``force`` 的调用。所以将 ``seqSort`` 和 ``sort`` 比较就可以观察到只应用 ``pseq`` 的性能：
 
 ::
 
-	$ ./Sorting +RTS -N1 -RTS 700000
-	We have 700000 elements to sort.
-	Sorted all 700000 elements.
-	3.848295s elapsed.
+  $ ./Sorting +RTS -N1 -RTS 700000
+  We have 700000 elements to sort.
+  Sorted all 700000 elements.
+  3.848295s elapsed.
 
 上面的运行结果说明 ``par`` 和 ``pseq`` 耗时相似。我们该如何改进性能呢？
 
@@ -940,25 +940,25 @@ par 提供什么保证？
 
 ::
 
-	-- file: ch24/Sorting.hs
-	parSort2 :: (Ord a) => Int -> [a] -> [a]
-	parSort2 d list@(x:xs)
-	  | d <= 0     = sort list
-	  | otherwise  = force greater `par` (force lesser `pseq` (lesser ++ x:greater))
-		  where lesser      = parSort2 d' [y | y <- xs, y <  x]
-				    greater     = parSort2 d' [y | y <- xs, y >= x]
-				    d' = d - 1
-	parSort2 _ _              = []
+  -- file: ch24/Sorting.hs
+  parSort2 :: (Ord a) => Int -> [a] -> [a]
+  parSort2 d list@(x:xs)
+    | d <= 0     = sort list
+    | otherwise  = force greater `par` (force lesser `pseq` (lesser ++ x:greater))
+      where lesser      = parSort2 d' [y | y <- xs, y <  x]
+            greater     = parSort2 d' [y | y <- xs, y >= x]
+            d' = d - 1
+  parSort2 _ _              = []
 
 ``parSort2`` 在到达可控深度时停止递归以及创建新的并行计算。如果待处理数据的规模已知，程序就能在剩余工作数量足够少的时刻停止
 并行计算并切换到非并行代码。
 
 ::
 
-	$ ./Sorting +RTS -N2 -RTS 700000
-	We have 700000 elements to sort.
-	Sorted all 700000 elements.
-	2.947872s elapsed.
+  $ ./Sorting +RTS -N2 -RTS 700000
+  We have 700000 elements to sort.
+  Sorted all 700000 elements.
+  2.947872s elapsed.
 
 在双核系统中，这一改进将运行速度提升了大约 25%。性能的提升并不高，但想想我们对代码所做的改变：几句注解而已就让速度提升了四分之一。
 
@@ -972,10 +972,10 @@ par 提供什么保证？
 
 .. info::
 
-	留意 GHC 6.8.2 中的垃圾回收 bug
-	
-	GHC 6.8.2 release 版本中的垃圾回收器存在一个会导致 ``par`` 阻塞的 bug。如果你想使用 ``par``，我们建议你至少升级到 GHC 6.8.3。
-	
+  留意 GHC 6.8.2 中的垃圾回收 bug
+  
+  GHC 6.8.2 release 版本中的垃圾回收器存在一个会导致 ``par`` 阻塞的 bug。如果你想使用 ``par``，我们建议你至少升级到 GHC 6.8.3。
+  
 [Forec 译注：翻译此处时 GHC 的最新版本为 8.0.2，已支持多核系统的垃圾回收。实际测试表明，
 即使支持多核 GC，并行编程的主要瓶颈在很多时候还是垃圾回收。]
 
@@ -984,7 +984,7 @@ par 提供什么保证？
 
 1. 决定什么时候从 ``parSort2`` 切换到 ``sort`` 不是一件容易的事。我们上面实现的方法是根据递归的深度选择，另一种方法是根据待排序子列表的长度决定。重写 ``parSort2`` 使其在待排序子列表长度小于某个数的时候切换到 ``sort``。
 2. 测试基于列表长度切换的 ``parSort2`` 的性能，并于基于递归深度的版本比较。哪一个性能更好？
-	
+  
 并行策略和 Map Reduce
 ---------------------------------------
 
