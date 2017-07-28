@@ -184,6 +184,11 @@ monad栈      monad transformer stack / monad stack
 
 惰性求值 lazy evaluation
 
+第二十四章
+-----------------
+
+求值策略 evaluation strategy
+
 第二十五章
 ----------
 

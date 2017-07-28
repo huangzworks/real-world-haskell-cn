@@ -651,7 +651,7 @@ Chan 是无边界的
 
 选择正确的运行时需要花点心思。 ``threaded`` 运行时可以使用多核，但是也有相应的代价：线程间共享数据的成本比 ``non-threaded`` 运行时更大。
 
-目前为止， GHC 的 6.8.3 版本使用的垃圾收集器是单线程的：它执行时暂停其他所有线程，而且它是在单核上执行。这限制了我们在使用多核的时候希望看到的性能改进[56]_。
+目前为止， GHC 的 6.8.3 版本使用的垃圾收集器是单线程的：它执行时暂停其他所有线程，而且它是在单核上执行。这限制了我们在使用多核的时候希望看到的性能改进 [56]_ 。
 
 很多真实世界中的并发程序中，一个单独的线程多数时间实在等待一个网络请求或响应。这些情况下，若以一个单独的 ``Haskell`` 程序为数万并发客户端提供服务，使用低开销的 ``non-threaded`` 运行时很可能是合适的。例如，与其用 4 个核跑 threaded 运行时的单个服务器程序，可能同时跑 4 个 non-threaded 运行时的相同服务器程序性能更好。
 
@@ -988,9 +988,415 @@ par 提供什么保证？
 并行策略和 Map Reduce
 ---------------------------------------
 
+在编程社区中，Google 用于并行处理海量数据的 MapReduce 框架是受函数式编程启发的著名软件系统之一。
 
+我们可以用 Haskell 轻松构建一个简单而实用的 “山寨版” MapReduce。我们将把重点落在 Web 服务器日志文件的处理上，这些文件通常规模较大并且信息丰富[57]_。
+
+举个例子，这是 Apache Web 服务器记录的一条访问记录。这条记录原本是一行，这里为了阅读方便将其切分成多行。
+
+::
+  
+  201.49.94.87 - - [08/Jun/2008:07:04:20 -0500] "GET / HTTP/1.1"
+  200 2097 "http://en.wikipedia.org/wiki/Mercurial_(software)"
+  "Mozilla/5.0 (Windows; U; Windows XP 5.1; en-GB; rv:1.8.1.12)
+  Gecko/20080201 Firefox/2.0.0.12" 0 hgbook.red-bean.com
+
+虽然直接处理这些日志文件的实现非常简单，但这显然不是我们想要的。如果考虑解决一类问题而非一个问题，我们就可能得到适用范围更广的代码。
+
+在开发并行程序时，无论使用何种底层语言，我们都总会遇到一些 “坏钱币” 问题。
+
+[Forec 译注：坏钱币，原文为 ``Bad penny``，意味着一个不好的东西总会一次接一次地出现。]
+
+* 算法很快被切分和通信过程地细节所掩盖，这导致代码难以理解，从而使修改代码的风险加大；
+* 选择 “粒度” —— 很难确定计算核心处理的最小工作单元。如果粒度太小，核心将会花费大量的时间保存上下文，从而使并行程序比串行更慢。如果粒度太大，那么有些核心由于负载均衡不良可能会闲置。
+
+将算法和求值分离
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+并行 Haskell 代码不存在传统语言中通信部分代码产生的混乱，取而代之的，是 ``par`` 和 ``pseq`` 对应的繁杂注释。举个例子，下面这个函数的操作方式与 ``map`` 类似，但会以并行方式将每个元素求值为弱首范式（WHNF）。[Forec 译注：弱首范式的概念在上文的译注中已经介绍过。]
+
+::
+
+  -- file: ch24/ParMap.hs
+  import Control.Parallel (par)
+  
+  parallelMap :: (a -> b) -> [a] -> [b]
+  parallelMap f (x:xs) = let r = f x
+                         in r `par` r : parallelMap f xs
+  parallelMap _ _      = []
+
+类型 ``b`` 可以是一个列表，或者是其它容易求值为弱首范式的类型。我们希望得到万精油式的解法，而不必为列表或者其他任何特殊类型编写定制的 ``parallelMap``。
+
+要解决这个问题，首先需要考虑如何强制求值。下面这个函数将列表中的每个元素强制求值为弱首范式。
+
+::
+
+  -- file: ch24/ParMap.hs
+  forceList :: [a] -> ()
+  forceList (x:xs) = x `pseq` forceList xs
+  forceList _      = ()
+
+上面的函数并不对列表做任何计算（实际上，该函数的类型签名就已经说明它无法做任何计算，因为它并不知晓列表中的具体元素）。这个函数的唯一目的是确保列表被评估为首范式，它仅能作为 ``seq`` 或 ``par`` 函数的第一个参数，例如：
+
+::
+
+  -- file: ch24/ParMap.hs
+  stricterMap :: (a -> b) -> [a] -> [b]
+  stricterMap f xs = forceList xs `seq` map f xs
+
+上面的 ``stricterMap`` 仅仅使列表中的元素被求值为弱首范式。我们可以添加一个函数作为参数，从而强制每个元素被求值至更深的层次。
+
+::
+
+  -- file: ch24/ParMap.hs
+  forceListAndElts :: (a -> ()) -> [a] -> ()
+  forceListAndElts forceElt (x:xs) =
+      forceElt x `seq` forceListAndElts forceElt xs
+  forceListAndElts _        _      = ()
+
+模块 ``Control.Parallel.Strategies`` 将这个想法浓缩为一个库，它引入了 “求值策略”（Evaluation Strategy） 这个概念。
+
+::
+
+  -- file: ch24/Strat.hs
+  type Done = ()
+  type Strategy a = a -> Done
+
+一个求值策略不会执行任何计算操作，它仅仅保证求值的程度。最简单的策略是 ``r0``，也就是什么都不做。
+
+::
+
+  -- file: ch24/Strat.hs
+  r0 :: Strategy a 
+  r0 _ = ()
+
+下面是 ``rwhnf`` ，它会将参数求值为弱首范式。
+
+::
+
+  -- file: ch24/Strat.hs
+  rwhnf :: Strategy a 
+  rwhnf x = x `seq` ()
+
+这个模块还提供了一个类型类 ``NFData``，它提供了方法 ``rnf`` ，能够将一个值求值为范式。
+
+::
+
+  -- file: ch24/Strat.hs
+  class NFData a where
+    rnf :: Strategy a
+    rnf = rwhnf
+
+[Forec 译注： ``NFData`` 类型类已经被迁移至 ``Control.DeepSeq`` ， ``rnf`` 现在已经不再是策略，取而代之的是 ``rdeepseq`` 。]
+
+.. info::
+  
+  记住这些名字
+  
+  你可以将这些函数和类型的名字看作首字母缩略词以方便记忆。 ``rwhnf`` 可以扩展为 “reduce to weak head normal form”， ``NFData`` 则是 ``normal form data`` 。
+  
+对于基本的类型（如 ``Int`` ），弱首范式和范式完全相同，这也是 ``NFData`` 类型类用 ``rwhnf`` 作为 ``rnf`` 默认实现的原因。 ``Control.Parallel.Strategies`` 模块也为许多常见类型提供了 ``NFData`` 的实例。
+
+::
+  
+  -- file: ch24/Strat.hs
+  instance NFData Char
+  instance NFData Int
+  
+  instance NFData a => NFData (Maybe a) where
+      rnf Nothing  = ()
+      rnf (Just x) = rnf x
+  
+  {- ... and so on ... -}
+
+通过这些例子，你应该已经大致清楚如何为自定义类型编写 ``NFData`` 实例了。你的 ``rnf`` 应当能够处理每个构造器，并且将 ``rnf`` 应用到构造器的每个字段上。
+
+
+将算法和策略分离
+^^^^^^^^^^^^^^^^^^^^^^
+
+我们可以通过这些基本策略构造更多复杂策略。 ``Control.Parallel.Strategies`` 提供了很多更复杂的策略，例如 ``parList`` 将一个求值策略并行地应用到列表的每个元素上。
+
+::
+
+  -- file: ch24/Strat.hs
+  parList :: Strategy a -> Strategy [a]
+  parList strat []     = ()
+  parList strat (x:xs) = strat x `par` (parList strat xs)
+
+该模块用 ``parList`` 定义了并行的 ``map`` 函数。
+
+::
+
+  -- file: ch24/Strat.hs
+  parMap :: Strategy b -> (a -> b) -> [a] -> [b]
+  parMap strat f xs = map f xs `using` parList strat
+
+这正是代码有趣之处。在 ``using`` 的左边是普通形式的 ``map`` ，而右侧是求值策略。组合器 ``using`` 告诉我们如何把策略应用到待求值，从而使代码和具体的求值方式分离。
+
+::
+
+  -- file: ch24/Strat.hs
+  using :: a -> Strategy a -> a
+  using x s = s x `seq` x
+
+``Control.Parallel.Strategies`` 还包含了许多其它函数，它们可以更精确地求值。例如，``parZipWith`` 通过求值策略并行地应用 ``zipWith`` 。
+
+::
+
+  -- file: ch24/Strat.hs
+  vectorSum' :: (NFData a, Num a) => [a] -> [a] -> [a]
+  vectorSum' = parZipWith rnf (+)
+
+[Forec 译注：函数 ``parZipWith`` 似乎并不存在，也许这里是原作自己实现的某个函数。]
+
+
+编写简单的 MapReduce 定义
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+只需要考虑一下 ``mapReduce`` 函数需要做什么，就能推导出它的类型。首先，``map`` 部件是必须的，因此有类型 ``a -> b`` ；其次需要 ``reduce`` ，也就是 ``fold`` 的同义词，这里我们使用更普适的类型 ``[b] -> c`` 。这个类型同时兼容左/右 ``fold``，因此我们可以根据数据和处理过程灵活地选择。
+
+把这些类型整合到一起，完整的类型如下：
+
+::
+
+  -- file: ch24/MapReduce.hs
+  simpleMapReduce
+      :: (a -> b)      -- map function
+      -> ([b] -> c)    -- reduce function
+      -> [a]           -- list to map over
+      -> c
+	  
+代码非常简单：
+
+::
+
+  simpleMapReduce mapFunc reduceFunc = reduceFunc . map mapFunc
+
+
+MapReduce 和策略
+^^^^^^^^^^^^^^^^^^^^
+
+上面定义的 ``simpleMapReduce`` 实在太简单了。我们希望能够指定一些并行执行的工作，让它更实用。这一目标可以通过分别在 map 和 reduce 阶段传入策略实现。
+
+::
+
+  -- file: ch24/MapReduce.hs
+  mapReduce
+      :: Strategy b    -- evaluation strategy for mapping
+      -> (a -> b)      -- map function
+      -> Strategy c    -- evaluation strategy for reduction
+      -> ([b] -> c)    -- reduce function
+      -> [a]           -- list to map over
+      -> c
+
+修改后的类型和函数体大小都有所增长。
+
+::
+
+  -- file: ch24/MapReduce.hs
+  mapReduce mapStrat mapFunc reduceStrat reduceFunc input =
+      mapResult `pseq` reduceResult
+    where mapResult    = parMap mapStrat mapFunc input
+          reduceResult = reduceFunc mapResult `using` reduceStrat
+
+	  
+适当调整工作量
+^^^^^^^^^^^^^^^^^^
+
+要取得更好的性能，必须保证 ``par`` 中每个应用所做的工作量远大于维护并行计算所需额外数据的开销。例如处理一个巨大的文件时，若按行切割，那么真正有意义的工作远小于切割、合并的额外开销。
+
+我们将在后面的章节开发一种处理大块文件的方式。这些大块会由什么组成？由于 Web 服务器日志文件应该只包含 ASCII 文本，我们将会看到 ``ByteString`` 的出色性能：这种类型极其高效，并且以流方式传输时消耗非常少的内存。
+
+::
+
+  -- file: ch24/LineChunks.hs
+  module LineChunks
+      (
+        chunkedReadWith
+      ) where
+  
+  import Control.Exception (bracket, finally)
+  import Control.Monad (forM, liftM)
+  import Control.Parallel.Strategies (NFData, rnf)
+  import Data.Int (Int64)
+  import qualified Data.ByteString.Lazy.Char8 as LB
+  import GHC.Conc (numCapabilities)
+  import System.IO
+  
+  data ChunkSpec = CS {
+        chunkOffset :: !Int64
+      , chunkLength :: !Int64
+      } deriving (Eq, Show)
+  
+  withChunks :: (NFData a) =>
+                (FilePath -> IO [ChunkSpec])
+             -> ([LB.ByteString] -> a)
+             -> FilePath
+             -> IO a
+  withChunks chunkFunc process path = do
+    (chunks, handles) <- chunkedRead chunkFunc path
+    let r = process chunks
+    (rnf r `seq` return r) `finally` mapM_ hClose handles
+    
+  chunkedReadWith :: (NFData a) =>
+                     ([LB.ByteString] -> a) -> FilePath -> IO a
+  chunkedReadWith func path =
+      withChunks (lineChunks (numCapabilities * 4)) func path
+
+各个块之间得以并行处理。惰性 I/O 保证了我们可以安全地传输这些块。
+	  
+减轻惰性 I/O 的风险
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+惰性 I/O 带来了一些众所周知的风险，下面我们要尝试避免。
+
+* 如果不强制要求程序从文件中拉取数据并计算，那么惰性 I/O 的特性会隐式地延长文件句柄打开的时间。操作系统会限制同时打开的文件数量，这个限制的数量较小且固定。如果这个风险不解决，可能会导致程序中使用到文件句柄的其他部分发生饥饿现象。
+* 如果没有显式关闭文件句柄，垃圾回收器会自动关闭它，但等到 GC 注意到这个泄漏的文件句柄可能需要很长的时间。这与上面的饥饿风险同理。
+* 显式关闭句柄能够避免饥饿，但如果关闭地太早，惰性计算可能还需要从这个被关闭的句柄中读取更多数据，这将导致该计算的失败。
+
+除了这些常见的风险外，我们无法通过单个文件句柄为多个线程提供数据。一个文件句柄只有一个 “寻址指针”，它指明了当前应当读取的位置。如果我们想读取多块，而每一块都需要从文件中不同的位置读取，单个句柄显然是无法满足的。
+
+将上面这些思考整合到一起，得到如下的惰性 I/O 解决方案：
+
+::
+
+  -- file: ch24/LineChunks.hs
+  chunkedRead :: (FilePath -> IO [ChunkSpec])
+              -> FilePath
+              -> IO ([LB.ByteString], [Handle])
+  chunkedRead chunkFunc path = do
+    chunks <- chunkFunc path
+    liftM unzip . forM chunks $ \spec -> do
+      h <- openFile path ReadMode
+      hSeek h AbsoluteSeek (fromIntegral (chunkOffset spec))
+      chunk <- LB.take (chunkLength spec) `liftM` LB.hGetContents h
+      return (chunk, h)
+	  
+上面的代码通过显式关闭文件句柄来避免饥饿问题。我们为每个线程提供了不同的、读取相同文件的文件句柄，从而允许它们同时读取一个文件的不同块。
+
+要解决的最后一个问题是句柄在计算结束之前关闭。我们使用 ``rnf`` 保证所有的处理过程在 ``withChunks`` 函数返回前完成，从而可以显式关闭文件句柄（可以确保这些句柄不会再被读取）。如果你必须在程序中使用惰性 I/O，那么最好用这种方式构建一道 “防火墙”，从而避免在意想不到的位置发生错误。
+
+.. info::
+
+  通过 fold 处理块
+  
+  我们可以将 :ref:`another-way-of-looking-at-traversal` 中的 “提前终止折叠” 技术应用到基于流的文件处理中。虽然这比惰性 I/O 需要更多的工作量，但它很好地避免了上述问题。
+
+高效寻找行对齐的块
+^^^^^^^^^^^^^^^^^^^^^^
+
+由于服务器的记录文件是面向行的，所以需要寻找一种高效的方式，保证在文件切分为大块后，每块均在行的边界上结束。我们不想通过扫描一个块的所有数据来确定边界，因为每一块数据可能达到几十兆字节。
+
+无论是固定块的大小还是固定块的数量，我们的方法都能奏效，这里选择后者。首先寻求一个大块结尾的大致位置，之后向前扫描直到换行符，然后在换行符后开始寻找下一个块，并重复该过程。
+
+::
+
+  -- file: ch24/LineChunks.hs
+  lineChunks :: Int -> FilePath -> IO [ChunkSpec]
+  lineChunks numChunks path = do
+    bracket (openFile path ReadMode) hClose $ \h -> do
+      totalSize <- fromIntegral `liftM` hFileSize h
+      let chunkSize = totalSize `div` fromIntegral numChunks
+          findChunks offset = do
+            let newOffset = offset + chunkSize
+            hSeek h AbsoluteSeek (fromIntegral newOffset)
+            let findNewline off = do
+                  eof <- hIsEOF h
+                  if eof
+                    then return [CS offset (totalSize - offset)]
+                    else do
+                      bytes <- LB.hGet h 4096
+                      case LB.elemIndex '\n' bytes of
+                        Just n -> do
+                          chunks@(c:_) <- findChunks (off + n + 1)
+                          let coff = chunkOffset c
+                          return (CS offset (coff - offset):chunks)
+                        Nothing -> findNewline (off + LB.length bytes)
+            findNewline newOffset
+      findChunks 0
+
+最后一块的大小会比前面的块稍小一些，但这种差异在实际应用中无关紧要。
+
+计算行数
+^^^^^^^^^^^^^^
+
+下面这个简单的例子展示了如何使用我们构建的 “脚手架”。
+
+::
+
+  -- file: ch24/LineCount.hs
+  module Main where
+  
+  import Control.Monad (forM_)
+  import Data.Int (Int64)
+  import qualified Data.ByteString.Lazy.Char8 as LB
+  import System.Environment (getArgs)
+  
+  import LineChunks (chunkedReadWith)
+  import MapReduce (mapReduce, rnf)
+  
+  lineCount :: [LB.ByteString] -> Int64
+  lineCount = mapReduce rnf (LB.count '\n')
+                        rnf sum
+  
+  main :: IO ()
+  main = do
+    args <- getArgs
+    forM_ args $ \path -> do
+      numLines <- chunkedReadWith lineCount path
+      putStrLn $ path ++ ": " ++ show numLines
+
+若使用 ``ghc -O2 --make-threaded`` 命令编译此程序，它在运行过一次后性能会更好（文件系统已缓存数据）。在双核笔记本上，处理 248MB （110 万行）的数据只需要 0.361 秒（加上 ``+RTS -N2`` 参数），单核需要 0.576 秒。
+
+找到最受欢迎的 URL
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+下面这个例子将计算每个 URL 被访问的次数，它来自 `[Google08] <https://research.google.com/archive/mapreduce.html>`_ （Google 讨论 MapReduce 的原始论文）。在 ``map`` 阶段，我们为每个数据块创建从 URL 映射到访问次数的 ``Map`` 。在 ``reduce`` 阶段，合并这些映射。
+
+[Forec 译注：该链接需科学上网后访问。]
+
+::
+
+  -- file: ch24/CommonURLs.hs
+  module Main where
+  
+  import Control.Parallel.Strategies (NFData(..), rwhnf)
+  import Control.Monad (forM_)
+  import Data.List (foldl', sortBy)
+  import qualified Data.ByteString.Lazy.Char8 as L
+  import qualified Data.ByteString.Char8 as S
+  import qualified Data.Map as M
+  import Text.Regex.PCRE.Light (compile, match)
+  
+  import System.Environment (getArgs)
+  import LineChunks (chunkedReadWith)
+  import MapReduce (mapReduce)
+  
+  countURLs :: [L.ByteString] -> M.Map S.ByteString Int
+  countURLs = mapReduce rwhnf (foldl' augment M.empty . L.lines)
+                        rwhnf (M.unionsWith (+))
+    where augment map line =
+              case match (compile pattern []) (strict line) [] of
+                Just (_:url:_) -> M.insertWith' (+) url 1 map
+                _ -> map
+          strict  = S.concat . L.toChunks
+          pattern = S.pack "\"(?:GET|POST|HEAD) ([^ ]+) HTTP/"
+
+为了从记录文件的每一行中提取出 URL，我们使用了在 :ref:`chapter_17` 中开发的 PCRE 正则表达式库。
+
+驱动程序打印了十条最受欢迎的 URL。与统计行数的例子类似，这个程序在双核上的速度是单核的 1.8 倍，处理 110 万条记录只需要 1.7 秒。
+		  
+
+总结
+^^^^^^^^^^
+
+给定一个适合 MapReduce 模型的问题，MapReduce 编程模型可以帮助我们使用 Haskell 以极小的工作量编写 “临时” 但高效的并行程序。此外，这个想法可以轻松扩展到其它数据源，如文件集和或网络上的数据资源。
+
+在许多情况下，为了跟上计算核心的处理速度，数据流的速度必须足够快，这一点将成为性能瓶颈。例如，若我们尝试将上述某个示例程序应用于一个没有缓存在主存的文件，或者是一个通过高带宽存储阵列传输的文件，那么大部分时间都将浪费在等待磁盘 I/O 上，而无法利用多核的优势。
 
 
 .. [54] 在稍后将展示，GHC 的线程异常轻量。如果运行时提供检查每个线程状态的方法，每个线程的开销将增加，哪怕永远不会用到这些信息。
 .. [55] ``non-threaded`` 运行时不接受这个选项，会用一条错误信息拒绝它。
 .. [56] 此书撰写时，垃圾收集器已经开始重新编写以利用多核，但是我们不确定它在未来的效果。
+.. [57] 这个想法是 Tim Bray 提出的。
