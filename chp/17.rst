@@ -1,0 +1,1008 @@
+第 17 章：面向 C 语言的接口：FFI
+================================
+
+Programming languages do not exist in perfect isolation. They inhabit an ecosystem of tools and libraries, built up over decades, and often written in a range of programming languages. Good engineering practice suggests we reuse that effort. The Haskell Foreign Function Interface (the "FFI") is the means by which Haskell code can use, and be used by, code written in other languages. In this chapter we'll look at how the FFI works, and how to produce a Haskell binding to a C library, including how to use an FFI preprocessor to automate much of the work. The challenge: take PCRE, the standard Perl-compatible regular expression library, and make it usable from Haskell in an efficient and functional way. Throughout, we'll seek to abstract out manual effort required by the C implementation, delegating that work to Haskell to make the interface more robust, yielding a clean, high level binding. We assume only some basic familiarity with regular expressions.
+
+Binding one language to another is a non-trivial task. The binding language needs to understand the calling conventions, type system, data structures, memory allocation mechanisms and linking strategy of the target language, just to get things working. The task is to carefully align the semantics of both languages, so that both languages can understand the data that passes between them.
+
+For Haskell, this technology stack is specified by the Foreign Function Interface addendum to the Haskell report. The FFI report describes how to correctly bind Haskell and C together, and how to extend bindings to other languages. The standard is designed to be portable, so that FFI bindings will work reliably across Haskell implementations, operating systems and C compilers.
+
+All implementations of Haskell support the FFI, and it is a key technology when using Haskell in a new field. Instead of reimplementing the standard libraries in a domain, we just bind to existing ones written in languages other than Haskell.
+
+The FFI adds a new dimension of flexibility to the language: if we need to access raw hardware for some reason (say we're programming new hardware, or implementing an operating system), the FFI lets us get access to that hardware. It also gives us a performance escape hatch: if we can't get a code hot spot fast enough, there's always the option of trying again in C. So let's look at what the FFI actually means for writing code.
+
+.. _foreign-language-bindings-the-basics:
+
+外部语言绑定：基础
+------------------
+
+The most common operation we'll want to do, unsurprisingly, is to call a C function from Haskell. So let's do that, by binding to some functions from the standard C math library. We'll put the binding in a source file, and then compile it into a Haskell binary that makes use of the C code.
+
+o start with, we need to enable the foreign function interface extension, as the FFI addendum support isn't enabled by default. We do this, as always, via a ``LANGUAGE`` pragma at the top of our source file:
+
+.. code:: haskell
+
+    -- file: ch17/SimpleFFI.hs
+    {-# LANGUAGE ForeignFunctionInterface #-}
+
+The LANGUAGE pragmas indicate which extensions to Haskell 98 a module uses. We bring just the FFI extension in play this time. It is important to track which extensions to the language you need. Fewer extensions generally means more portable, more robust code. Indeed, it is common for Haskell programs written more than a decade ago to compile perfectly well today, thanks to standardization, despite changes to the language's syntax, type system and core libraries.
+
+The next step is to import the ``Foreign`` modules, which provide useful types (such as pointers, numerical types, arrays) and utility functions (such as ``malloc`` and ``alloca``), for writing bindings to other languages:
+
+.. code:: haskell
+
+    -- file: ch17/SimpleFFI.hs
+    import Foreign
+    import Foreign.C.Types
+
+For extensive work with foreign libraries, a good knowledge of the ``Foreign`` modules is essential. Other useful modules include ``Foreign.C.String``, ``Foreign.Ptr`` and ``Foreign.Marshal.Array``.
+
+Now we can get down to work calling C functions. To do this, we need to know three things: the name of the C function, its type, and its associated header file. Additionally, for code that isn't provided by the standard C library, we'll need to know the C library's name, for linking purposes. The actual binding work is done with a ``foreign import`` declaration, like so:
+
+.. code:: haskell
+
+    -- file: ch17/SimpleFFI.hs
+    foreign import ccall "math.h sin"
+         c_sin :: CDouble -> CDouble
+
+This defines a new Haskell function, ``c_sin``, whose concrete implementation is in C, via the ``sin`` function. When ``c_sin`` is called, a call to the actual ``sin`` will be made (using the standard C calling convention, indicated by ``ccall`` keyword). The Haskell runtime passes control to C, which returns its results back to Haskell. The result is then wrapped up as a Haskell value of type ``CDouble``.
+
+A common idiom when writing FFI bindings is to expose the C function with the prefix "c\_", distinguishing it from more user-friendly, higher level functions. The raw C function is specified by the ``math.h`` header, where it is declared to have the type:
+
+.. code:: c
+
+    double sin(double x);
+
+When writing the binding, the programmer has to translate C type signatures like this into their Haskell FFI equivalents, making sure that the data representations match up. For example, ``double`` in C corresponds to ``CDouble`` in Haskell. We need to be careful here, since if a mistake is made the Haskell compiler will happily generate incorrect code to call C! The poor Haskell compiler doesn't know anything about what types the C function actually requires, so if instructed to, it will call the C function with the wrong arguments. At best this will lead to C compiler warnings, and more likely, it will end with with a runtime crash. At worst the error will silently go unnoticed until some critical failure occurs. So make sure you use the correct FFI types, and don't be wary of using QuickCheck to test your C code via the bindings. 
+
+[注： Some more advanced binding tools provide greater degrees of type checking. For example, c2hs is able to parse the C header, and generate the binding definition for you, and is especially suited for large projects where the full API is specified. ]
+
+The most important primitive C types are represented in Haskell with the somewhat intuitive names (for signed and unsigned types) ``CChar``, ``CUChar``, ``CInt``, ``CUInt``, ``CLong``, ``CULong``, ``CSize``, ``CFloat``, ``CDouble``. More are defined in the FFI standard, and can be found in the Haskell base library under ``Foreign.C.Types``. It is also possible to define your own Haskell-side representation types for C, as we'll see later.
+
+.. _be-careful-of-side-effects:
+
+当心副作用
+^^^^^^^^^^
+
+需要注意的一点是，我们将 ``sin`` 作为 Haskell 中的没有副作用的纯函数。
+这种情况下没问题，因为 C 语言中的 ``sin`` 函数是引用透明的。
+通过将 C 语言纯函数绑定到 Haskell 纯函数，Haskell 编译器会获悉一些关于 C 代码的情况，即它没有副作用、更易于优化。
+对于 Haskell 程序员来说纯的代码也是更灵活的代码，因为它自然产出持久数据结构以及线程安全功能。
+然而，纯的 Haskell 代码总是线程安全的，这是 C 语言更难以保证的。
+即使文档表明该函数很可能没有副作用发生，也无法确保它同时是线程安全的，除非文档明确有说“可重入（reentrant）”。
+纯的、线程安全的 C 语言代码，虽然罕见，却也是种有价的商品。
+这是在 Haskell 中使用 C 语言的最简单的滋味。
+
+当然，具有副作用的代码在命令式语言中更常见，其中语句的显式排列鼓励副作用的使用。在 C 语言中更为常见的是，函数会由于全局或者局部状态的变化对于给定相同的参数返回不同的值，或者具有其他副作用。
+通常情况下，在 C 语言中会有这样暗示：函数只返回一个状态值或者一些 void 类型，而不是一个有用的结果值。
+这表明该函数的实际产出在其副作用中。
+对于这样的函数，我们需要在 IO monad 中捕获那些副作用（例如，通过将返回类型改为 ``IO CDouble``\）。
+对于不可重入的 C 语言纯函数，我们还需格外小心，因为与 C 语言相比，多线程在 Haskell 代码中极其常见。
+我们可能需要通过一些措施让不可重入代码能够安全使用：通过事务锁缓和对 FFI 绑定的访问或者复制（duplicating）底层 C 语言状态。
+
+.. _a-high-level-wrapper:
+
+高级包装
+^^^^^^^^
+
+随着外部导入的搞定，下一步是将外部语言调用中传给和传回的 C 语言类型转换为 Haskell 原生类型，包装该绑定使其呈现为正常的 Haskell 函数：
+
+.. code:: haskell
+
+    -- file: ch17/SimpleFFI.hs
+    fastsin :: Double -> Double
+    fastsin x = realToFrac (c_sin (realToFrac x))
+
+为这样的绑定编写便利的包装器时，需要首要记住的事情是将输入与输出正确地转回正常 Haskell 类型。
+要在浮点值之间进行转换，我们可以使用 ``realToFrac``\，这样我们可以将不同的浮点值相互转换（并且对于如从 ``CDouble`` 到 ``Double`` 的这类转换通常是无开销的，因为其底层表示并无变化）。
+对于整型值可以使用 ``fromIntegral``\。
+对于其他常见的 C 语言数据类型，例如数组，我们可能需要将数据解包为更可行的 Haskell 类型（例如列表），或者可能保持 C 语言数据的不透明（opaque）、而只是（可能通过 ``ByteString``\）间接操作它。
+具体选择取决于转换的成本以及源类型与目标类型上可用的函数。
+
+现在我们可以继续在程序中使用已绑定函数式了。
+例如，我们可以对一个 Haskell 的十分数列表（a Haskell list of tenths）应用 C 语言的 ``sin``\：
+
+.. code:: haskell
+
+    -- file: ch17/SimpleFFI.hs
+    main = mapM_ (print . fastsin) [0/10, 1/10 .. 10/10]
+
+这个简单程序在计算每个结果的同时输出该结果。
+将完整绑定放在文件 ``SimpleFFI.hs`` 中，我们可以在 ``GHCi`` 中运行它：
+
+::
+
+    $ ghci SimpleFFI.hs
+    *Main> main
+    0.0
+    9.983341664682815e-2
+    0.19866933079506122
+    0.2955202066613396
+    0.3894183423086505
+    0.479425538604203
+    0.5646424733950354
+    0.644217687237691
+    0.7173560908995227
+    0.7833269096274833
+    0.8414709848078964
+
+或者，我们可以将代码编译成可执行文件，并与相应的 C 语言库动态链接：
+
+::
+
+    $ ghc -O --make SimpleFFI.hs
+    [1 of 1] Compiling Main             ( SimpleFFI.hs, SimpleFFI.o )
+    Linking SimpleFFI ...
+
+然后运行：
+
+::
+
+    $ ./SimpleFFI 
+    0.0
+    9.983341664682815e-2
+    0.19866933079506122
+    0.2955202066613396
+    0.3894183423086505
+    0.479425538604203
+    0.5646424733950354
+    0.644217687237691
+    0.7173560908995227
+    0.7833269096274833
+    0.8414709848078964
+
+我们现在做的很好，有一个完整的静态链接到 C 语言、C 代码与 Haskell 代码相交织、并跨过语言边界传数据的程序。
+如上所述的简单绑定几乎是微不足道的，因为标准 ``Foreign`` 库为常用的类型提供了便利的别名，如 ``CDouble``\。
+在下一节中，我们会介绍一个更大的工程任务：绑定到会引发内存管理和类型安全问题的 PCRE 库。
+
+.. _regular-expressions-for-haskell-a-binding-for-pcre:
+
+Haskell 的正则表达式：对 PCRE 的绑定
+------------------------------------
+
+正如我们在之前章节中所看到的，Haskell 程序钟爱于列表作为基本数据结构。
+列表函数是基础库的核心部分，并且构建和分离列表结构的便利语法已纳入到语言中。
+字符串当然也是简单的字符列表（而不是平直的字符数组这种）。
+这样的灵活性非常好，但是它导致标准库倾向于支持多态列表操作而牺牲字符串特有操作。
+
+事实上，许多常见的任务都可以通过基于正则表达式的字符串处理来解决，但是正则表达式支持却不是 Haskell ``Prelude`` 的一部分。
+所以我们来看看如何使用现成的正则表达式库 PCRE，并为其提供一个自然、便利的 Haskell 绑定，让我们在 Haskell 中能够使用正则表达式。
+
+PCRE 是一个实现 Perl 风格正则表达式的很普及的 C 语言库。
+它广泛可用，并已预装在许多系统上。
+如果未预装，可以在 http://www.pcre.org/ 找到。
+在下面的部分中，我们假设 PCRE 库和头文件已在机器上可用。
+
+.. _simple-tasks-using-the-c-preprocessor:
+
+简单任务：使用 C 语言预处理器
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+开始写一个新的 Haskell 到 C 语言的 FFI 绑定的最简单的任务是，将 C 语言头文件中定义的常量绑定到等同的 Haskell 值。
+例如，PCRE 提供了一组用于修改核心模式匹配系统如何工作的标志（例如忽略大小写、或者允许匹配换行）。
+这些标志是作为常量出现在 PCRE 头文件中的：
+
+.. code:: c
+
+    /* Options */
+    
+    #define PCRE_CASELESS           0x00000001
+    #define PCRE_MULTILINE          0x00000002
+    #define PCRE_DOTALL             0x00000004
+    #define PCRE_EXTENDED           0x00000008
+
+**
+
+要将这些值导出到 Haskell 中，我们需要以某种方式将它们插入到 Haskell 源文件中。
+能做到这样的一个明显的方式是使用 C 语言的预处理器将 C 语言的定义转换到 Haskell 源代码中，然后我们可将该 Haskell 源代码作为正常 Haskell 源文件编译。
+使用预处理器，我们甚至还可以通过 Haskell 源文件中的文本替换来声明简单的常量：
+
+.. code:: haskell
+
+    -- file: ch17/Enum1.hs
+    {-# LANGUAGE CPP #-}
+    
+    #define N 16
+    
+    main = print [ 1 .. N ]
+
+预处理器处理该文件的方式与 C 源代码相同（当 Haskell 识别到 ``LANGUAGE`` 编译指示时，Haskell 编译器会为我们运行 CPP），结果程序输出：
+
+::
+
+    $ runhaskell Enum.hs
+    [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
+
+然而，依靠 CPP 是一种相当脆弱的方法。
+C 语言预处理器并不知道它正在处理 Haskell 源文件，并会很愉快地包含文本或转换源代码，这会使我们的 Haskell 代码失效。
+我们需要当心不要被 CPP 搅乱。
+如果我们想要包含 C 语言头文件，我们会冒着这些风险：替换不需要的符号、或者将 C 语言类型信息与原型插入到 Haskell 源代码中，从而导致一团糟。
+
+为了解决这些问题，随 GHC 一起分发了绑定预处理器 ``hsc2hs``\。
+它提供了用于在 Haskell 中包含 C 语言绑定信息的便利语法，并且让我们安全地操作头文件。
+它是大多数 Haskell FFI 绑定的首选工具。
+
+.. _binding-haskell-to-c-with-hsc2hs:
+
+用 hsc2hs 将 Haskell 绑定到 C 语言
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+如要使用 hsc2hs 作为 Haskell 的智能绑定工具，我们需要创建一个 ``.hsc`` 文件： ``Regex.hsc``\，该文件会包含用于绑定的 Haskell 源代码、hsc2hs 处理规则、C 语言头文件与 C 语言类型信息。
+如要开始，我们需要一些编译指示与导入：
+
+.. code:: haskell
+
+    -- file: ch17/Regex-hsc.hs
+    {-# LANGUAGE CPP, ForeignFunctionInterface #-}
+    
+    module Regex where
+    
+    import Foreign
+    import Foreign.C.Types
+    
+    #include <pcre.h>
+
+该模块以 FFI 绑定的典型序文开头：启用 CPP、启用外部函数接口语法、声明模块名、然后从基础库导入一些内容。
+不寻常项是最后一行，我们在那里包含了 PCRE 的 C 语言头文件。
+这在 ``.hs`` 源文件中是无效的，但是在 ``.hsc`` 代码中却有效。
+
+.. _adding-type-safety-to-pcre:
+
+给 PCRE 添加类型安全
+^^^^^^^^^^^^^^^^^^^^
+
+接下来，我们需要一个类型来表示 PCRE 编译期标志。
+在 C 语言中，这些都是 ``compile`` 函数的整数标志，所以我们可以只是使用 ``CInt`` 来表示它们。
+据我们对该变量的了解，它们是 C 语言中的数字常量，所以 ``CInt`` 就是恰当的表示。
+
+尽管作为一名 Haskell 库的作者，还是觉得这很草率。
+可以用作正则表达式标志的值的类型所包含的值比 ``CInt`` 允许的值要少。
+这会无法阻止最终用户传入非法整数值作为参数，或混用只能在正则表达式编译期传入的标志与运行时标志。
+也可以对标志进行任意数学运算，或者进行其他使整数和标志混淆的错误操作。
+我们真的需要更精确地指出标志的类型不同于其运行时表示（作为数值）。
+如果可以这样做，我们就能静态地防止一些滥用标志相关的错误。
+
+添加一个这样的类型安全层比较容易，并且这是类型引入声明 ``newtype`` 的一个很好的用例。
+``newtype`` 能让我们做的是创建一个与另一类型具有同一运行时表示、但在编译期作为独立类型的一个类型。
+我们可以将标志表示为 ``CInt`` 值，但是在编译期它们会由类型检查器区别标记。
+当使用错误标志值（因为我们只指定那些有效的标志，并且阻止访问数据构造器）、或者将标志传给期待整数的函数时，这会导致类型错误。
+我们可以使用 Haskell 类型系统为 C 语言 PCRE API 引入类型安全的层。
+
+为此，我们为 PCRE 编译期选项定义了一个 ``newtype``\，其内部表示实际上是一个 ``CInt`` 值，如下所示：
+
+.. code:: haskell
+
+    -- file: ch17/Regex-hsc.hs
+    -- | A type for PCRE compile-time options. These are newtyped CInts,
+    -- which can be bitwise-or'd together, using '(Data.Bits..|.)'
+    --
+    newtype PCREOption = PCREOption { unPCREOption :: CInt }
+        deriving (Eq,Show)
+
+该类型名为 ``PCREOption``\，它有一个单一的构造器，也命名为 ``PCREOption``\，它通过将构造器包装起来而将 ``CInt`` 值提升为新类型。
+我们还可以使用 Haskell 记录语法愉快地定义一个到其底层类型 ``CInt`` 的访问器 ``unPCREOption``\。
+在同一行内这很方便。
+此处我们也可以为标志继承一些有用的类型类操作（如相等性与可输出）。
+我们还需记住从源模块抽象地导出数据构造器，确保用户不能构建自己的 ``PCREOption`` 值。
+
+.. _binding-to-constants:
+
+绑定到常量
+^^^^^^^^^^
+
+现在我们已经导入了所需的模块、开启了我们需要的语言特性、并定义了一种表示 PCRE 选项的类型，我们需要实际定义一些与这些 PCRE 常量相对应的 Haskell 值。
+
+我们可以用 hsc2hs 以两种方式来做到这一点。
+第一种方法是使用 hsc2hs 提供的 ``#const`` 关键字。
+这让我们可以命名由 C 语言预处理器提供的常量。
+我们可以通过使用 ``#const`` 关键字列出 CPP 符号来手动绑定常量：
+
+.. code:: haskell
+
+    -- file: ch17/Regex-hsc-const.hs
+    caseless       :: PCREOption
+    caseless       = PCREOption #const PCRE_CASELESS
+    
+    dollar_endonly :: PCREOption
+    dollar_endonly = PCREOption #const PCRE_DOLLAR_ENDONLY
+    
+    dotall         :: PCREOption
+    dotall         = PCREOption #const PCRE_DOTALL
+
+这在 Haskell 这边引入了三个新的常量： ``caseless``\、 ``dollar_endonly`` 以及 ``dotall``\，对应于类似命名的 C 语言定义。
+我们立即将这些常量包装在一个 newtype 构造器中，因此它们仅作为抽象的 ``PCREOption`` 类型暴露给程序员。
+
+这是第一步，创建了一个 ``.hsc`` 文件。
+C 语言预处理完成后，我们现在需要实际创建一个 Haskell 源文件。
+是时候对  ``.hsc`` 文件运行 ``hsc2hs`` 了：
+
+::
+
+    $ hsc2hs Regex.hsc
+
+这会创建一个新的输出文件 ``Regex.hs``\，其中的 CPP 变量已经扩展，并产生有效的 Haskell 代码：
+
+.. code:: haskell
+
+    -- file: ch17/Regex-hsc-const-generated.hs
+    caseless       :: PCREOption
+    caseless       = PCREOption 1
+    {-# LINE 21 "Regex.hsc" #-}
+    
+    dollar_endonly :: PCREOption
+    dollar_endonly = PCREOption 32
+    {-# LINE 24 "Regex.hsc" #-}
+    
+    dotall         :: PCREOption
+    dotall         = PCREOption 4
+    {-# LINE 27 "Regex.hsc" #-}
+
+还请注意， ``.hsc`` 的原始行号是如何通过 ``LINE`` 编译指示列在每个定义展开之后的。
+编译器使用这些信息依照其原始文件中的源代码而不是所生成的代码报告错误。
+我们可以将这个生成的 ``.hs`` 文件加载到解释器中，并使用其结果：
+
+::
+
+    $ ghci Regex.hs
+    *Regex> caseless
+    PCREOption {unPCREOption = 1}
+    *Regex> unPCREOption caseless
+    1
+    *Regex> unPCREOption caseless + unPCREOption caseless
+    2
+    *Regex> caseless + caseless
+    interactive>:1:0:
+        No instance for (Num PCREOption)
+
+所以都按预期运转。
+该值是不透明的，如果尝试破坏抽象，我们会得到类型错误，而如果需要，我们可以解开它们并对它们进行操作。
+``unPCREOption`` 访问器用于打开该封装。
+这是一个好的开始，不过让我们看下我们可以如何进一步简化这个任务。
+
+.. _automating-the-binding:
+
+自动绑定
+^^^^^^^^
+
+显然，手动列出所有 C 语言定义并且包装它们是乏味的，并且容易出错。
+在 ``newtype`` 构造器中包装所有字面值的工作也令人厌烦。
+这种绑定是一个非常常见的任务，于是 ``hsc2hs`` 提供了便利的语法来自动化进行： ``#enum`` 结构。
+
+我们可以用以下等效形式替换我们的顶层绑定列表：
+
+.. code:: haskell
+
+    -- file: ch17/Regex-hsc.hs
+    -- PCRE compile options
+    #{enum PCREOption, PCREOption
+      , caseless             = PCRE_CASELESS
+      , dollar_endonly       = PCRE_DOLLAR_ENDONLY
+      , dotall               = PCRE_DOTALL
+      }
+
+这要简洁很多！ ``#enum`` 结构给了我们三个要使用的字段。
+第一个名称是我们希望 C 语言定义转换后的类型名。
+这样我们可以选择绑定到除了 ``CInt`` 之外的其他类型。
+我们选择的是用 ``PCREOption`` 来构建。
+
+第二个字段是可选的放在符号前面的构造器。
+这专门针对我们想要构造 ``newtype`` 值的情况，并且会节约很多啰嗦的工作。
+``#enum`` 语法的最后一部分是自解释的：它只是定义了会由 CPP 填充的常量的 Haskell 名称。
+
+像之前一样，通过 hsc2hs 运行这段代码，会生成一个 Haskell 文件，其中生成了以下绑定代码（为简洁起见删除了 ``LINE`` 编译指示）：
+
+.. code:: haskell
+
+    -- file: ch17/Regex.hs
+    caseless              :: PCREOption
+    caseless              = PCREOption 1
+    dollar_endonly        :: PCREOption
+    dollar_endonly        = PCREOption 32
+    dotall                :: PCREOption
+    dotall                = PCREOption 4
+
+太完美了。
+现在我们可以使用这些值在 Haskell 中做一些事情。
+我们的目标是将标志视为抽象类型，而不是 C 语言中的整数位域。
+在 C 语言中传入多个标志可通过将多个标志位或在一起来完成。
+而对于一个抽象类型来说，这会暴露过多的信息。
+为保持抽象并赋予其 Haskell 风格，我们希望用户以列表形式传入多个标志而由库自身来组合。
+这可以通过简单的 fold 来实现：
+
+.. code:: haskell
+
+    -- file: ch17/Regex.hs
+    -- | Combine a list of options into a single option, using bitwise (.|.)
+    combineOptions :: [PCREOption] -> PCREOption
+    combineOptions = PCREOption . foldr ((.|.) . unPCREOption) 0
+
+这个简单的循环以初始值 0 开始、解包每个标志、并在底层 ``CInt`` 上用位或 ``(.|.)`` 通过循环累积器来组合每个值。
+最后的累积状态会随即包装在 ``PCREOption`` 构造器中。
+
+现在轮到我们实际编译一些正则表达式了。
+
+在 Haskell 与 C 语言之间传递字符串数据
+--------------------------------------
+
+下一个任务是编写一个到 PCRE 正则表达式编译函数 ``compile`` 的绑定。
+我们直接在 ``pcre.h`` 头文件中看看它的类型：
+
+.. code:: c
+
+    pcre *pcre_compile(const char *pattern,
+                       int options,
+                       const char **errptr,
+                       int *erroffset,
+                       const unsigned char *tableptr); 
+**
+
+这个函数将正则表达式模式编译成一些内部格式，它接受模式、一些标志以及返回状态信息的一些变量作为参数。
+
+我们需要找出用来表示每个参数的 Haskell 类型。
+这些类型中的大多数已经由 FFI 标注定义的等价形式所覆盖，并且在 ``Foreign.C.Types`` 中可用。
+第一个参数，正则表达式自身，作为一个空结尾的 char 指针传给 C 语言，等价于 Haskell 中的 ``CString`` 类型。
+PCRE 编译器选项，我们已经选用表示为抽象的 newtype ``PCREOption``\，其运行时表示是一个 ``CInt``\。
+由于该表示保障同一，因此我们可以安全地传入 ``newtype``\。
+其他的参数有点复杂，需要一些工作来构造和分解。
+
+第三个参数，一个指向 C 语言字符串的指针，将用作编译表达式时所生成任何错误信息的引用。
+该指针的值会被 C 语言函数修改为指向自定义的错误字符串。
+这可以用 ``Ptr CString`` 类型来表示。
+Haskell 中的指针是用于原始地址的堆分配的容器，并且可以使用 FFI 库中的若干个分配原语来创建和操作。
+例如，我们可以将一个指向 C 语言 ``int`` 的指针表示为 ``Ptr CInt``\、并将一个指向 unsigned char 的指针表示为 ``Ptr Word8``。
+
+.. note::
+    关于指针的注意事项
+
+    一旦我们有一个 Haskell 的 ``Ptr`` 值，我们就可以用它来做各种类似指针的事情。
+    我们可以将其与空指针（用特殊常量 ``nullPtr`` 表示）进行比较。
+    我们可以将指针从一个类型转换为另一个指针类型，或者我们可以使用 ``plusPtr`` 以字节数偏移量移动一个指针。
+    我们还可以使用 ``poke`` 修改它指向的值，当然也可以使用 ``peek`` 解引用一个指针并产生它所指向的值。
+    在大多数情况下，Haskell 程序员不需要直接操作指针，但是当需要时，这些工具就会派上用场。
+
+那么问题是如何表示当我们编译正则表达式时返回的抽象 ``pcre`` 指针。
+我们需要找到一个像该 C 语言类型一样抽象的 Haskell 类型。
+由于该 C 语言类型被抽象地处理，我们可以为该数据赋值给任何堆分配的 Haskell 类型，只要其上没有或几乎没有操作即可。
+这是应对任意类型外部数据的常用技巧。
+用于表示未知外部数据的惯用简单类型是指向 ``()`` 类型的指针。
+我们可以使用类型别名记住该绑定：
+
+.. code:: haskell
+
+    -- file: ch17/PCRE-compile.hs
+    type PCRE = ()
+
+也就是说，外部数据是一些未知的、不透明的对象，而我们只是将其视为指向 ``()`` 的指针，我们清楚地知道我们永远不会真正解引用该指针。
+这为我们提供了 ``pcre_compile`` 的以下外部导入绑定，它必须在 ``IO`` 中，因为不同的调用它返回的指针会有所不同，即使返回的对象在功能上是等价的：
+
+.. code:: haskell
+
+    -- file: ch17/PCRE-compile.hs
+    foreign import ccall unsafe "pcre.h pcre_compile"
+        c_pcre_compile  :: CString
+                        -> PCREOption
+                        -> Ptr CString
+                        -> Ptr CInt
+                        -> Ptr Word8
+                        -> IO (Ptr PCRE)
+
+类型化的指针
+^^^^^^^^^^^^
+
+.. note::
+    关于安全的注意事项
+
+    当进行外部导入声明时，我们可以可选地通过 ``safe`` 或者 ``unsafe`` 关键字指定一个当调用时使用的“安全性”等级。
+    安全调用效率较低，但是保证 Haskell 系统能够在 C 语言中安全地调用。
+    一个“不安全的”调用的开销要少得多，但是所调用 C 语言代码不能回调到 Haskell 中。
+    默认的外部导入是“安全的”，但实践中 C 语言代码很少会回调到 Haskell 中，所以为了效率，我们主要使用“不安全的”调用。
+
+我们可以通过使用“类型化的”（而不是使用 ``()`` 类型）指针来进一步增强绑定的安全性。
+也就是说，与单元类型不同的、没有有意义的运行时表示的唯一类型。
+一种不能构造数据、解引用会导致类型错误的类型。
+构建这样已知不可探查的数据类型的一个好方式是使用空元（nullary）数据类型：
+
+.. code:: haskell
+
+    -- file: ch17/PCRE-nullary.hs
+    data PCRE
+
+这需要 ``EmptyDataDecls`` 语言扩展。
+这种类型显然没有值！
+我们只能构造指向这些值的指针，因为没有具有这种类型的具体值（除了 bottom）。
+
+再次重复，我们不能真正对这样的值做任何事情，因为它没有运行时表示。
+以这样的方式使用类型化的指针只是为 C 语言所提供功能之上的 Haskell 层添加安全性的另一种方式。
+对于 C 语言程序员方面需要遵守的规定 （请记住永远不要解引用 PCRE 指针）可以在 Haskell 绑定的类型系统中静态强制执行。
+如果这段代码通过编译，那么类型检查器给了我们一个这样的凭证：C 语言返回的 PCRE 对象在 Haskell 端决不会解引用。
+
+现在我们已经将外部导入声明整理好，下一步是将数据编排成正确的形式，这样我们就可以最终调用 C 语言代码了。
+
+内存管理：让垃圾回收器司其职
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+一个尚未解决的问题是如何管理与 C 语言库返回的抽象 ``PCRE`` 结构相关联的内存。
+调用者无需分配它：该库通过在 C 语言端分配内存来处理这个问题。
+在某个时间点我们需要回收它。
+这又是一个通过隐藏 Haskell 绑定内部复杂性来抽象对于 C 语言乏味使用的机会。
+
+我们会使用 Haskell 垃圾收集器在不再使用时自动回收 C 语言结构。
+为此，我们会利用 Haskell 垃圾收集器终结器（finalizer）与 ``ForeignPtr`` 类型。
+
+我们不希望用户必须手动回收外部调用返回的 ``Ptr PCRE`` 值。
+PCRE 库特别指出，在 C 语言端结构是由 ``malloc`` 分配的，而在不再使用时需要释放它，否则会有内存泄漏的风险。
+Haskell 垃圾回收器已经使管理 Haskell 值的内存的任务很大程度上自动化了。
+我们也可以巧妙地给我们勤奋的垃圾回收器关联上为我们照看 C 语言内存的任务。
+诀窍是将一块 Haskell 数据与外部分配器数据关联，并给 Haskell 垃圾收集器一个任意函数，一旦该函数注意到 Haskell 数据用完就回收相应 C 语言资源。
+
+这里我们有两个工具，不透明的 ``ForeignPtr`` 数据类型以及具有以下类型的 ``newForeignPtr`` 函数：
+
+.. code:: haskell
+
+    -- file: ch17/ForeignPtr.hs
+    newForeignPtr :: FinalizerPtr a -> Ptr a -> IO (ForeignPtr a)
+
+该函数有两个参数，一个在数据离开作用域时运行的终结器，以及一个指向所关联 C 语言数据的指针。
+它返回一个新的托管的指针，一旦垃圾收集器决定不再使用相应数据，该指针就会运行其终结器。
+多优美的抽象！
+
+这些可终结的指针适用于一个 C 语言库需要用户显式回收的任何事物，以及当不再使用时清理资源。
+这是一个简单的装备，它非常有助于使 C 语言库绑定的风格更加自然、更加函数式。
+
+因此，考虑到这一点，我们可以把手动管理的 ``Ptr PCRE`` 类型隐藏在自动管理的数据结构中，从而产生用于表示用户将会看到的正则表达式的数据类型：
+
+.. code:: haskell
+
+    -- file: ch17/PCRE-compile.hs
+    data Regex = Regex !(ForeignPtr PCRE)
+                       !ByteString
+            deriving (Eq, Ord, Show)
+
+这个新的 ``Regex`` 数据类型由两部分组成。
+第一个是抽象的 ``ForeignPtr``\，我们会用它来管理在 C 语言中分配的底层 ``PCRE`` 数据。
+第二个组件是严格的 ``ByteString``\，它是我们所编译的正则表达式的字符串表示形式。
+通过使 ``Regex`` 类型内部的正则表达式的用户级表示保持便利，输出友好的错误消息、以有意义的方式显示 ``Regex`` 自身都会更容易。
+
+高级接口：数据编排
+^^^^^^^^^^^^^^^^^^
+
+编写 FFI 绑定时，一旦 Haskell 类型确定，挑战就是将 Haskell 程序员熟悉的常规数据类型转换为低层级的数组的指针以及其他 C 语言类型。
+正则表达式编译的理想 Haskell 接口是什么样的？
+有一些设计直觉来指导我们。
+
+对于初学者来说，编译行为应该是一个引用透明的操作：传递相同的正则表达式字符串每次都会产生功能上相同的编译模式，尽管 C 语言库会给我们可观察到不同的指向同一功能的表达式的指针。
+如果我们可以隐藏这些内存管理细节，我们应该能够将绑定表示为纯函数。
+将 C 语言函数表示为 Haskell 中的纯操作的能力，是迈向灵活性的关键步骤，也是该接口易于使用（因为在使用前不需要初始化复杂状态）的指标。
+
+就算是纯函数也可以失败。
+如果用户提供的正则表达式输入格式错误，就返回一个错误字符串。
+表示带有错误值的可选失败的一个很好的数据类型是 ``Either``\。
+也就是说，要么我们返回一个有效的编译过的正则表达式，要么我们会返回一个错误字符串。
+将一个 C 语言函数的结果编码为这种熟悉的基本 Haskell 类型，是使该绑定更合乎惯用法的另一个有用步骤。
+
+对于用户提供的参数，我们已经决定以列表的形式传递编译标志。
+我们可以选择将输入正则表达式作为一个高效的 ``ByteString`` 传递，或者作为一个常规的 ``String`` 来传递。
+那么，对于引用透明的编译成功时得到一个值、失败时得到一个错误字符串（的函数）的适宜的类型签名会是这样：
+
+.. code:: haskell
+
+    -- file: ch17/PCRE-compile.hs
+    compile :: ByteString -> [PCREOption] -> Either String Regex
+
+输入是一个 ``ByteString``\，可以从 ``Data.ByteString.Char8`` 模块中获得（我们将以此 ``qualified`` 导入来避免名字冲突），它包含正则表达式；以及一个标志列表（或者空列表，如果没有标志可传的话）。
+其结果要么是一个错误字符串，要么是一个新编译的正则表达式。
+
+编排 ByteString
+^^^^^^^^^^^^^^^
+
+给定这种类型，我们可以勾画出 ``compile`` 函数：对原始 C 语言绑定的高级接口。
+在其核心会调用 ``c_pcre_compile``\。
+在这之前，它必须将输入 ``ByteString`` 编入一个 ``CString``\。
+这是通过 ``ByteString`` 库的 ``useAsCString`` 函数来完成的，它将输入的 ``ByteString`` 复制到一个空结尾的 C 语言数组中（也有一个不安全的零拷贝变体，它假定 ``ByteString`` 已经是空结尾）：
+
+.. code:: haskell
+
+    -- file: ch17/ForeignPtr.hs
+    useAsCString :: ByteString -> (CString -> IO a) -> IO a
+
+该函数使用一个 ``ByteString`` 作为输入。
+第二个参数是一个用户定义的函数，该函数运行时使用所生成的 ``CString``\。
+我们在这里看到另一个有用的惯用法：数据编排函数由闭包自然界定。
+我们的 ``useAsCString`` 函数将把输入数据转换成一个 C 语言字符串，然后我们可以传给 C 语言作为一个指针。
+然后我们的负担就是提供一大堆代码来调用 C 语言。
+
+这种风格的代码通常用一个缩进的“do-代码块”表示法来写。
+以下伪代码说明了这一结构：
+
+.. code:: haskell
+
+    -- file: ch17/DoBlock.hs
+    useAsCString str $ \cstr -> do
+       ... operate on the C string
+       ... return a result
+
+这里的第二个参数是一个匿名函数，一个函数体是单子化的“do”代码块的 lambda 表达式。
+通常使用简单的 ``($)`` 应用操作符来避免使用括号分隔代码块参数。
+在处理这样的代码块参数时，这是一个很有用的惯用法。
+
+分配本地 C 语言数据（内存）：Storable 类
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+我们可以很高兴地将 ``ByteString`` 数据编排为 C 语言兼容类型，但是 ``pcre_compile`` 函数还需要一些指针与数组来放置它的其他返回值。
+这些只能简单存在，所以我们不需要复杂的分配策略。
+可以使用 ``alloca`` 函数创建这样的短期 C 语言数据：
+
+.. code:: haskell
+
+    -- file: ch17/ForeignPtr.hs
+    alloca :: Storable a => (Ptr a -> IO b) -> IO b
+
+这个函数接受一个代码块，该代码块接受一个某种 C 语言类型的指针作为参数。函数会安排用新分配的、未初始化的正确大小的数据调用该代码块。
+这种分配机制将局部堆栈变量镜像到其他语言中。
+一旦参数函数退出就释放所分配的内存。
+以这种方式，我们让低级数据类型在词法作用域分配，保证在退出作用域后释放。
+我们可以用它来分配具有 ``Storable`` 类型类的实例的任何数据类型。
+这样重载分配运算符隐含的一点是分配的数据类型可以根据使用处类型信息推断出来！
+基于我们对该数据使用的函数，Haskell 会知道要分配的内容。
+
+例如，要分配一个指向 ``CString`` 的指针，会通过调用的函数将该指针会更新为指向特定的 ``CString``\，我们在下述伪代码中调用 ``alloca``\：
+
+.. code:: haskell
+
+    -- file: ch17/DoBlock.hs
+    alloca $ \stringptr -> do
+       ... call some Ptr CString function
+       peek stringptr
+
+这在局部分配一个 ``Ptr CString``\，并将代码块应用于该指针，然后该代码块调用 C 语言函数来修改该指针的内容。
+最后，我们用 ``Storable`` 类的 ``peek`` 函数解引用该指针，产生一个 ``CString``\。
+
+我们现在可以把它们放在一起，来完成我们的高级 PCRE 编译包装（high level PCRE compilation wrapper）。
+
+把这些全部放在一起
+^^^^^^^^^^^^^^^^^^
+
+我们已经决定了用什么 Haskell 类型来表示 C 语言函数、结果数据表示形式以及如何管理它的内存。
+我们已经为 ``pcre_compile`` 函数选择了标志的表示形式，并且确定了如何使 C 语言字符串与探查它的代码交互。
+那么我们来编写一个完整的函数用来在 Haskell 中编译 PCRE 正则表达式吧：
+
+.. code:: haskell
+
+    -- file: ch17/PCRE-compile.hs
+    compile :: ByteString -> [PCREOption] -> Either String Regex
+    compile str flags = unsafePerformIO $
+      useAsCString str $ \pattern -> do
+        alloca $ \errptr       -> do
+        alloca $ \erroffset    -> do
+            pcre_ptr <- c_pcre_compile pattern (combineOptions flags) errptr erroffset nullPtr
+            if pcre_ptr == nullPtr
+                then do
+                    err <- peekCString =<< peek errptr
+                    return (Left err)
+                else do
+                    reg <- newForeignPtr finalizerFree pcre_ptr -- release with free()
+                    return (Right (Regex reg str))
+    
+
+仅此而已！
+让我们仔细阅读这里的细节，因为它相当密集。
+第一件突出的事情是使用 ``unsafePerformIO``\，这是一个非常声名狼藉的函数，具有非常不寻常的类型，从不吉利的 ``System.IO.Unsafe`` 导入：
+
+.. code:: haskell
+
+    -- file: ch17/ForeignPtr.hs
+    unsafePerformIO :: IO a -> a
+
+这个函数有点奇怪：它接受一个 IO 值并将其转换成一个纯的值！
+在长期以来对副作用危险性的警告后，我们这里刚好在一行中启用了危险效果。
+非常不明智，这个函数使我们避开了 Haskell 类型系统提供的所有安全保证，将任意副作用插入到 Haskell 程序中的任何地方。
+这样做的危险事关重大：我们可以打破优化、修改内存中的任意位置、删除用户机器上的文件、或者在我们的斐波那契序列中发射核导弹。
+那么究竟为什么要有这个函数存在呢？
+
+它正是为了使 Haskell 能够绑定到我们知道的引用透明、但不能证明给 Haskell 类型系统情况下的 C 语言代码。
+它让我们对编译器说，“我知道我在做什么——这段代码真的是纯的”。
+对于正则表达式编译，我们知道是这样的场景：给定相同的模式，我们应该每次都得到相同的正则表达式匹配器。
+然而，证明这些给编译器超出了 Haskell 类型系统能力，所以我们被迫断言这个代码是纯的。
+使用 ``unsafePerformIO`` 正好让我们可以这样做。
+
+但是，如果我们知道该 C 语言代码是纯的，那么为什么我们不正好这样声明——通过在导入声明中给它一个纯类型呢？
+因为我们必须为 C 语言函数分配局部内存来用，这必须在 IO monad 中完成，因为这是一个局部的副作用。
+不过这些副作用不会逃脱其外围的外部调用，所以包装的时候我们使用 ``unsafePerformIO`` 来重新引入纯净度。
+
+``unsafePerformIO`` 的参数是我们编译函数的实际函数体，它由四部分组成：
+将 Haskell 数据编排为 C 语言形式；
+调用到 C 语言库中；
+检查其返回值；
+最后，从结果中构建 Haskell 值。
+
+我们使用 ``useAsCString`` 和 ``alloca`` 编排、设置我们需要传给 C 语言的数据，然后使用之前开发的 ``combineOptions`` 将标志列表折叠成单个 ``CInt``\。
+一旦一切就绪，我们就终于可以通过模式、标志以及指向结果的指针来调用 ``c_pcre_compile`` 了。
+我们使用 ``nullPtr`` 作为字符编码表，它在本例中并未用到。
+
+从 C 语言调用返回的结果是一个指向抽象 ``PCRE`` 结构的指针。
+之后我们与 ``nullPtr`` 进行（比较）测试。
+如果正则表达式出现问题，我们必须解引用错误指针，产生一个 ``CString``\。
+然后我们使用库函数 ``peekCString`` 将其解压到一个正常的 Haskell 列表。
+错误路径的最终结果是 ``Left err`` 的值，它向调用者表明失败。
+
+而如果调用成功，我们就通过该 C 语言函数使用 ``ForeignPtr`` 分配一个新的存储托管的指针。
+特殊值 ``finalizerFree`` 被绑定为这个数据的终结器，它使用标准的 C 语言的 ``free`` 来回收数据。
+然后将其包装为不透明的 ``Regex`` 值。
+成功的结果会标记为 ``Right``\，并返回给用户。
+至此我们完工了。
+
+我们需要使用 hsc2hs 处理我们的源文件，然后在 GHCi 中加载该函数。
+然而，这样做导致第一次尝试时发生错误：
+
+::
+
+    $ hsc2hs Regex.hsc
+    $ ghci Regex.hs
+    
+    During interactive linking, GHCi couldn't find the following symbol:
+      pcre_compile
+    This may be due to you not asking GHCi to load extra object files,
+    archives or DLLs needed by your current session.  Restart GHCi, specifying
+    the missing library using the -L/path/to/object/dir and -lmissinglibname
+    flags, or simply by naming the relevant files on the GHCi command line.
+
+有点可怕。
+当然，这只是因为我们没有将我们想要调用的 C 语言库链接到 Haskell 代码。
+假设 PCRE 库已经安装在系统的默认库位置，我们可以通过在 GHCi 命令行中添加 ``-lpcre`` 来让 GHCi 知道它。
+现在我们可以尝试一些正则表达式的代码，看看成功与错误的情况：
+
+::
+
+    $ ghci Regex.hs -lpcre
+    *Regex> :m + Data.ByteString.Char8
+    *Regex Data.ByteString.Char8> compile (pack "a.*b") []
+    Right (Regex 0x00000000028882a0 "a.*b")
+    *Regex Data.ByteString.Char8> compile (pack "a.*b[xy]+(foo?)") []
+    Right (Regex 0x0000000002888860 "a.*b[xy]+(foo?)")
+    *Regex Data.ByteString.Char8> compile (pack "*") []
+    Left "nothing to repeat"
+
+由 PCRE 库编译的正则表达式会打包成字节串并已编排到 C 语言。
+然后其结果交回给 Haskell，其中使用默认的 ``Show`` 实例显示其结构。
+我们的下一步是使用这些已编译正则表达式来匹配某些字符串。
+
+匹配字符串
+----------
+
+一个好的正则表达式库的第二部分是匹配函数。
+给定一个已编译正则表达式，该函数执行已编译正则表达式与某些输入的匹配，指示它是否匹配以及（如果是）匹配的字符串的哪些部分。
+在 PCRE 中，这个函数是 ``pcre_exec``\，其类型为：
+
+.. code:: haskell
+
+    int pcre_exec(const pcre *code,
+                  const pcre_extra *extra,
+                  const char *subject,
+                  int length,
+                  int startoffset,
+                  int options,
+                  int *ovector,
+                  int ovecsize);
+
+**
+
+最重要的参数是从 ``pcre_compile`` 获取的 ``pcre`` 指针结构输入与主题（subject）字符串。
+其他标志让我们提供簿记结构及返回值的空间。
+我们可以直接将此类型翻译为 Haskell 导入声明：
+
+.. code:: haskell
+
+    -- file: ch17/RegexExec.hs
+    foreign import ccall "pcre.h pcre_exec"
+        c_pcre_exec     :: Ptr PCRE
+                        -> Ptr PCREExtra
+                        -> Ptr Word8
+                        -> CInt
+                        -> CInt
+                        -> PCREExecOption
+                        -> Ptr CInt
+                        -> CInt
+                    -> IO CInt
+
+我们使用与之前相同的方法为 ``PCREExtra`` 结构创建类型化的指针，并使用 ``newtype`` 来表示在正则表达式执行时传的标志。
+这让我们能够确保用户不会错误地在正则表达式运行时传入编译期标志。
+
+提取关于模式的信息
+^^^^^^^^^^^^^^^^^^
+
+调用 ``pcre_exec`` 涉及的主要的复杂因素是用于保存模式匹配器发现的匹配子串的偏移量的 ``int`` 指针数组。
+这些偏移保存在偏移向量中，其所需大小通过分析输入正则表达式来确定它所包含的捕获模式的数量来确定的。
+PCRE 提供了一个函数 ``pcre_fullinfo`` 用于确定关于正则表达式的很多信息，包括模式数量。
+我们需要调用这个函数，并且现在，我们可以直接写下用于 ``pcre_fullinfo`` 绑定的 Haskell 类型为：
+
+.. code:: haskell
+
+    -- file: ch17/RegexExec.hs
+    foreign import ccall "pcre.h pcre_fullinfo"
+        c_pcre_fullinfo :: Ptr PCRE
+                        -> Ptr PCREExtra
+                        -> PCREInfo
+                        -> Ptr a
+                        -> IO CInt
+
+这个函数最重要的参数是已编译的正则表达式以及指示我们感兴趣的信息的 ``PCREInfo`` 标志。
+在本例中，我们关心捕获的模式数。
+这些标志以数字常量编码，我们特别地需要使用 ``PCRE_INFO_CAPTURECOUNT`` 值。
+还有一系列其他用来确定该函数结果类型的常量，我们可以像之前一样使用 ``#enum`` 结构绑定。
+最后一个参数是指向存储关于模式的信息（其大小取决于传入的标志参数！）的位置的指针。
+
+调用 ``pcre_fullinfo`` 来确定捕获的模式数非常简单：
+
+.. code:: haskell
+
+    -- file: ch17/RegexExec.hs
+    capturedCount :: Ptr PCRE -> IO Int
+    capturedCount regex_ptr =
+        alloca $ \n_ptr -> do
+             c_pcre_fullinfo regex_ptr nullPtr info_capturecount n_ptr
+             return . fromIntegral =<< peek (n_ptr :: Ptr CInt)
+
+这需要一个原始 PCRE 指针，并为已匹配模式的 ``CInt`` 计数分配空间。
+然后我们调用该信息函数，并查看其结果结构，找到一个 ``CInt``\。
+最后，我们将它转换为一个普通的 Haskell ``Int``\，并将它传回给用户。
+
+与子串模式匹配
+^^^^^^^^^^^^^^
+现在我们来写正则表达式匹配函数。
+用于匹配的 Haskell 类型与编译正则表达式类似：
+
+.. code:: haskell
+
+    -- file: ch17/RegexExec.hs
+    match :: Regex -> ByteString -> [PCREExecOption] -> Maybe [ByteString]
+
+该函数是用户将字符串与已编译正则表达式匹配的方式。
+再次，主要的设计点是它是一个纯函数。
+匹配是一个纯函数：给定相同的输入正则表达式和主题字符串，它会始终返回相同的已匹配子串。
+我们通过类型签名向用户传达这一信息，表明当你调用此函数时不会发生任何副作用。
+
+其参数是一个已编译的 ``Regex``\、一个包含输入数据的严格 ``ByteString`` 以及一个在运行时修改正则表达式引擎行为的标志列表。
+其结果要么是 ``Nothing`` 值表明根本不匹配，要么刚好（just）是一个已匹配子串的列表。
+我们使用 ``Maybe`` 类型来清楚地指明匹配可能失败的类型。
+通过对输入数据使用严格的 ``ByteString``\，我们可以在无需复制的情况下提取已匹配子串，使接口效率更高。
+如果在输入中匹配子串，则偏移向量将填充成对的到主题字符串的整数偏移量。
+我们需要循环遍历这个结果向量、读取偏移量、并在每次循环最后构建 ``ByteString`` 切片。
+
+匹配包装器的实现可以分为三个部分。
+在顶层，我们的函数分解了已编译的 ``Regex`` 结构，产生了底层 ``PCRE`` 指针：
+
+.. code:: haskell
+
+    -- file: ch17/RegexExec.hs
+    match :: Regex -> ByteString -> [PCREExecOption] -> Maybe [ByteString]
+    match (Regex pcre_fp _) subject os = unsafePerformIO $ do
+      withForeignPtr pcre_fp $ \pcre_ptr -> do
+        n_capt <- capturedCount pcre_ptr
+    
+        let ovec_size = (n_capt + 1) * 3
+            ovec_bytes = ovec_size * sizeOf (undefined :: CInt)
+
+
+因为它是纯函数，我们可以使用 ``unsafePerformIO`` 在内部隐藏任何内存分配副作用。
+在对 ``PCRE`` 类型模式匹配之后，我们需要分解隐藏我们 C 语言所分配的原始 PCRE 数据的 ``ForeignPtr``\。
+我们可以使用 ``withForeignPtr``\。
+当进行调用时，这保持 Haskell 数据与 PCRE 值相关联，至少在它被此调用使用时防止它被收集。
+然后我们调用该信息函数，并使其值来计算偏移向量的大小（该公式已在 PCRE 文档中给出）。
+我们需要的字节数是元素的数量乘以一个 ``CInt`` 的大小。
+为了可移植地计算 C 语言类型的大小，``Storable`` 类提供了一个 ``sizeOf`` 函数，它接受所需类型的任意值（我们可以在这里使用 ``undefined`` 来进行类型分发）。
+
+下一步是分配一个我们已计算大小的偏移向量，来将输入 ``ByteString`` 转换为 C 语言 ``char`` 数组的指针。
+最后，我们使用所有必需的参数来调用 ``pcre_exec``\：
+
+.. code:: haskell
+
+    -- file: ch17/RegexExec.hs
+        allocaBytes ovec_bytes $ \ovec -> do
+    
+            let (str_fp, off, len) = toForeignPtr subject
+            withForeignPtr str_fp $ \cstr -> do
+                r <- c_pcre_exec
+                             pcre_ptr
+                             nullPtr
+                             (cstr `plusPtr` off)
+                             (fromIntegral len)
+                             0
+                             (combineExecOptions os)
+                             ovec
+                             (fromIntegral ovec_size)
+
+对于偏移向量，我们使用 ``allocaBytes`` 来精确地控制所分配数组的大小。
+它就像 ``alloca``\，但不是使用 ``Storable`` 类来确定所需的大小，而是需要一个明确的大小（以字节为单位）来进行分配。
+解开这些 ``ByteString``\，产生指向它们所包含内存的底层指针，这可通过 ``toForeignPtr`` 完成，它会将我们友好的 ``ByteString`` 类型转换为托管的指针。
+在结果上使用 ``withForeignPtr`` 给我们一个原始的 ``Ptr CChar``\，这正是我们需要传给 C 语言的输入字符串。
+用 Haskell 编程通常只是解决类型谜题。
+
+然后我们只是用原始 PCRE 指针、在正确偏移位置的输入字符串指针、它的长度以及结果向量指针来调用 ``c_pcre_exec``\。
+返回一个状态码，并且最终分析该结果：
+
+.. code:: haskell
+
+    -- file: ch17/RegexExec.hs
+                if r < 0
+                    then return Nothing
+                    else let loop n o acc =
+                                if n == r
+                                  then return (Just (reverse acc))
+                                  else do
+                                        i <- peekElemOff ovec o
+                                        j <- peekElemOff ovec (o+1)
+                                        let s = substring i j subject
+                                        loop (n+1) (o+2) (s : acc)
+                         in loop 0 0 []
+    
+      where
+        substring :: CInt -> CInt -> ByteString -> ByteString
+        substring x y _ | x == y = empty
+        substring a b s = end
+            where
+                start = unsafeDrop (fromIntegral a) s
+                end   = unsafeTake (fromIntegral (b-a)) start
+
+如果结果值小于零，那么出现了错误，或者未能匹配，所以我们将 ``Nothing`` 返回给用户。
+否则，我们需要一个循环从偏移向量中（通过 ``peekElemOff``\）取出成对的偏移量。
+这些偏移量用于查找已匹配子串。
+要构建子串，我们使用一个助手函数，给定一个起始与结束偏移量，丢弃主题字符串的外围部分，只产生匹配的部分。
+循环一直运行，直到它提取够了我们告诉它的由匹配器发现的子串数量。
+
+子串在一个尾递归循环中累积，建立了每个字符串的反向列表。
+在返回该用户的子串之前，我们需要翻转该列表，并将其包装进一个成功的 ``Just`` 标签。
+让我们试试吧！
+
+货真价实：编译并匹配正则表达式
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+如果我们采用这个函数、其外围的 hsc2hs 定义以及数据包装，并使用 hsc2hs 进行处理，我们可以将生成的 Haskell 文件加载到 GHCi 中并尝试我们的代码（我们需要导入 ``Data.ByteString.Char8`` 这样可以从字符串字面值来构建 ``ByteString``\）：
+
+::
+
+    $ hsc2hs Regex.hsc
+    $ ghci Regex.hs -lpcre
+    *Regex> :t compile
+    compile :: ByteString -> [PCREOption] -> Either String Regex
+    *Regex> :t match
+    match :: Regex -> ByteString -> Maybe [ByteString]
+
+事情看起来是合理的。
+现在我们来尝试一些编译与匹配。
+首先，来点容易的：
+
+::
+
+    *Regex> :m + Data.ByteString.Char8
+    *Regex Data.ByteString.Char8> let Right r = compile (pack "the quick brown fox") []
+    *Regex Data.ByteString.Char8> match r (pack "the quick brown fox") []
+    Just ["the quick brown fox"]
+    *Regex Data.ByteString.Char8> match r (pack "The Quick Brown Fox") []
+    Nothing
+    *Regex Data.ByteString.Char8> match r (pack "What
+      do you know about the quick brown fox?") []
+    Just ["the quick brown fox"]
+
+（我们也可以使用 ``OverloadedStrings`` 扩展来避免 ``pack`` 调用）。
+或者我们可以更冒险一些：
+
+::
+
+    *Regex Data.ByteString.Char8> let Right r = compile (pack "a*abc?xyz+pqr{3}ab{2,}xy{4,5}pq{0,6}AB{0,}zz") []
+    *Regex Data.ByteString.Char8> match r (pack "abxyzpqrrrabbxyyyypqAzz") []
+    Just ["abxyzpqrrrabbxyyyypqAzz"]
+    *Regex Data.ByteString.Char8> let Right r = compile (pack "^([^!]+)!(.+)=apquxz\\.ixr\\.zzz\\.ac\\.uk$") []
+    *Regex Data.ByteString.Char8> match r (pack "abc!pqr=apquxz.ixr.zzz.ac.uk") []
+    Just ["abc!pqr=apquxz.ixr.zzz.ac.uk","abc","pqr"]
+
+真的太棒了。
+Perl 正则表达式的全部强大功能，尽在你指尖下的 Haskell 代码中。
+
+在本章中，我们研究了如何声明让 Haskell 代码调用 C 语言函数的绑定、如何编排两种语言之间的不同数据类型、如何分配低级别内存（通过局部分配或者通过 C 语言内存管理）以及如何利用 Haskell 类型系统和垃圾收集器来自动化处理 C 语言的大量工作。
+最后，我们研究了 FFI 预处理器如何缓解构建新绑定的大量工作。
+其结果是一个实际上主要由 C 语言实现的自然的 Haskell API。
+
+大多数 FFI 任务可归类为上述类别。
+我们无法涵盖的其他高级技术包括：将 Haskell 链接到 C 语言程序、将回调从一种语言注册到另一种语言以及 ``c2hs`` 预处理工具。
+关于这些主题的更多信息可以在线查到。
+
