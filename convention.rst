@@ -162,10 +162,34 @@
 
 功能依赖	functional dependency
 
+第十七章
+--------
+
+产生         yield
+
+终结器       finalizer
+
+可重入       reentrant
+
+编译指示     pragma
+
+解引用       dereference
+
+类型化的     typed
+
+空元         nullary
+
+托管的指针   managed pointer
+
+空结尾       null-terminated
+
+单子化的     monadic
+
+
 第十八章
 ----------
 
-monad变换器   monad transformer
+monad变换器  monad transformer
 
 monad栈      monad transformer stack / monad stack
 

@@ -3,7 +3,7 @@
 import Foreign
 import Foreign.C.Types
 import Foreign.C.String
-import Regex
+import Regex hiding (PCRE)
 
 type PCRE = ()
 

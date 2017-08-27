@@ -65,9 +65,9 @@ The most important primitive C types are represented in Haskell with the somewha
 ^^^^^^^^^^
 
 需要注意的一点是，我们将 ``sin`` 作为 Haskell 中的没有副作用的纯函数。
-这种情况下没问题，因为 C 语言中的 ``sin`` 函数是引用透明的。
-通过将 C 语言纯函数绑定到 Haskell 纯函数，Haskell 编译器会获悉一些关于 C 代码的情况，即它没有副作用、更易于优化。
-对于 Haskell 程序员来说纯的代码也是更灵活的代码，因为它自然产出持久数据结构以及线程安全功能。
+这本例中没问题，因为 C 语言中的 ``sin`` 函数是引用透明的。
+通过将 C 语言纯函数绑定到 Haskell 纯函数，Haskell 编译器会获悉一些关于 C 语言代码的情况，即它没有副作用、更易于优化。
+对于 Haskell 程序员来说纯的代码也是更灵活的代码，因为它自然产出持久数据结构以及线程安全函数。
 然而，纯的 Haskell 代码总是线程安全的，这是 C 语言更难以保证的。
 即使文档表明该函数很可能没有副作用发生，也无法确保它同时是线程安全的，除非文档明确有说“可重入（reentrant）”。
 纯的、线程安全的 C 语言代码，虽然罕见，却也是种有价的商品。
@@ -99,7 +99,7 @@ The most important primitive C types are represented in Haskell with the somewha
 对于其他常见的 C 语言数据类型，例如数组，我们可能需要将数据解包为更可行的 Haskell 类型（例如列表），或者可能保持 C 语言数据的不透明（opaque）、而只是（可能通过 ``ByteString``\）间接操作它。
 具体选择取决于转换的成本以及源类型与目标类型上可用的函数。
 
-现在我们可以继续在程序中使用已绑定函数式了。
+现在我们可以继续在程序中使用已绑定的函数了。
 例如，我们可以对一个 Haskell 的十分数列表（a Haskell list of tenths）应用 C 语言的 ``sin``\：
 
 .. code:: haskell
@@ -193,10 +193,9 @@ PCRE 是一个实现 Perl 风格正则表达式的很普及的 C 语言库。
     #define PCRE_DOTALL             0x00000004
     #define PCRE_EXTENDED           0x00000008
 
-**
 
 要将这些值导出到 Haskell 中，我们需要以某种方式将它们插入到 Haskell 源文件中。
-能做到这样的一个明显的方式是使用 C 语言的预处理器将 C 语言的定义转换到 Haskell 源代码中，然后我们可将该 Haskell 源代码作为正常 Haskell 源文件编译。
+能做到这点的一个明显的方式是使用 C 语言的预处理器将 C 语言的定义转换到 Haskell 源代码中，然后我们可将该 Haskell 源代码作为正常 Haskell 源文件编译。
 使用预处理器，我们甚至还可以通过 Haskell 源文件中的文本替换来声明简单的常量：
 
 .. code:: haskell
@@ -381,9 +380,9 @@ C 语言预处理完成后，我们现在需要实际创建一个 Haskell 源文
 自动绑定
 ^^^^^^^^
 
-显然，手动列出所有 C 语言定义并且包装它们是乏味的，并且容易出错。
+显然，手动列出所有 C 语言定义并包装它们是乏味的、且容易出错。
 在 ``newtype`` 构造器中包装所有字面值的工作也令人厌烦。
-这种绑定是一个非常常见的任务，于是 ``hsc2hs`` 提供了便利的语法来自动化进行： ``#enum`` 结构。
+这种绑定是一个非常常见的任务，因此 ``hsc2hs`` 提供了便利的语法来自动化进行： ``#enum`` 结构。
 
 我们可以用以下等效形式替换我们的顶层绑定列表：
 
@@ -453,15 +452,14 @@ C 语言预处理完成后，我们现在需要实际创建一个 Haskell 源文
                        const char **errptr,
                        int *erroffset,
                        const unsigned char *tableptr); 
-**
 
 这个函数将正则表达式模式编译成一些内部格式，它接受模式、一些标志以及返回状态信息的一些变量作为参数。
 
 我们需要找出用来表示每个参数的 Haskell 类型。
-这些类型中的大多数已经由 FFI 标注定义的等价形式所覆盖，并且在 ``Foreign.C.Types`` 中可用。
+这些类型中的大多数已经由 FFI 标准定义的等价形式所覆盖，并且在 ``Foreign.C.Types`` 中可用。
 第一个参数，正则表达式自身，作为一个空结尾的 char 指针传给 C 语言，等价于 Haskell 中的 ``CString`` 类型。
 PCRE 编译器选项，我们已经选用表示为抽象的 newtype ``PCREOption``\，其运行时表示是一个 ``CInt``\。
-由于该表示保障同一，因此我们可以安全地传入 ``newtype``\。
+由于该表示保障同一，因此我们可以安全地传入该 ``newtype``\。
 其他的参数有点复杂，需要一些工作来构造和分解。
 
 第三个参数，一个指向 C 语言字符串的指针，将用作编译表达式时所生成任何错误信息的引用。
@@ -488,17 +486,17 @@ Haskell 中的指针是用于原始地址的堆分配的容器，并且可以使
 
 .. code:: haskell
 
-    -- file: ch17/PCRECompile0.hs
+    -- file: ch17/PCRE-compile0.hs
     type PCRE = ()
 
-[译注：原文代码文件名为 PCRE-compile.hs，根据实际情况改为 PCRECompile0.hs]
+[译注：原文代码文件名为 PCRE-compile.hs，根据实际情况改为 PCRE-compile0.hs]
 
 也就是说，外部数据是一些未知的、不透明的对象，而我们只是将其视为指向 ``()`` 的指针，我们清楚地知道我们永远不会真正解引用该指针。
 这为我们提供了 ``pcre_compile`` 的以下外部导入绑定，它必须在 ``IO`` 中，因为不同的调用它返回的指针会有所不同，即使返回的对象在功能上是等价的：
 
 .. code:: haskell
 
-    -- file: ch17/PCRECompile0.hs
+    -- file: ch17/PCRE-compile0.hs
     foreign import ccall unsafe "pcre.h pcre_compile"
         c_pcre_compile  :: CString
                         -> PCREOption
@@ -507,7 +505,7 @@ Haskell 中的指针是用于原始地址的堆分配的容器，并且可以使
                         -> Ptr Word8
                         -> IO (Ptr PCRE)
 
-[译注：原文代码文件名为 PCRE-compile.hs，根据实际情况改为 PCRECompile0.hs]
+[译注：原文代码文件名为 PCRE-compile.hs，根据实际情况改为 PCRE-compile0.hs]
 
 类型化的指针
 ^^^^^^^^^^^^
@@ -533,7 +531,7 @@ Haskell 中的指针是用于原始地址的堆分配的容器，并且可以使
 这需要 ``EmptyDataDecls`` 语言扩展[译注：新版 ghc-7.6.3/ghc-8.0.2 无需配置此扩展]。
 这种类型显然没有值！
 我们只能构造指向这些值的指针，因为没有具有这种类型的具体值（除了 bottom）。
-[译注：bottom 类型参见第 26 章或者：http://www.haskell.org/haskellwiki/Bottom ]
+[译注：关于 bottom 请参见第 26 章或者：http://www.haskell.org/haskellwiki/Bottom ]
 
 再次重复，我们不能真正对这样的值做任何事情，因为它没有运行时表示。
 以这样的方式使用类型化的指针只是为 C 语言所提供功能之上的 Haskell 层添加安全性的另一种方式。
@@ -579,12 +577,10 @@ Haskell 垃圾回收器已经使管理 Haskell 值的内存的任务很大程度
 
 .. code:: haskell
 
-    -- file: ch17/PCRECompile.hs
+    -- file: ch17/PCRE-compile.hs
     data Regex = Regex !(ForeignPtr PCRE)
                        !ByteString
             deriving (Eq, Ord, Show)
-
-[译注：原文代码文件名为 PCRE-compile.hs，根据实际情况改为 PCRECompile.hs]
 
 这个新的 ``Regex`` 数据类型由两部分组成。
 第一个是抽象的 ``ForeignPtr``\，我们会用它来管理在 C 语言中分配的底层 ``PCRE`` 数据。
@@ -614,10 +610,8 @@ Haskell 垃圾回收器已经使管理 Haskell 值的内存的任务很大程度
 
 .. code:: haskell
 
-    -- file: ch17/PCRECompile.hs
+    -- file: ch17/PCRE-compile.hs
     compile :: ByteString -> [PCREOption] -> Either String Regex
-
-[译注：原文代码文件名为 PCRE-compile.hs，根据实际情况改为 PCRECompile.hs]
 
 输入是一个 ``ByteString``\，可以从 ``Data.ByteString.Char8`` 模块中获得（我们将以此 ``qualified`` 导入来避免名字冲突），它包含正则表达式；以及一个标志列表（或者空列表，如果没有标志可传的话）。
 其结果要么是一个错误字符串，要么是一个新编译的正则表达式。
@@ -663,7 +657,7 @@ Haskell 垃圾回收器已经使管理 Haskell 值的内存的任务很大程度
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 我们可以很高兴地将 ``ByteString`` 数据编排为 C 语言兼容类型，但是 ``pcre_compile`` 函数还需要一些指针与数组来放置它的其他返回值。
-这些只能简单存在，所以我们不需要复杂的分配策略。
+这些都只应该短暂存在，所以我们不需要复杂的分配策略。
 可以使用 ``alloca`` 函数创建这样的短期 C 语言数据：
 
 .. code:: haskell
@@ -676,12 +670,12 @@ Haskell 垃圾回收器已经使管理 Haskell 值的内存的任务很大程度
 这个函数接受一个代码块，该代码块接受一个某种 C 语言类型的指针作为参数。函数会安排用新分配的、未初始化的正确大小的数据调用该代码块。
 这种分配机制将局部堆栈变量镜像到其他语言中。
 一旦参数函数退出就释放所分配的内存。
-以这种方式，我们让低级数据类型在词法作用域分配，保证在退出作用域后释放。
+以这种方式，我们让低级数据类型在词法级作用域分配，保证在退出作用域后释放。
 我们可以用它来分配具有 ``Storable`` 类型类的实例的任何数据类型。
 这样重载分配运算符隐含的一点是分配的数据类型可以根据使用处类型信息推断出来！
 基于我们对该数据使用的函数，Haskell 会知道要分配的内容。
 
-例如，要分配一个指向 ``CString`` 的指针，会通过调用的函数将该指针会更新为指向特定的 ``CString``\，我们在下述伪代码中调用 ``alloca``\：
+例如，要分配一个指向 ``CString`` 的指针，会通过所调用函数将该指针会更新为指向特定的 ``CString``\，我们在下述伪代码中调用 ``alloca``\：
 
 .. code:: haskell
 
@@ -706,7 +700,7 @@ Haskell 垃圾回收器已经使管理 Haskell 值的内存的任务很大程度
 
 .. code:: haskell
 
-    -- file: ch17/PCRECompile.hs
+    -- file: ch17/PCRE-compile.hs
     compile :: ByteString -> [PCREOption] -> Either String Regex
     compile str flags = unsafePerformIO $
       useAsCString str $ \pattern -> do
@@ -720,8 +714,6 @@ Haskell 垃圾回收器已经使管理 Haskell 值的内存的任务很大程度
                 else do
                     reg <- newForeignPtr finalizerFree pcre_ptr -- release with free()
                     return (Right (Regex reg str))
-
-[译注：原文代码文件名为 PCRE-compile.hs，根据实际情况改为 PCRECompile.hs]
 
 仅此而已！
 让我们仔细阅读这里的细节，因为它相当密集。
@@ -748,7 +740,7 @@ Haskell 垃圾回收器已经使管理 Haskell 值的内存的任务很大程度
 
 但是，如果我们知道该 C 语言代码是纯的，那么为什么我们不正好这样声明——通过在导入声明中给它一个纯类型呢？
 因为我们必须为 C 语言函数分配局部内存来用，这必须在 IO monad 中完成，因为这是一个局部的副作用。
-不过这些副作用不会逃脱其外围的外部调用，所以包装的时候我们使用 ``unsafePerformIO`` 来重新引入纯净度。
+不过这些副作用不会逃脱其外围的外部调用，所以包装的时候我们使用 ``unsafePerformIO`` 来重新引入纯度。
 
 ``unsafePerformIO`` 的参数是我们编译函数的实际函数体，它由四部分组成：
 将 Haskell 数据编排为 C 语言形式；
@@ -778,7 +770,7 @@ Haskell 垃圾回收器已经使管理 Haskell 值的内存的任务很大程度
 ::
 
     $ hsc2hs Regex.hsc
-    $ ghci PCRECompile.hs
+    $ ghci PCRE-compile.hs
     
     During interactive linking, GHCi couldn't find the following symbol:
       pcre_compile
@@ -787,7 +779,7 @@ Haskell 垃圾回收器已经使管理 Haskell 值的内存的任务很大程度
     the missing library using the -L/path/to/object/dir and -lmissinglibname
     flags, or simply by naming the relevant files on the GHCi command line.
 
-[译注：原文运行代码为 Regex.hs，根据实际情况改为 PCRECompile.hs]
+[译注：原文运行代码为 Regex.hs，根据实际情况改为 PCRE-compile.hs]
 
 有点可怕。
 当然，这只是因为我们没有将我们想要调用的 C 语言库链接到 Haskell 代码。
@@ -796,7 +788,7 @@ Haskell 垃圾回收器已经使管理 Haskell 值的内存的任务很大程度
 
 ::
 
-    $ ghci PCRECompile.hs -lpcre
+    $ ghci PCRE-compile.hs -lpcre
     *Regex> :m + Data.ByteString.Char8
     *Regex Data.ByteString.Char8> compile (pack "a.*b") []
     Right (Regex 0x00000000028882a0 "a.*b")
@@ -805,18 +797,18 @@ Haskell 垃圾回收器已经使管理 Haskell 值的内存的任务很大程度
     *Regex Data.ByteString.Char8> compile (pack "*") []
     Left "nothing to repeat"
 
-[译注：原文运行代码为 Regex.hs，根据实际情况改为 PCRECompile.hs]
+[译注：原文运行代码为 Regex.hs，根据实际情况改为 PCRE-compile.hs]
 
 
-由 PCRE 库编译的正则表达式会打包成字节串并已编排到 C 语言。
+由 PCRE 库编译的正则表达式会打包成字节串且已编排到 C 语言。
 然后其结果交回给 Haskell，其中使用默认的 ``Show`` 实例显示其结构。
-我们的下一步是使用这些已编译正则表达式来匹配某些字符串。
+我们的下一步是使用这些已编译的正则表达式来匹配某些字符串。
 
 匹配字符串
 ----------
 
 一个好的正则表达式库的第二部分是匹配函数。
-给定一个已编译正则表达式，该函数执行已编译正则表达式与某些输入的匹配，指示它是否匹配以及（如果是）匹配的字符串的哪些部分。
+给定一个已编译的正则表达式，该函数执行已编译正则表达式与某些输入的匹配，指示它是否匹配以及（如果是）匹配的字符串的哪些部分。
 在 PCRE 中，这个函数是 ``pcre_exec``\，其类型为：
 
 .. code:: haskell
@@ -830,10 +822,8 @@ Haskell 垃圾回收器已经使管理 Haskell 值的内存的任务很大程度
                   int *ovector,
                   int ovecsize);
 
-**
-
 最重要的参数是从 ``pcre_compile`` 获取的 ``pcre`` 指针结构输入与主题（subject）字符串。
-其他标志让我们提供簿记结构及返回值的空间。
+其他标志让我们提供簿记结构以及用于返回值的空间。
 我们可以直接将此类型翻译为 Haskell 导入声明：
 
 .. code:: haskell
@@ -888,14 +878,14 @@ PCRE 提供了一个函数 ``pcre_fullinfo`` 用于确定关于正则表达式�
              c_pcre_fullinfo regex_ptr nullPtr info_capturecount n_ptr
              return . fromIntegral =<< peek (n_ptr :: Ptr CInt)
 
-这需要一个原始 PCRE 指针，并为已匹配模式的 ``CInt`` 计数分配空间。
+这接受一个原始 PCRE 指针，并且为已匹配模式的 ``CInt`` 计数分配空间。
 然后我们调用该信息函数，并查看其结果结构，找到一个 ``CInt``\。
 最后，我们将它转换为一个普通的 Haskell ``Int``\，并将它传回给用户。
 
 与子串模式匹配
 ^^^^^^^^^^^^^^
 现在我们来写正则表达式匹配函数。
-用于匹配的 Haskell 类型与编译正则表达式类似：
+用于匹配（的函数）的 Haskell 类型与编译正则表达式类似：
 
 .. code:: haskell
 
@@ -903,7 +893,7 @@ PCRE 提供了一个函数 ``pcre_fullinfo`` 用于确定关于正则表达式�
     match :: Regex -> ByteString -> [PCREExecOption] -> Maybe [ByteString]
 
 该函数是用户将字符串与已编译正则表达式匹配的方式。
-再次，主要的设计点是它是一个纯函数。
+再次重复，主要的设计点是它是一个纯函数。
 匹配是一个纯函数：给定相同的输入正则表达式和主题字符串，它会始终返回相同的已匹配子串。
 我们通过类型签名向用户传达这一信息，表明当你调用此函数时不会发生任何副作用。
 
@@ -911,7 +901,7 @@ PCRE 提供了一个函数 ``pcre_fullinfo`` 用于确定关于正则表达式�
 其结果要么是 ``Nothing`` 值表明根本不匹配，要么刚好（just）是一个已匹配子串的列表。
 我们使用 ``Maybe`` 类型来清楚地指明匹配可能失败的类型。
 通过对输入数据使用严格的 ``ByteString``\，我们可以在无需复制的情况下提取已匹配子串，使接口效率更高。
-如果在输入中匹配子串，则偏移向量将填充成对的到主题字符串的整数偏移量。
+如果在输入中匹配子串，则偏移向量会填充为成对的到主题字符串的整数偏移量。
 我们需要循环遍历这个结果向量、读取偏移量、并在每次循环最后构建 ``ByteString`` 切片。
 
 匹配包装器的实现可以分为三个部分。
@@ -1015,7 +1005,7 @@ PCRE 提供了一个函数 ``pcre_fullinfo`` 用于确定关于正则表达式�
 
 [译注：原文运行代码为 Regex.hs，根据实际情况改为 RegexExec.hs]
 
-事情看起来是合理的。
+事情看起来合情合理。
 现在我们来尝试一些编译与匹配。
 首先，来点容易的：
 
