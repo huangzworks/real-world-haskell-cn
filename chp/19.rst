@@ -384,7 +384,7 @@ I/O异常
 
 这需要使用两个很不常用的Haskell模块: ``Data.Dynamic`` 和 ``Data.Typeable`` 。我们不会讲太多关于这些模块，但是告诉你当你需要制作自己的动态异常类型时，可以使用这些工具。
 
-在 `<第二十一章 使用数据库 http://book.realworldhaskell.org/read/using-databases.html>`_ 中，你会看到HDBC数据库库使用动态异常来表示SQL数据库返回给应用的错误。数据库引擎返回的错误通常有三个组件：一个表示错误码的整数，一个状态，以及一条人类可读的错误消息。在这一章中我们会创建我们自己的HDBC ``SqlError`` 实现。让我们从错误自身的数据结构表示开始：
+在 `第二十一章 使用数据库 <http://book.realworldhaskell.org/read/using-databases.html>`_ 中，你会看到HDBC数据库库使用动态异常来表示SQL数据库返回给应用的错误。数据库引擎返回的错误通常有三个组件：一个表示错误码的整数，一个状态，以及一条人类可读的错误消息。在这一章中我们会创建我们自己的HDBC ``SqlError`` 实现。让我们从错误自身的数据结构表示开始：
 
 .. literalinclude:: /code/ch19/dynexc.hs
 
