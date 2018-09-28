@@ -575,7 +575,7 @@ monad中的错误处理
 .. rubric:: 注
 
 .. [38] 这里我们使用的是整数的除法，因此 50 / 8 显示是 6 而不是 6.25 。在这个例子中我们没有使用浮点算术是因为对一个 ``Double`` 除以零会返回一个特殊的 ``Infinity`` 而不是一个错误。
-.. [39] 关于 ``Maybe`` 的介绍，参考`<让过程更可控的方法 http://rwh.readthedocs.org/en/latest/chp/3.html#id21>`_
-.. [40] 更多关于 ``Either`` 的信息，参考`<通过 API 设计进行错误处理 http://rwh.readthedocs.org/en/latest/chp/8.html#api>`_
+.. [39] 关于 ``Maybe`` 的介绍，参考 `让过程更可控的方法 <http://rwh.readthedocs.org/en/latest/chp/3.html#id21>`_
+.. [40] 更多关于 ``Either`` 的信息，参考 `通过 API 设计进行错误处理 <http://rwh.readthedocs.org/en/latest/chp/8.html#api>`_
 .. [41] 在一些其它语言中，抛出异常是叫做 raising 。
 .. [42] 可以手动继承 ``Typeable`` 实例，但是那样很麻烦。
