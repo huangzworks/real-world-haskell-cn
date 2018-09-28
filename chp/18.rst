@@ -120,8 +120,8 @@ Monad和Monad变换器中的模式
     -- file: ch18/UglyStack.hs
     import System.Directory
     import System.FilePath
-    import System.Monad.Reader
-    import System.Monad.State
+    import Control.Monad.Reader
+    import Control.Monad.State
 
     data AppConfig = AppConfig
       { cfgMaxDepth :: Int

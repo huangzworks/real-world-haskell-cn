@@ -384,7 +384,7 @@ I/O异常
 
 这需要使用两个很不常用的Haskell模块: ``Data.Dynamic`` 和 ``Data.Typeable`` 。我们不会讲太多关于这些模块，但是告诉你当你需要制作自己的动态异常类型时，可以使用这些工具。
 
-在 `<第二十一章 使用数据库 http://book.realworldhaskell.org/read/using-databases.html>`_ 中，你会看到HDBC数据库库使用动态异常来表示SQL数据库返回给应用的错误。数据库引擎返回的错误通常有三个组件：一个表示错误码的整数，一个状态，以及一条人类可读的错误消息。在这一章中我们会创建我们自己的HDBC ``SqlError`` 实现。让我们从错误自身的数据结构表示开始：
+在 `第二十一章 使用数据库 <http://book.realworldhaskell.org/read/using-databases.html>`_ 中，你会看到HDBC数据库库使用动态异常来表示SQL数据库返回给应用的错误。数据库引擎返回的错误通常有三个组件：一个表示错误码的整数，一个状态，以及一条人类可读的错误消息。在这一章中我们会创建我们自己的HDBC ``SqlError`` 实现。让我们从错误自身的数据结构表示开始：
 
 .. literalinclude:: /code/ch19/dynexc.hs
 
@@ -575,7 +575,7 @@ monad中的错误处理
 .. rubric:: 注
 
 .. [38] 这里我们使用的是整数的除法，因此 50 / 8 显示是 6 而不是 6.25 。在这个例子中我们没有使用浮点算术是因为对一个 ``Double`` 除以零会返回一个特殊的 ``Infinity`` 而不是一个错误。
-.. [39] 关于 ``Maybe`` 的介绍，参考`<让过程更可控的方法 http://rwh.readthedocs.org/en/latest/chp/3.html#id21>`_
-.. [40] 更多关于 ``Either`` 的信息，参考`<通过 API 设计进行错误处理 http://rwh.readthedocs.org/en/latest/chp/8.html#api>`_
+.. [39] 关于 ``Maybe`` 的介绍，参考 `让过程更可控的方法 <http://rwh.readthedocs.org/en/latest/chp/3.html#id21>`_
+.. [40] 更多关于 ``Either`` 的信息，参考 `通过 API 设计进行错误处理 <http://rwh.readthedocs.org/en/latest/chp/8.html#api>`_
 .. [41] 在一些其它语言中，抛出异常是叫做 raising 。
 .. [42] 可以手动继承 ``Typeable`` 实例，但是那样很麻烦。
