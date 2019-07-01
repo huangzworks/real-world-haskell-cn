@@ -1,0 +1,33 @@
+{
+ "embeddedFonts": [
+   "chinese.msyh.ttf"
+ ],
+ "fontsAlias": {
+  "stdFont": "Microsoft YaHei",
+  "stdBold": "Microsoft YaHei",
+  "stdItalic": "Microsoft YaHei",
+  "stdBoldItalic": "Microsoft YaHei",
+  "stdMono": "Microsoft YaHei",
+  "stdMonoBold": "Microsoft YaHei",
+  "stdMonoItalic": "Microsoft YaHei",
+  "stdMonoBoldItalic": "Microsoft YaHei",
+  "stdSans": "Microsoft YaHei",
+  "stdSansBold": "Microsoft YaHei",
+  "stdSansItalic": "Microsoft YaHei",
+  "stdSansBoldItalic": "Microsoft YaHei"
+ },
+ "styles": [
+  [
+   "base",
+   {
+    "wordWrap": "CJK"
+   }
+  ],
+  [
+   "literal",
+   {
+    "wordWrap": "None"
+   }
+  ]
+ ]
+}
