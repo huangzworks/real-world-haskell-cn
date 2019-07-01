@@ -25,7 +25,16 @@ import sys, os
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = []
+# extensions = []
+extensions = ['rst2pdf.pdfbuilder']
+
+pdf_documents = [('index', u'Real_World_Haskell_zh_cn', u'Real World Haskell 中文版', u'jiahut@gmail.com'),]
+pdf_language = "zh_CN"
+pdf_fit_mode = "shrink"
+pdf_toc_depth = 2
+pdf_fit_background_mode = 'scale'
+pdf_stylesheets = ['a3','zh_CN']
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
