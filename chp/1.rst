@@ -146,7 +146,7 @@ prelude模块中的类型，值和函数是默认直接可用的，在使用之�
         precedence parsing error
             cannot mix `(+)' [infixl 6] and prefix `-' [infixl 6] in the same infix expression
 
-如果需要在一个中缀操作符附近使用一元操作符，则需要将一元操作符以及其操作数包含的括号内。
+如果需要在一个中缀操作符附近使用一元操作符，则需要将一元操作符以及其操作数包含在括号内。
 
 ::
 
