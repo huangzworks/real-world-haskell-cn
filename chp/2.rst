@@ -581,6 +581,7 @@ Haskell 不使用 ``return`` 关键字来返回函数值：因为一个函数就
 
 ::
 
+    ghci> :load myDrop.hs
     [1 of 1] Compiling Main             ( myDrop.hs, interpreted )
     Ok, modules loaded: Main.
 
