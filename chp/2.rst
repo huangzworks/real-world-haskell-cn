@@ -581,6 +581,7 @@ Haskell 不使用 ``return`` 关键字来返回函数值：因为一个函数就
 
 ::
 
+    ghci> :load myDrop.hs
     [1 of 1] Compiling Main             ( myDrop.hs, interpreted )
     Ok, modules loaded: Main.
 
@@ -680,7 +681,7 @@ Haskell 不使用 ``return`` 关键字来返回函数值：因为一个函数就
 
     def myDrop(n, elts):
         while n > 0 and elts:
-            n = n -1
+            n = n - 1
             elts = elts[1:]
         return elts
 
@@ -832,6 +833,10 @@ Haskell 使用了另外一种求值方式 —— *非严格*\ 求值。在这种
 
     *Main> :type (1 - 1) <= 0
     (1 - 1) <= 0 :: Bool
+    *Main> 1 - 1
+    0
+    *Main> 0 <= 0
+    True
 
 最终，我们得出了一个 ``True`` 值！
 
