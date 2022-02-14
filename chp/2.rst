@@ -681,7 +681,7 @@ Haskell 不使用 ``return`` 关键字来返回函数值：因为一个函数就
 
     def myDrop(n, elts):
         while n > 0 and elts:
-            n = n -1
+            n = n - 1
             elts = elts[1:]
         return elts
 
